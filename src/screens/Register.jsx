@@ -26,26 +26,15 @@ function Register({ onFinish, onBack }) {
 
     try {
       if (mode === 'signup') {
-        const { data, error: authError } = await supabase.auth.signUp({
+        const { error: authError } = await supabase.auth.signUp({
           email,
           password,
         })
 
         if (authError) throw authError
 
-        if (data.user) {
-          const { error: profileError } = await supabase
-            .from('profiles')
-            .insert([
-              {
-                user_id: data.user.id,
-                full_name: '',
-                user_type: 'neighbor',
-              },
-            ])
-
-          if (profileError) throw profileError
-        }
+        // El perfil se crea solo, con el trigger de Supabase (on_auth_user_created).
+        // No hay que insertarlo acá: duplicaba el perfil y rompía el UNIQUE de user_id.
 
         onFinish()
       } else {
@@ -65,7 +54,7 @@ function Register({ onFinish, onBack }) {
   }
 
   const handleGoogleLogin = () => {
-    alert('🚀 Login con Google disponible próximamente')
+    alert('Login con Google disponible próximamente')
   }
 
   return (

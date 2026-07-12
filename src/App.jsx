@@ -17,26 +17,25 @@ import TabBar from './components/TabBar'
 import Barrio from './screens/Barrio'
 import ChatList from './screens/ChatList'
 
-
 const Icon = {
   Building: ({ size = 34, color = '#9ca3af' }) => (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <rect x="4" y="2" width="16" height="20" rx="2"/>
-      <path d="M10 22v-4h4v4"/>
+      <rect x="4" y="2" width="16" height="20" rx="2" />
+      <path d="M10 22v-4h4v4" />
     </svg>
   ),
   Message: ({ size = 34, color = '#9ca3af' }) => (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+      <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
     </svg>
   ),
   Alert: ({ size = 34, color = '#9ca3af' }) => (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-      <circle cx="12" cy="12" r="10"/>
-      <line x1="12" y1="8" x2="12" y2="12"/>
-      <line x1="12" y1="16" x2="12.01" y2="16"/>
+      <circle cx="12" cy="12" r="10" />
+      <line x1="12" y1="8" x2="12" y2="12" />
+      <line x1="12" y1="16" x2="12.01" y2="16" />
     </svg>
-  )
+  ),
 }
 
 export default function App() {
@@ -45,6 +44,7 @@ export default function App() {
   const [selectedPostId, setSelectedPostId] = useState(null)
   const [selectedSellerId, setSelectedSellerId] = useState(null)
   const [currentUser, setCurrentUser] = useState(null)
+  const [profile, setProfile] = useState(null)
   const [loading, setLoading] = useState(true)
   const [showCreate, setShowCreate] = useState(false)
 
@@ -56,30 +56,70 @@ export default function App() {
         setCurrentUser({ id: session.user.id, email: session.user.email })
       } else {
         setCurrentUser(null)
+        setProfile(null)
       }
     })
 
     return () => subscription.unsubscribe()
   }, [])
 
+  /* ============================================================
+     DECIDE DÓNDE ENTRA EL USUARIO SEGÚN EL ESTADO DE SU PERFIL.
+     Antes se iba directo a 'main' con solo tener sesión: se podía
+     entrar a la app sin nombre, sin RUT y sin verificar.
+     ============================================================ */
   const checkSession = async () => {
     const { data: { session } } = await supabase.auth.getSession()
 
-    if (session?.user) {
-      setCurrentUser({ id: session.user.id, email: session.user.email })
-      setCurrentScreen('main')
-    } else {
+    if (!session?.user) {
       setCurrentScreen('splash')
+      setLoading(false)
+      return
+    }
+
+    setCurrentUser({ id: session.user.id, email: session.user.email })
+
+    const { data: p } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('user_id', session.user.id)
+      .maybeSingle()
+
+    setProfile(p || null)
+
+    // Falta completar los datos personales
+    if (!p || !p.full_name || !p.rut) {
+      setCurrentScreen('profile')
+    }
+    // Datos listos, pero la ubicación no está confirmada → puerta cerrada
+    else if (p.verification_status !== 'verified') {
+      setCurrentScreen('verification')
+    }
+    // Todo listo
+    else {
+      setCurrentScreen('main')
     }
 
     setLoading(false)
   }
 
+  const recargarPerfil = async () => {
+    if (!currentUser?.id) return null
+    const { data: p } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('user_id', currentUser.id)
+      .maybeSingle()
+    setProfile(p || null)
+    return p
+  }
+
   const handleLogout = async () => {
     await supabase.auth.signOut()
     setCurrentUser(null)
+    setProfile(null)
     setActiveTab('feed')
-    setCurrentScreen('register')
+    setCurrentScreen('splash')
   }
 
   const flowScreens = ['splash', 'onboarding', 'register', 'profile', 'verification', 'complete']
@@ -90,34 +130,31 @@ export default function App() {
     if (screen === 'ProductDetail' && params.postId) {
       setSelectedPostId(params.postId)
       setCurrentScreen('productDetail')
-    }
-    else if (screen === 'Chat' && params.postId && params.sellerId) {
+    } else if (screen === 'Chat' && params.postId && params.sellerId) {
       setSelectedPostId(params.postId)
       setSelectedSellerId(params.sellerId)
       setCurrentScreen('chatConversation')
-    }
-    else if (screen === 'ChatConversation') {
+    } else if (screen === 'ChatConversation') {
       setSelectedPostId(params.postId || null)
       setSelectedSellerId(params.otherUserId)
       setCurrentScreen('chatConversation')
-    }
-    else if (screen === 'DealDone') {
+    } else if (screen === 'DealDone') {
       setSelectedPostId(params.postId)
       setSelectedSellerId(params.sellerId)
       setCurrentScreen('dealDone')
-    }
-    else if (screen === 'back') {
+    } else if (screen === 'Perfil') {
+      setActiveTab('profile')
+      setCurrentScreen('main')
+    } else if (screen === 'back') {
       if (currentScreen === 'dealDone') setCurrentScreen('chatConversation')
       else if (currentScreen === 'chatConversation') setCurrentScreen('productDetail')
       else setCurrentScreen('main')
-    }
-    else if (screen === 'home') {
+    } else if (screen === 'home') {
       setActiveTab('feed')
       setCurrentScreen('main')
       setSelectedPostId(null)
       setSelectedSellerId(null)
-    }
-    else {
+    } else {
       console.log(`Navegación a ${screen} no implementada`)
     }
   }
@@ -133,17 +170,61 @@ export default function App() {
 
     if (currentScreen === 'splash') return <Splash onFinish={() => setCurrentScreen('onboarding')} />
     if (currentScreen === 'onboarding') return <Onboarding onFinish={() => setCurrentScreen('register')} />
-    if (currentScreen === 'register') return <Register onFinish={() => setCurrentScreen('profile')} onBack={() => setCurrentScreen('onboarding')} />
-    if (currentScreen === 'profile') return <Profile onFinish={() => setCurrentScreen('verification')} onBack={() => setCurrentScreen('register')} />
-    if (currentScreen === 'verification') return <Verification onFinish={() => setCurrentScreen('complete')} onBack={() => setCurrentScreen('profile')} />
-    if (currentScreen === 'complete') return <Complete onFinish={() => setCurrentScreen('main')} />
+
+    if (currentScreen === 'register') {
+      return (
+        <Register
+          onFinish={async () => {
+            // checkSession decide sola dónde entra:
+            //   sin datos  -> profile
+            //   sin verificar -> verification (cuenta en espera)
+            //   verificado -> main
+            await checkSession()
+          }}
+          onBack={() => setCurrentScreen('onboarding')}
+        />
+      )
+    }
+
+    if (currentScreen === 'profile') {
+      return (
+        <Profile
+          onFinish={async () => {
+            await recargarPerfil()
+            setCurrentScreen('verification')
+          }}
+          onBack={handleLogout}
+        />
+      )
+    }
+
+    if (currentScreen === 'verification') {
+      // isPending = ya se había registrado antes y volvió sin verificar
+      const isPending = !!profile?.address && profile?.verification_status !== 'verified'
+      return (
+        <Verification
+          profile={profile}
+          isPending={isPending}
+          onFinish={async () => {
+            await recargarPerfil()
+            setCurrentScreen('complete')
+          }}
+          onBack={handleLogout}
+          onLogout={handleLogout}
+        />
+      )
+    }
+
+    if (currentScreen === 'complete') {
+      return <Complete onFinish={() => setCurrentScreen('main')} />
+    }
 
     if (currentScreen === 'productDetail') return <ProductDetail postId={selectedPostId} currentUser={currentUser} onNavigate={onNavigate} />
     if (currentScreen === 'chatConversation') return <ChatConversation postId={selectedPostId} sellerId={selectedSellerId} currentUser={currentUser} onNavigate={onNavigate} />
     if (currentScreen === 'dealDone') return <DealDone postId={selectedPostId} sellerId={selectedSellerId} currentUser={currentUser} onNavigate={onNavigate} />
 
     if (!currentUser) {
-      return <Register onFinish={() => setCurrentScreen('profile')} onBack={() => setCurrentScreen('onboarding')} />
+      return <Register onFinish={() => checkSession()} onBack={() => setCurrentScreen('onboarding')} />
     }
 
     if (activeTab === 'feed') return <Feed currentUser={currentUser} onNavigate={onNavigate} />
@@ -159,9 +240,7 @@ export default function App() {
     <div className="phone-frame">
       <div className="phone-notch"></div>
 
-      <div className="phone-content">
-        {renderScreen()}
-      </div>
+      <div className="phone-content">{renderScreen()}</div>
 
       {isMainApp && currentUser && (
         <TabBar
@@ -177,7 +256,7 @@ export default function App() {
           top: 0, left: 0, right: 0, bottom: 0,
           background: '#f4f7f4',
           zIndex: 9999,
-          overflow: 'hidden'
+          overflow: 'hidden',
         }}>
           <CreatePost
             onClose={() => setShowCreate(false)}
@@ -195,14 +274,12 @@ function PlaceholderScreen({ title, icon = 'alert' }) {
   const iconMap = {
     building: <Icon.Building />,
     message: <Icon.Message />,
-    alert: <Icon.Alert />
+    alert: <Icon.Alert />,
   }
 
   return (
     <div style={s.wrap}>
-      <div style={s.iconBox}>
-        {iconMap[icon] || <Icon.Alert />}
-      </div>
+      <div style={s.iconBox}>{iconMap[icon] || <Icon.Alert />}</div>
       <h2 style={s.title}>{title}</h2>
       <p style={s.text}>Próximamente</p>
     </div>
@@ -219,7 +296,7 @@ const s = {
     textAlign: 'center',
     padding: 40,
     backgroundColor: '#f4f7f4',
-    fontFamily: 'system-ui, -apple-system, sans-serif'
+    fontFamily: 'system-ui, -apple-system, sans-serif',
   },
   iconBox: {
     width: 74,
@@ -230,18 +307,8 @@ const s = {
     alignItems: 'center',
     justifyContent: 'center',
     boxShadow: '0 2px 8px rgba(0,0,0,0.05)',
-    marginBottom: 18
+    marginBottom: 18,
   },
-  title: {
-    fontSize: 22,
-    fontWeight: 800,
-    margin: 0,
-    marginBottom: 8,
-    color: '#111'
-  },
-  text: {
-    color: '#6b7280',
-    fontSize: 14,
-    margin: 0
-  }
+  title: { fontSize: 22, fontWeight: 800, margin: 0, marginBottom: 8, color: '#111' },
+  text: { color: '#6b7280', fontSize: 14, margin: 0 },
 }

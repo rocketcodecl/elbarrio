@@ -100,6 +100,10 @@ function Profile({ onFinish, onBack }) {
       setError('El RUT ingresado no es válido')
       return
     }
+    if (phone.replace(/\D/g, '').length < 8) {
+      setError('Ingresa tu teléfono. Los vecinos lo necesitan para contactarte.')
+      return
+    }
 
     setLoading(true)
 
@@ -143,7 +147,11 @@ function Profile({ onFinish, onBack }) {
 
       onFinish()
     } catch (err) {
-      setError(err.message)
+      if (err.code === '23505' && err.message?.includes('rut')) {
+        setError('Ese RUT ya está registrado en El Barrio. Cada persona puede tener una sola cuenta.')
+      } else {
+        setError(err.message)
+      }
     } finally {
       setLoading(false)
     }
@@ -191,8 +199,16 @@ function Profile({ onFinish, onBack }) {
               )}
             </div>
           )}
-          <label htmlFor="avatar-upload" style={styles.cameraButton}>
-            <span style={{ fontSize: 16 }}>📷</span>
+          <label htmlFor="avatar-upload" style={{
+            ...styles.cameraButton,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}>
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ display: 'block' }}>
+              <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+              <circle cx="12" cy="13" r="4" />
+            </svg>
           </label>
           <input
             id="avatar-upload"
@@ -210,9 +226,14 @@ function Profile({ onFinish, onBack }) {
       {/* FORMULARIO */}
       <div style={styles.form}>
         <div style={styles.inputGroup}>
-          <label style={styles.label}>Nombre y apellido</label>
+          <label style={styles.label}>Escribe tu nombre y tu apellido</label>
           <div style={styles.inputWrapper}>
-            <span style={styles.inputIcon}>👤</span>
+            <span style={styles.inputIcon}>
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+    <circle cx="12" cy="7" r="4" />
+  </svg>
+</span>
             <input
               type="text"
               placeholder="Ej: Carlos Mendoza"
@@ -237,7 +258,15 @@ function Profile({ onFinish, onBack }) {
             ...styles.inputWrapper,
             borderColor: rutValid === true ? '#138864' : rutValid === false ? '#E63946' : '#E5E7EB',
           }}>
-            <span style={styles.inputIcon}>🪪</span>
+            <span style={styles.inputIcon}>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <rect x="2" y="4" width="20" height="16" rx="2" />
+          <circle cx="8.5" cy="11" r="2" />
+          <path d="M5.5 17a3.5 3.5 0 0 1 6 0" />
+          <line x1="15" y1="10" x2="19" y2="10" />
+          <line x1="15" y1="14" x2="19" y2="14" />
+        </svg>
+      </span>
             <input
               type="text"
               placeholder="12.345.678-9"
@@ -252,12 +281,17 @@ function Profile({ onFinish, onBack }) {
           </p>
         </div>
 
-        <div style={styles.inputGroup}>
+       <div style={styles.inputGroup}>
           <label style={styles.label}>
-            Teléfono <span style={styles.optional}>(opcional)</span>
+            Teléfono
           </label>
           <div style={styles.inputWrapper}>
-            <span style={styles.inputIcon}>📱</span>
+            <span style={styles.inputIcon}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="5" y="2" width="14" height="20" rx="2" />
+                <line x1="12" y1="18" x2="12.01" y2="18" />
+              </svg>
+            </span>
             <span style={styles.phonePrefix}>+56 9</span>
             <input
               type="tel"
@@ -272,7 +306,16 @@ function Profile({ onFinish, onBack }) {
 
         {error && (
           <div style={styles.errorBox}>
-            ⚠️ {error}
+            {error && (
+  <div style={{ ...styles.error, display: 'flex', alignItems: 'center', gap: 8 }}>
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+      <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+      <line x1="12" y1="9" x2="12" y2="13" />
+      <line x1="12" y1="17" x2="12.01" y2="17" />
+    </svg>
+    <span>{error}</span>
+  </div>
+)}
           </div>
         )}
       </div>

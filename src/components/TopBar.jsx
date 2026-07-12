@@ -18,8 +18,9 @@ import { supabase } from '../lib/supabase'
 */
 
 function TopBar({
-  title = 'Barrio Italia',
-  subtitle = 'Providencia, Santiago',
+  title = 'El Barrio',
+  subtitle = 'Las Condes, Santiago',
+  beta = true,
   notifCount = 0,
   onBell,
   onAvatar,
@@ -74,7 +75,10 @@ function TopBar({
           </svg>
         </span>
         <div style={s.textCol}>
-          <div style={s.title}>{title}</div>
+          <div style={s.titleRow}>
+            <span style={s.title}>{title}</span>
+            {beta && <span style={s.betaPill}>Beta</span>}
+          </div>
           <div style={s.subtitle}>{subtitle}</div>
         </div>
       </div>
@@ -122,6 +126,19 @@ const s = {
   left: { display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 },
   pin: { color: VERDE, display: 'flex', flexShrink: 0 },
   textCol: { display: 'flex', flexDirection: 'column', minWidth: 0 },
+  titleRow: { display: 'flex', alignItems: 'center', gap: 7, minWidth: 0 },
+  betaPill: {
+    fontSize: 9.5,
+    fontWeight: 800,
+    letterSpacing: 0.4,
+    color: '#fff',
+    background: VERDE,
+    padding: '3px 7px',
+    borderRadius: 6,
+    textTransform: 'uppercase',
+    flexShrink: 0,
+    lineHeight: 1.3,
+  },
   title: {
     fontSize: 17,
     fontWeight: 800,
