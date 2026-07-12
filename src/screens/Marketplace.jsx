@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabase";
+import TopBar from "../components/TopBar";
 
 // ===== ICONOS =====
 const Icon = {
@@ -28,7 +29,7 @@ const Icon = {
       <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/>
     </svg>
   ),
-  Star: ({ size = 11, color = "#e11d48" }) => (
+  Star: ({ size = 11, color = "#f59e0b" }) => (
     <svg width={size} height={size} viewBox="0 0 24 24" fill={color} stroke={color} strokeWidth="1">
       <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
     </svg>
@@ -43,17 +44,27 @@ const Icon = {
       <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/>
     </svg>
   ),
-  Bell: ({ size = 22, color = "#16a34a" }) => (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/>
-    </svg>
-  ),
-  PinHeader: ({ size = 22, color = "#16a34a" }) => (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/>
-    </svg>
-  )
 };
+
+// ============================================================
+// TIPOS: incluyen los que escribe CreatePost (sell / gift / trade)
+// y los antiguos en español, para no perder los posts semilla.
+// ============================================================
+const TABS = [
+  { id: "venta",       label: "Venta",   icon: Icon.Tag,  alts: ["venta", "vender", "vende", "sell", "sale"] },
+  { id: "regalo",      label: "Regalos", icon: Icon.Gift, alts: ["regalo", "regalar", "regala", "gift", "free"] },
+  { id: "intercambio", label: "Trueque", icon: Icon.Swap, alts: ["intercambio", "intercambiar", "trueque", "swap", "trade"] },
+];
+
+// ============================================================
+// CATEGORÍAS: deben ser EXACTAMENTE las mismas que CreatePost.jsx
+// Si se cambian aquí, hay que cambiarlas allá. Y viceversa.
+// ============================================================
+const CATEGORIES = [
+  "Todo",
+  "Muebles", "Tecnología", "Bicicletas", "Herramientas",
+  "Ropa", "Mascotas", "Libros", "Deportes", "Hogar", "Otro",
+];
 
 export default function Marketplace({ currentUser, onNavigate }) {
   const [activeTab, setActiveTab] = useState("venta");
@@ -61,14 +72,6 @@ export default function Marketplace({ currentUser, onNavigate }) {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("Todo");
-
-  const tabs = [
-    { id: "venta", label: "Venta", icon: Icon.Tag, alts: ["venta", "vender", "vende", "sell", "sale"] },
-    { id: "regalo", label: "Regalos", icon: Icon.Gift, alts: ["regalo", "regalar", "regala", "gift", "free"] },
-    { id: "intercambio", label: "Trueque", icon: Icon.Swap, alts: ["intercambio", "intercambiar", "trueque", "swap"] },
-  ];
-
-  const categories = ["Todo", "Muebles", "Ropa", "Tecnología", "Electrónica", "Hogar", "Deportes", "Libros", "Juguetes", "Otros"];
 
   const nav = onNavigate || (() => {});
 
@@ -78,13 +81,16 @@ export default function Marketplace({ currentUser, onNavigate }) {
 
   const fetchMarketplace = async () => {
     setLoading(true);
-    const currentTab = tabs.find(t => t.id === activeTab);
+    const currentTab = TABS.find((t) => t.id === activeTab);
 
-    let query = supabase.from("posts").select(`
+    let query = supabase
+      .from("posts")
+      .select(`
         *,
         author:profiles!author_id (full_name, avatar_url, reputation_score, badge_founder, badge_trusted_seller)
       `)
       .in("type", currentTab.alts)
+      .eq("status", "active")
       .order("created_at", { ascending: false });
 
     if (category !== "Todo") query = query.eq("category", category);
@@ -98,132 +104,153 @@ export default function Marketplace({ currentUser, onNavigate }) {
 
   const getInitials = (name) => {
     if (!name) return "??";
-    return name.split(' ').map(n => n[0]).slice(0,2).join('').toUpperCase();
+    return name.split(" ").map((n) => n[0]).slice(0, 2).join("").toUpperCase();
   };
 
   const getPriceLabel = (post) => {
-    if (tabs[1].alts.includes(post.type)) return "Gratis";
-    if (tabs[2].alts.includes(post.type)) return "Trueque";
-    return post.price ? `$${Number(post.price).toLocaleString('es-CL')}` : "Consultar";
+    if (TABS[1].alts.includes(post.type)) return "Gratis";
+    if (TABS[2].alts.includes(post.type)) return "Trueque";
+    return post.price ? `$${Number(post.price).toLocaleString("es-CL")}` : "Consultar";
   };
 
+  // Distancia REAL o nada. Nunca inventada.
+  // Si no hay distance_meters (todavía no hay GPS), no se muestra la píldora.
   const getDistance = (post) => {
-    const meters = post.distance_meters || Math.floor(Math.random() * 900) + 100;
-    if (meters < 1000) return `${meters}m`;
-    return `${(meters/1000).toFixed(1)}km`;
+    const m = post.distance_meters;
+    if (!m && m !== 0) return null;
+    return m < 1000 ? `${m}m` : `${(m / 1000).toFixed(1)}km`;
   };
 
-  const FeaturedCard = ({ post }) => (
-    <div style={s.featuredCard} onClick={() => nav('ProductDetail', { postId: post.id })}>
-      <div style={s.featuredImgBox}>
-        {post.images?.[0] ? (
-          <img src={post.images[0]} style={s.featuredImg} alt="" />
-        ) : (
-          <div style={s.noImg}><Icon.Box size={60} /></div>
-        )}
-        <div style={s.distancePill}>
-          <Icon.Pin />
-          <span>{getDistance(post)}</span>
-        </div>
+  const Reputacion = ({ author, small }) => {
+    const score = Number(author?.reputation_score);
+    const val = Number.isFinite(score) ? score.toFixed(1) : "0.0";
+    return (
+      <div style={small ? s.scoreRowSm : s.scoreRow}>
+        <Icon.Star size={small ? 9 : 11} />
+        <span style={small ? s.scoreTextSm : s.scoreText}>
+          {small ? `Score: ${val}` : `Reputación: ${val}`}
+        </span>
       </div>
-      <div style={s.featuredBody}>
-        <div style={s.featuredTitleRow}>
-          <div style={s.featuredTitle}>{post.title || post.content?.slice(0,50)}</div>
-          <div style={s.featuredPrice}>{getPriceLabel(post)}</div>
-        </div>
-        <div style={s.divider} />
-        <div style={s.authorBlock}>
-          {post.author?.avatar_url ? (
-            <img src={post.author.avatar_url} style={s.avatarMd} alt="" />
-          ) : (
-            <div style={s.avatarMdFallback}>{getInitials(post.author?.full_name)}</div>
-          )}
-          <div>
-            <div style={s.authorNameRow}>
-              <span style={s.authorNameMd}>{post.author?.full_name?.split(' ')[0] || 'Vecino'}</span>
-              {post.author?.badge_founder && <Icon.Verified />}
-            </div>
-            <div style={s.scoreRow}>
-              <Icon.Star />
-              <span style={s.scoreText}>Neighbor Score: {post.author?.reputation_score || '0.0'}</span>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
+    );
+  };
 
-  const NormalCard = ({ post }) => (
-  <div style={s.card} onClick={() => nav('ProductDetail', { postId: post.id })}>
-    <div style={s.imgBox}>
-      {post.images?.[0] ? (
-        <img src={post.images[0]} style={s.img} alt="" />
-      ) : (
-        <div style={s.noImg}><Icon.Box /></div>
-      )}
-      <div style={s.distancePillSm}>
-        <Icon.Pin size={10} />
-        <span>{getDistance(post)}</span>
-      </div>
-    </div>
-    <div style={s.cardBody}>
-      <div style={s.postTitle}>{post.title || post.content?.slice(0,40)}</div>
-      <div style={s.priceSm}>{getPriceLabel(post)}</div>
-      <div style={s.dividerSm} />
-      <div style={s.authorBlockSm}>
-        {post.author?.avatar_url ? (
-          <img src={post.author.avatar_url} style={s.avatarSm} alt="" />
-        ) : (
-          <div style={s.avatarSmFallback}>{getInitials(post.author?.full_name)}</div>
-        )}
-        <div style={{ minWidth: 0, flex: 1 }}>
-          <div style={s.authorNameRowSm}>
-            <span style={s.authorNameSm}>{post.author?.full_name?.split(' ')[0] || 'Vecino'}</span>
-            {post.author?.badge_founder && <Icon.Verified size={10} />}
+  const FeaturedCard = ({ post }) => {
+    const dist = getDistance(post);
+    return (
+      <div style={s.featuredCard} onClick={() => nav("ProductDetail", { postId: post.id })}>
+        <div style={s.featuredImgBox}>
+          {post.images?.[0] ? (
+            <img src={post.images[0]} style={s.featuredImg} alt="" />
+          ) : (
+            <div style={s.noImg}><Icon.Box size={60} /></div>
+          )}
+          {dist && (
+            <div style={s.distancePill}>
+              <Icon.Pin />
+              <span>{dist}</span>
+            </div>
+          )}
+        </div>
+
+        <div style={s.featuredBody}>
+          <div style={s.featuredTitleRow}>
+            <div style={s.featuredTitle}>{post.title || post.content?.slice(0, 50)}</div>
+            <div style={s.featuredPrice}>{getPriceLabel(post)}</div>
           </div>
-          <div style={s.scoreRowSm}>
-            <Icon.Star size={9} />
-            <span style={s.scoreTextSm}>Score: {post.author?.reputation_score || '0.0'}</span>
+
+          {post.type === "trade" && post.looking_for && (
+            <div style={s.lookingFor}>Busca a cambio: {post.looking_for}</div>
+          )}
+
+          <div style={s.divider} />
+
+          <div style={s.authorBlock}>
+            {post.author?.avatar_url ? (
+              <img src={post.author.avatar_url} style={s.avatarMd} alt="" />
+            ) : (
+              <div style={s.avatarMdFallback}>{getInitials(post.author?.full_name)}</div>
+            )}
+            <div>
+              <div style={s.authorNameRow}>
+                <span style={s.authorNameMd}>
+                  {post.author?.full_name?.split(" ")[0] || "Vecino"}
+                </span>
+                {post.author?.badge_founder && <Icon.Verified />}
+              </div>
+              <Reputacion author={post.author} />
+            </div>
           </div>
         </div>
       </div>
-    </div>
-  </div>
-);
+    );
+  };
+
+  const NormalCard = ({ post }) => {
+    const dist = getDistance(post);
+    return (
+      <div style={s.card} onClick={() => nav("ProductDetail", { postId: post.id })}>
+        <div style={s.imgBox}>
+          {post.images?.[0] ? (
+            <img src={post.images[0]} style={s.img} alt="" />
+          ) : (
+            <div style={s.noImg}><Icon.Box /></div>
+          )}
+          {dist && (
+            <div style={s.distancePillSm}>
+              <Icon.Pin size={10} />
+              <span>{dist}</span>
+            </div>
+          )}
+        </div>
+
+        <div style={s.cardBody}>
+          <div style={s.postTitle}>{post.title || post.content?.slice(0, 40)}</div>
+          <div style={s.priceSm}>{getPriceLabel(post)}</div>
+          <div style={s.dividerSm} />
+
+          <div style={s.authorBlockSm}>
+            {post.author?.avatar_url ? (
+              <img src={post.author.avatar_url} style={s.avatarSm} alt="" />
+            ) : (
+              <div style={s.avatarSmFallback}>{getInitials(post.author?.full_name)}</div>
+            )}
+            <div style={{ minWidth: 0, flex: 1 }}>
+              <div style={s.authorNameRowSm}>
+                <span style={s.authorNameSm}>
+                  {post.author?.full_name?.split(" ")[0] || "Vecino"}
+                </span>
+                {post.author?.badge_founder && <Icon.Verified size={10} />}
+              </div>
+              <Reputacion author={post.author} small />
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
 
   const featured = posts[0];
   const rest = posts.slice(1);
 
   return (
     <div style={s.wrap}>
-      {/* HEADER FIJO (sticky) */}
+      {/* ===== TOP FIJO ===== */}
       <div style={s.stickyTop}>
-        <div style={s.header}>
-          <div style={s.headerTop}>
-            <div style={s.headerLeft}>
-              <Icon.PinHeader />
-            </div>
-            <img src="/isotipo.png" alt="" style={s.isoLogo} />
-            <div style={s.headerRight}>
-              <button style={s.bellBtn}>
-                <Icon.Bell />
-              </button>
-            </div>
-          </div>
-          <div style={s.searchWrap}>
-            <div style={s.searchIcon}><Icon.Search /></div>
-            <input
-              placeholder="¿Qué estás buscando en el barrio?"
-              style={s.search}
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && fetchMarketplace()}
-            />
-          </div>
+        <TopBar notifCount={3} onAvatar={() => nav("Perfil")} />
+
+        <div style={s.searchWrap}>
+          <div style={s.searchIcon}><Icon.Search /></div>
+          <input
+            placeholder="¿Qué estás buscando en el barrio?"
+            style={s.search}
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && fetchMarketplace()}
+          />
         </div>
 
         <div style={s.tabRow}>
-          {tabs.map(tab => {
+          {TABS.map((tab) => {
             const TabIcon = tab.icon;
             const active = activeTab === tab.id;
             return (
@@ -232,11 +259,11 @@ export default function Marketplace({ currentUser, onNavigate }) {
                 onClick={() => { setActiveTab(tab.id); setCategory("Todo"); }}
                 style={{
                   ...s.tab,
-                  color: active ? '#16a34a' : '#888',
-                  borderBottom: active ? '3px solid #16a34a' : '3px solid transparent'
+                  color: active ? "#16a34a" : "#888",
+                  borderBottom: active ? "3px solid #16a34a" : "3px solid transparent",
                 }}
               >
-                <TabIcon size={14} color={active ? '#16a34a' : '#888'} />
+                <TabIcon size={14} color={active ? "#16a34a" : "#888"} />
                 <span>{tab.label}</span>
               </button>
             );
@@ -244,11 +271,11 @@ export default function Marketplace({ currentUser, onNavigate }) {
         </div>
       </div>
 
-      {/* SCROLL AREA */}
+      {/* ===== SCROLL ===== */}
       <div style={s.scrollArea}>
         <div style={s.catWrap}>
           <div style={s.catScroll}>
-            {categories.map(cat => {
+            {CATEGORIES.map((cat) => {
               const active = category === cat;
               return (
                 <button
@@ -256,9 +283,9 @@ export default function Marketplace({ currentUser, onNavigate }) {
                   onClick={() => setCategory(cat)}
                   style={{
                     ...s.catBtn,
-                    backgroundColor: active ? '#16a34a' : '#fff',
-                    color: active ? '#fff' : '#555',
-                    border: active ? 'none' : '1px solid #e5e5e5'
+                    backgroundColor: active ? "#16a34a" : "#fff",
+                    color: active ? "#fff" : "#555",
+                    border: active ? "none" : "1px solid #e5e5e5",
                   }}
                 >
                   {cat}
@@ -273,21 +300,25 @@ export default function Marketplace({ currentUser, onNavigate }) {
             <>
               <div style={s.skeletonFeatured} />
               <div style={s.grid}>
-                {[1,2,3,4].map(i => <div key={i} style={s.skeleton} />)}
+                {[1, 2, 3, 4].map((i) => <div key={i} style={s.skeleton} />)}
               </div>
             </>
           ) : posts.length === 0 ? (
             <div style={s.empty}>
               <img src="/isotipo.png" alt="" style={{ width: 90, height: 90, opacity: 0.5, marginBottom: 16 }} />
-              <div style={{fontWeight:600, marginBottom:4, color:'#111'}}>Nada por aquí todavía</div>
-              <div style={{fontSize:13, color:'#888'}}>Sé el primero en publicar algo en tu barrio</div>
+              <div style={{ fontWeight: 600, marginBottom: 4, color: "#111" }}>
+                Nada por aquí todavía
+              </div>
+              <div style={{ fontSize: 13, color: "#888" }}>
+                Sé el primero en publicar algo en tu barrio
+              </div>
             </div>
           ) : (
             <>
               {featured && <FeaturedCard post={featured} />}
               {rest.length > 0 && (
                 <div style={s.grid}>
-                  {rest.map(post => <NormalCard key={post.id} post={post} />)}
+                  {rest.map((post) => <NormalCard key={post.id} post={post} />)}
                 </div>
               )}
             </>
@@ -300,269 +331,211 @@ export default function Marketplace({ currentUser, onNavigate }) {
 
 const s = {
   wrap: {
-    width: '100%',
-    height: '100%',
-    backgroundColor: '#f4f7f4',
-    fontFamily: 'system-ui, -apple-system, sans-serif',
-    overflow: 'hidden',
-    boxSizing: 'border-box',
-    display: 'flex',
-    flexDirection: 'column'
+    width: "100%",
+    height: "100%",
+    backgroundColor: "#f4f7f4",
+    fontFamily: "system-ui, -apple-system, sans-serif",
+    overflow: "hidden",
+    boxSizing: "border-box",
+    display: "flex",
+    flexDirection: "column",
   },
 
-  // ==== STICKY TOP ====
   stickyTop: {
     flexShrink: 0,
-    backgroundColor: '#f4f7f4',
-    paddingTop: 44,
+    backgroundColor: "#fff",
     zIndex: 10,
-    boxShadow: '0 2px 8px rgba(0,0,0,0.03)'
+    boxShadow: "0 2px 8px rgba(0,0,0,0.04)",
   },
-  header: {
-    padding: '14px 16px 16px'
-  },
-  headerTop: {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 16
-  },
-  headerLeft: { width: 40, display: 'flex', alignItems: 'center' },
-  headerRight: { width: 40, display: 'flex', justifyContent: 'flex-end' },
-  isoLogo: { height: 32, objectFit: 'contain' },
-  bellBtn: {
-    background: 'none',
-    border: 'none',
-    cursor: 'pointer',
-    padding: 4,
-    display: 'flex'
-  },
-  searchWrap: { position: 'relative' },
+
+  searchWrap: { position: "relative", margin: "14px 16px 4px" },
   searchIcon: {
-    position: 'absolute', left: 16, top: '50%', transform: 'translateY(-50%)',
-    display: 'flex', alignItems: 'center'
+    position: "absolute", left: 16, top: "50%", transform: "translateY(-50%)",
+    display: "flex", alignItems: "center",
   },
   search: {
-    width: '100%',
-    padding: '13px 16px 13px 44px',
+    width: "100%",
+    padding: "13px 16px 13px 44px",
     borderRadius: 30,
-    border: 'none',
+    border: "1px solid #ececec",
     fontSize: 14,
-    outline: 'none',
-    backgroundColor: '#fff',
-    boxSizing: 'border-box',
-    boxShadow: '0 1px 3px rgba(0,0,0,0.05)'
+    outline: "none",
+    backgroundColor: "#f9fafb",
+    boxSizing: "border-box",
   },
-  tabRow: {
-    display: 'flex',
-    padding: '0 8px 4px'
-  },
+
+  tabRow: { display: "flex", padding: "6px 8px 0" },
   tab: {
     flex: 1,
-    padding: '10px 4px',
-    border: 'none',
-    background: 'none',
-    cursor: 'pointer',
+    padding: "10px 4px",
+    border: "none",
+    background: "none",
+    cursor: "pointer",
     fontSize: 13,
     fontWeight: 600,
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    fontFamily: "inherit",
   },
 
-  // ==== SCROLL AREA ====
   scrollArea: {
     flex: 1,
-    overflowY: 'auto',
-    overflowX: 'hidden',
-    WebkitOverflowScrolling: 'touch'
+    overflowY: "auto",
+    overflowX: "hidden",
+    WebkitOverflowScrolling: "touch",
   },
 
-  catWrap: {
-    padding: '12px 0'
-  },
+  catWrap: { padding: "12px 0" },
   catScroll: {
-    display: 'flex',
+    display: "flex",
     gap: 8,
-    overflowX: 'auto',
-    padding: '0 16px',
-    scrollbarWidth: 'none',
-    WebkitOverflowScrolling: 'touch'
+    overflowX: "auto",
+    padding: "0 16px",
+    scrollbarWidth: "none",
+    WebkitOverflowScrolling: "touch",
   },
   catBtn: {
-    padding: '8px 18px',
+    padding: "8px 18px",
     borderRadius: 24,
-    whiteSpace: 'nowrap',
+    whiteSpace: "nowrap",
     fontSize: 13,
     fontWeight: 600,
-    cursor: 'pointer',
-    flexShrink: 0
+    cursor: "pointer",
+    flexShrink: 0,
+    fontFamily: "inherit",
   },
-  content: { padding: '4px 12px 120px' },
+
+  content: { padding: "4px 12px 120px" },
 
   featuredCard: {
-    backgroundColor: '#fff',
+    backgroundColor: "#fff",
     borderRadius: 18,
-    overflow: 'hidden',
-    boxShadow: '0 2px 10px rgba(0,0,0,0.06)',
-    cursor: 'pointer',
-    marginBottom: 14
+    overflow: "hidden",
+    boxShadow: "0 2px 10px rgba(0,0,0,0.06)",
+    cursor: "pointer",
+    marginBottom: 14,
   },
   featuredImgBox: {
-  position: 'relative',
-  width: '100%',
-  aspectRatio: '16/10',
-  backgroundColor: '#f0f0f0',
-  borderTopLeftRadius: 18,
-  borderTopRightRadius: 18,
-  overflow: 'hidden'
-},
-  featuredImg: { width: '100%', height: '100%', objectFit: 'cover', display: 'block', borderTopLeftRadius: 18, borderTopRightRadius: 18 },
-  featuredBody: { padding: '16px 18px 18px' },
+    position: "relative",
+    width: "100%",
+    aspectRatio: "16/10",
+    backgroundColor: "#f0f0f0",
+    borderTopLeftRadius: 18,
+    borderTopRightRadius: 18,
+    overflow: "hidden",
+  },
+  featuredImg: {
+    width: "100%", height: "100%", objectFit: "cover", display: "block",
+  },
+  featuredBody: { padding: "16px 18px 18px" },
   featuredTitleRow: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
     gap: 14,
-    marginBottom: 12
+    marginBottom: 10,
   },
   featuredTitle: {
-    fontSize: 17,
-    fontWeight: 800,
-    color: '#111',
-    lineHeight: 1.25,
-    flex: 1
+    fontSize: 17, fontWeight: 800, color: "#111", lineHeight: 1.25, flex: 1,
   },
   featuredPrice: {
-    fontSize: 17,
-    fontWeight: 800,
-    color: '#16a34a',
-    whiteSpace: 'nowrap'
+    fontSize: 17, fontWeight: 800, color: "#16a34a", whiteSpace: "nowrap",
   },
-  divider: {
-    height: 1,
-    backgroundColor: '#eee',
-    margin: '0 0 12px 0'
+  lookingFor: {
+    fontSize: 12.5,
+    color: "#c2410c",
+    fontWeight: 600,
+    background: "#ffedd5",
+    padding: "6px 10px",
+    borderRadius: 8,
+    marginBottom: 12,
+    display: "inline-block",
   },
-  authorBlock: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: 10
-  },
-  avatarMd: { width: 30, height: 30, borderRadius: '50%', objectFit: 'cover' },
+  divider: { height: 1, backgroundColor: "#eee", margin: "0 0 12px 0" },
+
+  authorBlock: { display: "flex", alignItems: "center", gap: 10 },
+  avatarMd: { width: 30, height: 30, borderRadius: "50%", objectFit: "cover" },
   avatarMdFallback: {
-    width: 30, height: 30, borderRadius: '50%',
-    backgroundColor: '#16a34a', color: '#fff',
+    width: 30, height: 30, borderRadius: "50%",
+    backgroundColor: "#16a34a", color: "#fff",
     fontSize: 12, fontWeight: 700,
-    display: 'flex', alignItems: 'center', justifyContent: 'center'
+    display: "flex", alignItems: "center", justifyContent: "center",
   },
-  authorNameRow: { display: 'flex', alignItems: 'center', gap: 5 },
-  authorNameMd: { fontSize: 14, fontWeight: 700, color: '#111' },
-  scoreRow: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: 4,
-    marginTop: 2
-  },
-  scoreText: { fontSize: 11, color: '#888', fontWeight: 500 },
+  authorNameRow: { display: "flex", alignItems: "center", gap: 5 },
+  authorNameMd: { fontSize: 14, fontWeight: 700, color: "#111" },
+  scoreRow: { display: "flex", alignItems: "center", gap: 4, marginTop: 2 },
+  scoreText: { fontSize: 11, color: "#888", fontWeight: 500 },
 
   distancePill: {
-    position: 'absolute',
-    top: 12,
-    right: 12,
-    backgroundColor: '#fff',
-    color: '#111',
-    padding: '6px 12px',
-    borderRadius: 20,
-    fontSize: 12,
-    fontWeight: 700,
-    display: 'flex',
-    alignItems: 'center',
-    gap: 4,
-    boxShadow: '0 2px 6px rgba(0,0,0,0.1)'
+    position: "absolute", top: 12, right: 12,
+    backgroundColor: "#fff", color: "#111",
+    padding: "6px 12px", borderRadius: 20,
+    fontSize: 12, fontWeight: 700,
+    display: "flex", alignItems: "center", gap: 4,
+    boxShadow: "0 2px 6px rgba(0,0,0,0.1)",
   },
   distancePillSm: {
-    position: 'absolute',
-    top: 8,
-    left: 8,
-    backgroundColor: '#fff',
-    color: '#111',
-    padding: '4px 9px',
-    borderRadius: 20,
-    fontSize: 11,
-    fontWeight: 700,
-    display: 'flex',
-    alignItems: 'center',
-    gap: 3,
-    boxShadow: '0 1px 4px rgba(0,0,0,0.1)'
+    position: "absolute", top: 8, left: 8,
+    backgroundColor: "#fff", color: "#111",
+    padding: "4px 9px", borderRadius: 20,
+    fontSize: 11, fontWeight: 700,
+    display: "flex", alignItems: "center", gap: 3,
+    boxShadow: "0 1px 4px rgba(0,0,0,0.1)",
   },
 
-  grid: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 },
+  grid: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 },
   card: {
-    backgroundColor: '#fff',
+    backgroundColor: "#fff",
     borderRadius: 16,
-    overflow: 'hidden',
-    boxShadow: '0 2px 8px rgba(0,0,0,0.05)',
-    cursor: 'pointer',
-    display: 'flex',
-    flexDirection: 'column'
+    overflow: "hidden",
+    boxShadow: "0 2px 8px rgba(0,0,0,0.05)",
+    cursor: "pointer",
+    display: "flex",
+    flexDirection: "column",
   },
-  imgBox: { position: 'relative', width: '100%', aspectRatio: '1/1', backgroundColor: '#f0f0f0' },
-  img: { width: '100%', height: '100%', objectFit: 'cover', display: 'block' },
-  noImg: { width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' },
-  cardBody: { padding: '10px 12px 12px' },
+  imgBox: {
+    position: "relative", width: "100%", aspectRatio: "1/1", backgroundColor: "#f0f0f0",
+  },
+  img: { width: "100%", height: "100%", objectFit: "cover", display: "block" },
+  noImg: {
+    width: "100%", height: "100%",
+    display: "flex", alignItems: "center", justifyContent: "center",
+  },
+  cardBody: { padding: "10px 12px 12px" },
   postTitle: {
-    fontSize: 13,
-    fontWeight: 700,
-    color: '#111',
-    marginBottom: 6,
-    minHeight: 34,
-    lineHeight: '17px',
-    overflow: 'hidden',
-    display: '-webkit-box',
-    WebkitLineClamp: 2,
-    WebkitBoxOrient: 'vertical'
+    fontSize: 13, fontWeight: 700, color: "#111",
+    marginBottom: 6, minHeight: 34, lineHeight: "17px",
+    overflow: "hidden", display: "-webkit-box",
+    WebkitLineClamp: 2, WebkitBoxOrient: "vertical",
   },
-  priceSm: {
-    fontSize: 15,
-    fontWeight: 800,
-    color: '#16a34a',
-    marginBottom: 10
-  },
-  authorRowSm: { display: 'flex', alignItems: 'center', gap: 6 },
-  avatar: { width: 20, height: 20, borderRadius: '50%', objectFit: 'cover' },
-  avatarFallback: {
-    width: 20, height: 20, borderRadius: '50%',
-    backgroundColor: '#16a34a', color: '#fff',
+  priceSm: { fontSize: 15, fontWeight: 800, color: "#16a34a", marginBottom: 10 },
+
+  dividerSm: { height: 1, backgroundColor: "#eee", margin: "0 0 8px 0" },
+  authorBlockSm: { display: "flex", alignItems: "center", gap: 6 },
+  avatarSm: { width: 22, height: 22, borderRadius: "50%", objectFit: "cover" },
+  avatarSmFallback: {
+    width: 22, height: 22, borderRadius: "50%",
+    backgroundColor: "#16a34a", color: "#fff",
     fontSize: 9, fontWeight: 700,
-    display: 'flex', alignItems: 'center', justifyContent: 'center'
+    display: "flex", alignItems: "center", justifyContent: "center",
   },
-  authorName: { fontSize: 12, color: '#555', fontWeight: 600 },
+  authorNameRowSm: { display: "flex", alignItems: "center", gap: 4 },
+  authorNameSm: { fontSize: 12, fontWeight: 700, color: "#111" },
+  scoreRowSm: { display: "flex", alignItems: "center", gap: 3, marginTop: 1 },
+  scoreTextSm: { fontSize: 10, color: "#888", fontWeight: 500 },
 
   skeletonFeatured: {
-    width: '100%',
-    aspectRatio: '16/13',
-    backgroundColor: '#e8e8e8',
-    borderRadius: 18,
-    marginBottom: 14
+    width: "100%", aspectRatio: "16/13",
+    backgroundColor: "#e8e8e8", borderRadius: 18, marginBottom: 14,
   },
-
-  dividerSm: { height: 1, backgroundColor: '#eee', margin: '0 0 8px 0' },
-  authorBlockSm: { display: 'flex', alignItems: 'center', gap: 6 },
-  avatarSm: { width: 22, height: 22, borderRadius: '50%', objectFit: 'cover' },
-  avatarSmFallback: {
-    width: 22, height: 22, borderRadius: '50%',
-    backgroundColor: '#16a34a', color: '#fff',
-    fontSize: 9, fontWeight: 700,
-    display: 'flex', alignItems: 'center', justifyContent: 'center'
+  skeleton: {
+    width: "100%", aspectRatio: "1/1.4",
+    backgroundColor: "#e8e8e8", borderRadius: 16,
   },
-  authorNameRowSm: { display: 'flex', alignItems: 'center', gap: 4 },
-  authorNameSm: { fontSize: 12, fontWeight: 700, color: '#111' },
-  scoreRowSm: { display: 'flex', alignItems: 'center', gap: 3, marginTop: 1 },
-  scoreTextSm: { fontSize: 10, color: '#888', fontWeight: 500 
+  empty: {
+    textAlign: "center", padding: "60px 20px", color: "#666",
+    display: "flex", flexDirection: "column", alignItems: "center",
   },
-
-  skeleton: { width: '100%', aspectRatio: '1/1.4', backgroundColor: '#e8e8e8', borderRadius: 16 },
-  empty: { textAlign: 'center', padding: '60px 20px', color: '#666', display: 'flex', flexDirection: 'column', alignItems: 'center' }
 };

@@ -105,6 +105,7 @@ export default function ChatConversation({ postId, sellerId, currentUser, onNavi
     .from("messages")
     .update({ read: true })
     .eq("post_id", postId)
+    .eq("sender_id", sellerId)
     .eq("receiver_id", currentUser.id)
     .eq("read", false)
     .select();
