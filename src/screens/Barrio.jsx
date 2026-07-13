@@ -1,6 +1,9 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import MiniMap from '../components/MiniMap'
+import CommerceForm from '../components/CommerceForm'
+import PromoForm from '../components/PromoForm'
+import { textoEstado, estadoComercio } from '../lib/horarios'
 
 // ===== ICONOS UI =====
 const Icon = {
@@ -275,6 +278,23 @@ const TOP_KEYS = ['gasfiter', 'electrico', 'aseo', 'jardinero', 'mascotas', 'pin
 const getRubro = (key) => RUBROS.find(r => r.key === key)
 
 // ===== CATEGORÍAS DE REPORTE =====
+Icon.StoreBig = ({ size = 26, color = 'currentColor' }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M3 9l1.5-5h15L21 9"/><path d="M4 9v11a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1V9"/>
+    <path d="M3 9a3 3 0 0 0 6 0 3 3 0 0 0 6 0 3 3 0 0 0 6 0"/>
+    <path d="M9 21v-6h6v6"/>
+  </svg>
+)
+Icon.Spark = ({ size = 13, color = 'currentColor' }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M12 3l1.9 5.6L19.5 10l-5.6 1.9L12 17.5l-1.9-5.6L4.5 10l5.6-1.4z"/>
+  </svg>
+)
+Icon.Plus = ({ size = 16, color = 'currentColor' }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+    <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+  </svg>
+)
 Icon.Edit = ({ size = 15, color = 'currentColor' }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
@@ -363,6 +383,14 @@ function Barrio({ currentUser, onNavigate }) {
   const [editText, setEditText] = useState('')
   const [confirmDelete, setConfirmDelete] = useState(null)
 
+  // Comercios REALES
+  const [comercios, setComercios] = useState([])
+  const [loadingComercios, setLoadingComercios] = useState(true)
+  const [editCommerce, setEditCommerce] = useState(null)   // objeto o 'nuevo'
+  const [selectedCommerce, setSelectedCommerce] = useState(null)
+  const [promos, setPromos] = useState([])                 // promos activas del barrio
+  const [editPromo, setEditPromo] = useState(null)         // {commerce} o promo
+
   // Reportes reales de vecinos (tabla incident_reports)
   const [incidents, setIncidents] = useState([])
   const [myConfirms, setMyConfirms] = useState([])   // ids que YO ya confirmé
@@ -372,6 +400,9 @@ function Barrio({ currentUser, onNavigate }) {
 
   useEffect(() => { loadProfile() }, [currentUser?.id])
   useEffect(() => { if (currentProfile?.id) fetchIncidents() }, [currentProfile?.id])
+  useEffect(() => {
+    if (currentProfile?.neighborhood_id) { fetchComercios(); fetchPromos() }
+  }, [currentProfile?.neighborhood_id])
 
   const loadProfile = async () => {
     if (!currentUser?.id) return
@@ -542,6 +573,67 @@ function Barrio({ currentUser, onNavigate }) {
     } finally {
       setConfirming(null)
     }
+  }
+
+  /* Comercios del barrio. Los destacados (is_premium) primero, después
+     los abiertos ahora. El que paga sube, pero NUNCA excluye al que no paga. */
+  const fetchComercios = async () => {
+    if (!currentProfile?.neighborhood_id) return
+    setLoadingComercios(true)
+    try {
+      const { data, error } = await supabase
+        .from('commerces')
+        .select('*')
+        .eq('neighborhood_id', currentProfile.neighborhood_id)
+        .eq('is_active', true)
+        .order('is_premium', { ascending: false })
+        .order('name', { ascending: true })
+
+      if (error) throw error
+
+      const lista = (data || []).sort((a, b) => {
+        if (a.is_premium !== b.is_premium) return a.is_premium ? -1 : 1
+        const oa = estadoComercio(a.opening_hours).open
+        const ob = estadoComercio(b.opening_hours).open
+        if (oa !== ob) return oa ? -1 : 1
+        return a.name.localeCompare(b.name)
+      })
+
+      setComercios(lista)
+    } catch (err) {
+      console.error('Error cargando comercios:', err)
+    } finally {
+      setLoadingComercios(false)
+    }
+  }
+
+  /* Promociones activas del barrio. Son TEMPORALES y siempre expiran.
+     No confundir con el Beneficio Vecinal (permanente). */
+  const fetchPromos = async () => {
+    if (!currentProfile?.neighborhood_id) return
+    try {
+      const { data, error } = await supabase
+        .from('commerce_promos')
+        .select('*, commerce:commerces (name, cover_url, category)')
+        .eq('neighborhood_id', currentProfile.neighborhood_id)
+        .eq('is_active', true)
+        .gt('expires_at', new Date().toISOString())
+        .order('expires_at', { ascending: true })
+
+      if (error) throw error
+      setPromos(data || [])
+    } catch (err) {
+      console.error('Error cargando promos:', err)
+    }
+  }
+
+  const promosDe = (commerceId) => promos.filter(p => p.commerce_id === commerceId)
+
+  const quedanHoras = (fecha) => {
+    const h = Math.floor((new Date(fecha) - Date.now()) / 3600000)
+    if (h <= 0) return null
+    if (h < 24) return `Termina en ${h}h`
+    return `Quedan ${Math.floor(h / 24)} días`
   }
 
   const tiempoRelativo = (fecha) => {
@@ -1011,44 +1103,267 @@ function Barrio({ currentUser, onNavigate }) {
     )
   }
 
-  const renderComercio = (item) => (
-    <div key={item.id} style={s.card}>
-      {item.image && (
-        <div style={s.comercioImgWrap}>
-          <img src={item.image} alt="" style={s.comercioImg} />
-          <span style={{
-            ...s.openChip,
-            backgroundColor: item.open ? 'rgba(22,163,74,0.95)' : 'rgba(120,120,120,0.9)'
-          }}>
-            {item.open ? `Abierto · cierra ${item.closesAt}` : 'Cerrado'}
-          </span>
+  /* Tarjeta COMPACTA. El detalle completo va en el modal.
+     Mismo patrón que Servicios: lista navegable, no un muro. */
+  const renderComercio = (item) => {
+    const estado = estadoComercio(item.opening_hours)
+    const esAdmin = currentProfile?.user_type === 'admin'
+    const misPromos = promosDe(item.id)
+    const cats = (item.categories?.length ? item.categories : [item.category]).filter(Boolean)
+
+    return (
+      <div key={item.id} style={s.comCard} onClick={() => setSelectedCommerce(item)}>
+        <div style={s.comThumbWrap}>
+          {item.logo_url || item.cover_url ? (
+            <img src={item.logo_url || item.cover_url} alt="" style={s.comThumb} />
+          ) : (
+            <div style={s.comThumbEmpty}>
+              <Icon.StoreBig size={24} color="#c7cdc7" />
+            </div>
+          )}
+          {item.is_premium && <span style={s.comPremiumDot} />}
         </div>
-      )}
-      <div style={{ padding: item.image ? '12px 4px 4px' : 0 }}>
-        <div style={s.comercioTitleRow}>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={s.cardTitle}>{item.name}</div>
-            <div style={s.comercioCat}>{item.category}</div>
+
+        <div style={s.comInfo}>
+          <div style={s.comNameRow}>
+            <span style={s.comName}>{item.name}</span>
+            {item.is_premium && <Icon.VerifiedGold size={13} />}
           </div>
-          <Icon.ChevronRight />
-        </div>
-        <div style={s.comercioMetaRow}>
-          <Icon.PinSm />
-          <span style={s.metaText}>{item.address}</span>
-          <span style={s.dotSep}>·</span>
-          <Icon.Star />
-          <span style={s.ratingText}>{item.rating}</span>
-          <span style={s.reviewsText}>({item.reviews})</span>
-        </div>
-        {item.benefit && (
-          <div style={s.benefitCard}>
-            <span style={s.benefitLabel}>Beneficio Vecinal</span>
-            <span style={s.benefitText}>{item.benefit}</span>
+
+          <div style={s.comCats}>{cats.join(' · ')}</div>
+
+          <div style={s.comStatusRow}>
+            <span style={{
+              ...s.comDot,
+              backgroundColor: estado.open ? '#22c55e' : '#c7cdc7',
+            }} />
+            <span style={{
+              ...s.comStatusText,
+              color: estado.open ? '#16a34a' : '#9ca3af',
+            }}>
+              {estado.open
+                ? `Abierto · cierra ${estado.closesAt}`
+                : textoEstado(item.opening_hours)}
+            </span>
           </div>
+
+          {misPromos.length > 0 && (
+            <div style={s.comPromoRow}>
+              <Icon.Spark size={11} />
+              <span style={s.comPromoText}>
+                {misPromos.length === 1 ? misPromos[0].title : `${misPromos.length} promociones hoy`}
+              </span>
+            </div>
+          )}
+
+          {item.discount_text && (
+            <div style={s.comBenefitRow}>
+              <span style={s.comBenefitLabel}>VECINOS</span>
+              <span style={s.comBenefitText}>{item.discount_text}</span>
+            </div>
+          )}
+        </div>
+
+        {esAdmin && (
+          <button
+            style={s.comEditBtn}
+            onClick={(e) => { e.stopPropagation(); setEditCommerce(item) }}
+          >
+            <Icon.Edit size={14} />
+          </button>
         )}
       </div>
-    </div>
-  )
+    )
+  }
+
+  /* MODAL: la ficha completa del comercio */
+  const renderCommerceModal = () => {
+    if (!selectedCommerce) return null
+    const item = selectedCommerce
+    const estado = estadoComercio(item.opening_hours)
+    const esAdmin = currentProfile?.user_type === 'admin'
+    const misPromos = promosDe(item.id)
+    const cats = (item.categories?.length ? item.categories : [item.category]).filter(Boolean)
+
+    const openWhatsApp = () => {
+      if (!item.phone) return
+      window.open(`https://wa.me/${item.phone.replace(/[^0-9]/g, '')}`, '_blank')
+    }
+
+    return (
+      <div style={s.modalBackdrop} onClick={() => setSelectedCommerce(null)}>
+        <div style={s.modalSheet} onClick={(e) => e.stopPropagation()}>
+
+          <div style={s.modalHeaderImg}>
+            {item.cover_url ? (
+              <img src={item.cover_url} alt="" style={s.modalCoverImg} />
+            ) : (
+              <div style={{
+                ...s.modalCoverImg,
+                backgroundColor: '#eef0ee',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }}>
+                <Icon.StoreBig size={34} color="#c7cdc7" />
+              </div>
+            )}
+            <button style={s.modalClose} onClick={() => setSelectedCommerce(null)}>
+              <Icon.X />
+            </button>
+            {item.is_premium && <span style={s.premiumChip}>DESTACADO</span>}
+
+            <div style={s.comLogoFloat}>
+              {item.logo_url ? (
+                <img src={item.logo_url} alt="" style={s.comLogoImg} />
+              ) : (
+                <div style={s.comLogoFallback}>
+                  {getInitials(item.name)}
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div style={s.modalBody}>
+            <div style={{ height: 42 }} />
+
+            <div style={s.modalName}>{item.name}</div>
+            <div style={s.comercioCat}>{cats.join(' · ')}</div>
+
+            <div style={s.modalStatusRow}>
+              <span style={{
+                ...s.comDot,
+                backgroundColor: estado.open ? '#22c55e' : '#c7cdc7',
+              }} />
+              <span style={{
+                ...s.comStatusText,
+                color: estado.open ? '#16a34a' : '#9ca3af',
+                fontSize: 13,
+              }}>
+                {textoEstado(item.opening_hours)}
+              </span>
+            </div>
+
+            {/* BENEFICIO VECINAL — permanente, la razón para ser vecino */}
+            {item.discount_text && (
+              <div style={s.benefitBig}>
+                <div style={s.benefitBigIcon}>
+                  <Icon.Spark size={17} color="#fff" />
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={s.benefitBigLabel}>Beneficio Vecinal</div>
+                  <div style={s.benefitBigText}>{item.discount_text}</div>
+                  <div style={s.benefitBigSub}>
+                    Solo para vecinos verificados de El Barrio. Siempre.
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* PROMOS ACTIVAS — temporales */}
+            {misPromos.length > 0 && (
+              <div style={s.modalSection}>
+                <div style={s.modalSectionTitle}>Promociones de hoy</div>
+                {misPromos.map((p) => (
+                  <div key={p.id} style={s.promoCard}>
+                    {p.image_url && (
+                      <img src={p.image_url} alt="" style={s.promoImg} />
+                    )}
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={s.promoTitle}>{p.title}</div>
+                      {p.description && (
+                        <div style={s.promoDesc}>{p.description}</div>
+                      )}
+                      <div style={s.promoTime}>{quedanHoras(p.expires_at)}</div>
+                    </div>
+                    {esAdmin && (
+                      <button
+                        style={s.promoEdit}
+                        onClick={() => setEditPromo({ promo: p, commerce: item })}
+                      >
+                        <Icon.Edit size={13} />
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {esAdmin && (
+              <button
+                style={s.addPromoBtn}
+                onClick={() => setEditPromo({ promo: null, commerce: item })}
+              >
+                <Icon.Plus />
+                <span>Agregar una promoción</span>
+              </button>
+            )}
+
+            {item.description && (
+              <div style={s.modalSection}>
+                <div style={s.modalSectionTitle}>Sobre el local</div>
+                <div style={s.modalDescription}>{item.description}</div>
+              </div>
+            )}
+
+            {/* HORARIO */}
+            {item.opening_hours && (
+              <div style={s.modalSection}>
+                <div style={s.modalSectionTitle}>Horario</div>
+                <div style={s.horarioList}>
+                  {[['1','Lunes'],['2','Martes'],['3','Miércoles'],['4','Jueves'],
+                    ['5','Viernes'],['6','Sábado'],['0','Domingo']].map(([k, label]) => {
+                    const h = item.opening_hours[k]
+                    const esHoy = String(new Date().getDay()) === k
+                    return (
+                      <div key={k} style={{
+                        ...s.horarioRow,
+                        fontWeight: esHoy ? 800 : 500,
+                        color: esHoy ? '#111827' : '#6b7280',
+                      }}>
+                        <span>{label}</span>
+                        <span>{h ? `${h.o} - ${h.c}` : 'Cerrado'}</span>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* UBICACIÓN */}
+            {item.address && (
+              <div style={s.modalSection}>
+                <div style={s.modalSectionTitle}>Dónde está</div>
+                <div style={s.modalDescription}>{item.address}</div>
+                {item.lat && (
+                  <div style={{ marginTop: 10 }}>
+                    <MiniMap lat={item.lat} lng={item.lng} height={160} color="#16a34a" />
+                  </div>
+                )}
+              </div>
+            )}
+
+            <div style={s.modalActions}>
+              {esAdmin && (
+                <button
+                  style={s.modalReviewsBtn}
+                  onClick={() => { setSelectedCommerce(null); setEditCommerce(item) }}
+                >
+                  Editar ficha
+                </button>
+              )}
+              <button
+                style={{ ...s.modalPrimaryBtn, opacity: item.phone ? 1 : 0.4 }}
+                onClick={openWhatsApp}
+                disabled={!item.phone}
+              >
+                <Icon.Phone />
+                <span>Contactar por WhatsApp</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   const renderServiceModal = () => {
     if (!selectedService) return null
@@ -1513,7 +1828,36 @@ function Barrio({ currentUser, onNavigate }) {
       )
     }
 
-    if (activeTab === 'comercios') return DEMO_COMERCIOS.map(renderComercio)
+    if (activeTab === 'comercios') {
+      const esAdmin = currentProfile?.user_type === 'admin'
+
+      if (loadingComercios) {
+        return <div style={s.loadingBox}>Cargando comercios...</div>
+      }
+
+      return (
+        <>
+          {esAdmin && (
+            <button style={s.addBtn} onClick={() => setEditCommerce('nuevo')}>
+              <Icon.Plus />
+              <span>Agregar un comercio del barrio</span>
+            </button>
+          )}
+
+          {comercios.length === 0 ? (
+            <div style={s.emptyBox}>
+              <img src="/isotipo.png" alt="" style={s.emptyLogo} />
+              <div style={s.emptyTitle}>Todavía no hay comercios</div>
+              <div style={s.emptyText}>
+                Los locales del barrio van a aparecer acá.
+              </div>
+            </div>
+          ) : (
+            comercios.map(renderComercio)
+          )}
+        </>
+      )
+    }
 
     return null
   }
@@ -1575,6 +1919,27 @@ function Barrio({ currentUser, onNavigate }) {
       {renderServiceModal()}
       {renderAllRubrosModal()}
       {renderReportModal()}
+
+      {renderCommerceModal()}
+
+      {editCommerce && (
+        <CommerceForm
+          commerce={editCommerce === 'nuevo' ? null : editCommerce}
+          neighborhoodId={currentProfile?.neighborhood_id}
+          onClose={() => setEditCommerce(null)}
+          onSaved={fetchComercios}
+        />
+      )}
+
+      {editPromo && (
+        <PromoForm
+          promo={editPromo.promo}
+          commerce={editPromo.commerce}
+          neighborhoodId={currentProfile?.neighborhood_id}
+          onClose={() => setEditPromo(null)}
+          onSaved={fetchPromos}
+        />
+      )}
     </div>
   )
 }
@@ -1660,7 +2025,7 @@ const s = {
 
   comercioImgWrap: { position: 'relative', width: '100%', aspectRatio: '16/9', borderRadius: 12, overflow: 'hidden', backgroundColor: '#f0f0f0' },
   comercioImg: { width: '100%', height: '100%', objectFit: 'cover', display: 'block' },
-  openChip: { position: 'absolute', top: 12, left: 12, color: '#fff', fontSize: 10.5, fontWeight: 700, padding: '5px 10px', borderRadius: 8, backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)' },
+  openChip: { position: 'absolute', bottom: 12, left: 12, color: '#fff', fontSize: 10.5, fontWeight: 700, padding: '6px 11px', borderRadius: 999, backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)', zIndex: 2 },
   comercioTitleRow: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 6 },
   comercioCat: { fontSize: 11.5, color: '#888', fontWeight: 500, marginTop: 2 },
   comercioMetaRow: { display: 'flex', alignItems: 'center', gap: 5, flexWrap: 'wrap', marginBottom: 6 },
@@ -1746,6 +2111,61 @@ const s = {
   confirmedTag: { display: 'flex', alignItems: 'center', gap: 5, marginTop: 10, padding: '5px 10px', backgroundColor: '#dcfce7', borderRadius: 999, alignSelf: 'flex-start', width: 'fit-content' },
   confirmedTagText: { fontSize: 11, fontWeight: 700, color: '#16a34a' },
   vecinoTag: { fontSize: 10.5, color: '#9ca3af', fontWeight: 600, marginTop: 1 },
+  comCard: { display: 'flex', alignItems: 'center', gap: 12, padding: 12, backgroundColor: '#fff', borderRadius: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.05)', marginBottom: 10, cursor: 'pointer', position: 'relative' },
+  comThumbWrap: { position: 'relative', width: 62, height: 62, borderRadius: 12, overflow: 'hidden', flexShrink: 0, backgroundColor: '#eef0ee' },
+  comThumb: { width: '100%', height: '100%', objectFit: 'cover' },
+  comThumbEmpty: { width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' },
+  comPremiumDot: { position: 'absolute', top: 4, right: 4, width: 8, height: 8, borderRadius: '50%', backgroundColor: '#d97706', border: '1.5px solid #fff' },
+  comInfo: { flex: 1, minWidth: 0 },
+  comNameRow: { display: 'flex', alignItems: 'center', gap: 5 },
+  comName: { fontSize: 14.5, fontWeight: 800, color: '#111', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' },
+  comCats: { fontSize: 11.5, color: '#9ca3af', fontWeight: 600, marginTop: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' },
+  comStatusRow: { display: 'flex', alignItems: 'center', gap: 5, marginTop: 5 },
+  comDot: { width: 6, height: 6, borderRadius: '50%', flexShrink: 0 },
+  comStatusText: { fontSize: 11.5, fontWeight: 700 },
+  comPromoRow: { display: 'flex', alignItems: 'center', gap: 5, marginTop: 7, color: '#ea580c' },
+  comPromoText: { fontSize: 11.5, fontWeight: 800, color: '#c2410c', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' },
+  comBenefitRow: { display: 'flex', alignItems: 'center', gap: 7, marginTop: 7, padding: '7px 9px', backgroundColor: '#f0fdf4', borderRadius: 9, border: '1px solid #dcfce7' },
+  comBenefitLabel: { fontSize: 8.5, fontWeight: 900, letterSpacing: 0.5, color: '#fff', backgroundColor: '#16a34a', padding: '3px 6px', borderRadius: 5, flexShrink: 0 },
+  comBenefitText: { fontSize: 11.5, fontWeight: 700, color: '#0f5f36', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' },
+
+  comLogoFloat: { position: 'absolute', bottom: -32, left: 20, width: 68, height: 68, borderRadius: 18, overflow: 'hidden', border: '4px solid #fff', backgroundColor: '#dcfce7', boxShadow: '0 4px 14px rgba(0,0,0,0.12)', zIndex: 3 },
+  comLogoImg: { width: '100%', height: '100%', objectFit: 'cover' },
+  comLogoFallback: { width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, fontWeight: 800, color: '#16a34a' },
+
+  benefitBig: { display: 'flex', alignItems: 'flex-start', gap: 13, padding: '16px 15px', marginTop: 20, background: 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)', border: '1.5px solid #86efac', borderRadius: 16 },
+  benefitBigIcon: { width: 36, height: 36, borderRadius: 11, backgroundColor: '#16a34a', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  benefitBigLabel: { fontSize: 10, fontWeight: 900, letterSpacing: 0.6, color: '#16a34a', textTransform: 'uppercase' },
+  benefitBigText: { fontSize: 17, fontWeight: 800, color: '#0f5f36', marginTop: 3, lineHeight: 1.3 },
+  benefitBigSub: { fontSize: 11.5, color: '#16a34a', marginTop: 5, lineHeight: 1.45, fontWeight: 500 },
+  comEditBtn: { width: 30, height: 30, borderRadius: '50%', backgroundColor: '#f4f7f4', color: '#6b7280', display: 'flex', alignItems: 'center', justifyContent: 'center', border: 'none', cursor: 'pointer', flexShrink: 0 },
+
+  modalStatusRow: { display: 'flex', alignItems: 'center', gap: 6, marginTop: 8 },
+  horarioList: { display: 'flex', flexDirection: 'column', gap: 7 },
+  horarioRow: { display: 'flex', justifyContent: 'space-between', fontSize: 13 },
+
+  promoCard: { display: 'flex', alignItems: 'center', gap: 11, padding: 11, backgroundColor: '#fff7ed', border: '1px solid #fed7aa', borderRadius: 13, marginBottom: 8 },
+  promoImg: { width: 52, height: 52, borderRadius: 10, objectFit: 'cover', flexShrink: 0 },
+  promoTitle: { fontSize: 13.5, fontWeight: 800, color: '#9a3412' },
+  promoDesc: { fontSize: 11.5, color: '#c2410c', marginTop: 2, lineHeight: 1.4 },
+  promoTime: { fontSize: 10.5, fontWeight: 700, color: '#ea580c', marginTop: 4 },
+  promoEdit: { width: 28, height: 28, borderRadius: '50%', backgroundColor: '#fff', color: '#c2410c', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid #fed7aa', cursor: 'pointer', flexShrink: 0 },
+  addPromoBtn: { width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7, padding: '12px', marginTop: 12, background: '#fff', border: '2px dashed #ea580c', borderRadius: 12, color: '#ea580c', fontSize: 12.5, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' },
+
+  addBtn: { width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '14px', marginBottom: 14, background: '#fff', border: '2px dashed #16a34a', borderRadius: 14, color: '#16a34a', fontSize: 13.5, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' },
+  premiumChip: { position: 'absolute', top: 10, left: 10, backgroundColor: 'rgba(217,119,6,0.95)', color: '#fff', fontSize: 9.5, fontWeight: 800, letterSpacing: 0.4, padding: '5px 9px', borderRadius: 999, zIndex: 2 },
+  comercioNoImg: { width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 5, backgroundColor: '#eef0ee' },
+  comercioNoImgText: { fontSize: 11, fontWeight: 600, color: '#c7cdc7' },
+  comercioRating: { display: 'flex', alignItems: 'center', gap: 3, flexShrink: 0, marginLeft: 8 },
+  editFloat: { position: 'absolute', top: 10, right: 10, width: 30, height: 30, borderRadius: '50%', background: 'rgba(255,255,255,0.95)', color: '#374151', display: 'flex', alignItems: 'center', justifyContent: 'center', border: 'none', cursor: 'pointer', boxShadow: '0 2px 6px rgba(0,0,0,0.15)' },
+  comercioDesc: { fontSize: 13, color: '#6b7280', lineHeight: 1.5, marginTop: 6, marginBottom: 2 },
+  waBtn: { width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '12px', marginTop: 12, background: '#25D366', color: '#fff', border: 'none', borderRadius: 12, fontSize: 13.5, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' },
+  loadingBox: { padding: '40px 20px', textAlign: 'center', color: '#9ca3af', fontSize: 13.5, fontWeight: 600 },
+  emptyBox: { padding: '50px 20px', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center' },
+  emptyLogo: { width: 80, height: 80, opacity: 0.45, marginBottom: 14 },
+  emptyTitle: { fontSize: 15, fontWeight: 700, color: '#111827', marginBottom: 5 },
+  emptyText: { fontSize: 13, color: '#9ca3af', lineHeight: 1.5 },
+
   iconAccion: { display: 'flex', alignItems: 'center', justifyContent: 'center', width: 30, height: 30, background: 'transparent', border: 'none', padding: 0, cursor: 'pointer', color: '#9ca3af', flexShrink: 0 },
   lockedTag: { fontSize: 10, fontWeight: 700, color: '#9ca3af', backgroundColor: '#f3f4f6', padding: '4px 8px', borderRadius: 999, whiteSpace: 'nowrap' },
   editBox: { marginTop: 4 },
