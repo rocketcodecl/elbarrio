@@ -573,4 +573,4 @@ const s = {
     fontWeight: 700,
     cursor: 'pointer'
   }
-};
+}; 
