@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
+import MiniMap from '../components/MiniMap'
 
 // ===== ICONOS UI =====
 const Icon = {
@@ -274,6 +275,19 @@ const TOP_KEYS = ['gasfiter', 'electrico', 'aseo', 'jardinero', 'mascotas', 'pin
 const getRubro = (key) => RUBROS.find(r => r.key === key)
 
 // ===== CATEGORÍAS DE REPORTE =====
+Icon.Edit = ({ size = 15, color = 'currentColor' }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+    <path d="M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4z"/>
+  </svg>
+)
+Icon.Trash = ({ size = 15, color = 'currentColor' }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <polyline points="3 6 5 6 21 6"/>
+    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+  </svg>
+)
+
 const REPORT_CATS = [
   { key: 'seguridad', label: 'Seguridad',       color: '#dc2626', bg: '#fee2e2', Icon: Icon.ShieldAlert, desc: 'Robos, peleas, sospechosos' },
   { key: 'salud',     label: 'Salud',           color: '#059669', bg: '#d1fae5', Icon: Icon.HeartPulse,  desc: 'Emergencia, riesgo sanitario' },
@@ -332,9 +346,32 @@ function Barrio({ currentUser, onNavigate }) {
   const [reportCat, setReportCat] = useState(null)
   const [reportText, setReportText] = useState('')
   const [reportAnon, setReportAnon] = useState(false)
+  const [reportError, setReportError] = useState('')
+  const [reportSending, setReportSending] = useState(false)
+  const [reportSent, setReportSent] = useState(false)
+
+  // Ubicación DEL HECHO (nunca la casa del vecino)
+  const [reportLat, setReportLat] = useState(null)
+  const [reportLng, setReportLng] = useState(null)
+  const [reportLocText, setReportLocText] = useState('')
+  const [locState, setLocState] = useState('idle')  // idle | locating | ok | denied | error
+  const [showMapPicker, setShowMapPicker] = useState(false)
+  const [openMapId, setOpenMapId] = useState(null)   // qué incidente muestra su mapa
+  const [myFlags, setMyFlags] = useState([])         // reportes que ya denuncié
+  const [actingOn, setActingOn] = useState(null)     // id en el que estoy operando
+  const [editingId, setEditingId] = useState(null)   // reporte que estoy editando
+  const [editText, setEditText] = useState('')
+  const [confirmDelete, setConfirmDelete] = useState(null)
+
+  // Reportes reales de vecinos (tabla incident_reports)
+  const [incidents, setIncidents] = useState([])
+  const [myConfirms, setMyConfirms] = useState([])   // ids que YO ya confirmé
+  const [confirming, setConfirming] = useState(null)
+
   const notifCount = 3
 
   useEffect(() => { loadProfile() }, [currentUser?.id])
+  useEffect(() => { if (currentProfile?.id) fetchIncidents() }, [currentProfile?.id])
 
   const loadProfile = async () => {
     if (!currentUser?.id) return
@@ -347,13 +384,185 @@ function Barrio({ currentUser, onNavigate }) {
     } catch (err) { console.error(err) }
   }
 
+  /* ============================================================
+     REPORTES DE VECINOS (reales, desde Supabase)
+     Solo del barrio del usuario, activos, de las últimas 24h.
+     ============================================================ */
+  const fetchIncidents = async () => {
+    if (!currentProfile?.neighborhood_id) return
+    try {
+      const { data, error } = await supabase
+        .from('incident_reports')
+        .select('*, reporter:profiles!reporter_id (full_name, avatar_url)')
+        .eq('neighborhood_id', currentProfile.neighborhood_id)
+        .eq('status', 'active')
+        .gt('expires_at', new Date().toISOString())
+        .order('confirms_count', { ascending: false })
+        .order('created_at', { ascending: false })
+
+      if (error) throw error
+      setIncidents(data || [])
+
+      // ¿Cuáles ya confirmé yo?
+      const { data: confirms } = await supabase
+        .from('incident_confirmations')
+        .select('incident_id')
+        .eq('profile_id', currentProfile.id)
+
+      setMyConfirms((confirms || []).map(c => c.incident_id))
+
+      const { data: flags } = await supabase
+        .from('incident_flags')
+        .select('incident_id')
+        .eq('profile_id', currentProfile.id)
+
+      setMyFlags((flags || []).map(f => f.incident_id))
+    } catch (err) {
+      console.error('Error cargando reportes:', err)
+    }
+  }
+
+  /* Marcar como resuelto. Solo el que reportó (o el operador).
+     Un bache arreglado deja de ser una alerta. */
+  const resolveIncident = async (incidentId) => {
+    if (!currentProfile?.id) return
+    setActingOn(incidentId)
+    try {
+      const { error } = await supabase
+        .from('incident_reports')
+        .update({
+          status: 'resolved',
+          resolved_at: new Date().toISOString(),
+          resolved_by: currentProfile.id,
+        })
+        .eq('id', incidentId)
+
+      if (error) throw error
+      await fetchIncidents()
+    } catch (err) {
+      console.error('Error al resolver:', err)
+    } finally {
+      setActingOn(null)
+    }
+  }
+
+  /* Denunciar contenido abusivo. Con 3 denuncias el reporte se oculta solo,
+     a la espera de revisión. No es censura: es un freno para lo obvio. */
+  const flagIncident = async (incidentId) => {
+    if (!currentProfile?.id || myFlags.includes(incidentId)) return
+    setActingOn(incidentId)
+    try {
+      const { error } = await supabase
+        .from('incident_flags')
+        .insert([{ incident_id: incidentId, profile_id: currentProfile.id }])
+
+      if (error && error.code !== '23505') throw error
+
+      setMyFlags(prev => [...prev, incidentId])
+      await fetchIncidents()
+    } catch (err) {
+      console.error('Error al denunciar:', err)
+    } finally {
+      setActingOn(null)
+    }
+  }
+
+  /* Borrar. Siempre se puede: es TU reporte. */
+  const deleteIncident = async (incidentId) => {
+    setActingOn(incidentId)
+    try {
+      const { error } = await supabase
+        .from('incident_reports')
+        .delete()
+        .eq('id', incidentId)
+
+      if (error) throw error
+      setConfirmDelete(null)
+      await fetchIncidents()
+    } catch (err) {
+      console.error('Error al borrar:', err)
+    } finally {
+      setActingOn(null)
+    }
+  }
+
+  /* Editar el texto. SOLO si nadie lo ha confirmado todavía.
+     Si un vecino ya puso la cara por tu reporte, el texto se congela:
+     si no, se podría publicar "perro perdido", juntar 15 confirmaciones,
+     y después cambiar el texto por spam o una acusación con respaldo falso. */
+  const saveEdit = async (incidentId) => {
+    if (!editText.trim()) return
+    setActingOn(incidentId)
+    try {
+      const { error } = await supabase
+        .from('incident_reports')
+        .update({ description: editText.trim() })
+        .eq('id', incidentId)
+
+      if (error) throw error
+      setEditingId(null)
+      setEditText('')
+      await fetchIncidents()
+    } catch (err) {
+      console.error('Error al editar:', err)
+    } finally {
+      setActingOn(null)
+    }
+  }
+
+  const startEdit = (item) => {
+    setEditingId(item.id)
+    setEditText(item.description)
+  }
+
+  const expiraEn = (fecha) => {
+    if (!fecha) return null
+    const hrs = Math.floor((new Date(fecha) - Date.now()) / 3600000)
+    if (hrs <= 0) return null
+    if (hrs < 24) return `Expira en ${hrs}h`
+    return `Expira en ${Math.floor(hrs / 24)}d`
+  }
+
+  /* "Yo también lo veo" — la corroboración vecinal.
+     Es lo que hace creíble un reporte sin necesidad de ninguna autoridad. */
+  const confirmIncident = async (incidentId) => {
+    if (!currentProfile?.id || myConfirms.includes(incidentId)) return
+    setConfirming(incidentId)
+    try {
+      const { error } = await supabase
+        .from('incident_confirmations')
+        .insert([{ incident_id: incidentId, profile_id: currentProfile.id }])
+
+      if (error && error.code !== '23505') throw error   // 23505 = ya lo confirmó
+
+      setMyConfirms(prev => [...prev, incidentId])
+      await fetchIncidents()
+    } catch (err) {
+      console.error('Error al confirmar:', err)
+    } finally {
+      setConfirming(null)
+    }
+  }
+
+  const tiempoRelativo = (fecha) => {
+    const min = Math.floor((Date.now() - new Date(fecha)) / 60000)
+    if (min < 1) return 'Recién'
+    if (min < 60) return `Hace ${min} min`
+    const hrs = Math.floor(min / 60)
+    if (hrs < 24) return `Hace ${hrs}h`
+    return `Hace ${Math.floor(hrs / 24)}d`
+  }
+
   const eventosVigentes = DEMO_EVENTOS
     .filter(e => new Date(e.date) >= new Date(now.toDateString()))
     .sort((a, b) => new Date(a.date) - new Date(b.date))
 
-  const alertasActivas = DEMO_AVISOS.filter(a =>
-    ['corte_agua', 'corte_luz', 'seguridad', 'incidente_reportado'].includes(a.type)
-  ).length
+  // Alertas activas = reportes REALES de vecinos + avisos oficiales urgentes
+  const alertasActivas =
+    incidents.length +
+    DEMO_AVISOS.filter(a =>
+      ['corte_agua', 'corte_luz', 'seguridad'].includes(a.type)
+    ).length
 
   const serviciosFiltrados = servicioCat === 'todos'
     ? DEMO_SERVICIOS
@@ -368,18 +577,80 @@ function Barrio({ currentUser, onNavigate }) {
     { id: 'comercios', label: 'Comercios', Icon: Icon.Store }
   ]
 
+  /* GPS del INCIDENTE. Ojo: es la ubicación del hecho, no la del vecino.
+     Guardar la casa del reportante filtraría su dirección en cada reporte. */
+  const useCurrentLocation = () => {
+    if (!navigator.geolocation) { setLocState('error'); return }
+    setLocState('locating')
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setReportLat(pos.coords.latitude)
+        setReportLng(pos.coords.longitude)
+        setLocState('ok')
+      },
+      (err) => setLocState(err.code === 1 ? 'denied' : 'error'),
+      { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 }
+    )
+  }
+
+  const clearLocation = () => {
+    setReportLat(null)
+    setReportLng(null)
+    setLocState('idle')
+  }
+
   const openReportModal = () => {
     setReportCat(null)
     setReportText('')
     setReportAnon(false)
+    setReportError('')
+    setReportSent(false)
+    setReportLat(null)
+    setReportLng(null)
+    setReportLocText('')
+    setLocState('idle')
+    setShowMapPicker(false)
     setShowReportModal(true)
   }
 
-  const submitReport = () => {
-    if (!reportCat) { alert('Elige una categoría'); return }
-    if (!reportText.trim()) { alert('Describe qué está pasando'); return }
-    alert('Reporte enviado (próximo paso: guardar en Supabase)')
-    setShowReportModal(false)
+  const submitReport = async () => {
+    if (!reportCat) { setReportError('Elige una categoría'); return }
+    if (!reportText.trim()) { setReportError('Describe qué está pasando'); return }
+    if (!reportLocText.trim() && !reportLat) {
+      setReportError('Indica dónde está pasando: usa tu ubicación o escribe la referencia')
+      return
+    }
+    if (!currentProfile?.id) { setReportError('No se encontró tu perfil'); return }
+
+    setReportError('')
+    setReportSending(true)
+
+    try {
+      const { error } = await supabase.from('incident_reports').insert([{
+        reporter_id: currentProfile.id,
+        neighborhood_id: currentProfile.neighborhood_id,
+        category: reportCat,
+        description: reportText.trim(),
+        is_anonymous: reportAnon,
+        lat: reportLat,                       // ubicación DEL HECHO
+        lng: reportLng,
+        location_text: reportLocText.trim() || null,
+        status: 'active',
+      }])
+
+      if (error) throw error
+
+      setReportSent(true)
+      await fetchIncidents()
+      setTimeout(() => {
+        setShowReportModal(false)
+        setReportSent(false)
+      }, 1700)
+    } catch (err) {
+      setReportError(err.message || 'No se pudo enviar el reporte')
+    } finally {
+      setReportSending(false)
+    }
   }
 
   const renderAlertBanner = () => {
@@ -397,6 +668,202 @@ function Barrio({ currentUser, onNavigate }) {
           <Icon.Flag />
           <span style={s.reportBtnText}>Reportar</span>
         </button>
+      </div>
+    )
+  }
+
+  /* Tarjeta de reporte de VECINO. Se ve distinta a un aviso oficial:
+     sin check verde, etiqueta "Reportado por vecinos", y contador de
+     confirmaciones. La credibilidad la dan los vecinos, no la autoridad. */
+  const renderIncidente = (item) => {
+    const cat = REPORT_CATS.find(c => c.key === item.category) || REPORT_CATS[0]
+    const yaConfirme = myConfirms.includes(item.id)
+    const yaDenuncie = myFlags.includes(item.id)
+    const esMio = item.reporter_id === currentProfile?.id
+    const esAdmin = currentProfile?.user_type === 'admin'
+    const confirmado = item.confirms_count >= 3
+    const CIcon = cat.Icon
+
+    return (
+      <div key={item.id} style={{ ...s.card, borderLeft: `3px solid ${cat.color}` }}>
+        <div style={s.cardTop}>
+          <span style={{ ...s.typeBadge, backgroundColor: cat.bg, color: cat.color }}>
+            {cat.label.toUpperCase()}
+          </span>
+          <div style={s.cardTopRight}>
+            {expiraEn(item.expires_at) && (
+              <span style={s.expiraText}>{expiraEn(item.expires_at)}</span>
+            )}
+            <span style={s.timeText}>{tiempoRelativo(item.created_at)}</span>
+          </div>
+        </div>
+
+        {editingId === item.id ? (
+          <div style={s.editBox}>
+            <textarea
+              value={editText}
+              onChange={(e) => setEditText(e.target.value)}
+              style={s.editArea}
+              maxLength={500}
+              autoFocus
+            />
+            <div style={s.editActions}>
+              <button
+                style={s.editCancel}
+                onClick={() => { setEditingId(null); setEditText('') }}
+              >
+                Cancelar
+              </button>
+              <button
+                style={s.editSave}
+                onClick={() => saveEdit(item.id)}
+                disabled={actingOn === item.id || !editText.trim()}
+              >
+                {actingOn === item.id ? 'Guardando...' : 'Guardar'}
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div style={s.cardDesc}>{item.description}</div>
+        )}
+
+        {(item.location_text || item.lat) && (
+          <div style={s.incidentLocRow}>
+            <Icon.MapPinSm color="#9ca3af" />
+            <span style={s.incidentLocText}>
+              {item.location_text || 'Ubicación marcada en el mapa'}
+            </span>
+            {item.lat && (
+              <button
+                style={s.mapToggleBtn}
+                onClick={() => setOpenMapId(openMapId === item.id ? null : item.id)}
+              >
+                {openMapId === item.id ? 'Ocultar mapa' : 'Ver en el mapa'}
+              </button>
+            )}
+          </div>
+        )}
+
+        {openMapId === item.id && item.lat && (
+          <div style={{ marginTop: 10 }}>
+            <MiniMap lat={item.lat} lng={item.lng} height={155} color={cat.color} />
+          </div>
+        )}
+
+        {confirmDelete === item.id && (
+          <div style={s.deleteBox}>
+            <div style={s.deleteText}>¿Borrar este reporte? No se puede deshacer.</div>
+            <div style={s.editActions}>
+              <button style={s.editCancel} onClick={() => setConfirmDelete(null)}>
+                Cancelar
+              </button>
+              <button
+                style={s.deleteConfirm}
+                onClick={() => deleteIncident(item.id)}
+                disabled={actingOn === item.id}
+              >
+                {actingOn === item.id ? 'Borrando...' : 'Sí, borrar'}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {confirmado && (
+          <div style={s.confirmedTag}>
+            <Icon.VerifiedGreen size={12} />
+            <span style={s.confirmedTagText}>
+              Confirmado por {item.confirms_count} vecinos
+            </span>
+          </div>
+        )}
+
+        <div style={s.cardDivider} />
+
+        <div style={s.cardBottom}>
+          <div style={s.authorRow}>
+            <div style={{ ...s.authorAvatar, backgroundColor: cat.color, opacity: 0.9 }}>
+              {item.is_anonymous ? '?' : getInitials(item.reporter?.full_name)}
+            </div>
+            <div>
+              <span style={s.authorName}>
+                {item.is_anonymous ? 'Vecino anónimo' : (item.reporter?.full_name || 'Vecino')}
+              </span>
+              <div style={s.vecinoTag}>Reportado por vecinos</div>
+            </div>
+          </div>
+
+          {esMio || esAdmin ? (
+            <div style={s.accionesRow}>
+              {/* Editar: solo mientras NADIE lo haya confirmado.
+                  Después el texto se congela. */}
+              {esMio && item.confirms_count === 0 && editingId !== item.id && (
+                <button
+                  onClick={() => startEdit(item)}
+                  title="Editar"
+                  style={s.iconAccion}
+                >
+                  <Icon.Edit />
+                </button>
+              )}
+
+              {esMio && item.confirms_count > 0 && (
+                <span style={s.lockedTag} title="Ya hay vecinos que lo confirmaron">
+                  Texto bloqueado
+                </span>
+              )}
+
+              <button
+                onClick={() => setConfirmDelete(item.id)}
+                title="Borrar"
+                style={{ ...s.iconAccion, color: '#dc2626' }}
+              >
+                <Icon.Trash />
+              </button>
+
+              <button
+                onClick={() => resolveIncident(item.id)}
+                disabled={actingOn === item.id}
+                style={s.resolveBtn}
+              >
+                {actingOn === item.id ? '...' : 'Marcar resuelto'}
+              </button>
+            </div>
+          ) : (
+            <div style={s.accionesRow}>
+              <button
+                onClick={() => flagIncident(item.id)}
+                disabled={yaDenuncie || actingOn === item.id}
+                title="Denunciar contenido"
+                style={{
+                  ...s.flagBtn,
+                  color: yaDenuncie ? '#dc2626' : '#c7cdc7',
+                  cursor: yaDenuncie ? 'default' : 'pointer',
+                }}
+              >
+                <Icon.Flag />
+              </button>
+
+              <button
+                onClick={() => confirmIncident(item.id)}
+                disabled={yaConfirme || confirming === item.id}
+                style={{
+                  ...s.confirmBtn,
+                  backgroundColor: yaConfirme ? '#dcfce7' : '#fff',
+                  borderColor: yaConfirme ? '#16a34a' : '#e5e7eb',
+                  color: yaConfirme ? '#16a34a' : '#374151',
+                  cursor: yaConfirme ? 'default' : 'pointer',
+                }}
+              >
+                {yaConfirme
+                  ? <><Icon.VerifiedGreen size={12} /> <span>Confirmado</span></>
+                  : <span>Yo también lo veo</span>}
+                {item.confirms_count > 0 && (
+                  <span style={s.confirmCount}>{item.confirms_count}</span>
+                )}
+              </button>
+            </div>
+          )}
+        </div>
       </div>
     )
   }
@@ -748,7 +1215,28 @@ function Barrio({ currentUser, onNavigate }) {
 
   const renderReportModal = () => {
     if (!showReportModal) return null
-    const canSubmit = reportCat && reportText.trim().length > 0
+    const canSubmit = reportCat && reportText.trim().length > 0 && !reportSending
+
+    // Pantalla de éxito
+    if (reportSent) {
+      return (
+        <div style={s.modalBackdrop}>
+          <div style={s.modalSheet} onClick={(e) => e.stopPropagation()}>
+            <div style={s.reportSuccess}>
+              <div style={s.reportSuccessIcon}>
+                <Icon.VerifiedGreen size={38} />
+              </div>
+              <div style={s.reportSuccessTitle}>Reporte enviado</div>
+              <div style={s.reportSuccessText}>
+                Ya está visible para tus vecinos. Cuando otros lo confirmen,
+                subirá como alerta del barrio.
+              </div>
+            </div>
+          </div>
+        </div>
+      )
+    }
+
     return (
       <div style={s.modalBackdrop} onClick={() => setShowReportModal(false)}>
         <div style={s.modalSheet} onClick={(e) => e.stopPropagation()}>
@@ -799,17 +1287,84 @@ function Barrio({ currentUser, onNavigate }) {
             />
             <div style={s.reportCounter}>{reportText.length}/500</div>
 
-            <div style={s.reportSectionTitle}>Ubicación</div>
-            <div style={s.reportLocationBox}>
-              <Icon.MapPinSm color="#16a34a" />
-              <span style={s.reportLocationText}>Barrio Italia, Providencia</span>
-              <span style={s.reportLocationHint}>Aproximada</span>
+            <div style={s.reportSectionTitle}>¿Dónde está pasando?</div>
+
+            {locState === 'ok' ? (
+              <div style={s.locOkBox}>
+                <Icon.MapPinSm color="#16a34a" />
+                <span style={s.locOkText}>Ubicación del incidente capturada</span>
+                <button style={s.locClearBtn} onClick={clearLocation}>Quitar</button>
+              </div>
+            ) : (
+              <button
+                style={s.locGpsBtn}
+                onClick={useCurrentLocation}
+                disabled={locState === 'locating'}
+              >
+                <Icon.MapPinSm color="#16a34a" />
+                <span style={s.locGpsText}>
+                  {locState === 'locating'
+                    ? 'Leyendo tu ubicación...'
+                    : 'Estoy aquí, usar mi ubicación actual'}
+                </span>
+              </button>
+            )}
+
+            {(locState === 'denied' || locState === 'error') && (
+              <div style={s.locHintErr}>
+                No pudimos leer tu ubicación. Escribe la referencia abajo.
+              </div>
+            )}
+
+            <button
+              style={s.locMapToggle}
+              onClick={() => setShowMapPicker(!showMapPicker)}
+            >
+              <Icon.MapPinSm color="#6b7280" />
+              <span style={s.locMapToggleText}>
+                {showMapPicker ? 'Ocultar el mapa' : 'O marca el punto en el mapa'}
+              </span>
+            </button>
+
+            {showMapPicker && (
+              <div style={{ marginBottom: 10 }}>
+                <MiniMap
+                  lat={reportLat}
+                  lng={reportLng}
+                  centerLat={currentProfile?.lat}
+                  centerLng={currentProfile?.lng}
+                  editable
+                  height={190}
+                  color="#dc2626"
+                  onPick={(la, ln) => {
+                    setReportLat(la)
+                    setReportLng(ln)
+                    setLocState('ok')
+                  }}
+                />
+                <div style={s.mapPickHint}>
+                  Toca el mapa donde está pasando. Puedes mover el punto las veces que quieras.
+                </div>
+              </div>
+            )}
+
+            <input
+              type="text"
+              value={reportLocText}
+              onChange={(e) => setReportLocText(e.target.value)}
+              placeholder="Ej: Av. Italia con Condell, frente al almacén"
+              style={s.locInput}
+              maxLength={120}
+            />
+            <div style={s.locHint}>
+              Si no estás en el lugar, marca el punto en el mapa o escribe la referencia.
+              Nunca guardamos tu dirección de casa en un reporte.
             </div>
 
             <div style={s.reportSectionTitle}>Foto (opcional)</div>
-            <button style={s.reportPhotoBtn} onClick={() => alert('Subida de foto próximamente')}>
+            <button style={{ ...s.reportPhotoBtn, opacity: 0.5, cursor: 'not-allowed' }} disabled>
               <Icon.Camera />
-              <span style={s.reportPhotoText}>Agregar foto</span>
+              <span style={s.reportPhotoText}>Agregar foto (próximamente)</span>
             </button>
 
             <div style={s.reportAnonRow}>
@@ -831,16 +1386,30 @@ function Barrio({ currentUser, onNavigate }) {
               </button>
             </div>
 
+            {reportError && (
+              <div style={s.reportErrorBox}>
+                <Icon.ShieldAlert size={15} color="#991b1b" />
+                <span>{reportError}</span>
+              </div>
+            )}
+
             <button
               onClick={submitReport}
+              disabled={!canSubmit}
               style={{
                 ...s.reportSubmitBtn,
                 opacity: canSubmit ? 1 : 0.5,
                 cursor: canSubmit ? 'pointer' : 'not-allowed'
               }}
             >
-              <Icon.Send />
-              <span>Enviar reporte</span>
+              {reportSending ? (
+                <span>Enviando...</span>
+              ) : (
+                <>
+                  <Icon.Send />
+                  <span>Enviar reporte</span>
+                </>
+              )}
             </button>
           </div>
         </div>
@@ -862,7 +1431,14 @@ function Barrio({ currentUser, onNavigate }) {
   }
 
   const renderContent = () => {
-    if (activeTab === 'avisos') return DEMO_AVISOS.map(renderAviso)
+    if (activeTab === 'avisos') {
+      return (
+        <>
+          {incidents.map(renderIncidente)}
+          {DEMO_AVISOS.map(renderAviso)}
+        </>
+      )
+    }
 
     if (activeTab === 'eventos') {
       if (eventosVigentes.length === 0) {
@@ -1152,6 +1728,49 @@ const s = {
   reportLocationHint: { fontSize: 10.5, color: '#888', fontWeight: 600 },
   reportPhotoBtn: { width: '100%', padding: '14px', backgroundColor: '#fff', border: '1.5px dashed #ccc', borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, cursor: 'pointer', marginBottom: 22 },
   reportPhotoText: { fontSize: 13, fontWeight: 600, color: '#666' },
+  locGpsBtn: { width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '13px 14px', backgroundColor: '#fff', border: '2px dashed #16a34a', borderRadius: 12, cursor: 'pointer', fontFamily: 'inherit', marginBottom: 10 },
+  locGpsText: { fontSize: 13, fontWeight: 700, color: '#16a34a' },
+  locOkBox: { display: 'flex', alignItems: 'center', gap: 8, padding: '13px 14px', backgroundColor: '#f0fdf4', border: '1.5px solid #86efac', borderRadius: 12, marginBottom: 10 },
+  locOkText: { flex: 1, fontSize: 13, fontWeight: 700, color: '#0f5f36' },
+  locClearBtn: { fontSize: 11.5, fontWeight: 700, color: '#6b7280', background: '#fff', border: '1px solid #e5e7eb', borderRadius: 999, padding: '5px 11px', cursor: 'pointer', fontFamily: 'inherit' },
+  locHintErr: { fontSize: 11.5, color: '#dc2626', fontWeight: 600, marginBottom: 10, lineHeight: 1.4 },
+  locInput: { width: '100%', padding: '13px 14px', fontSize: 14, backgroundColor: '#fff', border: '1.5px solid #e5e7eb', borderRadius: 12, color: '#111', fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box' },
+  locHint: { fontSize: 11, color: '#9ca3af', lineHeight: 1.45, marginTop: 7, marginBottom: 18 },
+  locMapToggle: { width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7, padding: '11px', backgroundColor: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: 12, cursor: 'pointer', fontFamily: 'inherit', marginBottom: 10 },
+  locMapToggleText: { fontSize: 12.5, fontWeight: 700, color: '#6b7280' },
+  mapPickHint: { fontSize: 11, color: '#9ca3af', lineHeight: 1.45, marginTop: 7 },
+  mapToggleBtn: { marginLeft: 'auto', fontSize: 11, fontWeight: 700, color: '#16a34a', background: 'transparent', border: 'none', cursor: 'pointer', fontFamily: 'inherit', padding: 0, flexShrink: 0 },
+  incidentLocRow: { display: 'flex', alignItems: 'center', gap: 5, marginTop: 9 },
+  incidentLocText: { fontSize: 11.5, color: '#6b7280', fontWeight: 500 },
+
+  confirmedTag: { display: 'flex', alignItems: 'center', gap: 5, marginTop: 10, padding: '5px 10px', backgroundColor: '#dcfce7', borderRadius: 999, alignSelf: 'flex-start', width: 'fit-content' },
+  confirmedTagText: { fontSize: 11, fontWeight: 700, color: '#16a34a' },
+  vecinoTag: { fontSize: 10.5, color: '#9ca3af', fontWeight: 600, marginTop: 1 },
+  iconAccion: { display: 'flex', alignItems: 'center', justifyContent: 'center', width: 30, height: 30, background: 'transparent', border: 'none', padding: 0, cursor: 'pointer', color: '#9ca3af', flexShrink: 0 },
+  lockedTag: { fontSize: 10, fontWeight: 700, color: '#9ca3af', backgroundColor: '#f3f4f6', padding: '4px 8px', borderRadius: 999, whiteSpace: 'nowrap' },
+  editBox: { marginTop: 4 },
+  editArea: { width: '100%', minHeight: 70, padding: '11px 13px', fontSize: 13.5, border: '1.5px solid #16a34a', borderRadius: 12, fontFamily: 'inherit', outline: 'none', resize: 'vertical', boxSizing: 'border-box', color: '#111' },
+  editActions: { display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 8 },
+  editCancel: { padding: '8px 14px', borderRadius: 999, border: '1px solid #e5e7eb', backgroundColor: '#fff', color: '#6b7280', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' },
+  editSave: { padding: '8px 16px', borderRadius: 999, border: 'none', backgroundColor: '#16a34a', color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' },
+  deleteBox: { marginTop: 12, padding: 13, backgroundColor: '#fef2f2', border: '1px solid #fecaca', borderRadius: 12 },
+  deleteText: { fontSize: 12.5, fontWeight: 600, color: '#991b1b', lineHeight: 1.45 },
+  deleteConfirm: { padding: '8px 16px', borderRadius: 999, border: 'none', backgroundColor: '#dc2626', color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' },
+
+  cardTopRight: { display: 'flex', alignItems: 'center', gap: 8 },
+  expiraText: { fontSize: 10.5, fontWeight: 700, color: '#9ca3af', backgroundColor: '#f3f4f6', padding: '3px 8px', borderRadius: 999 },
+  accionesRow: { display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 },
+  flagBtn: { display: 'flex', alignItems: 'center', justifyContent: 'center', width: 30, height: 30, background: 'transparent', border: 'none', padding: 0, flexShrink: 0 },
+  resolveBtn: { padding: '8px 13px', borderRadius: 999, border: '1.5px solid #16a34a', backgroundColor: '#fff', color: '#16a34a', fontSize: 11.5, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', flexShrink: 0 },
+  miReporteTag: { fontSize: 11, fontWeight: 700, color: '#9ca3af', padding: '7px 12px', backgroundColor: '#f3f4f6', borderRadius: 999 },
+  confirmBtn: { display: 'flex', alignItems: 'center', gap: 5, padding: '8px 12px', borderRadius: 999, border: '1.5px solid #e5e7eb', fontSize: 11.5, fontWeight: 700, fontFamily: 'inherit', flexShrink: 0 },
+  confirmCount: { fontSize: 10.5, fontWeight: 800, backgroundColor: 'rgba(0,0,0,0.06)', padding: '2px 6px', borderRadius: 999, marginLeft: 2 },
+  reportErrorBox: { display: 'flex', alignItems: 'center', gap: 8, padding: '12px 14px', backgroundColor: '#fee2e2', color: '#991b1b', borderRadius: 12, fontSize: 13, fontWeight: 600, marginBottom: 12 },
+  reportSuccess: { padding: '48px 32px 44px', display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', gap: 10 },
+  reportSuccessIcon: { width: 82, height: 82, borderRadius: '50%', backgroundColor: '#dcfce7', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 6 },
+  reportSuccessTitle: { fontSize: 20, fontWeight: 800, color: '#111' },
+  reportSuccessText: { fontSize: 13, color: '#6b7280', lineHeight: 1.55 },
+
   reportAnonRow: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, padding: '14px', backgroundColor: '#f9fafb', borderRadius: 12, marginBottom: 22 },
   reportAnonTitle: { fontSize: 13, fontWeight: 700, color: '#111' },
   reportAnonSub: { fontSize: 11, color: '#888', marginTop: 2 },
