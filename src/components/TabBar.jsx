@@ -1,160 +1,190 @@
-const Icon = {
-  Home: ({ active }) => (
-    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={active ? '#16a34a' : '#9ca3af'} strokeWidth={active ? 2.4 : 2} strokeLinecap="round" strokeLinejoin="round">
-      <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
-      <polyline points="9 22 9 12 15 12 15 22"/>
-    </svg>
-  ),
-  Building: ({ active }) => (
-    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={active ? '#16a34a' : '#9ca3af'} strokeWidth={active ? 2.4 : 2} strokeLinecap="round" strokeLinejoin="round">
-      <rect x="4" y="2" width="16" height="20" rx="2"/>
-      <path d="M10 22v-4h4v4"/>
-    </svg>
-  ),
-  Bag: ({ active }) => (
-    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={active ? '#16a34a' : '#9ca3af'} strokeWidth={active ? 2.4 : 2} strokeLinecap="round" strokeLinejoin="round">
-      <path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/>
-      <line x1="3" y1="6" x2="21" y2="6"/>
-      <path d="M16 10a4 4 0 0 1-8 0"/>
-    </svg>
-  ),
-  Plus: () => (
-    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round">
-      <line x1="12" y1="5" x2="12" y2="19"/>
-      <line x1="5" y1="12" x2="19" y2="12"/>
-    </svg>
-  ),
-  Chat: ({ active }) => (
-    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={active ? '#16a34a' : '#9ca3af'} strokeWidth={active ? 2.4 : 2} strokeLinecap="round" strokeLinejoin="round">
-      <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
-    </svg>
-  ),
-  User: ({ active }) => (
-    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={active ? '#16a34a' : '#9ca3af'} strokeWidth={active ? 2.4 : 2} strokeLinecap="round" strokeLinejoin="round">
-      <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
-      <circle cx="12" cy="7" r="4"/>
-    </svg>
-  )
-}
+import { useState } from 'react'
+import { C, T, TIPOS } from '../lib/design'
 
-function TabBar({ activeTab, onChangeTab, onPublish, chatCount = 0 }) {
-  const showPlus = activeTab === 'marketplace'
-  const isActive = (tab) => activeTab === tab
+/*
+  TabBar — la navegación del demo.
 
-  const renderTab = (id, label, IconCmp, badge = 0) => (
-    <button key={id} onClick={() => onChangeTab(id)} style={s.tabBtn}>
-      <div style={s.iconWrap}>
-        <IconCmp active={isActive(id)} />
-        {badge > 0 && <span style={s.badge}>{badge}</span>}
-      </div>
-      <span style={{ ...s.label, color: isActive(id) ? '#16a34a' : '#9ca3af' }}>
-        {label}
-      </span>
-    </button>
-  )
+  Inicio · Mercado · Servicios · Eventos · Chat
+  (El Perfil vive en el avatar de la cabecera, no en un tab.)
+
+  Y el botón "+" que se despliega en las 6 formas de publicar.
+
+  REGLA DE ORO: cada cosa se crea donde se ve, pero el "+" es el atajo
+  universal. Cada opción aterriza en SU tabla:
+    · Vender/Regalar/Trueque/Publicar → posts
+    · Alerta                          → incident_reports (reporte de vecino)
+    · Evento                          → events
+  La Alerta del vecino NUNCA es un aviso oficial. Esa distinción es
+  lo que le da credibilidad al canal oficial.
+*/
+
+const TABS = [
+  { id: 'inicio',    emoji: '🏠', label: 'Inicio' },
+  { id: 'mercado',   emoji: '🏷️', label: 'Mercado' },
+  { id: 'servicios', emoji: '🔧', label: 'Servicios' },
+  { id: 'eventos',   emoji: '📅', label: 'Eventos' },
+  { id: 'chat',      emoji: '💬', label: 'Chat' },
+]
+
+const CREAR = [
+  { id: 'sell',    ...TIPOS.sell },
+  { id: 'gift',    ...TIPOS.gift },
+  { id: 'trade',   ...TIPOS.trade },
+  { id: 'alert',   ...TIPOS.alert },
+  { id: 'event',   ...TIPOS.event },
+  { id: 'general', ...TIPOS.general },
+]
+
+function TabBar({ activeTab, onChangeTab, onCrear, noLeidos = 0 }) {
+  const [abierto, setAbierto] = useState(false)
+
+  const elegir = (id) => {
+    setAbierto(false)
+    onCrear?.(id)
+  }
 
   return (
-    <div style={s.wrap}>
-      {renderTab('feed', 'Inicio', Icon.Home)}
-      {renderTab('barrio', 'Barrio', Icon.Building)}
+    <>
+      {/* ═══ MENÚ DEL "+" ═══ */}
+      {abierto && (
+        <div style={s.overlay} onClick={() => setAbierto(false)}>
+          <div style={s.menu} onClick={(e) => e.stopPropagation()}>
+            {CREAR.map((c) => (
+              <button key={c.id} style={s.menuItem} onClick={() => elegir(c.id)}>
+                <span style={{ ...s.menuIcono, background: c.bg }}>{c.emoji}</span>
+                <span style={s.menuLabel}>{c.label}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
-      <div style={s.marketWrap}>
-        {renderTab('marketplace', 'Mercado', Icon.Bag)}
-        {showPlus && (
-          <button style={s.plusBtn} onClick={onPublish}>
-            <Icon.Plus />
-          </button>
-        )}
+      {/* ═══ BOTÓN "+" ═══ */}
+      <button
+        style={{
+          ...s.fab,
+          transform: abierto ? 'rotate(45deg)' : 'rotate(0deg)',
+          background: abierto ? C.texto : C.verde,
+        }}
+        onClick={() => setAbierto(!abierto)}
+      >
+        +
+      </button>
+
+      {/* ═══ BARRA ═══ */}
+      <div style={s.barra}>
+        {TABS.map((t) => {
+          const activo = activeTab === t.id
+          return (
+            <button
+              key={t.id}
+              style={s.tab}
+              onClick={() => { setAbierto(false); onChangeTab(t.id) }}
+            >
+              <span style={{
+                ...s.tabEmoji,
+                filter: activo ? 'none' : 'grayscale(1)',
+                opacity: activo ? 1 : 0.45,
+              }}>
+                {t.emoji}
+              </span>
+              <span style={{
+                ...s.tabLabel,
+                color: activo ? C.verde : C.textoTenue,
+                fontWeight: activo ? 800 : 600,
+              }}>
+                {t.label}
+              </span>
+
+              {t.id === 'chat' && noLeidos > 0 && (
+                <span style={s.badge}>{noLeidos > 9 ? '9+' : noLeidos}</span>
+              )}
+            </button>
+          )
+        })}
       </div>
-
-      {renderTab('chat', 'Chat', Icon.Chat, chatCount)}
-      {renderTab('profile', 'Perfil', Icon.User)}
-    </div>
+    </>
   )
 }
 
 const s = {
-  wrap: {
+  barra: {
     position: 'absolute',
-    bottom: 14,
-    left: 14,
-    right: 14,
-    height: 66,
-    backgroundColor: 'rgba(255,255,255,0.72)',
-    backdropFilter: 'blur(20px) saturate(180%)',
-    WebkitBackdropFilter: 'blur(20px) saturate(180%)',
-    border: '1px solid rgba(255,255,255,0.6)',
-    borderRadius: 22,
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'space-around',
-    padding: '8px 4px',
-    zIndex: 50,
-    boxShadow: '0 10px 30px rgba(0,0,0,0.08), 0 2px 6px rgba(0,0,0,0.04)',
-    fontFamily: 'system-ui, -apple-system, sans-serif'
+    bottom: 0, left: 0, right: 0,
+    height: 76,
+    display: 'flex', alignItems: 'flex-start',
+    background: '#fff',
+    borderTop: `1px solid ${C.borde}`,
+    paddingTop: 9,
+    boxShadow: '0 -2px 16px rgba(0,0,0,0.05)',
+    zIndex: 100,
+    fontFamily: T.font,
   },
-  tabBtn: {
-    background: 'none',
-    border: 'none',
-    cursor: 'pointer',
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 3,
-    flex: 1,
-    padding: 0
+  tab: {
+    flex: 1, position: 'relative',
+    display: 'flex', flexDirection: 'column',
+    alignItems: 'center', gap: 3,
+    background: 'none', border: 'none',
+    cursor: 'pointer', padding: 0, fontFamily: 'inherit',
   },
-  label: {
-    fontSize: 10.5,
-    fontWeight: 600
-  },
-  iconWrap: {
-    position: 'relative',
-    display: 'flex'
-  },
+  tabEmoji: { fontSize: 21, lineHeight: 1.1, transition: 'all .15s' },
+  tabLabel: { fontSize: 10.5 },
   badge: {
-    position: 'absolute',
-    top: -4,
-    right: -8,
-    minWidth: 16,
-    height: 16,
-    borderRadius: '50%',
-    backgroundColor: '#dc2626',
-    color: '#fff',
-    fontSize: 9,
-    fontWeight: 800,
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
+    position: 'absolute', top: -3, right: '50%', marginRight: -22,
+    minWidth: 17, height: 17, padding: '0 4px',
+    borderRadius: 999, background: C.rojo, color: '#fff',
+    fontSize: 10, fontWeight: 800,
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
     border: '2px solid #fff',
-    padding: '0 3px',
-    boxSizing: 'border-box'
   },
-  marketWrap: {
-    flex: 1,
-    position: 'relative',
-    display: 'flex',
-    justifyContent: 'center'
-  },
-  plusBtn: {
+
+  fab: {
     position: 'absolute',
-    top: -34,
-    left: '50%',
-    transform: 'translateX(-50%)',
-    width: 42,
-    height: 42,
-    borderRadius: 12,
-    backgroundColor: '#16a34a',
-    border: 'none',
-    cursor: 'pointer',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    boxShadow: '0 0 0 6px rgba(22,163,74,0.12), 0 0 20px rgba(22,163,74,0.35), 0 6px 16px rgba(22,163,74,0.45)',
-    padding: 0,
-    zIndex: 60
-  }
+    bottom: 92, right: 18,
+    width: 58, height: 58, borderRadius: '50%',
+    color: '#fff', fontSize: 30, fontWeight: 300,
+    border: 'none', cursor: 'pointer',
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    boxShadow: '0 6px 22px rgba(22,163,74,0.4)',
+    zIndex: 300,
+    transition: 'transform .2s, background .2s',
+    lineHeight: 1,
+    fontFamily: T.font,
+  },
+
+  overlay: {
+    position: 'absolute',
+    top: 0, left: 0, right: 0, bottom: 0,
+    background: 'rgba(255,255,255,0.75)',
+    backdropFilter: 'blur(4px)',
+    WebkitBackdropFilter: 'blur(4px)',
+    zIndex: 200,
+  },
+  menu: {
+    position: 'absolute',
+    bottom: 162, right: 18,
+    background: '#fff',
+    borderRadius: 20,
+    padding: 10,
+    boxShadow: '0 12px 40px rgba(0,0,0,0.18)',
+    border: `1px solid ${C.borde}`,
+    display: 'flex', flexDirection: 'column', gap: 2,
+    minWidth: 218,
+    fontFamily: T.font,
+  },
+  menuItem: {
+    display: 'flex', alignItems: 'center', gap: 13,
+    padding: '12px 13px', borderRadius: 14,
+    background: 'none', border: 'none',
+    cursor: 'pointer', fontFamily: 'inherit',
+    width: '100%', textAlign: 'left',
+  },
+  menuIcono: {
+    width: 40, height: 40, borderRadius: 12,
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    fontSize: 20, flexShrink: 0,
+  },
+  menuLabel: { fontSize: 15, fontWeight: 700, color: C.texto },
 }
 
 export default TabBar

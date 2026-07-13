@@ -16,6 +16,8 @@ import CreatePost from './screens/CreatePost'
 import TabBar from './components/TabBar'
 import Barrio from './screens/Barrio'
 import ChatList from './screens/ChatList'
+import Home from './screens/Home'
+
 
 const Icon = {
   Building: ({ size = 34, color = '#9ca3af' }) => (
@@ -40,7 +42,7 @@ const Icon = {
 
 export default function App() {
   const [currentScreen, setCurrentScreen] = useState('splash')
-  const [activeTab, setActiveTab] = useState('feed')
+  const [activeTab, setActiveTab] = useState('inicio')
   const [selectedPostId, setSelectedPostId] = useState(null)
   const [selectedSellerId, setSelectedSellerId] = useState(null)
   const [currentUser, setCurrentUser] = useState(null)
@@ -227,9 +229,10 @@ export default function App() {
       return <Register onFinish={() => checkSession()} onBack={() => setCurrentScreen('onboarding')} />
     }
 
-    if (activeTab === 'feed') return <Feed currentUser={currentUser} onNavigate={onNavigate} />
-    if (activeTab === 'barrio') return <Barrio currentUser={currentUser} onNavigate={onNavigate} />
-    if (activeTab === 'marketplace') return <Marketplace currentUser={currentUser} onNavigate={onNavigate} />
+    if (activeTab === 'inicio') return <Home currentUser={currentUser} onNavigate={onNavigate} />
+    if (activeTab === 'mercado') return <Marketplace currentUser={currentUser} onNavigate={onNavigate} />
+    if (activeTab === 'servicios') return <Barrio currentUser={currentUser} onNavigate={onNavigate} />
+    if (activeTab === 'eventos') return <Barrio currentUser={currentUser} onNavigate={onNavigate} />
     if (activeTab === 'chat') return <ChatList currentUser={currentUser} onNavigate={onNavigate} />
     if (activeTab === 'profile') return <MyProfile currentUser={currentUser} onLogout={handleLogout} />
 
@@ -246,7 +249,7 @@ export default function App() {
         <TabBar
           activeTab={activeTab}
           onChangeTab={setActiveTab}
-          onPublish={() => setShowCreate(true)}
+          onCrear={(tipo) => setShowCreate(tipo)}
         />
       )}
 
