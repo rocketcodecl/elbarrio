@@ -48,7 +48,7 @@ export default function App() {
   const [currentUser, setCurrentUser] = useState(null)
   const [profile, setProfile] = useState(null)
   const [loading, setLoading] = useState(true)
-  const [showCreate, setShowCreate] = useState(false)
+  const [showCreate, setShowCreate] = useState(null)
 
   useEffect(() => {
     checkSession()
@@ -262,8 +262,9 @@ export default function App() {
           overflow: 'hidden',
         }}>
           <CreatePost
-            onClose={() => setShowCreate(false)}
-            onPublished={() => setShowCreate(false)}
+            startWith={showCreate}
+            onClose={() => setShowCreate(null)}
+            onPublished={() => setShowCreate(null)}
           />
         </div>
       )}

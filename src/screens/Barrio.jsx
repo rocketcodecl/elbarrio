@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
+import { hace } from '../lib/design'
 import MiniMap from '../components/MiniMap'
 import CommerceForm from '../components/CommerceForm'
 import PromoForm from '../components/PromoForm'
+import AvisoForm from '../components/AvisoForm'
 import { textoEstado, estadoComercio } from '../lib/horarios'
 
 // ===== ICONOS UI =====
@@ -387,6 +389,9 @@ function Barrio({ currentUser, onNavigate }) {
   const [comercios, setComercios] = useState([])
   const [loadingComercios, setLoadingComercios] = useState(true)
   const [editCommerce, setEditCommerce] = useState(null)   // objeto o 'nuevo'
+  const [avisos, setAvisos] = useState([])
+  const [showAvisoForm, setShowAvisoForm] = useState(false)
+  const [editAviso, setEditAviso] = useState(null)
   const [selectedCommerce, setSelectedCommerce] = useState(null)
   const [promos, setPromos] = useState([])                 // promos activas del barrio
   const [editPromo, setEditPromo] = useState(null)         // {commerce} o promo
@@ -401,7 +406,11 @@ function Barrio({ currentUser, onNavigate }) {
   useEffect(() => { loadProfile() }, [currentUser?.id])
   useEffect(() => { if (currentProfile?.id) fetchIncidents() }, [currentProfile?.id])
   useEffect(() => {
-    if (currentProfile?.neighborhood_id) { fetchComercios(); fetchPromos() }
+    if (currentProfile?.neighborhood_id) {
+      fetchComercios()
+      fetchPromos()
+      fetchAvisos()
+    }
   }, [currentProfile?.neighborhood_id])
 
   const loadProfile = async () => {
@@ -572,6 +581,60 @@ function Barrio({ currentUser, onNavigate }) {
       console.error('Error al confirmar:', err)
     } finally {
       setConfirming(null)
+    }
+  }
+
+  /* Avisos oficiales — los publica el operador (admin) desde la app.
+     Los vecinos NO pueden crear avisos oficiales, solo reportes de incidentes.
+     Esa distinción es lo que le da credibilidad al canal oficial. */
+  const fetchAvisos = async () => {
+    if (!currentProfile?.neighborhood_id) return
+    try {
+      const { data, error } = await supabase
+        .from('posts')
+        .select('*, author:profiles!author_id (full_name, user_type)')
+        .eq('neighborhood_id', currentProfile.neighborhood_id)
+        .eq('type', 'alert')
+        .eq('is_official', true)
+        .eq('status', 'active')
+        .order('created_at', { ascending: false })
+        .limit(10)
+      if (error) throw error
+      setAvisos(data || [])
+    } catch (err) {
+      console.error('Error cargando avisos:', err)
+    }
+  }
+
+  const publicarAviso = async ({ tipo, titulo, contenido, duracion }) => {
+    if (!currentProfile?.id) return
+    try {
+      const { error } = await supabase.from('posts').insert([{
+        author_id: currentProfile.id,
+        neighborhood_id: currentProfile.neighborhood_id,
+        type: 'alert',
+        is_official: true,
+        urgency: tipo === 'corte_agua' || tipo === 'corte_luz' ? 'high' : 'medium',
+        title: titulo,
+        content: contenido,
+        status: 'active',
+        category: tipo,
+      }])
+      if (error) throw error
+      await fetchAvisos()
+      setShowAvisoForm(false)
+    } catch (err) {
+      console.error('Error publicando aviso:', err)
+    }
+  }
+
+  const borrarAviso = async (id) => {
+    try {
+      const { error } = await supabase.from('posts').delete().eq('id', id)
+      if (error) throw error
+      await fetchAvisos()
+    } catch (err) {
+      console.error('Error borrando aviso:', err)
     }
   }
 
@@ -1747,10 +1810,24 @@ function Barrio({ currentUser, onNavigate }) {
 
   const renderContent = () => {
     if (activeTab === 'avisos') {
+      const esAdmin = currentProfile?.user_type === 'admin'
       return (
         <>
+          {esAdmin && (
+            <button style={s.addBtn} onClick={() => setShowAvisoForm(true)}>
+              <Icon.Plus />
+              <span>Publicar aviso oficial</span>
+            </button>
+          )}
+          {avisos.map(renderAviso)}
           {incidents.map(renderIncidente)}
-          {DEMO_AVISOS.map(renderAviso)}
+          {avisos.length === 0 && incidents.length === 0 && (
+            <div style={s.emptyBox}>
+              <div style={{ fontSize: 40, marginBottom: 12 }}>📋</div>
+              <div style={s.emptyTitle}>Sin avisos por ahora</div>
+              <div style={s.emptyText}>Cuando haya novedades en el barrio, aparecen acá.</div>
+            </div>
+          )}
         </>
       )
     }
@@ -1928,6 +2005,13 @@ function Barrio({ currentUser, onNavigate }) {
           neighborhoodId={currentProfile?.neighborhood_id}
           onClose={() => setEditCommerce(null)}
           onSaved={fetchComercios}
+        />
+      )}
+
+      {showAvisoForm && (
+        <AvisoForm
+          onClose={() => setShowAvisoForm(false)}
+          onPublicar={publicarAviso}
         />
       )}
 
@@ -2152,6 +2236,11 @@ const s = {
   promoEdit: { width: 28, height: 28, borderRadius: '50%', backgroundColor: '#fff', color: '#c2410c', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid #fed7aa', cursor: 'pointer', flexShrink: 0 },
   addPromoBtn: { width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7, padding: '12px', marginTop: 12, background: '#fff', border: '2px dashed #ea580c', borderRadius: 12, color: '#ea580c', fontSize: 12.5, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' },
 
+  avisoBorrar: {
+    background: 'none', border: 'none', cursor: 'pointer',
+    fontSize: 14, padding: '2px 6px', borderRadius: 6,
+    color: '#dc2626',
+  },
   addBtn: { width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '14px', marginBottom: 14, background: '#fff', border: '2px dashed #16a34a', borderRadius: 14, color: '#16a34a', fontSize: 13.5, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' },
   premiumChip: { position: 'absolute', top: 10, left: 10, backgroundColor: 'rgba(217,119,6,0.95)', color: '#fff', fontSize: 9.5, fontWeight: 800, letterSpacing: 0.4, padding: '5px 9px', borderRadius: 999, zIndex: 2 },
   comercioNoImg: { width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 5, backgroundColor: '#eef0ee' },
