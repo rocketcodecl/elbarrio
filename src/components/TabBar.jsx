@@ -7,10 +7,12 @@ import { C, T, TIPOS } from '../lib/design'
   Inicio · Mercado · Servicios · Eventos · Chat
   (El Perfil vive en el avatar de la cabecera, no en un tab.)
 
-  Y el botón "+" que se despliega en las 6 formas de publicar.
+  Y el botón "+" que se despliega en las 7 formas de publicar.
+  "Pedir ayuda" va primero porque es el motor del negocio.
 
   REGLA DE ORO: cada cosa se crea donde se ve, pero el "+" es el atajo
   universal. Cada opción aterriza en SU tabla:
+    · Pedir ayuda                    → posts (type='request')
     · Vender/Regalar/Trueque/Publicar → posts
     · Alerta                          → incident_reports (reporte de vecino)
     · Evento                          → events
@@ -27,6 +29,7 @@ const TABS = [
 ]
 
 const CREAR = [
+  { id: 'request', ...TIPOS.request },  // 🙋 Pedir ayuda — primero, motor del negocio
   { id: 'sell',    ...TIPOS.sell },
   { id: 'gift',    ...TIPOS.gift },
   { id: 'trade',   ...TIPOS.trade },
@@ -59,7 +62,7 @@ function TabBar({ activeTab, onChangeTab, onCrear, noLeidos = 0 }) {
         </div>
       )}
 
-      {/* ═══ BOTÓN "+" ═══ */}
+      {/* ═══ BOTÓN "+" (squircle, no círculo) ═══ */}
       <button
         style={{
           ...s.fab,
@@ -67,6 +70,7 @@ function TabBar({ activeTab, onChangeTab, onCrear, noLeidos = 0 }) {
           background: abierto ? C.texto : C.verde,
         }}
         onClick={() => setAbierto(!abierto)}
+        aria-label="Crear"
       >
         +
       </button>
@@ -138,10 +142,11 @@ const s = {
     border: '2px solid #fff',
   },
 
+  /* ── FAB squircle (cuadrado con puntas redondeadas) ── */
   fab: {
     position: 'absolute',
-    bottom: 92, right: 18,
-    width: 58, height: 58, borderRadius: '50%',
+    bottom: 90, right: 18,
+    width: 56, height: 56, borderRadius: 18,
     color: '#fff', fontSize: 30, fontWeight: 300,
     border: 'none', cursor: 'pointer',
     display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -162,7 +167,7 @@ const s = {
   },
   menu: {
     position: 'absolute',
-    bottom: 162, right: 18,
+    bottom: 158, right: 18,
     background: '#fff',
     borderRadius: 20,
     padding: 10,

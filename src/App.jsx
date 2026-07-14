@@ -229,7 +229,7 @@ export default function App() {
       return <Register onFinish={() => checkSession()} onBack={() => setCurrentScreen('onboarding')} />
     }
 
-    if (activeTab === 'inicio') return <Home currentUser={currentUser} onNavigate={onNavigate} />
+    if (activeTab === 'inicio') return <Home currentUser={currentUser} onNavigate={onNavigate} onCrear={(tipo) => setShowCreate(tipo)} />
     if (activeTab === 'mercado') return <Marketplace currentUser={currentUser} onNavigate={onNavigate} />
     if (activeTab === 'servicios') return <Barrio currentUser={currentUser} onNavigate={onNavigate} />
     if (activeTab === 'eventos') return <Barrio currentUser={currentUser} onNavigate={onNavigate} />

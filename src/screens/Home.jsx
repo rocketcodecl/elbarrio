@@ -1,18 +1,29 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import {
-  C, T, S, TIPOS, REPORTES, ACCESOS, FARMACIAS,
+  C, T, S, TIPOS, REPORTES, FARMACIAS,
   iniciales, hace, plata, distancia, saludo,
 } from '../lib/design'
+import PedidoCard from '../components/PedidoCard'
 
 /*
   INICIO — el Radar del barrio.
 
-  "¿Qué está pasando cerca mío, ahora?"
-  Ordenado por urgencia y frescura. Lo que envejece, se va.
-  El Radar NO guarda nada: lee de incident_reports y de posts.
+  Estructura del feed:
+    1. Header (saludo + ubicación)
+    2. Clima + Farmacia
+    3. Accesos rápidos (NO repetidos con el footer):
+       Pedidos · Comercios · Trueques · Favoritos
+    4. Pedidos vecinales
+       - Barra amarilla "¿Necesitás una mano?" (siempre)
+       - Cards de pedidos activos (si hay)
+    5. Alertas de el barrio
+    6. Actividad de el barrio
 
-  Clima: Open-Meteo. Gratis, sin API key, sin tarjeta.
+  "el barrio" va SIEMPRE en minúscula y en verde marca (C.verde).
+
+  Un pedido = post type='request'. Vive en la tabla posts.
+  No se muestra si needed_by ya pasó (filtro en JS).
 */
 
 const CLIMA_EMOJI = (code) => {
@@ -27,10 +38,19 @@ const CLIMA_EMOJI = (code) => {
   return { e: '🌤️', t: '' }
 }
 
-function Home({ currentUser, onNavigate }) {
+/* Accesos de la grilla de Inicio (NO se repiten con el footer). */
+const ACCESOS_HOME = [
+  { id: 'pedidos',   emoji: '🙋', label: 'Pedidos',   bg: C.doradoSuave },
+  { id: 'comercios', emoji: '🏪', label: 'Comercios', bg: C.verdeSuave },
+  { id: 'trueques',  emoji: '🔄', label: 'Trueques',  bg: C.azulSuave },
+  { id: 'favoritos', emoji: '⭐', label: 'Favoritos', bg: C.moradoSuave },
+]
+
+function Home({ currentUser, onNavigate, onCrear }) {
   const [profile, setProfile] = useState(null)
   const [barrio, setBarrio] = useState(null)
   const [alertas, setAlertas] = useState([])
+  const [pedidos, setPedidos] = useState([])
   const [actividad, setActividad] = useState([])
   const [noLeidos, setNoLeidos] = useState(0)
   const [clima, setClima] = useState(null)
@@ -51,7 +71,7 @@ function Home({ currentUser, onNavigate }) {
       if (!p) return
       setProfile(p)
 
-      const [hoodRes, alertRes, postRes, msgRes] = await Promise.all([
+      const [hoodRes, alertRes, pedidosRes, otrosRes, msgRes] = await Promise.all([
         supabase.from('neighborhoods').select('*')
           .eq('id', p.neighborhood_id).maybeSingle(),
 
@@ -64,10 +84,21 @@ function Home({ currentUser, onNavigate }) {
           .order('created_at', { ascending: false })
           .limit(5),
 
+        // Pedidos: type='request', traemos 10 y filtramos vencidos en JS
         supabase.from('posts')
           .select('*, author:profiles!author_id (full_name, avatar_url, badge_founder, verified)')
           .eq('neighborhood_id', p.neighborhood_id)
           .eq('status', 'active')
+          .eq('type', 'request')
+          .order('created_at', { ascending: false })
+          .limit(10),
+
+        // Otros posts: excluimos request para que no se mezclen
+        supabase.from('posts')
+          .select('*, author:profiles!author_id (full_name, avatar_url, badge_founder, verified)')
+          .eq('neighborhood_id', p.neighborhood_id)
+          .eq('status', 'active')
+          .neq('type', 'request')
           .order('created_at', { ascending: false })
           .limit(20),
 
@@ -78,7 +109,21 @@ function Home({ currentUser, onNavigate }) {
 
       setBarrio(hoodRes.data)
       setAlertas(alertRes.data || [])
-      setActividad(postRes.data || [])
+
+      // Filtrar pedidos vencidos (needed_by ya pasado) y ordenar por urgencia
+      const ahora = Date.now()
+      const pedidosActivos = (pedidosRes.data || []).filter((p) => {
+        if (!p.needed_by) return true
+        return new Date(p.needed_by).getTime() > ahora
+      })
+      pedidosActivos.sort((a, b) => {
+        const pa = a.needed_by ? new Date(a.needed_by).getTime() : Infinity
+        const pb = b.needed_by ? new Date(b.needed_by).getTime() : Infinity
+        return pa - pb
+      })
+      setPedidos(pedidosActivos)
+
+      setActividad(otrosRes.data || [])
       setNoLeidos(msgRes.count || 0)
 
       cargarClima(hoodRes.data?.lat, hoodRes.data?.lng)
@@ -89,7 +134,6 @@ function Home({ currentUser, onNavigate }) {
     }
   }
 
-  /* Clima real. Open-Meteo es gratis y no pide API key ni tarjeta. */
   const cargarClima = async (lat, lng) => {
     if (!lat || !lng) return
     try {
@@ -104,18 +148,27 @@ function Home({ currentUser, onNavigate }) {
           ...CLIMA_EMOJI(d.current.weather_code),
         })
       }
-    } catch {
-      // Sin clima, la tira simplemente no se muestra. Nunca datos inventados.
-    }
+    } catch {}
   }
 
   const nav = onNavigate || (() => {})
+  const crear = onCrear || (() => {})
 
   const filtrados = busqueda.trim()
     ? actividad.filter((p) =>
         (p.title || '').toLowerCase().includes(busqueda.toLowerCase()) ||
         (p.content || '').toLowerCase().includes(busqueda.toLowerCase()))
     : actividad
+
+  const onAcceso = (id) => {
+    if (id === 'pedidos') {
+      crear('request')
+    } else if (id === 'comercios') {
+      nav('comercios')
+    } else {
+      nav(id)
+    }
+  }
 
   if (cargando) {
     return (
@@ -148,14 +201,14 @@ function Home({ currentUser, onNavigate }) {
           </div>
 
           <div style={s.headerBtns}>
-            <button style={s.iconBtn} onClick={() => setVerBuscador(!verBuscador)}>🔍</button>
-            <button style={s.iconBtn} onClick={() => nav('notificaciones')}>
+            <button style={s.iconBtn} onClick={() => setVerBuscador(!verBuscador)} aria-label="Buscar">🔍</button>
+            <button style={s.iconBtn} onClick={() => nav('notificaciones')} aria-label="Notificaciones">
               🔔
               {noLeidos > 0 && (
                 <span style={s.badge}>{noLeidos > 9 ? '9+' : noLeidos}</span>
               )}
             </button>
-            <button style={s.avatarBtn} onClick={() => nav('perfil')}>
+            <button style={s.avatarBtn} onClick={() => nav('perfil')} aria-label="Mi perfil">
               {profile?.avatar_url
                 ? <img src={profile.avatar_url} alt="" style={s.avatarImg} />
                 : <span style={s.avatarTxt}>{iniciales(profile?.full_name)}</span>}
@@ -179,8 +232,6 @@ function Home({ currentUser, onNavigate }) {
         {/* ══════ CLIMA + FARMACIA ══════ */}
         {clima && (
           <div style={s.tiraInfo}>
-
-            {/* Clima: emoji grande arriba, temp, texto abajo */}
             <div style={s.climaBloque}>
               <span style={s.climaEmoji}>{clima.e}</span>
               <div>
@@ -190,10 +241,8 @@ function Home({ currentUser, onNavigate }) {
               </div>
             </div>
 
-            {/* Divisor vertical */}
             <div style={s.tiraDivisor} />
 
-            {/* Farmacia: alineada a la derecha */}
             {FARMACIAS.length > 0 && (
               <button style={s.farmaciaBloque} onClick={() => setVerFarmacias(true)}>
                 <div style={s.farmaciaLabel}>
@@ -211,13 +260,13 @@ function Home({ currentUser, onNavigate }) {
           </div>
         )}
 
-        {/* ══════ ACCESOS RÁPIDOS ══════ */}
+        {/* ══════ ACCESOS RÁPIDOS (no repetidos con el footer) ══════ */}
         <div style={s.accesos}>
-          {ACCESOS.map((a) => (
+          {ACCESOS_HOME.map((a) => (
             <button
               key={a.id}
               style={s.acceso}
-              onClick={() => nav(a.id)}
+              onClick={() => onAcceso(a.id)}
             >
               <span style={{ ...s.accesoIcono, background: a.bg }}>{a.emoji}</span>
               <span style={s.accesoLabel}>{a.label}</span>
@@ -225,11 +274,42 @@ function Home({ currentUser, onNavigate }) {
           ))}
         </div>
 
+        {/* ══════ PEDIDOS VECINALES ══════ */}
+        <div style={s.seccion}>
+          {/* Barra amarilla siempre visible, sin título */}
+          <button
+            style={s.pedirBarra}
+            onClick={() => crear('request')}
+          >
+            <span style={s.pedirBarraEmoji}>🙋</span>
+            <span style={s.pedirBarraTxt}>
+              <span style={s.pedirBarraTit}>¿Necesitás una mano?</span>
+              <span style={s.pedirBarraSub}>Gasfíter, flete, cuidado de perro...</span>
+            </span>
+            <span style={s.pedirBarraCta}>Pedir</span>
+          </button>
+
+          {/* Cards de pedidos activos (si hay) */}
+          {pedidos.map((p) => (
+            <PedidoCard
+              key={p.id}
+              post={{ ...p, deadline: p.needed_by }}
+              onAyudar={(pedido) => nav('chat', {
+                postId: pedido.id,
+                mensajeInicial: '🙋 Me anoté para ayudarte con esto',
+              })}
+              onVerDetalle={(pedido) => nav('post', { postId: pedido.id })}
+            />
+          ))}
+        </div>
+
         {/* ══════ ALERTAS ══════ */}
         {alertas.length > 0 && (
           <div style={s.seccion}>
             <div style={s.seccionTit}>
-              <span style={s.seccionTxt}>🚨 Alertas del barrio</span>
+              <span style={s.seccionTxt}>
+                🚨 Alertas de <span style={s.marca}>el barrio</span>
+              </span>
               <span style={s.pulso} />
             </div>
 
@@ -271,7 +351,9 @@ function Home({ currentUser, onNavigate }) {
         {/* ══════ ACTIVIDAD ══════ */}
         <div style={s.seccion}>
           <div style={s.seccionTit}>
-            <span style={s.seccionTxt}>🏘️ Actividad del barrio</span>
+            <span style={s.seccionTxt}>
+              🏘️ Actividad de <span style={s.marca}>el barrio</span>
+            </span>
           </div>
 
           {filtrados.length === 0 ? (
@@ -390,31 +472,36 @@ const s = {
   },
   cargando: { flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' },
 
+  /* ── marca ("el barrio" en verde, minúscula) ── */
+  marca: { color: C.verde, fontWeight: 600 },
+
   /* ── cabecera ── */
   header: {
     background: C.card,
-    padding: '52px 18px 16px',
+    padding: '28px 18px 10px',
     borderBottom: `1px solid ${C.borde}`,
     flexShrink: 0,
   },
   headerTop: { display: 'flex', alignItems: 'center', gap: 10 },
   saludo: {
-    fontSize: 21, fontWeight: 800, color: C.texto,
-    letterSpacing: '-0.3px',
+    fontSize: 16,
+    fontWeight: 500,
+    color: C.texto,
+    letterSpacing: '-0.1px',
     whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
   },
-  barrioRow: { display: 'flex', alignItems: 'center', gap: 5, marginTop: 4 },
-  barrioNombre: { fontSize: 13.5, color: C.textoSuave, fontWeight: 600 },
+  barrioRow: { display: 'flex', alignItems: 'center', gap: 5, marginTop: 3 },
+  barrioNombre: { fontSize: 13, color: C.textoSuave, fontWeight: 500 },
   beta: {
-    fontSize: 9, fontWeight: 900, letterSpacing: 0.5, color: '#fff',
+    fontSize: 9, fontWeight: 800, letterSpacing: 0.5, color: '#fff',
     background: C.verde, padding: '2px 6px', borderRadius: 5,
   },
 
   headerBtns: { display: 'flex', alignItems: 'center', gap: 7, flexShrink: 0 },
   iconBtn: {
-    position: 'relative', width: 40, height: 40, borderRadius: '50%',
+    position: 'relative', width: 36, height: 36, borderRadius: '50%',
     background: C.fondo, border: `1px solid ${C.borde}`,
-    fontSize: 17, cursor: 'pointer', padding: 0,
+    fontSize: 15, cursor: 'pointer', padding: 0,
     display: 'flex', alignItems: 'center', justifyContent: 'center',
   },
   badge: {
@@ -426,44 +513,43 @@ const s = {
     border: '2px solid #fff',
   },
   avatarBtn: {
-    width: 42, height: 42, borderRadius: '50%',
+    width: 38, height: 38, borderRadius: '50%',
     background: C.verdeSuave, color: C.verde,
     border: `2px solid ${C.verde}`, padding: 0, overflow: 'hidden',
     display: 'flex', alignItems: 'center', justifyContent: 'center',
     cursor: 'pointer', flexShrink: 0,
   },
   avatarImg: { width: '100%', height: '100%', objectFit: 'cover' },
-  avatarTxt: { fontSize: 13.5, fontWeight: 800 },
+  avatarTxt: { fontSize: 13, fontWeight: 700 },
 
   buscador: {
-    width: '100%', marginTop: 14, padding: '13px 16px',
-    fontSize: 15, background: C.fondo,
+    width: '100%', marginTop: 10, padding: '11px 16px',
+    fontSize: 14, background: C.fondo,
     border: `1.5px solid ${C.borde}`, borderRadius: 999,
     outline: 'none', fontFamily: 'inherit', color: C.texto,
     boxSizing: 'border-box',
   },
 
-  scroll: { flex: 1, overflowY: 'auto', padding: '16px 16px 120px' },
+  scroll: { flex: 1, overflowY: 'auto', padding: '6px 16px 120px' },
 
   /* ── clima + farmacia ── */
   tiraInfo: {
     display: 'flex', alignItems: 'center',
     gap: 0,
     background: C.tira, border: `1px solid ${C.tiraBorde}`,
-    borderRadius: 14, padding: '14px 16px', marginBottom: 16,
+    borderRadius: 14, padding: '12px 14px', marginBottom: 14,
   },
   climaBloque: {
     display: 'flex', alignItems: 'center', gap: 10,
     flexShrink: 0,
   },
-  climaEmoji: { fontSize: 28, lineHeight: 1 },
-  climaTemp: { fontSize: 20, fontWeight: 800, color: C.texto, lineHeight: 1.1 },
+  climaEmoji: { fontSize: 26, lineHeight: 1 },
+  climaTemp: { fontSize: 19, fontWeight: 700, color: C.texto, lineHeight: 1.1 },
   climaTxt: { fontSize: 11, color: C.textoTenue, fontWeight: 500, marginTop: 2 },
-  tiraDiv: {},
   tiraDivisor: {
-    width: 1, height: 36,
+    width: 1, height: 34,
     background: C.tiraBorde,
-    margin: '0 14px', flexShrink: 0,
+    margin: '0 12px', flexShrink: 0,
   },
   farmaciaBloque: {
     flex: 1, minWidth: 0,
@@ -473,7 +559,7 @@ const s = {
   },
   farmaciaLabel: { fontSize: 10, color: C.textoTenue, fontWeight: 500 },
   farmaciaNombre: {
-    fontSize: 13.5, fontWeight: 700, color: C.texto, marginTop: 2,
+    fontSize: 13, fontWeight: 700, color: C.texto, marginTop: 2,
     whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
     maxWidth: '100%',
   },
@@ -497,13 +583,13 @@ const s = {
     maxHeight: '80%', overflowY: 'auto',
   },
   modalTit: {
-    fontSize: 18, fontWeight: 800, color: C.texto, marginBottom: 16,
+    fontSize: 18, fontWeight: 700, color: C.texto, marginBottom: 16,
   },
   farmCard: {
     background: C.tira, border: `1px solid ${C.tiraBorde}`,
     borderRadius: 16, padding: 15, marginBottom: 11,
   },
-  farmNombre: { fontSize: 16, fontWeight: 800, color: C.texto },
+  farmNombre: { fontSize: 16, fontWeight: 700, color: C.texto },
   farmDir: { fontSize: 13.5, color: C.textoSuave, marginTop: 6, fontWeight: 500 },
   farmHora: { fontSize: 13.5, color: C.textoSuave, marginTop: 3, fontWeight: 500 },
   farmBtns: { display: 'flex', gap: 8, marginTop: 12 },
@@ -524,7 +610,7 @@ const s = {
   /* ── accesos ── */
   accesos: {
     display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)',
-    gap: 9, marginBottom: 22,
+    gap: 9, marginBottom: 18,
   },
   acceso: {
     display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6,
@@ -540,9 +626,9 @@ const s = {
   accesoLabel: { fontSize: 11, fontWeight: 600, color: C.textoSuave },
 
   /* ── secciones ── */
-  seccion: { marginBottom: 22 },
-  seccionTit: { display: 'flex', alignItems: 'center', marginBottom: 11 },
-  seccionTxt: { fontSize: 15.5, fontWeight: 800, color: C.texto },
+  seccion: { marginBottom: 20 },
+  seccionTit: { display: 'flex', alignItems: 'center', marginBottom: 10, gap: 8 },
+  seccionTxt: { fontSize: 15, fontWeight: 700, color: C.texto },
   pulso: {
     width: 8, height: 8, borderRadius: '50%', background: C.rojo,
     marginLeft: 'auto', boxShadow: `0 0 0 4px ${C.rojoSuave}`,
@@ -556,7 +642,7 @@ const s = {
   },
   alertaTop: { display: 'flex', alignItems: 'center', gap: 6, marginBottom: 5 },
   alertaEmoji: { fontSize: 14 },
-  alertaTitulo: { fontSize: 13.5, fontWeight: 800, flex: 1, minWidth: 0 },
+  alertaTitulo: { fontSize: 13.5, fontWeight: 700, flex: 1, minWidth: 0 },
   urgentePill: {
     fontSize: 8.5, fontWeight: 800, letterSpacing: 0.3, color: '#fff',
     background: C.rojo, padding: '3px 6px', borderRadius: 4, flexShrink: 0,
@@ -633,8 +719,36 @@ const s = {
     background: C.card, borderRadius: 18, border: `1px solid ${C.borde}`,
   },
   vacioEmoji: { fontSize: 46, marginBottom: 12 },
-  vacioTit: { fontSize: 16.5, fontWeight: 800, color: C.texto, marginBottom: 5 },
+  vacioTit: { fontSize: 16.5, fontWeight: 700, color: C.texto, marginBottom: 5 },
   vacioTxt: { fontSize: 14, color: C.textoTenue, lineHeight: 1.5 },
+
+  /* ── pedidos vecinales ── */
+  pedirBarra: {
+    display: 'flex', alignItems: 'center', gap: 11,
+    width: '100%',
+    background: '#fffbeb', border: '1px solid #fde68a',
+    borderRadius: 14, padding: '11px 13px',
+    cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left',
+  },
+  pedirBarraEmoji: { fontSize: 20, flexShrink: 0, lineHeight: 1 },
+  pedirBarraTxt: {
+    display: 'flex', flexDirection: 'column', gap: 1,
+    flex: 1, minWidth: 0,
+  },
+  pedirBarraTit: {
+    fontSize: 13.5, fontWeight: 700, color: C.texto,
+    whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+  },
+  pedirBarraSub: {
+    fontSize: 11.5, fontWeight: 400, color: C.textoTenue,
+    whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+  },
+  pedirBarraCta: {
+    fontSize: 12, fontWeight: 700, color: '#fff',
+    background: C.verde, padding: '7px 14px',
+    borderRadius: 999, flexShrink: 0,
+    display: 'flex', alignItems: 'center',
+  },
 }
 
 export default Home
