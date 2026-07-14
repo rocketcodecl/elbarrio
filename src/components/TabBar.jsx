@@ -18,14 +18,51 @@ import { C, T, TIPOS } from '../lib/design'
     · Evento                          → events
   La Alerta del vecino NUNCA es un aviso oficial. Esa distinción es
   lo que le da credibilidad al canal oficial.
+
+  ÍCONOS: la barra inferior usa SVG lineales (estilo Rappi).
+  El menú CREAR mantiene emojis (tiles coloridos de categorías).
 */
 
+// ─── Íconos lineales (SVG stroke, estilo Rappi) ───
+const Ico = {
+  inicio: (color) => (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+      <path d="M9 22V12h6v10" />
+    </svg>
+  ),
+  mercado: (color) => (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z" />
+      <path d="M3 6h18" />
+      <path d="M16 10a4 4 0 0 1-8 0" />
+    </svg>
+  ),
+  servicios: (color) => (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" />
+    </svg>
+  ),
+  eventos: (color) => (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="4" width="18" height="18" rx="2" />
+      <path d="M3 10h18" />
+      <path d="M8 2v4M16 2v4" />
+    </svg>
+  ),
+  chat: (color) => (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M7.9 20A9 9 0 1 0 4 16.1L2 22z" />
+    </svg>
+  ),
+}
+
 const TABS = [
-  { id: 'inicio',    emoji: '🏠', label: 'Inicio' },
-  { id: 'mercado',   emoji: '🏷️', label: 'Mercado' },
-  { id: 'servicios', emoji: '🔧', label: 'Servicios' },
-  { id: 'eventos',   emoji: '📅', label: 'Eventos' },
-  { id: 'chat',      emoji: '💬', label: 'Chat' },
+  { id: 'inicio',    icon: Ico.inicio,    label: 'Inicio' },
+  { id: 'mercado',   icon: Ico.mercado,   label: 'Mercado' },
+  { id: 'servicios', icon: Ico.servicios, label: 'Servicios' },
+  { id: 'eventos',   icon: Ico.eventos,   label: 'Eventos' },
+  { id: 'chat',      icon: Ico.chat,      label: 'Chat' },
 ]
 
 const CREAR = [
@@ -79,6 +116,7 @@ function TabBar({ activeTab, onChangeTab, onCrear, noLeidos = 0 }) {
       <div style={s.barra}>
         {TABS.map((t) => {
           const activo = activeTab === t.id
+          const color = activo ? C.verde : C.textoTenue
           return (
             <button
               key={t.id}
@@ -86,16 +124,15 @@ function TabBar({ activeTab, onChangeTab, onCrear, noLeidos = 0 }) {
               onClick={() => { setAbierto(false); onChangeTab(t.id) }}
             >
               <span style={{
-                ...s.tabEmoji,
-                filter: activo ? 'none' : 'grayscale(1)',
-                opacity: activo ? 1 : 0.45,
+                ...s.tabIcon,
+                opacity: activo ? 1 : 0.5,
               }}>
-                {t.emoji}
+                {t.icon(color)}
               </span>
               <span style={{
                 ...s.tabLabel,
-                color: activo ? C.verde : C.textoTenue,
-                fontWeight: activo ? 800 : 600,
+                color,
+                fontWeight: activo ? 700 : 500,
               }}>
                 {t.label}
               </span>
@@ -131,7 +168,11 @@ const s = {
     background: 'none', border: 'none',
     cursor: 'pointer', padding: 0, fontFamily: 'inherit',
   },
-  tabEmoji: { fontSize: 21, lineHeight: 1.1, transition: 'all .15s' },
+  tabIcon: {
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    height: 24,
+    transition: 'opacity .15s',
+  },
   tabLabel: { fontSize: 10.5 },
   badge: {
     position: 'absolute', top: -3, right: '50%', marginRight: -22,

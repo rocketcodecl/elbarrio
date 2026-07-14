@@ -1,318 +1,490 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { supabase } from './lib/supabase'
-import Splash from './screens/Splash'
-import Onboarding from './screens/Onboarding'
-import Register from './screens/Register'
-import Profile from './screens/Profile'
-import Verification from './screens/Verification'
-import Complete from './screens/Complete'
-import Feed from './screens/Feed'
-import MyProfile from './screens/MyProfile'
-import Marketplace from './screens/Marketplace'
-import ProductDetail from './screens/ProductDetail'
-import ChatConversation from './screens/ChatConversation'
-import DealDone from './screens/DealDone'
+import { C, T } from './lib/design'
+
+import Home from './screens/Home'
+import Alertas from './screens/Alertas'
 import CreatePost from './screens/CreatePost'
 import TabBar from './components/TabBar'
-import Barrio from './screens/Barrio'
-import ChatList from './screens/ChatList'
-import Home from './screens/Home'
 
+/* ============================================================
+   App — orquestador de El Barrio.
 
-const Icon = {
-  Building: ({ size = 34, color = '#9ca3af' }) => (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <rect x="4" y="2" width="16" height="20" rx="2" />
-      <path d="M10 22v-4h4v4" />
-    </svg>
-  ),
-  Message: ({ size = 34, color = '#9ca3af' }) => (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-    </svg>
-  ),
-  Alert: ({ size = 34, color = '#9ca3af' }) => (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-      <circle cx="12" cy="12" r="10" />
-      <line x1="12" y1="8" x2="12" y2="12" />
-      <line x1="12" y1="16" x2="12.01" y2="16" />
-    </svg>
-  ),
+   INCLUYE el phone frame (usa las clases .phone-frame,
+   .phone-notch, .phone-content que ya están definidas en
+   index.css). No necesita wrapper externo en main.jsx.
+   ============================================================ */
+
+function Placeholder({ titulo, onBack, mensaje }) {
+  return (
+    <div style={s.placeholderWrap}>
+      <div style={s.placeholderHeader}>
+        <button style={s.placeholderBack} onClick={() => onBack('inicio')}>←</button>
+        <div style={s.placeholderTit}>{titulo}</div>
+        <div style={{ width: 40 }} />
+      </div>
+      <div style={s.placeholderBody}>
+        <div style={s.placeholderEmoji}>🚧</div>
+        <div style={s.placeholderTit2}>{titulo}</div>
+        <div style={s.placeholderTxt}>
+          {mensaje || 'Esta pantalla todavía no está integrada. Pegá tu componente acá.'}
+        </div>
+      </div>
+    </div>
+  )
 }
 
-export default function App() {
-  const [currentScreen, setCurrentScreen] = useState('splash')
+function App() {
+  const [user, setUser] = useState(null)
+  const [cargandoAuth, setCargandoAuth] = useState(true)
+
+  const [screen, setScreen] = useState('inicio')
+  const [params, setParams] = useState({})
   const [activeTab, setActiveTab] = useState('inicio')
-  const [selectedPostId, setSelectedPostId] = useState(null)
-  const [selectedSellerId, setSelectedSellerId] = useState(null)
-  const [currentUser, setCurrentUser] = useState(null)
-  const [profile, setProfile] = useState(null)
-  const [loading, setLoading] = useState(true)
-  const [showCreate, setShowCreate] = useState(null)
 
+  const [createOpen, setCreateOpen] = useState(false)
+  const [createType, setCreateType] = useState(null)
+
+  const [noLeidos, setNoLeidos] = useState(0)
+
+  /* ── AUTH ── */
   useEffect(() => {
-    checkSession()
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (session?.user) {
-        setCurrentUser({ id: session.user.id, email: session.user.email })
-      } else {
-        setCurrentUser(null)
-        setProfile(null)
-      }
+    let mounted = true
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!mounted) return
+      setUser(session?.user || null)
+      setCargandoAuth(false)
     })
-
-    return () => subscription.unsubscribe()
+    const { data: sub } = supabase.auth.onAuthStateChange((_e, session) => {
+      setUser(session?.user || null)
+    })
+    return () => {
+      mounted = false
+      sub.subscription.unsubscribe()
+    }
   }, [])
 
-  /* ============================================================
-     DECIDE DÓNDE ENTRA EL USUARIO SEGÚN EL ESTADO DE SU PERFIL.
-     Antes se iba directo a 'main' con solo tener sesión: se podía
-     entrar a la app sin nombre, sin RUT y sin verificar.
-     ============================================================ */
-  const checkSession = async () => {
-    const { data: { session } } = await supabase.auth.getSession()
-
-    if (!session?.user) {
-      setCurrentScreen('splash')
-      setLoading(false)
-      return
+  /* ── CONTADORES no leídos ── */
+  useEffect(() => {
+    if (!user) return
+    let active = true
+    const cargarNoLeidos = async () => {
+      try {
+        const { data: prof } = await supabase
+          .from('profiles').select('id')
+          .eq('user_id', user.id).maybeSingle()
+        if (!prof?.id || !active) return
+        const { count } = await supabase
+          .from('messages')
+          .select('id', { count: 'exact', head: true })
+          .eq('receiver_id', prof.id).eq('read', false)
+        if (active) setNoLeidos(count || 0)
+      } catch {}
     }
-
-    setCurrentUser({ id: session.user.id, email: session.user.email })
-
-    const { data: p } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('user_id', session.user.id)
-      .maybeSingle()
-
-    setProfile(p || null)
-
-    // Falta completar los datos personales
-    if (!p || !p.full_name || !p.rut) {
-      setCurrentScreen('profile')
+    cargarNoLeidos()
+    const canal = supabase
+      .channel('app-unread')
+      .on('postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'messages' },
+        cargarNoLeidos)
+      .on('postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'messages' },
+        cargarNoLeidos)
+      .subscribe()
+    return () => {
+      active = false
+      supabase.removeChannel(canal)
     }
-    // Datos listos, pero la ubicación no está confirmada → puerta cerrada
-    else if (p.verification_status !== 'verified') {
-      setCurrentScreen('verification')
+  }, [user])
+
+  /* ── NAVIGACIÓN ── */
+  const onNavigate = useCallback((next, p = {}) => {
+    setScreen(next)
+    setParams(p)
+    const tabMap = {
+      inicio: 'inicio', mercado: 'mercado', marketplace: 'mercado',
+      servicios: 'servicios', events: 'eventos', eventos: 'eventos',
+      chat: 'chat', chatlist: 'chat',
     }
-    // Todo listo
-    else {
-      setCurrentScreen('main')
+    setActiveTab(tabMap[next] || activeTab)
+    requestAnimationFrame(() => {
+      const el = document.getElementById('elbarrio-scroll')
+      if (el) el.scrollTop = 0
+    })
+  }, [activeTab])
+
+  /* ── CREAR ── */
+  const onCrear = useCallback((type = null) => {
+    setCreateType(type)
+    setCreateOpen(true)
+  }, [])
+
+  const onCerrarCrear = useCallback(() => {
+    setCreateOpen(false)
+    setCreateType(null)
+  }, [])
+
+  const onPublicado = useCallback(() => {
+    setCreateOpen(false)
+    setCreateType(null)
+    setScreen('inicio')
+    setActiveTab('inicio')
+  }, [])
+
+  const onChangeTab = useCallback((tabId) => {
+    const screenMap = {
+      inicio: 'inicio', mercado: 'mercado', servicios: 'servicios',
+      eventos: 'eventos', chat: 'chat',
     }
+    onNavigate(screenMap[tabId] || tabId)
+  }, [onNavigate])
 
-    setLoading(false)
-  }
-
-  const recargarPerfil = async () => {
-    if (!currentUser?.id) return null
-    const { data: p } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('user_id', currentUser.id)
-      .maybeSingle()
-    setProfile(p || null)
-    return p
-  }
-
-  const handleLogout = async () => {
-    await supabase.auth.signOut()
-    setCurrentUser(null)
-    setProfile(null)
-    setActiveTab('feed')
-    setCurrentScreen('splash')
-  }
-
-  const flowScreens = ['splash', 'onboarding', 'register', 'profile', 'verification', 'complete']
-  const modalScreens = ['productDetail', 'chatConversation', 'dealDone']
-  const isMainApp = !flowScreens.includes(currentScreen) && !modalScreens.includes(currentScreen)
-
-  const onNavigate = (screen, params = {}) => {
-    if (screen === 'ProductDetail' && params.postId) {
-      setSelectedPostId(params.postId)
-      setCurrentScreen('productDetail')
-    } else if (screen === 'Chat' && params.postId && params.sellerId) {
-      setSelectedPostId(params.postId)
-      setSelectedSellerId(params.sellerId)
-      setCurrentScreen('chatConversation')
-    } else if (screen === 'ChatConversation') {
-      setSelectedPostId(params.postId || null)
-      setSelectedSellerId(params.otherUserId)
-      setCurrentScreen('chatConversation')
-    } else if (screen === 'DealDone') {
-      setSelectedPostId(params.postId)
-      setSelectedSellerId(params.sellerId)
-      setCurrentScreen('dealDone')
-    } else if (screen === 'Perfil') {
-      setActiveTab('profile')
-      setCurrentScreen('main')
-    } else if (screen === 'back') {
-      if (currentScreen === 'dealDone') setCurrentScreen('chatConversation')
-      else if (currentScreen === 'chatConversation') setCurrentScreen('productDetail')
-      else setCurrentScreen('main')
-    } else if (screen === 'home') {
-      setActiveTab('feed')
-      setCurrentScreen('main')
-      setSelectedPostId(null)
-      setSelectedSellerId(null)
-    } else {
-      console.log(`Navegación a ${screen} no implementada`)
-    }
-  }
-
-  const renderScreen = () => {
-    if (loading) {
-      return (
-        <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#f4f7f4' }}>
-          <img src="/isotipo.png" alt="" style={{ width: 60, opacity: 0.5 }} />
+  /* ── BOOT ── */
+  if (cargandoAuth) {
+    return (
+      <div className="phone-frame">
+        <div className="phone-notch" />
+        <div className="phone-content" style={s.bootWrap}>
+          <div style={s.bootLogo}>🏘️</div>
+          <div style={s.bootTxt}>el barrio</div>
         </div>
-      )
-    }
-
-    if (currentScreen === 'splash') return <Splash onFinish={() => setCurrentScreen('onboarding')} />
-    if (currentScreen === 'onboarding') return <Onboarding onFinish={() => setCurrentScreen('register')} />
-
-    if (currentScreen === 'register') {
-      return (
-        <Register
-          onFinish={async () => {
-            // checkSession decide sola dónde entra:
-            //   sin datos  -> profile
-            //   sin verificar -> verification (cuenta en espera)
-            //   verificado -> main
-            await checkSession()
-          }}
-          onBack={() => setCurrentScreen('onboarding')}
-        />
-      )
-    }
-
-    if (currentScreen === 'profile') {
-      return (
-        <Profile
-          onFinish={async () => {
-            await recargarPerfil()
-            setCurrentScreen('verification')
-          }}
-          onBack={handleLogout}
-        />
-      )
-    }
-
-    if (currentScreen === 'verification') {
-      // isPending = ya se había registrado antes y volvió sin verificar
-      const isPending = !!profile?.address && profile?.verification_status !== 'verified'
-      return (
-        <Verification
-          profile={profile}
-          isPending={isPending}
-          onFinish={async () => {
-            await recargarPerfil()
-            setCurrentScreen('complete')
-          }}
-          onBack={handleLogout}
-          onLogout={handleLogout}
-        />
-      )
-    }
-
-    if (currentScreen === 'complete') {
-      return <Complete onFinish={() => setCurrentScreen('main')} />
-    }
-
-    if (currentScreen === 'productDetail') return <ProductDetail postId={selectedPostId} currentUser={currentUser} onNavigate={onNavigate} />
-    if (currentScreen === 'chatConversation') return <ChatConversation postId={selectedPostId} sellerId={selectedSellerId} currentUser={currentUser} onNavigate={onNavigate} />
-    if (currentScreen === 'dealDone') return <DealDone postId={selectedPostId} sellerId={selectedSellerId} currentUser={currentUser} onNavigate={onNavigate} />
-
-    if (!currentUser) {
-      return <Register onFinish={() => checkSession()} onBack={() => setCurrentScreen('onboarding')} />
-    }
-
-    if (activeTab === 'inicio') return <Home currentUser={currentUser} onNavigate={onNavigate} onCrear={(tipo) => setShowCreate(tipo)} />
-    if (activeTab === 'mercado') return <Marketplace currentUser={currentUser} onNavigate={onNavigate} />
-    if (activeTab === 'servicios') return <Barrio currentUser={currentUser} onNavigate={onNavigate} />
-    if (activeTab === 'eventos') return <Barrio currentUser={currentUser} onNavigate={onNavigate} />
-    if (activeTab === 'chat') return <ChatList currentUser={currentUser} onNavigate={onNavigate} />
-    if (activeTab === 'profile') return <MyProfile currentUser={currentUser} onLogout={handleLogout} />
-
-    return <PlaceholderScreen title="Pantalla no encontrada" icon="alert" />
+        <div className="phone-home-indicator" />
+      </div>
+    )
   }
+
+  /* ── LOGIN ── */
+  if (!user) {
+    return (
+      <div className="phone-frame">
+        <div className="phone-notch" />
+        <div className="phone-content">
+          <Login />
+        </div>
+        <div className="phone-home-indicator" />
+      </div>
+    )
+  }
+
+  /* ── RENDER PRINCIPAL con phone-frame ── */
+  const mostrarTabBar = !createOpen
 
   return (
     <div className="phone-frame">
-      <div className="phone-notch"></div>
+      <div className="phone-notch" />
 
-      <div className="phone-content">{renderScreen()}</div>
+      <div className="phone-content" style={s.contentPad}>
+        <div style={s.root}>
+          <div id="elbarrio-scroll" style={s.screenArea}>
+            {renderScreen({ screen, params, user, onNavigate, onCrear })}
+          </div>
 
-      {isMainApp && currentUser && (
-        <TabBar
-          activeTab={activeTab}
-          onChangeTab={setActiveTab}
-          onCrear={(tipo) => setShowCreate(tipo)}
-        />
-      )}
+          {mostrarTabBar && (
+            <TabBar
+              activeTab={activeTab}
+              onChangeTab={onChangeTab}
+              onCrear={onCrear}
+              noLeidos={noLeidos}
+            />
+          )}
 
-      {showCreate && (
-        <div style={{
-          position: 'absolute',
-          top: 0, left: 0, right: 0, bottom: 0,
-          background: '#f4f7f4',
-          zIndex: 9999,
-          overflow: 'hidden',
-        }}>
-          <CreatePost
-            startWith={showCreate}
-            onClose={() => setShowCreate(null)}
-            onPublished={() => setShowCreate(null)}
-          />
+          {createOpen && (
+            <div style={s.createOverlay}>
+              <CreatePost
+                startWith={createType}
+                onClose={onCerrarCrear}
+                onPublished={onPublicado}
+              />
+            </div>
+          )}
         </div>
-      )}
+      </div>
 
-      <div className="phone-home-indicator"></div>
+      <div className="phone-home-indicator" />
     </div>
   )
 }
 
-function PlaceholderScreen({ title, icon = 'alert' }) {
-  const iconMap = {
-    building: <Icon.Building />,
-    message: <Icon.Message />,
-    alert: <Icon.Alert />,
+/* ============================================================
+   renderScreen — switch de navegación
+   ============================================================ */
+function renderScreen({ screen, params, user, onNavigate, onCrear }) {
+  switch (screen) {
+    case 'inicio':
+      return <Home currentUser={user} onNavigate={onNavigate} onCrear={onCrear} />
+
+    case 'alertas':
+      return <Alertas currentUser={user} onNavigate={onNavigate} onCrear={onCrear} />
+
+    case 'alerta':
+      return (
+        <Placeholder
+          titulo="Detalle de alerta"
+          mensaje={`ID: ${params?.id || '—'}. Pegá acá tu AlertaDetail.jsx`}
+          onBack={onNavigate}
+        />
+      )
+
+    case 'post':
+      return (
+        <Placeholder
+          titulo="Detalle de publicación"
+          mensaje={`postId: ${params?.postId || '—'}. Pegá acá tu ProductDetail.jsx`}
+          onBack={onNavigate}
+        />
+      )
+
+    case 'mercado':
+    case 'marketplace':
+      return <Placeholder titulo="Mercado" mensaje="Pegá acá tu Marketplace.jsx" onBack={onNavigate} />
+
+    case 'servicios':
+      return <Placeholder titulo="Servicios" mensaje="Pegá acá tu Services.jsx" onBack={onNavigate} />
+
+    case 'eventos':
+    case 'events':
+      return <Placeholder titulo="Eventos" mensaje="Pegá acá tu Events.jsx" onBack={onNavigate} />
+
+    case 'chat':
+    case 'chatlist':
+      return <Placeholder titulo="Chat" mensaje="Pegá acá tu ChatList.jsx" onBack={onNavigate} />
+
+    case 'chatconversation':
+      return (
+        <Placeholder
+          titulo="Conversación"
+          mensaje={`postId: ${params?.postId || '—'}. Pegá acá tu ChatConversation.jsx`}
+          onBack={onNavigate}
+        />
+      )
+
+    case 'perfil':
+    case 'profile':
+      return <Placeholder titulo="Mi perfil" mensaje="Pegá acá tu Profile.jsx" onBack={onNavigate} />
+
+    case 'notificaciones':
+      return <Placeholder titulo="Notificaciones" mensaje="Pegá acá tu Notifications.jsx" onBack={onNavigate} />
+
+    case 'comercios':
+      return <Placeholder titulo="Comercios" mensaje="Pegá acá tu Comercios.jsx" onBack={onNavigate} />
+
+    case 'noticias':
+      return <Placeholder titulo="Noticias" mensaje="Pegá acá tu Noticias.jsx" onBack={onNavigate} />
+
+    default:
+      return <Home currentUser={user} onNavigate={onNavigate} onCrear={onCrear} />
+  }
+}
+
+/* ============================================================
+   LOGIN
+   ============================================================ */
+function Login() {
+  const [modo, setModo] = useState('signin')
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [fullName, setFullName] = useState('')
+  const [cargando, setCargando] = useState(false)
+  const [error, setError] = useState('')
+
+  const submit = async (e) => {
+    e.preventDefault()
+    setError('')
+    setCargando(true)
+    try {
+      if (modo === 'signin') {
+        const { error } = await supabase.auth.signInWithPassword({ email, password })
+        if (error) throw error
+      } else {
+        const { error } = await supabase.auth.signUp({
+          email, password,
+          options: { data: { full_name: fullName } },
+        })
+        if (error) throw error
+        setError('Revisá tu email para confirmar la cuenta.')
+      }
+    } catch (err) {
+      setError(err.message || 'Algo salió mal')
+    } finally {
+      setCargando(false)
+    }
   }
 
   return (
-    <div style={s.wrap}>
-      <div style={s.iconBox}>{iconMap[icon] || <Icon.Alert />}</div>
-      <h2 style={s.title}>{title}</h2>
-      <p style={s.text}>Próximamente</p>
+    <div style={s.loginWrap}>
+      <div style={s.loginCard}>
+        <div style={s.loginLogo}>🏘️</div>
+        <div style={s.loginBrand}>el barrio</div>
+        <div style={s.loginSub}>
+          {modo === 'signin' ? 'Bienvenido de vuelta' : 'Unite a tu barrio'}
+        </div>
+
+        <form onSubmit={submit} style={s.loginForm}>
+          {modo === 'signup' && (
+            <input style={s.loginInput} placeholder="Tu nombre"
+              value={fullName} onChange={(e) => setFullName(e.target.value)} required />
+          )}
+          <input style={s.loginInput} type="email" placeholder="email@barrio.cl"
+            value={email} onChange={(e) => setEmail(e.target.value)} required />
+          <input style={s.loginInput} type="password" placeholder="••••••••"
+            value={password} onChange={(e) => setPassword(e.target.value)}
+            required minLength={6} />
+
+          {error && <div style={s.loginError}>{error}</div>}
+
+          <button type="submit"
+            style={{ ...s.loginBtn, opacity: cargando ? 0.6 : 1 }}
+            disabled={cargando}>
+            {cargando ? 'Cargando...' : (modo === 'signin' ? 'Entrar' : 'Crear cuenta')}
+          </button>
+        </form>
+
+        <button style={s.loginToggle}
+          onClick={() => {
+            setModo(modo === 'signin' ? 'signup' : 'signin')
+            setError('')
+          }}>
+          {modo === 'signin' ? '¿No tenés cuenta? Registrate' : '¿Ya tenés cuenta? Entrá'}
+        </button>
+      </div>
     </div>
   )
 }
 
+/* ============================================================
+   ESTILOS
+   ============================================================ */
 const s = {
-  wrap: {
+  /* ── Pad del phone-content: dejar aire arriba (notch) y abajo (home indicator) ── */
+  contentPad: {
+    paddingTop: 30,   // espacio para el notch
+    paddingBottom: 0, // el home indicator va encima, no necesitamos pad
+  },
+
+  /* ── ROOT: llena el .phone-content (que ya tiene height: 100%).
+     position: relative → la TabBar (absolute; bottom: 0) se pega acá. ── */
+  root: {
+    width: '100%',
     height: '100%',
+    background: C.fondo,
+    fontFamily: T.font,
+    position: 'relative',
+    overflow: 'hidden',
     display: 'flex',
     flexDirection: 'column',
-    alignItems: 'center',
-    justifyContent: 'center',
-    textAlign: 'center',
-    padding: 40,
-    backgroundColor: '#f4f7f4',
-    fontFamily: 'system-ui, -apple-system, sans-serif',
   },
-  iconBox: {
-    width: 74,
-    height: 74,
-    borderRadius: 22,
-    backgroundColor: '#fff',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    boxShadow: '0 2px 8px rgba(0,0,0,0.05)',
-    marginBottom: 18,
+
+  /* ── Área de la pantalla (todo menos la TabBar).
+     flex: 1 + minHeight: 0 → respeta el overflow interno. ── */
+  screenArea: {
+    flex: 1,
+    minHeight: 0,
+    width: '100%',
+    position: 'relative',
+    overflow: 'hidden',
   },
-  title: { fontSize: 22, fontWeight: 800, margin: 0, marginBottom: 8, color: '#111' },
-  text: { color: '#6b7280', fontSize: 14, margin: 0 },
+
+  /* ── Overlay de creación (fullscreen, tapa todo incl. TabBar) ── */
+  createOverlay: {
+    position: 'absolute',
+    top: 0, left: 0, right: 0, bottom: 0,
+    zIndex: 500,
+    background: C.fondo,
+  },
+
+  /* ── Boot ── */
+  bootWrap: {
+    width: '100%', height: '100%',
+    display: 'flex', flexDirection: 'column',
+    alignItems: 'center', justifyContent: 'center',
+    background: C.fondo, fontFamily: T.font, gap: 12,
+  },
+  bootLogo: { fontSize: 56 },
+  bootTxt: {
+    fontSize: 22, fontWeight: 700, color: C.verde,
+    letterSpacing: '-0.3px',
+  },
+
+  /* ── placeholder ── */
+  placeholderWrap: {
+    width: '100%', height: '100%',
+    background: C.fondo, fontFamily: T.font,
+    display: 'flex', flexDirection: 'column',
+  },
+  placeholderHeader: {
+    background: C.card,
+    padding: '28px 18px 12px',
+    borderBottom: `1px solid ${C.borde}`,
+    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+    flexShrink: 0,
+  },
+  placeholderBack: {
+    width: 40, height: 40, borderRadius: '50%',
+    background: C.fondo, border: `1px solid ${C.borde}`,
+    color: C.texto, cursor: 'pointer', padding: 0,
+    fontSize: 18, fontFamily: 'inherit',
+  },
+  placeholderTit: { fontSize: 17, fontWeight: 700, color: C.texto },
+  placeholderBody: {
+    flex: 1, display: 'flex', flexDirection: 'column',
+    alignItems: 'center', justifyContent: 'center',
+    padding: 40, gap: 12,
+  },
+  placeholderEmoji: { fontSize: 56 },
+  placeholderTit2: { fontSize: 20, fontWeight: 700, color: C.texto },
+  placeholderTxt: {
+    fontSize: 14, color: C.textoTenue, lineHeight: 1.5,
+    textAlign: 'center', maxWidth: 280,
+  },
+
+  /* ── login ── */
+  loginWrap: {
+    width: '100%', height: '100%',
+    background: C.fondo, fontFamily: T.font,
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    padding: 24,
+  },
+  loginCard: {
+    width: '100%', maxWidth: 360,
+    background: C.card, borderRadius: 22,
+    padding: 32, boxShadow: '0 12px 40px rgba(0,0,0,0.06)',
+    border: `1px solid ${C.borde}`,
+  },
+  loginLogo: { fontSize: 48, textAlign: 'center' },
+  loginBrand: {
+    fontSize: 26, fontWeight: 800, color: C.verde,
+    textAlign: 'center', letterSpacing: '-0.3px',
+  },
+  loginSub: {
+    fontSize: 13.5, color: C.textoTenue, textAlign: 'center',
+    marginTop: 4, marginBottom: 24,
+  },
+  loginForm: { display: 'flex', flexDirection: 'column', gap: 10 },
+  loginInput: {
+    width: '100%', padding: '13px 15px',
+    fontSize: 14, background: C.fondo,
+    border: `1.5px solid ${C.borde}`, borderRadius: 12,
+    outline: 'none', fontFamily: 'inherit', color: C.texto,
+    boxSizing: 'border-box',
+  },
+  loginError: {
+    fontSize: 12.5, color: C.rojo,
+    background: C.rojoBg, border: `1px solid ${C.rojoSuave}`,
+    borderRadius: 10, padding: '9px 11px', lineHeight: 1.4,
+  },
+  loginBtn: {
+    width: '100%', padding: '14px 16px', marginTop: 6,
+    background: C.verde, color: '#fff',
+    border: 'none', borderRadius: 12,
+    fontSize: 15, fontWeight: 700,
+    cursor: 'pointer', fontFamily: 'inherit',
+  },
+  loginToggle: {
+    width: '100%', marginTop: 16,
+    background: 'none', border: 'none',
+    color: C.verde, fontSize: 13, fontWeight: 600,
+    cursor: 'pointer', fontFamily: 'inherit',
+  },
 }
+
+export default App

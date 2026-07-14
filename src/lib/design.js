@@ -220,15 +220,32 @@ export const iniciales = (nombre) =>
     .join('')
     .toUpperCase() || '?'
 
-export const hace = (fecha) => {
-  const min = Math.floor((Date.now() - new Date(fecha)) / 60000)
-  if (min < 1) return 'Recién'
-  if (min < 60) return `${min} min`
-  const h = Math.floor(min / 60)
-  if (h < 24) return `${h} h`
-  const d = Math.floor(h / 24)
-  if (d < 7) return `${d} d`
-  return `${Math.floor(d / 7)} sem`
+// lib/design.js  —  reemplaza tu export `hace` por este completo.
+// NUNCA dice "hace recien" ni "en Xh". Siempre "hace X seg/min/h/d/...".
+
+export function hace(fecha) {
+  if (!fecha) return ''
+  const f = fecha instanceof Date ? fecha : new Date(fecha)
+  if (isNaN(f.getTime())) return ''
+
+  // Si la fecha es futura (raro en alertas), la clampeamos a "recién".
+  const diff = Date.now() - f.getTime()
+  const abs = Math.max(0, diff)            // nunca negativo
+  const seg = Math.max(1, Math.floor(abs / 1000))
+  const min = Math.floor(seg / 60)
+  const hor = Math.floor(min / 60)
+  const dia = Math.floor(hor / 24)
+  const sem = Math.floor(dia / 7)
+  const mes = Math.floor(dia / 30)
+  const anio = Math.floor(dia / 365)
+
+  if (seg < 60)       return `hace ${seg} seg`
+  if (min < 60)       return `hace ${min} min`
+  if (hor < 24)       return `hace ${hor} h`
+  if (dia < 7)        return `hace ${dia} d`
+  if (sem < 5)        return `hace ${sem} sem`
+  if (mes < 12)       return `hace ${mes} ${mes === 1 ? 'mes' : 'meses'}`
+  return `hace ${anio} ${anio === 1 ? 'año' : 'años'}`
 }
 
 export const plata = (n) =>

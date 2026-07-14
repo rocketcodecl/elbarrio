@@ -1,8 +1,10 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
+import MiniMap from '../components/MiniMap'
 
 /* ============================================================
    ICONOS SVG LINEALES (sin emojis)
+   Mismo lenguaje visual que el TabBar y los títulos del Home.
    ============================================================ */
 const Ico = ({ d, size = 24, stroke = 1.8, children }) => (
   <svg
@@ -74,6 +76,18 @@ const IcoAlerta = ({ size = 16 }) => (
     <line x1="12" y1="17" x2="12.01" y2="17" />
   </Ico>
 )
+const IcoUbicacion = ({ size = 18 }) => (
+  <Ico size={size}>
+    <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
+    <circle cx="12" cy="10" r="3" />
+  </Ico>
+)
+const IcoReloj = ({ size = 14 }) => (
+  <Ico size={size}>
+    <circle cx="12" cy="12" r="10" />
+    <polyline points="12 6 12 12 16 14" />
+  </Ico>
+)
 
 /* ============================================================
    CONFIGURACIÓN
@@ -86,6 +100,11 @@ const POST_TYPES = [
     id: 'request', label: 'Pedir', Icon: IcoPedir,
     sub: 'Necesito algo del barrio',
     color: VERDE, bg: '#dcfce7', primary: true,
+  },
+  {
+    id: 'alert', label: 'Alertar', Icon: IcoAlerta,
+    sub: 'Algo urgente para tus vecinos',
+    color: '#dc2626', bg: '#fee2e2', primary: true,
   },
   {
     id: 'sell', label: 'Vender', Icon: IcoVender,
@@ -139,10 +158,56 @@ const CATEGORIES = [
   'Ropa', 'Mascotas', 'Libros', 'Deportes', 'Hogar', 'Otro',
 ]
 
+/* ── Categorías de alerta con expiración automática ──
+   Cada categoría define cuánto dura la alerta activa.
+   El usuario NO elige la duración — se calcula sola según el tipo. */
+const ALERT_CATEGORIES = [
+  {
+    key: 'seguridad', label: 'Seguridad', hours: 6,
+    color: '#dc2626', bg: '#fee2e2',
+    desc: 'Robo, sospecha, intrusión',
+  },
+  {
+    key: 'salud', label: 'Salud', hours: 3,
+    color: '#ea580c', bg: '#ffedd5',
+    desc: 'Brotes, agua o alimento',
+  },
+  {
+    key: 'infra', label: 'Infraestructura', hours: 48,
+    color: '#ca8a04', bg: '#fef9c3',
+    desc: 'Luz, agua, bache, vereda',
+  },
+  {
+    key: 'mascotas', label: 'Mascotas', hours: 72,
+    color: '#0891b2', bg: '#cffafe',
+    desc: 'Perro perdido, animal suelto',
+  },
+  {
+    key: 'otro', label: 'Otro', hours: 24,
+    color: '#6b7280', bg: '#f3f4f6',
+    desc: 'Otra alerta del barrio',
+  },
+]
+
+const calcNeededBy = (plazoKey) => {
+  const p = PLAZOS.find((x) => x.key === plazoKey)
+  if (!p || p.hours === null) return null
+  return new Date(Date.now() + p.hours * 3600 * 1000).toISOString()
+}
+
+// Expiración automática de alertas según categoría.
+// seguridad 6h, salud 3h, infra 48h, mascotas 72h, default 24h.
+const calcExpiresAt = (categoryKey) => {
+  const cat = ALERT_CATEGORIES.find((c) => c.key === categoryKey)
+  const hours = cat ? cat.hours : 24
+  return new Date(Date.now() + hours * 3600 * 1000).toISOString()
+}
+
 /* ============================================================
    COMPONENTE
    ============================================================ */
 // startWith='request'  -> abre directo el formulario de Pedido (desde Inicio/Radar)
+// startWith='alert'    -> abre directo el formulario de Alerta (desde botón Reportar)
 // sin startWith         -> muestra Vender / Regalar / Intercambiar (desde el + del Mercado)
 function CreatePost({ onClose, onPublished, startWith }) {
   const initialType = startWith
@@ -164,6 +229,18 @@ function CreatePost({ onClose, onPublished, startWith }) {
   const [budget, setBudget] = useState('')
   const [budgetOpen, setBudgetOpen] = useState(false) // "a convenir"
   const [plazo, setPlazo] = useState('')
+
+  // Alerta vecinal
+  const [alertCategory, setAlertCategory] = useState('')
+  const [alertLocation, setAlertLocation] = useState('')
+  const [mapaAbierto, setMapaAbierto] = useState(false)
+  const [pinCoords, setPinCoords] = useState(null)
+  const [barrioCoords, setBarrioCoords] = useState(null)
+  const [userCoords, setUserCoords] = useState(null)
+  // Búsqueda + reverse geocode (Nominatim, gratis, sin API key)
+  const [searchQ, setSearchQ] = useState('')
+  const [results, setResults] = useState([])
+  const [loadingAddr, setLoadingAddr] = useState(false)
 
   const [images, setImages] = useState([])
   const [previews, setPreviews] = useState([])
@@ -200,10 +277,118 @@ function CreatePost({ onClose, onPublished, startWith }) {
 
   const toNumber = (v) => parseInt(v.replace(/\./g, ''), 10)
 
-  const calcNeededBy = (plazoKey) => {
-    const p = PLAZOS.find((x) => x.key === plazoKey)
-    if (!p || p.hours === null) return null
-    return new Date(Date.now() + p.hours * 3600 * 1000).toISOString()
+  /* ---------- MAPA ----------
+     Al abrir el mapa, cargamos las coords del barrio del user (1 vez).
+     Si no las encuentra, MiniMap usa Santiago como fallback.
+     Usa el componente MiniMap (../components/MiniMap) — Leaflet puro,
+     sin react-leaflet, sin API key. ---------- */
+  useEffect(() => {
+    if (!mapaAbierto || barrioCoords) return
+    ;(async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) return
+        const { data: prof } = await supabase
+          .from('profiles')
+          .select('neighborhood_id')
+          .eq('user_id', user.id)
+          .single()
+        if (prof?.neighborhood_id) {
+          const { data: hood } = await supabase
+            .from('neighborhoods')
+            .select('lat, lng')
+            .eq('id', prof.neighborhood_id)
+            .maybeSingle()
+          if (hood?.lat && hood?.lng) {
+            setBarrioCoords({ lat: hood.lat, lng: hood.lng })
+          }
+        }
+      } catch (e) {
+        console.error('No se pudo cargar ubicación del barrio:', e)
+      }
+    })()
+  }, [mapaAbierto, barrioCoords])
+
+  /* ---------- GPS del usuario ----------
+     Al abrir el mapa, pedimos la ubicación real del dispositivo.
+     Si el user acepta, centramos ahí y auto-pineamos (si no hay pin).
+     Si la rechaza o falla, seguimos con barrioCoords → Santiago. ---------- */
+  useEffect(() => {
+    if (!mapaAbierto || userCoords) return
+    if (!navigator.geolocation) return
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const coords = { lat: pos.coords.latitude, lng: pos.coords.longitude }
+        setUserCoords(coords)
+        // Auto-pinear en mi ubicación si no hay pin todavía
+        setPinCoords((prev) => prev || coords)
+      },
+      () => { /* silent — fallback a barrioCoords */ },
+      { enableHighAccuracy: true, timeout: 5000, maximumAge: 60000 }
+    )
+  }, [mapaAbierto, userCoords])
+
+  // shortenAddress: toma la respuesta de Nominatim y arma una dirección
+  // CORTA y legible (ej: 'Latadia 4616, Las Condes' en vez del display_name
+  // kilométrico que viene por defecto con provincia/región/país/código postal).
+  // Estrategia: usa los campos estructurados de `address` (road, house_number,
+  // neighbourhood/suburb/city/commune) y los junta con coma. Si no hay
+  // nada útil, cae a las primeras 2 partes del display_name.
+  const shortenAddress = (nominatim) => {
+    if (!nominatim) return ''
+    const a = nominatim.address || {}
+    const calle = [a.road, a.pedestrian, a.footway, a.path, a.cycleway]
+      .find(Boolean)
+    const numero = a.house_number
+    const street = numero && calle ? `${calle} ${numero}` : (calle || numero || '')
+    const local = a.neighbourhood || a.suburb || a.city_district ||
+      a.city || a.town || a.commune || a.village || a.hamlet
+    const parts = [street, local].filter(Boolean)
+    if (parts.length > 0) return parts.join(', ')
+    // fallback: primeras 2 partes del display_name
+    return (nominatim.display_name || '').split(',').slice(0, 2).join(',').trim()
+  }
+
+  // Reverse geocode al cambiar el pin (debounce 300ms).
+  // Llena el campo de texto con la dirección CORTA detectada — el user
+  // puede editarla después. Así pinear O escribir son la misma fuente.
+  useEffect(() => {
+    if (!pinCoords) return
+    setLoadingAddr(true)
+    const t = setTimeout(() => {
+      fetch(
+        `https://nominatim.openstreetmap.org/reverse?lat=${pinCoords.lat}&lon=${pinCoords.lng}&format=json&accept-language=es`
+      )
+        .then((r) => r.json())
+        .then((d) => {
+          const addr = shortenAddress(d)
+          if (addr) setAlertLocation(addr)
+        })
+        .catch(() => {})
+        .finally(() => setLoadingAddr(false))
+    }, 300)
+    return () => clearTimeout(t)
+  }, [pinCoords])
+
+  // Búsqueda de dirección via Nominatim (gratis, sin API key, solo Chile).
+  const buscar = async () => {
+    if (!searchQ.trim()) return
+    try {
+      const r = await fetch(
+        `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(searchQ)}` +
+        `&format=json&limit=5&countrycodes=cl&accept-language=es`
+      )
+      const data = await r.json()
+      setResults(data)
+    } catch {}
+  }
+
+  const elegirResultado = (r) => {
+    const lat = parseFloat(r.lat), lng = parseFloat(r.lon)
+    setPinCoords({ lat, lng })
+    setAlertLocation(shortenAddress(r))
+    setResults([])
+    setSearchQ('')
   }
 
   /* ---------- PUBLICAR ---------- */
@@ -217,6 +402,9 @@ function CreatePost({ onClose, onPublished, startWith }) {
       if (!rubro) return setError('Elige una categoría')
       if (!plazo) return setError('Indica para cuándo lo necesitas')
       if (!budgetOpen && !budget) return setError('Indica un presupuesto o marca "A convenir"')
+    } else if (t === 'alert') {
+      if (!alertCategory) return setError('Elige un tipo de alerta')
+      if (!content.trim()) return setError('Describe qué pasó')
     } else if (t === 'sell') {
       if (!title.trim()) return setError('Ponle un título a tu producto')
       if (!price) return setError('Ingresa un precio')
@@ -259,7 +447,56 @@ function CreatePost({ onClose, onPublished, startWith }) {
         urls.push(urlData.publicUrl)
       }
 
-      // Payload base
+      /* ── ALERTA va a incident_reports (tabla separada) ──
+         No pasa por posts. expires_at se calcula solo según categoría.
+         lat/lng se incluyen si el user pineó en el mapa (con fallback
+         si las columnas no existen en el schema). ── */
+      if (t === 'alert') {
+        const incident = {
+          reporter_id: profile.id,
+          neighborhood_id: profile.neighborhood_id,
+          description: content.trim(),
+          category: alertCategory,
+          location_text: alertLocation.trim() || null,
+          latitude: pinCoords?.lat || null,
+          longitude: pinCoords?.lng || null,
+          images: urls.length > 0 ? urls : null,
+          expires_at: calcExpiresAt(alertCategory),
+          status: 'active',
+          confirms_count: 0,
+          // distance_meters queda null — se calculará con GPS real.
+        }
+
+        const { error: alertErr } = await supabase
+          .from('incident_reports')
+          .insert([incident])
+
+        if (alertErr) {
+          // Fallback: si faltan columnas (images, latitude, longitude),
+          // reintenta sin ellas. Cubre el caso de schema sin migrar.
+          if (alertErr.code === '42703' || alertErr.message?.includes('column')) {
+            const stripped = { ...incident }
+            delete stripped.images
+            delete stripped.latitude
+            delete stripped.longitude
+            const { error: retryErr } = await supabase
+              .from('incident_reports')
+              .insert([stripped])
+            if (retryErr) throw retryErr
+          } else {
+            throw alertErr
+          }
+        }
+
+        setStep('success')
+        setTimeout(() => {
+          onPublished?.()
+          onClose?.()
+        }, 1400)
+        return
+      }
+
+      // Payload base para posts (request / sell / gift / trade)
       const post = {
         author_id: profile.id,
         neighborhood_id: profile.neighborhood_id,
@@ -401,12 +638,42 @@ function CreatePost({ onClose, onPublished, startWith }) {
   if (step === 'success') {
     return (
       <div style={s.container}>
+        <style>{`
+          @keyframes ebPop {
+            0%   { transform: scale(0.3); opacity: 0; }
+            55%  { transform: scale(1.15); opacity: 1; }
+            75%  { transform: scale(0.95); }
+            100% { transform: scale(1); }
+          }
+          @keyframes ebFadeUp {
+            0%   { transform: translateY(8px); opacity: 0; }
+            100% { transform: translateY(0); opacity: 1; }
+          }
+          @keyframes ebRing {
+            0%   { transform: scale(0.8); opacity: 0.5; }
+            100% { transform: scale(2.2); opacity: 0; }
+          }
+        `}</style>
         <div style={s.overlay}>
-          <div style={s.successCircle}><IcoCheck /></div>
-          <div style={s.successTitle}>Listo</div>
-          <div style={s.successText}>
+          <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            {/* Anillo expansivo detrás del check */}
+            <div style={{
+              position: 'absolute', width: 88, height: 88, borderRadius: '50%',
+              background: VERDE, animation: 'ebRing 0.9s ease-out 0.2s 1 both',
+            }} />
+            <div style={{
+              ...s.successCircle,
+              animation: 'ebPop 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) both',
+            }}>
+              <IcoCheck />
+            </div>
+          </div>
+          <div style={{ ...s.successTitle, animation: 'ebFadeUp 0.4s ease-out 0.4s both' }}>Listo</div>
+          <div style={{ ...s.successText, animation: 'ebFadeUp 0.4s ease-out 0.55s both' }}>
             {selectedType.id === 'request'
               ? 'Tus vecinos ya recibieron tu pedido'
+              : selectedType.id === 'alert'
+              ? 'Tu alerta ya llegó a tus vecinos'
               : 'Tus vecinos ya lo pueden ver'}
           </div>
         </div>
@@ -418,6 +685,9 @@ function CreatePost({ onClose, onPublished, startWith }) {
      PANTALLA — FORMULARIO
      ============================================================ */
   const t = selectedType.id
+
+  // Categoría de alerta elegida (para mostrar hint dinámico)
+  const alertCatElegida = ALERT_CATEGORIES.find((c) => c.key === alertCategory)
 
   return (
     <div style={s.container}>
@@ -438,6 +708,217 @@ function CreatePost({ onClose, onPublished, startWith }) {
       </div>
 
       <div style={s.formScroll}>
+
+        {/* ---------- ALERTA VECINAL ---------- */}
+        {t === 'alert' && (
+          <div style={s.form}>
+            <div style={s.hintBoxAlerta}>
+              <IcoAlerta size={14} />
+              <span>
+                Las alertas llegan a todos tus vecinos. Úsalas con criterio
+                para cosas que importen ahora.
+              </span>
+            </div>
+
+            <label style={s.labelFirst}>¿Qué tipo de alerta?</label>
+            <div style={s.alertCatList}>
+              {ALERT_CATEGORIES.map((c) => {
+                const activo = alertCategory === c.key
+                return (
+                  <button
+                    key={c.key}
+                    onClick={() => setAlertCategory(c.key)}
+                    style={{
+                      ...s.alertCat,
+                      background: activo ? c.bg : '#fff',
+                      borderColor: activo ? c.color : '#e5e7eb',
+                    }}
+                  >
+                    <div style={{ ...s.alertCatIcon, background: c.bg, color: c.color }}>
+                      <IcoAlerta size={18} />
+                    </div>
+                    <div style={s.alertCatText}>
+                      <div style={{
+                        ...s.alertCatLabel,
+                        color: activo ? c.color : '#111827',
+                      }}>
+                        {c.label}
+                      </div>
+                      <div style={s.alertCatDesc}>{c.desc}</div>
+                      <div style={s.alertCatHours}>
+                        <IcoReloj size={11} />
+                        <span>Expira en {c.hours}h</span>
+                      </div>
+                    </div>
+                    <span style={{
+                      ...s.alertCatCheck,
+                      color: activo ? c.color : 'transparent',
+                    }}>
+                      <Ico size={16}><polyline points="20 6 9 17 4 12" /></Ico>
+                    </span>
+                  </button>
+                )
+              })}
+            </div>
+
+            <label style={s.label}>¿Qué pasó?</label>
+            <textarea
+              placeholder="Sé concreto y objetivo. Sin nombres ni acusaciones. Ej: Acaban de intentar forzar la reja de la casa esquinera de Houston."
+              value={content}
+              onChange={(e) => setContent(e.target.value)}
+              style={{ ...s.input, minHeight: 100, resize: 'vertical' }}
+            />
+
+            <label style={s.label}>
+              <span style={{ display: 'inline-flex', verticalAlign: '-3px', marginRight: 4 }}>
+                <IcoUbicacion size={14} />
+              </span>
+              Ubicación <span style={s.opt}>(opcional)</span>
+            </label>
+            <div style={s.ubicRow}>
+              <input
+                type="text"
+                placeholder="Ej: Esquina Houston, Plaza de Armas"
+                value={alertLocation}
+                onChange={(e) => setAlertLocation(e.target.value)}
+                style={s.ubicInput}
+              />
+              <button
+                type="button"
+                onClick={() => setMapaAbierto(!mapaAbierto)}
+                style={{
+                  ...s.ubicMapBtn,
+                  background: mapaAbierto ? VERDE : '#dcfce7',
+                  color: mapaAbierto ? '#fff' : VERDE_OSC,
+                  borderColor: mapaAbierto ? VERDE : VERDE,
+                }}
+              >
+                <IcoUbicacion size={16} />
+                <span>{mapaAbierto ? 'Cerrar' : 'Mapa'}</span>
+              </button>
+            </div>
+
+            {pinCoords && (
+              <div style={s.pinInfo}>
+                <IcoCheck size={12} />
+                <span>
+                  Pin: {pinCoords.lat.toFixed(4)}, {pinCoords.lng.toFixed(4)}
+                  {loadingAddr && ' · cargando dirección...'}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setPinCoords(null)}
+                  style={s.pinClear}
+                  aria-label="Quitar pin"
+                >
+                  <IcoCerrar size={12} />
+                </button>
+              </div>
+            )}
+
+            {mapaAbierto && (
+              <div style={s.mapWrap}>
+                <div style={s.searchBox}>
+                  <input
+                    type="text"
+                    placeholder="Buscar dirección en Chile..."
+                    value={searchQ}
+                    onChange={(e) => setSearchQ(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && buscar()}
+                    style={s.searchInput}
+                  />
+                  <button onClick={buscar} style={s.searchBtn}>Buscar</button>
+                </div>
+
+                {results.length > 0 && (
+                  <div style={s.searchResults}>
+                    {results.map((r, i) => (
+                      <button
+                        key={i}
+                        style={s.searchResultItem}
+                        onClick={() => elegirResultado(r)}
+                      >
+                        <span style={{ color: VERDE, display: 'flex', flexShrink: 0, marginTop: 1 }}>
+                          <IcoUbicacion size={14} />
+                        </span>
+                        <span style={{ display: 'flex', flexDirection: 'column', gap: 1, minWidth: 0 }}>
+                          <span style={{ fontSize: 13, fontWeight: 600, color: '#111827' }}>
+                            {shortenAddress(r)}
+                          </span>
+                          <span style={{
+                            fontSize: 10.5, color: '#9ca3af', fontWeight: 400,
+                            whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                          }}>
+                            {(r.display_name || '').split(',').slice(2).join(',').trim()}
+                          </span>
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                <MiniMap
+                  editable
+                  lat={pinCoords?.lat}
+                  lng={pinCoords?.lng}
+                  centerLat={userCoords?.lat || barrioCoords?.lat || -33.4489}
+                  centerLng={userCoords?.lng || barrioCoords?.lng || -70.6693}
+                  height={200}
+                  zoom={15}
+                  onPick={(lat, lng) => setPinCoords({ lat, lng })}
+                />
+
+                {/* Botón "usar mi GPS" — recentra y pinea donde estás ahora */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!navigator.geolocation) return
+                    navigator.geolocation.getCurrentPosition(
+                      (pos) => {
+                        const c = { lat: pos.coords.latitude, lng: pos.coords.longitude }
+                        setUserCoords(c)
+                        setPinCoords(c)
+                      },
+                      () => {},
+                      { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
+                    )
+                  }}
+                  style={s.gpsBtn}
+                >
+                  <IcoUbicacion size={14} />
+                  <span>Usar mi ubicación</span>
+                </button>
+
+                <div style={s.mapHintInline}>
+                  <span style={{ color: VERDE, display: 'flex' }}>
+                    <IcoUbicacion size={13} />
+                  </span>
+                  <span>
+                    {pinCoords
+                      ? (loadingAddr
+                        ? 'Buscando dirección...'
+                        : 'Toca el mapa para mover el pin')
+                      : 'Toca el mapa para colocar el pin'}
+                  </span>
+                </div>
+              </div>
+            )}
+
+            <Fotos
+              images={images} previews={previews}
+              onUpload={handleImageUpload} onRemove={removeImage}
+            />
+
+            {alertCatElegida && (
+              <div style={{ ...s.hintBox, marginTop: 18, marginBottom: 0 }}>
+                <strong>Esta alerta estará activa {alertCatElegida.hours} horas.</strong>
+                <br />
+                Los vecinos pueden confirmarla. Si se confirma 3+ veces,
+                se marca como verificada.
+              </div>
+            )}
+          </div>
+        )}
 
         {/* ---------- PEDIDO VECINAL ---------- */}
         {t === 'request' && (
@@ -701,7 +1182,8 @@ function CreatePost({ onClose, onPublished, startWith }) {
 
       <div style={s.footer}>
         <button onClick={handlePublish} style={s.publishBtn}>
-          {t === 'request' ? 'Enviar pedido al barrio' :
+          {t === 'alert' ? 'Enviar alerta al barrio' :
+           t === 'request' ? 'Enviar pedido al barrio' :
            t === 'sell' ? 'Publicar venta' :
            t === 'gift' ? 'Publicar regalo' :
            'Publicar intercambio'}
@@ -852,6 +1334,14 @@ const s = {
     borderRadius: 12, fontSize: 12.5, fontWeight: 500,
     lineHeight: 1.45, marginBottom: 18,
   },
+  /* hintBox para alertas — tono rojo suave, con icono */
+  hintBoxAlerta: {
+    display: 'flex', alignItems: 'flex-start', gap: 8,
+    padding: '12px 14px',
+    background: '#fee2e2', color: '#991b1b',
+    borderRadius: 12, fontSize: 12.5, fontWeight: 500,
+    lineHeight: 1.45, marginBottom: 18,
+  },
 
   chipGrid2: { display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8 },
   chipGrid3: { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 },
@@ -869,6 +1359,32 @@ const s = {
   photoHint: {
     fontSize: 11.5, color: '#6b7280', lineHeight: 1.4,
     marginTop: -2, marginBottom: 10,
+  },
+
+  /* --- categorías de alerta (cards grandes con descripción + horas) --- */
+  alertCatList: { display: 'flex', flexDirection: 'column', gap: 8 },
+  alertCat: {
+    display: 'flex', alignItems: 'center', gap: 12,
+    padding: 12, borderRadius: 14,
+    border: '1.5px solid #e5e7eb', background: '#fff',
+    cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left',
+    transition: 'background 0.15s',
+  },
+  alertCatIcon: {
+    width: 38, height: 38, borderRadius: 10, flexShrink: 0,
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+  },
+  alertCatText: { flex: 1, display: 'flex', flexDirection: 'column', gap: 1, minWidth: 0 },
+  alertCatLabel: { fontSize: 14, fontWeight: 700 },
+  alertCatDesc: { fontSize: 11.5, color: '#6b7280', fontWeight: 500 },
+  alertCatHours: {
+    display: 'flex', alignItems: 'center', gap: 4,
+    fontSize: 10.5, color: '#9ca3af', fontWeight: 600,
+    marginTop: 2,
+  },
+  alertCatCheck: {
+    flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
+    width: 22, height: 22,
   },
 
   row: { display: 'flex', gap: 8, alignItems: 'stretch' },
@@ -955,6 +1471,85 @@ const s = {
   },
   successTitle: { fontSize: 22, fontWeight: 800, color: '#111827', marginTop: 6 },
   successText: { fontSize: 13, color: '#6b7280', textAlign: 'center' },
+
+  /* --- ubicación (input + botón mapa + pin info) --- */
+  ubicRow: { display: 'flex', gap: 8, alignItems: 'stretch' },
+  ubicInput: {
+    flex: 1, padding: '14px 16px', fontSize: 15,
+    background: '#fff', border: '1.5px solid #e5e7eb', borderRadius: 12,
+    color: '#111827', fontFamily: 'inherit', outline: 'none',
+    boxSizing: 'border-box',
+  },
+  ubicMapBtn: {
+    display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+    gap: 2, padding: '0 14px',
+    background: '#dcfce7', color: VERDE_OSC,
+    border: `1.5px solid ${VERDE}`,
+    borderRadius: 12, cursor: 'pointer', fontFamily: 'inherit',
+    fontSize: 10.5, fontWeight: 700, whiteSpace: 'nowrap',
+  },
+  pinInfo: {
+    display: 'flex', alignItems: 'center', gap: 6,
+    marginTop: 8, padding: '8px 12px',
+    background: '#dcfce7', color: VERDE_OSC,
+    borderRadius: 10, fontSize: 12, fontWeight: 600,
+  },
+  pinClear: {
+    marginLeft: 'auto', width: 22, height: 22, borderRadius: '50%',
+    background: 'rgba(22,163,74,0.15)', color: VERDE_OSC,
+    border: 'none', cursor: 'pointer', padding: 0,
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+  },
+
+  /* --- mapa inline (MiniMap editable + búsqueda) --- */
+  mapWrap: {
+    marginTop: 10,
+    display: 'flex', flexDirection: 'column', gap: 8,
+  },
+  searchBox: {
+    display: 'flex', gap: 8,
+  },
+  searchInput: {
+    flex: 1, padding: '11px 14px', fontSize: 14,
+    background: '#fff', border: '1.5px solid #e5e7eb', borderRadius: 999,
+    color: '#111827', fontFamily: 'inherit', outline: 'none',
+    boxSizing: 'border-box',
+  },
+  searchBtn: {
+    padding: '0 18px', borderRadius: 999,
+    background: VERDE, color: '#fff',
+    fontSize: 13, fontWeight: 700, whiteSpace: 'nowrap',
+    border: 'none', cursor: 'pointer', fontFamily: 'inherit',
+  },
+  searchResults: {
+    maxHeight: 200, overflowY: 'auto',
+    background: '#fff', border: '1px solid #eef0ee',
+    borderRadius: 12,
+    boxShadow: '0 4px 12px rgba(0,0,0,0.06)',
+  },
+  searchResultItem: {
+    display: 'flex', alignItems: 'flex-start', gap: 8,
+    width: '100%', padding: '11px 14px',
+    background: 'none', border: 'none', borderBottom: '1px solid #f5f5f5',
+    cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left',
+    fontSize: 12.5, color: '#374151', lineHeight: 1.4,
+  },
+  mapHintInline: {
+    display: 'flex', alignItems: 'center', gap: 6,
+    padding: '7px 12px',
+    background: '#f0fdf4', color: VERDE_OSC,
+    borderRadius: 999, fontSize: 11.5, fontWeight: 600,
+    alignSelf: 'flex-start',
+  },
+  gpsBtn: {
+    display: 'flex', alignItems: 'center', gap: 6,
+    alignSelf: 'flex-start',
+    padding: '8px 14px',
+    background: '#fff', color: VERDE_OSC,
+    border: `1.5px solid ${VERDE}`,
+    borderRadius: 999, fontSize: 12, fontWeight: 700,
+    cursor: 'pointer', fontFamily: 'inherit',
+  },
 }
 
 export default CreatePost

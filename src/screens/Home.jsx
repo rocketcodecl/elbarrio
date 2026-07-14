@@ -10,20 +10,17 @@ import PedidoCard from '../components/PedidoCard'
   INICIO — el Radar del barrio.
 
   Estructura del feed:
-    1. Header (saludo + ubicación)
+    1. Header
     2. Clima + Farmacia
-    3. Accesos rápidos (NO repetidos con el footer):
-       Pedidos · Comercios · Trueques · Favoritos
-    4. Pedidos vecinales
-       - Barra amarilla "¿Necesitás una mano?" (siempre)
-       - Cards de pedidos activos (si hay)
-    5. Alertas de el barrio
-    6. Actividad de el barrio
+    3. Accesos: Pedidos · Comercios · Noticias · Alertas
+    4. Pedidos vecinales (barra amarilla + cards full-width)
+    5. Alertas (cards full-width, con distancia "Estás a xx m")
+    6. Mercado (scroll lateral: ventas + regalos + trueques juntos)
+    7. Actividad de el barrio (vertical, 6 + pill "+ ver más")  ← feed principal
+    8. Eventos (scroll lateral, abajo del feed principal)
 
-  "el barrio" va SIEMPRE en minúscula y en verde marca (C.verde).
-
-  Un pedido = post type='request'. Vive en la tabla posts.
-  No se muestra si needed_by ya pasó (filtro en JS).
+  "el barrio" siempre minúscula y en verde (C.verde).
+  Stats (❤️ 💬 👁️) fuera del feed. Distancia solo en alertas.
 */
 
 const CLIMA_EMOJI = (code) => {
@@ -38,19 +35,129 @@ const CLIMA_EMOJI = (code) => {
   return { e: '🌤️', t: '' }
 }
 
-/* Accesos de la grilla de Inicio (NO se repiten con el footer). */
 const ACCESOS_HOME = [
   { id: 'pedidos',   emoji: '🙋', label: 'Pedidos',   bg: C.doradoSuave },
   { id: 'comercios', emoji: '🏪', label: 'Comercios', bg: C.verdeSuave },
-  { id: 'trueques',  emoji: '🔄', label: 'Trueques',  bg: C.azulSuave },
-  { id: 'favoritos', emoji: '⭐', label: 'Favoritos', bg: C.moradoSuave },
+  { id: 'noticias',  emoji: '📰', label: 'Noticias',  bg: C.azulSuave },
+  { id: 'alertas',   emoji: '🚨', label: 'Alertas',   bg: C.rojoSuave },
 ]
+
+/* ── Íconos lineales (verde marca) para títulos de sección ──
+   Mismo lenguaje visual que el TabBar: trazo 1.9, sin relleno,
+   extremos redondos. Heredan C.verde por defecto. ── */
+const Ico = {
+  alerta: ({ size = 17, color = C.verde }) => (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
+      stroke={color} strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+      <path d="M12 9v4" />
+      <path d="M12 17h.01" />
+    </svg>
+  ),
+  mercado: ({ size = 17, color = C.verde }) => (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
+      stroke={color} strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z" />
+      <path d="M3 6h18" />
+      <path d="M16 10a4 4 0 0 1-8 0" />
+    </svg>
+  ),
+  eventos: ({ size = 17, color = C.verde }) => (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
+      stroke={color} strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M8 2v4" />
+      <path d="M16 2v4" />
+      <rect width="18" height="18" x="3" y="4" rx="2" />
+      <path d="M3 10h18" />
+    </svg>
+  ),
+  actividad: ({ size = 17, color = C.verde }) => (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
+      stroke={color} strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
+      <path d="m3 11 18-5v12L3 14v-3z" />
+      <path d="M11.6 16.8a3 3 0 1 1-5.8-1.6" />
+    </svg>
+  ),
+  /* Pin de mapa lineal (verde marca) — reemplaza al pin con fondo blanco */
+  pin: ({ size = 11, color = C.verde }) => (
+    <svg width={size} height={size + 2} viewBox="0 0 24 24" fill="none"
+      stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z" />
+      <circle cx="12" cy="10" r="3" />
+    </svg>
+  ),
+}
+
+/* ── Card horizontal para scroll lateral ──
+   wide=true → card más ancha (210px) con foto más alta (96px).
+   Se usa en Eventos para diferenciarse del Mercado (compacto, 140px). ── */
+function PostCardH({ post, onClick, wide }) {
+  const t = TIPOS[post.type] || TIPOS.general
+  const autor = post.author || {}
+  return (
+    <button style={{ ...s.cardH, ...(wide ? s.cardHWide : {}) }} onClick={onClick}>
+      <div style={{ ...s.cardHFoto, background: t.bg, ...(wide ? s.cardHFotoWide : {}) }}>
+        {post.images?.[0]
+          ? <img src={post.images[0]} alt="" style={s.cardHImg} />
+          : <span style={s.cardHEmoji}>{t.emoji}</span>}
+      </div>
+      {post.price > 0
+        ? <div style={s.cardHPrecio}>{plata(post.price)}</div>
+        : <div style={s.cardHPrecioAlt}>{t.corto}</div>}
+      <div style={s.cardHTit}>{post.title}</div>
+      <div style={s.cardHAutor}>
+        <span style={s.cardHAvatar}>
+          {autor.avatar_url
+            ? <img src={autor.avatar_url} alt="" style={s.cardHAvatarImg} />
+            : <span>{iniciales(autor.full_name)}</span>}
+        </span>
+        <span style={s.cardHAutorTxt}>
+          {(autor.full_name || 'Vecino').split(' ')[0]}
+        </span>
+        {autor.verified && <span style={{ fontSize: 8 }}>✅</span>}
+      </div>
+    </button>
+  )
+}
+
+// haversine: distancia en METROS entre 2 coords (lat/lng).
+// Se usa para calcular qué tan lejos está cada alerta del usuario.
+// No necesita PostGIS ni triggers — puro JS con la lat/lng que ya
+// viene en incident_reports (la setea el user al pinear en CreatePost).
+const haversine = (lat1, lng1, lat2, lng2) => {
+  if (lat1 == null || lng1 == null || lat2 == null || lng2 == null) return null
+  const R = 6371000 // radio de la Tierra en metros
+  const toRad = (d) => (d * Math.PI) / 180
+  const dLat = toRad(lat2 - lat1)
+  const dLng = toRad(lng2 - lng1)
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2
+  return Math.round(R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)))
+}
+
+// Convierte un hex (#dc2626) a rgba con alpha. Se usa para que cada
+// tarjeta de alerta tenga su halo pulse del color de su categoría
+// (seguridad=rojo, salud=verde, infra=naranja, mascotas=violeta, otro=gris).
+// Si el hex viene mal, cae a rojo por defecto (color de seguridad).
+const hexToRgba = (hex, alpha) => {
+  if (!hex || typeof hex !== 'string') return `rgba(220,38,38,${alpha})`
+  const h = hex.replace('#', '').trim()
+  if (h.length !== 6) return `rgba(220,38,38,${alpha})`
+  const r = parseInt(h.substring(0, 2), 16)
+  const g = parseInt(h.substring(2, 4), 16)
+  const b = parseInt(h.substring(4, 6), 16)
+  return `rgba(${r},${g},${b},${alpha})`
+}
 
 function Home({ currentUser, onNavigate, onCrear }) {
   const [profile, setProfile] = useState(null)
   const [barrio, setBarrio] = useState(null)
   const [alertas, setAlertas] = useState([])
   const [pedidos, setPedidos] = useState([])
+  const [ventas, setVentas] = useState([])
+  const [regalos, setRegalos] = useState([])
+  const [eventos, setEventos] = useState([])
   const [actividad, setActividad] = useState([])
   const [noLeidos, setNoLeidos] = useState(0)
   const [clima, setClima] = useState(null)
@@ -58,75 +165,200 @@ function Home({ currentUser, onNavigate, onCrear }) {
   const [cargando, setCargando] = useState(true)
   const [busqueda, setBusqueda] = useState('')
   const [verBuscador, setVerBuscador] = useState(false)
+  const [verMasActividad, setVerMasActividad] = useState(false)
+  const [userCoords, setUserCoords] = useState(null)
 
-  useEffect(() => { cargar() }, [currentUser?.id])
+  // ── CACHE LOCAL (stale-while-revalidate) ──
+  // La primera vez que entra, baja todo y lo guarda en localStorage con
+  // timestamp. La segunda vez, pinta INSTANTANEAMENTE con el cache viejo
+  // y refresca en segundo plano. Así el Home "vuela" cuando volvés.
+  const CACHE_KEY = 'elbarrio_home_v1'
 
-  const cargar = async () => {
-    if (!currentUser?.id) return
-    setCargando(true)
+  // Lee el cache del localStorage. Si hay, pinta todo instantáneamente
+  // (sin spinner) y deja cargando=false. Después cargar() refresca en
+  // background silenciosamente.
+  const leerCache = () => {
     try {
-      const { data: p } = await supabase
+      const raw = localStorage.getItem(CACHE_KEY)
+      if (!raw) return null
+      const c = JSON.parse(raw)
+      if (!c || !c.profile) return null
+      // TTL de seguridad: si el cache tiene más de 1 hora, lo ignoramos
+      // (probablemente está desactualizado y mejor mostrar spinner).
+      if (Date.now() - c.ts > 60 * 60 * 1000) return null
+      return c
+    } catch { return null }
+  }
+
+  const escribirCache = (data) => {
+    try {
+      localStorage.setItem(CACHE_KEY, JSON.stringify({ ...data, ts: Date.now() }))
+    } catch {}
+  }
+
+  useEffect(() => {
+    // 1) Pintar cache instantáneamente si existe (sin spinner).
+    const cache = leerCache()
+    if (cache) {
+      setProfile(cache.profile)
+      setBarrio(cache.barrio)
+      setAlertas(cache.alertas || [])
+      setPedidos(cache.pedidos || [])
+      setVentas(cache.ventas || [])
+      setRegalos(cache.regalos || [])
+      setEventos(cache.eventos || [])
+      setActividad(cache.actividad || [])
+      setNoLeidos(cache.noLeidos || 0)
+      setClima(cache.clima || null)
+      setCargando(false)  // ya tenemos algo que mostrar
+      // Si el cache tenía barrio pero NO clima (primer cacheo, o se borró),
+      // disparamos cargarClima AHORA — en paralelo con cargar(), no después.
+      // Así el bloque clima+farmacia aparece lo antes posible.
+      if (cache.barrio?.lat && cache.barrio?.lng && !cache.clima) {
+        cargarClima(cache.barrio.lat, cache.barrio.lng)
+      }
+    }
+    // 2) Lanzar refresh en background (stale-while-revalidate).
+    cargar(cache?.profile?.neighborhood_id)
+  }, [currentUser?.id])
+
+  // GPS del usuario: pedimos una vez al montar el Home.
+  // Si lo acepta, guardamos las coords para calcular distancia a cada alerta.
+  // Si lo rechaza, las alertas sin lat/lng simplemente no muestran distancia.
+  useEffect(() => {
+    if (!navigator.geolocation) return
+    navigator.geolocation.getCurrentPosition(
+      (pos) => setUserCoords({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+      () => {},
+      // Sin enableHighAccuracy: el GPS de alta precisión tarda 3-8s en móvil.
+      // Con maximumAge: 5min reutilizamos la última posición conocida.
+      { enableHighAccuracy: false, timeout: 5000, maximumAge: 300000 }
+    )
+  }, [])
+
+  // neighborhoodIdOpt: si viene del cache, arrancamos las queries en paralelo
+  // SIN esperar el profile del servidor (ya lo tenemos del cache). Eso
+  // ahorra 200-400ms de query serial bloqueante.
+  const cargar = async (neighborhoodIdOpt) => {
+    if (!currentUser?.id) return
+    // Solo mostramos spinner si NO tenemos cache (primera vez).
+    const cache = leerCache()
+    if (!cache) setCargando(true)
+    try {
+      // ── Paso 1 (paralelo con todo): profile del usuario ──
+      // Si tenemos neighborhood_id del cache, no necesitamos esperar el
+      // profile para lanzar las queries de abajo — lo hacemos en paralelo.
+      let p = cache?.profile
+      const profilePromise = supabase
         .from('profiles').select('*')
         .eq('user_id', currentUser.id).maybeSingle()
-      if (!p) return
-      setProfile(p)
 
-      const [hoodRes, alertRes, pedidosRes, otrosRes, msgRes] = await Promise.all([
+      if (!p) {
+        // Primera vez: esperamos el profile (no hay otra opción).
+        const { data: pData } = await profilePromise
+        p = pData
+        if (!p) return
+        setProfile(p)
+      }
+
+      const neighborhoodId = neighborhoodIdOpt || p.neighborhood_id
+
+      // ── Paso 2: 4 queries en paralelo (antes eran 9) ──
+      // Unificamos pedidos/ventas/regalos/eventos/actividad en UNA sola
+      // query a posts con type IN (...) y limit alto. Particionamos en JS.
+      const TIPOS_FEED = ['request', 'sell', 'gift', 'trade', 'event', 'general']
+      const selectPost = '*, author:profiles!author_id (full_name, avatar_url, badge_founder, verified)'
+
+      const [profileRes, hoodRes, alertRes, postsRes, msgRes] = await Promise.all([
+        // Refresca el profile en background si lo teníamos del cache.
+        cache ? profilePromise : Promise.resolve({ data: p }),
         supabase.from('neighborhoods').select('*')
-          .eq('id', p.neighborhood_id).maybeSingle(),
+          .eq('id', neighborhoodId).maybeSingle(),
 
         supabase.from('incident_reports')
           .select('*, reporter:profiles!reporter_id (full_name, avatar_url, badge_founder)')
-          .eq('neighborhood_id', p.neighborhood_id)
+          .eq('neighborhood_id', neighborhoodId)
           .eq('status', 'active')
-          .gt('expires_at', new Date().toISOString())
           .order('confirms_count', { ascending: false })
-          .order('created_at', { ascending: false })
-          .limit(5),
-
-        // Pedidos: type='request', traemos 10 y filtramos vencidos en JS
-        supabase.from('posts')
-          .select('*, author:profiles!author_id (full_name, avatar_url, badge_founder, verified)')
-          .eq('neighborhood_id', p.neighborhood_id)
-          .eq('status', 'active')
-          .eq('type', 'request')
           .order('created_at', { ascending: false })
           .limit(10),
 
-        // Otros posts: excluimos request para que no se mezclen
+        // UNA sola query para todo el feed (antes eran 6 separadas).
         supabase.from('posts')
-          .select('*, author:profiles!author_id (full_name, avatar_url, badge_founder, verified)')
-          .eq('neighborhood_id', p.neighborhood_id)
+          .select(selectPost)
+          .eq('neighborhood_id', neighborhoodId)
           .eq('status', 'active')
-          .neq('type', 'request')
+          .in('type', TIPOS_FEED)
           .order('created_at', { ascending: false })
-          .limit(20),
+          .limit(60),
 
         supabase.from('messages')
           .select('id', { count: 'exact', head: true })
           .eq('receiver_id', p.id).eq('read', false),
       ])
 
+      // Si el profile refrescado trae datos nuevos, los usamos.
+      const profileFresco = profileRes?.data || p
+      if (profileFresco && profileFresco !== p) setProfile(profileFresco)
+
       setBarrio(hoodRes.data)
-      setAlertas(alertRes.data || [])
 
-      // Filtrar pedidos vencidos (needed_by ya pasado) y ordenar por urgencia
+      // Alertas: filtrar expiradas en JS (no en el servidor) para no romper
+      // si la columna expires_at no existe en el schema.
+      if (alertRes.error) {
+        console.error('[el barrio] Error cargando alertas:', alertRes.error)
+      }
+      const ahoraMs = Date.now()
+      const alertasActivas = (alertRes.data || []).filter((a) => {
+        if (!a.expires_at) return true
+        return new Date(a.expires_at).getTime() > ahoraMs
+      })
+      setAlertas(alertasActivas)
+
+      // ── Particionar posts por type (en vez de 6 queries) ──
+      const todos = postsRes.data || []
       const ahora = Date.now()
-      const pedidosActivos = (pedidosRes.data || []).filter((p) => {
-        if (!p.needed_by) return true
-        return new Date(p.needed_by).getTime() > ahora
-      })
-      pedidosActivos.sort((a, b) => {
-        const pa = a.needed_by ? new Date(a.needed_by).getTime() : Infinity
-        const pb = b.needed_by ? new Date(b.needed_by).getTime() : Infinity
-        return pa - pb
-      })
-      setPedidos(pedidosActivos)
+      const pedidosActivos = todos
+        .filter((x) => x.type === 'request' && (!x.needed_by || new Date(x.needed_by).getTime() > ahora))
+        .sort((a, b) => {
+          const pa = a.needed_by ? new Date(a.needed_by).getTime() : Infinity
+          const pb = b.needed_by ? new Date(b.needed_by).getTime() : Infinity
+          return pa - pb
+        })
+        .slice(0, 10)
 
-      setActividad(otrosRes.data || [])
+      const ventas = todos.filter((x) => x.type === 'sell').slice(0, 10)
+      const regalos = todos.filter((x) => x.type === 'gift' || x.type === 'trade').slice(0, 10)
+      const eventos = todos.filter((x) => x.type === 'event').slice(0, 10)
+      const actividad = todos.filter((x) => x.type === 'general').slice(0, 20)
+
+      setPedidos(pedidosActivos)
+      setVentas(ventas)
+      setRegalos(regalos)
+      setEventos(eventos)
+      setActividad(actividad)
       setNoLeidos(msgRes.count || 0)
 
-      cargarClima(hoodRes.data?.lat, hoodRes.data?.lng)
+      // ── Guardar cache para la próxima vez ──
+      escribirCache({
+        profile: profileFresco,
+        barrio: hoodRes.data,
+        alertas: alertasActivas,
+        pedidos: pedidosActivos,
+        ventas, regalos, eventos, actividad,
+        noLeidos: msgRes.count || 0,
+        clima: cache?.clima || null,
+      })
+
+      // Clima: se refresca si (a) no hay cache, (b) cambió el barrio,
+      // o (c) el clima cacheado tiene más de 30 min (stale). El clima
+      // cambia con el tiempo, no queremos mostrarlo stale por horas.
+      const CLIMA_TTL = 30 * 60 * 1000  // 30 min
+      const climaStale = !cache?.clima || (cache.clima?.ts && Date.now() - cache.clima.ts > CLIMA_TTL)
+      const barrioCambio = cache?.barrio?.id !== hoodRes.data?.id
+      if (hoodRes.data && (!cache || climaStale || barrioCambio)) {
+        cargarClima(hoodRes.data?.lat, hoodRes.data?.lng)
+      }
     } catch (err) {
       console.error('Error cargando el radar:', err)
     } finally {
@@ -143,10 +375,21 @@ function Home({ currentUser, onNavigate, onCrear }) {
       )
       const d = await r.json()
       if (d?.current) {
-        setClima({
+        const nuevoClima = {
           temp: Math.round(d.current.temperature_2m),
           ...CLIMA_EMOJI(d.current.weather_code),
-        })
+          // guardamos ts para poder invalidar el clima a los 30 min
+          // (el clima cambia, no queremos mostrarlo stale por horas).
+          ts: Date.now(),
+        }
+        setClima(nuevoClima)
+        // ⚠️ FIX: persistir el clima al cache. Antes no lo hacíamos, así
+        // que en cada visita cache.clima era null y el bloque aparecía 1s
+        // después. Ahora se guarda y la próxima vez pinta instantáneo.
+        const cache = leerCache()
+        if (cache) {
+          escribirCache({ ...cache, clima: nuevoClima })
+        }
       }
     } catch {}
   }
@@ -154,20 +397,20 @@ function Home({ currentUser, onNavigate, onCrear }) {
   const nav = onNavigate || (() => {})
   const crear = onCrear || (() => {})
 
+  // Buscador filtra sobre TODOS los posts visibles (actividad + ventas + regalos + eventos)
+  const todosLosPosts = [...actividad, ...ventas, ...regalos, ...eventos]
   const filtrados = busqueda.trim()
-    ? actividad.filter((p) =>
+    ? todosLosPosts.filter((p) =>
         (p.title || '').toLowerCase().includes(busqueda.toLowerCase()) ||
         (p.content || '').toLowerCase().includes(busqueda.toLowerCase()))
     : actividad
 
   const onAcceso = (id) => {
-    if (id === 'pedidos') {
-      crear('request')
-    } else if (id === 'comercios') {
-      nav('comercios')
-    } else {
-      nav(id)
-    }
+    if (id === 'pedidos') crear('request')
+    else if (id === 'comercios') nav('comercios')
+    else if (id === 'noticias') nav('noticias')
+    else if (id === 'alertas') nav('alertas')
+    else nav(id)
   }
 
   if (cargando) {
@@ -182,8 +425,29 @@ function Home({ currentUser, onNavigate, onCrear }) {
 
   const nombre = (profile?.full_name || '').split(' ')[0] || 'vecino'
 
+  // Si hay búsqueda activa, ocultamos las filas laterales y mostramos solo resultados verticales
+  const buscando = busqueda.trim().length > 0
+
+  // Mercado = ventas + regalos/trueques en una sola fila (ordenados por fecha)
+  const mercado = [...ventas, ...regalos].sort((a, b) =>
+    new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+  )
+
   return (
     <div style={s.wrap}>
+
+      {/* ══════ Keyframes inyectados: pulse radial para tarjetas de alerta ══════
+          El color del halo lo define cada tarjeta vía --pulse-color (CSS var),
+          así cada alerta pulsea con el color de su categoría (seguridad=rojo,
+          salud=verde, infra=naranja, mascotas=violeta, otro=gris). */}
+      <style>{`
+        @keyframes elBarrioPulse {
+          0%   { box-shadow: 0 0 0 0 var(--pulse-color, rgba(220,38,38,0.35)); }
+          70%  { box-shadow: 0 0 0 10px transparent; }
+          100% { box-shadow: 0 0 0 0 transparent; }
+        }
+        .alerta-pulse { animation: elBarrioPulse 2.4s ease-out infinite; }
+      `}</style>
 
       {/* ══════ CABECERA ══════ */}
       <div style={s.header}>
@@ -260,7 +524,7 @@ function Home({ currentUser, onNavigate, onCrear }) {
           </div>
         )}
 
-        {/* ══════ ACCESOS RÁPIDOS (no repetidos con el footer) ══════ */}
+        {/* ══════ ACCESOS RÁPIDOS ══════ */}
         <div style={s.accesos}>
           {ACCESOS_HOME.map((a) => (
             <button
@@ -275,84 +539,150 @@ function Home({ currentUser, onNavigate, onCrear }) {
         </div>
 
         {/* ══════ PEDIDOS VECINALES ══════ */}
-        <div style={s.seccion}>
-          {/* Barra amarilla siempre visible, sin título */}
-          <button
-            style={s.pedirBarra}
-            onClick={() => crear('request')}
-          >
-            <span style={s.pedirBarraEmoji}>🙋</span>
-            <span style={s.pedirBarraTxt}>
-              <span style={s.pedirBarraTit}>¿Necesitás una mano?</span>
-              <span style={s.pedirBarraSub}>Gasfíter, flete, cuidado de perro...</span>
-            </span>
-            <span style={s.pedirBarraCta}>Pedir</span>
-          </button>
-
-          {/* Cards de pedidos activos (si hay) */}
-          {pedidos.map((p) => (
-            <PedidoCard
-              key={p.id}
-              post={{ ...p, deadline: p.needed_by }}
-              onAyudar={(pedido) => nav('chat', {
-                postId: pedido.id,
-                mensajeInicial: '🙋 Me anoté para ayudarte con esto',
-              })}
-              onVerDetalle={(pedido) => nav('post', { postId: pedido.id })}
-            />
-          ))}
-        </div>
-
-        {/* ══════ ALERTAS ══════ */}
-        {alertas.length > 0 && (
+        {!buscando && (
           <div style={s.seccion}>
-            <div style={s.seccionTit}>
-              <span style={s.seccionTxt}>
-                🚨 Alertas de <span style={s.marca}>el barrio</span>
+            <button style={s.pedirBarra} onClick={() => crear('request')}>
+              <span style={s.pedirBarraEmoji}>🙋</span>
+              <span style={s.pedirBarraTxt}>
+                <span style={s.pedirBarraTit}>¿Necesitás una mano?</span>
+                <span style={s.pedirBarraSub}>Gasfíter, flete, cuidado de perro...</span>
               </span>
-              <span style={s.pulso} />
-            </div>
+              <span style={s.pedirBarraCta}>Pedir</span>
+            </button>
 
-            {alertas.map((a) => {
-              const cat = REPORTES[a.category] || REPORTES.seguridad
-              const urgente = a.category === 'seguridad' || a.category === 'salud'
-              const confirmado = a.confirms_count >= 3
-              return (
-                <div
-                  key={a.id}
-                  style={{ ...s.alertaCard, borderLeft: `4px solid ${cat.color}` }}
-                  onClick={() => nav('alerta', { id: a.id })}
-                >
-                  <div style={s.alertaTop}>
-                    <span style={s.alertaEmoji}>{cat.emoji}</span>
-                    <span style={{ ...s.alertaTitulo, color: cat.color }}>
-                      {cat.label}
-                    </span>
-                    {urgente && <span style={s.urgentePill}>URGENTE</span>}
-                  </div>
-
-                  <div style={s.alertaTexto}>{a.description}</div>
-
-                  <div style={s.alertaMeta}>
-                    {a.location_text && (
-                      <span style={s.metaItem}>📍 {a.location_text}</span>
-                    )}
-                    <span style={s.metaItem}>🕐 {hace(a.created_at)}</span>
-                    {confirmado && (
-                      <span style={s.confirmado}>✅ {a.confirms_count} vecinos</span>
-                    )}
-                  </div>
-                </div>
-              )
-            })}
+            {pedidos.map((p) => (
+              <PedidoCard
+                key={p.id}
+                post={{ ...p, deadline: p.needed_by }}
+                onAyudar={(pedido) => nav('chat', {
+                  postId: pedido.id,
+                  mensajeInicial: '🙋 Me anoté para ayudarte con esto',
+                })}
+                onVerDetalle={(pedido) => nav('post', { postId: pedido.id })}
+              />
+            ))}
           </div>
         )}
 
-        {/* ══════ ACTIVIDAD ══════ */}
+        {/* ══════ ALERTAS (tira horizontal compacta, máx 3) ══════
+            Título: solo "Alertas".
+            Pin: lineal verde marca, sin fondo blanco.
+            Texto: "Estás a xx m" (metros desde el user vía Haversine).
+            Radial: clase .alerta-pulse anima un halo rojo suave. */}
+        {!buscando && (
+          <div style={s.seccion}>
+            <div style={s.seccionTit}>
+              <Ico.alerta />
+              <span style={s.seccionTxt}>Alertas</span>
+              {alertas.length > 0 && (
+                <button
+                  style={s.verTodasBtn}
+                  onClick={() => nav('alertas')}
+                >
+                  Ver todas
+                  <span style={s.verTodasFlecha}>→</span>
+                </button>
+              )}
+            </div>
+
+            {alertas.length === 0 ? (
+              <button style={s.alertaVaciaStrip} onClick={() => nav('alertas')}>
+                <span style={{ fontSize: 18, lineHeight: 1 }}>🚨</span>
+                <span style={s.alertaVaciaTxt}>
+                  No hay alertas activas ahora.
+                  <span style={s.alertaVaciaCta}>Ver centro de alertas →</span>
+                </span>
+              </button>
+            ) : (
+              <div style={s.scrollH}>
+                {alertas.slice(0, 3).map((a) => {
+                  const cat = REPORTES[a.category] || REPORTES.seguridad
+                  // Distancia: preferimos la calculada con Haversine desde
+                  // el GPS del user hasta la lat/lng de la alerta. Si no hay
+                  // GPS o la alerta no tiene coords, cae a distance_meters.
+                  const metros = (a.latitude && a.longitude && userCoords)
+                    ? haversine(userCoords.lat, userCoords.lng, a.latitude, a.longitude)
+                    : a.distance_meters
+                  return (
+                    <button
+                      key={a.id}
+                      className="alerta-pulse"
+                      style={{
+                        ...s.alertaStrip,
+                        background: cat.bg,
+                        // El halo del pulse toma el color de la categoría.
+                        '--pulse-color': hexToRgba(cat.color, 0.35),
+                      }}
+                      onClick={() => nav('alerta', { id: a.id })}
+                    >
+                      <div style={s.alertaStripTop}>
+                        <span style={s.alertaStripEmoji}>{cat.emoji}</span>
+                        <span style={{ ...s.alertaStripCat, color: cat.color }}>
+                          {cat.label}
+                        </span>
+                      </div>
+                      <div style={s.alertaStripDesc}>
+                        {a.description}
+                      </div>
+                      <div style={s.alertaStripPie}>
+                        {metros != null && (
+                          <span style={s.alertaStripDist}>
+                            <Ico.pin size={11} color={C.verde} /> Estás a {metros} m
+                          </span>
+                        )}
+                        <span style={s.alertaStripTime}>| {hace(a.created_at)}</span>
+                        {a.confirms_count >= 3 && (
+                          <span style={s.alertaStripConf}>✅ {a.confirms_count}</span>
+                        )}
+                      </div>
+                    </button>
+                  )
+                })}
+
+                {/* Pill "Ver todas" al final de la tira */}
+                <button
+                  style={s.alertaStripMore}
+                  onClick={() => nav('alertas')}
+                >
+                  <span style={s.alertaStripMoreEmoji}>→</span>
+                  <span style={s.alertaStripMoreTxt}>
+                    Ver todas<br />las alertas
+                  </span>
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ══════ MERCADO (scroll lateral: ventas + regalos + trueques juntos) ══════
+            Card sin minHeight en título → no queda espacio vacío abajo.
+            marginBottom: 20 inline para separar bien de Actividad de el barrio. */}
+        {!buscando && mercado.length > 0 && (
+          <div style={{ ...s.seccion, marginBottom: 20 }}>
+            <div style={s.seccionTit}>
+              <Ico.mercado />
+              <span style={s.seccionTxt}>Mercado</span>
+              {mercado.length > 6 && <span style={s.cantidad}>{mercado.length}</span>}
+            </div>
+            <div style={s.scrollH}>
+              {mercado.slice(0, 15).map((p) => (
+                <PostCardH
+                  key={p.id}
+                  post={p}
+                  onClick={() => nav('post', { postId: p.id })}
+                />
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* ══════ ACTIVIDAD DE EL BARRIO (vertical, 6 + "+ ver más") ══════
+            Feed principal — ahora queda ARRIBA de Eventos para que no se pierda. */}
         <div style={s.seccion}>
           <div style={s.seccionTit}>
+            <Ico.actividad />
             <span style={s.seccionTxt}>
-              🏘️ Actividad de <span style={s.marca}>el barrio</span>
+              Actividad de <span style={s.marca}>el barrio</span>
             </span>
           </div>
 
@@ -363,59 +693,93 @@ function Home({ currentUser, onNavigate, onCrear }) {
               <div style={s.vacioTxt}>Sé el primero en publicar algo.</div>
             </div>
           ) : (
-            filtrados.map((p) => {
-              const t = TIPOS[p.type] || TIPOS.general
-              const dist = distancia(p.distance_meters)
-              return (
-                <div
-                  key={p.id}
-                  style={s.postCard}
-                  onClick={() => nav('post', { postId: p.id })}
+            <>
+              {filtrados.slice(0, verMasActividad ? filtrados.length : 6).map((p) => {
+                const t = TIPOS[p.type] || TIPOS.general
+                return (
+                  <div
+                    key={p.id}
+                    style={s.postCard}
+                    onClick={() => nav('post', { postId: p.id })}
+                  >
+                    <div style={{ ...s.postFoto, background: t.bg }}>
+                      {p.images?.[0]
+                        ? <img src={p.images[0]} alt="" style={s.postImg} />
+                        : <span style={s.postEmoji}>{t.emoji}</span>}
+                    </div>
+
+                    <div style={s.postInfo}>
+                      <div style={s.postChips}>
+                        <span style={{ ...s.chip, background: t.bg, color: t.color }}>
+                          {t.corto}
+                        </span>
+                        {p.price > 0 && <span style={s.precio}>{plata(p.price)}</span>}
+                        {p.is_negotiable && <span style={s.chipNeg}>Conversable</span>}
+                      </div>
+
+                      <div style={s.postTit}>{p.title}</div>
+                      {p.content && <div style={s.postTxt}>{p.content}</div>}
+
+                      <div style={s.postPie}>
+                        <span style={s.autorAvatar}>
+                          {p.author?.avatar_url
+                            ? <img src={p.author.avatar_url} alt="" style={s.autorImg} />
+                            : iniciales(p.author?.full_name)}
+                        </span>
+                        <span style={s.autorNombre}>
+                          {(p.author?.full_name || 'Vecino').split(' ')[0]}
+                        </span>
+                        {p.author?.verified && <span style={s.badgeMini}>✅</span>}
+                        {p.author?.badge_founder && <span style={s.badgeMini}>⭐</span>}
+                        <span style={s.postMeta}>· {hace(p.created_at)}</span>
+                      </div>
+                    </div>
+                  </div>
+                )
+              })}
+
+              {!verMasActividad && filtrados.length > 6 && (
+                <button
+                  style={s.verMasBtn}
+                  onClick={() => setVerMasActividad(true)}
                 >
-                  <div style={{ ...s.postFoto, background: t.bg }}>
-                    {p.images?.[0]
-                      ? <img src={p.images[0]} alt="" style={s.postImg} />
-                      : <span style={s.postEmoji}>{t.emoji}</span>}
-                  </div>
-
-                  <div style={s.postInfo}>
-                    <div style={s.postChips}>
-                      <span style={{ ...s.chip, background: t.bg, color: t.color }}>
-                        {t.corto}
-                      </span>
-                      {p.price > 0 && <span style={s.precio}>{plata(p.price)}</span>}
-                      {p.is_negotiable && <span style={s.chipNeg}>Conversable</span>}
-                    </div>
-
-                    <div style={s.postTit}>{p.title}</div>
-                    {p.content && <div style={s.postTxt}>{p.content}</div>}
-
-                    <div style={s.postPie}>
-                      <span style={s.autorAvatar}>
-                        {p.author?.avatar_url
-                          ? <img src={p.author.avatar_url} alt="" style={s.autorImg} />
-                          : iniciales(p.author?.full_name)}
-                      </span>
-                      <span style={s.autorNombre}>
-                        {(p.author?.full_name || 'Vecino').split(' ')[0]}
-                      </span>
-                      {p.author?.verified && <span style={s.badgeMini}>✅</span>}
-                      {p.author?.badge_founder && <span style={s.badgeMini}>⭐</span>}
-                      {dist && <span style={s.postMeta}>· 📍 {dist}</span>}
-                      <span style={s.postMeta}>· {hace(p.created_at)}</span>
-                    </div>
-
-                    <div style={s.stats}>
-                      <span style={s.stat}>❤️ {p.likes_count || 0}</span>
-                      <span style={s.stat}>💬 {p.comments_count || 0}</span>
-                      <span style={s.stat}>👁️ {p.views_count || 0}</span>
-                    </div>
-                  </div>
-                </div>
-              )
-            })
+                  + ver más ({filtrados.length - 6})
+                </button>
+              )}
+              {verMasActividad && filtrados.length > 6 && (
+                <button
+                  style={s.verMasBtn}
+                  onClick={() => setVerMasActividad(false)}
+                >
+                  Ver menos
+                </button>
+              )}
+            </>
           )}
         </div>
+
+        {/* ══════ EVENTOS (scroll lateral) ══════
+            Movido al FINAL, bajo Actividad de el barrio — el feed principal
+            ya no se pierde tapado por esta fila. */}
+        {!buscando && eventos.length > 0 && (
+          <div style={s.seccion}>
+            <div style={s.seccionTit}>
+              <Ico.eventos />
+              <span style={s.seccionTxt}>Eventos</span>
+              {eventos.length > 6 && <span style={s.cantidad}>{eventos.length}</span>}
+            </div>
+            <div style={s.scrollH}>
+              {eventos.slice(0, 10).map((p) => (
+                <PostCardH
+                  key={p.id}
+                  post={p}
+                  wide
+                  onClick={() => nav('post', { postId: p.id })}
+                />
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* ══════ MODAL DE FARMACIAS ══════ */}
@@ -484,9 +848,7 @@ const s = {
   },
   headerTop: { display: 'flex', alignItems: 'center', gap: 10 },
   saludo: {
-    fontSize: 16,
-    fontWeight: 500,
-    color: C.texto,
+    fontSize: 16, fontWeight: 500, color: C.texto,
     letterSpacing: '-0.1px',
     whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
   },
@@ -539,18 +901,11 @@ const s = {
     background: C.tira, border: `1px solid ${C.tiraBorde}`,
     borderRadius: 14, padding: '12px 14px', marginBottom: 14,
   },
-  climaBloque: {
-    display: 'flex', alignItems: 'center', gap: 10,
-    flexShrink: 0,
-  },
+  climaBloque: { display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 },
   climaEmoji: { fontSize: 26, lineHeight: 1 },
   climaTemp: { fontSize: 19, fontWeight: 700, color: C.texto, lineHeight: 1.1 },
   climaTxt: { fontSize: 11, color: C.textoTenue, fontWeight: 500, marginTop: 2 },
-  tiraDivisor: {
-    width: 1, height: 34,
-    background: C.tiraBorde,
-    margin: '0 12px', flexShrink: 0,
-  },
+  tiraDivisor: { width: 1, height: 34, background: C.tiraBorde, margin: '0 12px', flexShrink: 0 },
   farmaciaBloque: {
     flex: 1, minWidth: 0,
     background: 'none', border: 'none', padding: 0,
@@ -582,9 +937,7 @@ const s = {
     boxShadow: '0 20px 50px rgba(0,0,0,0.25)',
     maxHeight: '80%', overflowY: 'auto',
   },
-  modalTit: {
-    fontSize: 18, fontWeight: 700, color: C.texto, marginBottom: 16,
-  },
+  modalTit: { fontSize: 18, fontWeight: 700, color: C.texto, marginBottom: 16 },
   farmCard: {
     background: C.tira, border: `1px solid ${C.tiraBorde}`,
     borderRadius: 16, padding: 15, marginBottom: 11,
@@ -626,101 +979,23 @@ const s = {
   accesoLabel: { fontSize: 11, fontWeight: 600, color: C.textoSuave },
 
   /* ── secciones ── */
-  seccion: { marginBottom: 20 },
-  seccionTit: { display: 'flex', alignItems: 'center', marginBottom: 10, gap: 8 },
+  // marginBottom reducido (20→8) para que el gap entre Alertas y Mercado
+  // sea más apretado. Afecta a todas las secciones (queda uniforme).
+  seccion: { marginBottom: 8 },
+  // marginBottom reducido (10→3) para que el título quede más pegado a
+  // sus tarjetas. El scrollH ya aporta 14px de paddingTop (para el halo
+  // del pulse de alertas), así que no hace falta más gap aquí.
+  seccionTit: { display: 'flex', alignItems: 'center', marginBottom: 3, gap: 8 },
   seccionTxt: { fontSize: 15, fontWeight: 700, color: C.texto },
   pulso: {
     width: 8, height: 8, borderRadius: '50%', background: C.rojo,
     marginLeft: 'auto', boxShadow: `0 0 0 4px ${C.rojoSuave}`,
   },
-
-  /* ── alertas ── */
-  alertaCard: {
-    background: C.rojoBg, borderRadius: 12, padding: '12px 13px',
-    marginBottom: 9, border: `1px solid ${C.rojoSuave}`,
-    borderLeftWidth: 3, cursor: 'pointer',
+  cantidad: {
+    fontSize: 11, fontWeight: 700, color: C.textoTenue,
+    background: C.fondo, padding: '2px 8px', borderRadius: 999,
+    marginLeft: 'auto',
   },
-  alertaTop: { display: 'flex', alignItems: 'center', gap: 6, marginBottom: 5 },
-  alertaEmoji: { fontSize: 14 },
-  alertaTitulo: { fontSize: 13.5, fontWeight: 700, flex: 1, minWidth: 0 },
-  urgentePill: {
-    fontSize: 8.5, fontWeight: 800, letterSpacing: 0.3, color: '#fff',
-    background: C.rojo, padding: '3px 6px', borderRadius: 4, flexShrink: 0,
-  },
-  alertaTexto: {
-    fontSize: 13, color: C.textoSuave, lineHeight: 1.5, fontWeight: 400,
-    display: '-webkit-box', WebkitLineClamp: 2,
-    WebkitBoxOrient: 'vertical', overflow: 'hidden',
-  },
-  alertaMeta: {
-    display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 9,
-    marginTop: 7,
-  },
-  metaItem: { fontSize: 11, color: C.textoTenue, fontWeight: 500 },
-  confirmado: {
-    fontSize: 10.5, fontWeight: 700, color: C.verdeOsc,
-    background: C.verdeSuave, padding: '3px 7px', borderRadius: 999,
-  },
-
-  /* ── posts ── */
-  postCard: {
-    display: 'flex', gap: 12,
-    background: C.card, borderRadius: 14, padding: 12,
-    border: `1px solid ${C.borde}`,
-    marginBottom: 9, cursor: 'pointer',
-  },
-  postFoto: {
-    width: 66, height: 66, borderRadius: 11, flexShrink: 0, overflow: 'hidden',
-    display: 'flex', alignItems: 'center', justifyContent: 'center',
-  },
-  postImg: { width: '100%', height: '100%', objectFit: 'cover' },
-  postEmoji: { fontSize: 26 },
-
-  postInfo: { flex: 1, minWidth: 0 },
-  postChips: { display: 'flex', alignItems: 'center', gap: 7, flexWrap: 'wrap' },
-  chip: { fontSize: 10.5, fontWeight: 700, padding: '3px 7px', borderRadius: 5 },
-  precio: { fontSize: 13, fontWeight: 800, color: C.texto },
-  chipNeg: {
-    fontSize: 10, fontWeight: 600, color: C.textoSuave,
-    background: C.fondo, padding: '3px 6px', borderRadius: 5,
-  },
-
-  postTit: {
-    fontSize: 14, fontWeight: 700, color: C.texto,
-    lineHeight: 1.35, marginTop: 5,
-  },
-  postTxt: {
-    fontSize: 12.5, color: C.textoSuave, lineHeight: 1.45, marginTop: 3,
-    display: '-webkit-box', WebkitLineClamp: 2,
-    WebkitBoxOrient: 'vertical', overflow: 'hidden',
-  },
-
-  postPie: {
-    display: 'flex', alignItems: 'center', gap: 4,
-    marginTop: 7, flexWrap: 'wrap',
-  },
-  autorAvatar: {
-    width: 19, height: 19, borderRadius: '50%',
-    background: C.verdeSuave, color: C.verde,
-    fontSize: 8, fontWeight: 800, overflow: 'hidden', flexShrink: 0,
-    display: 'flex', alignItems: 'center', justifyContent: 'center',
-  },
-  autorImg: { width: '100%', height: '100%', objectFit: 'cover' },
-  autorNombre: { fontSize: 11.5, fontWeight: 700, color: C.texto },
-  badgeMini: { fontSize: 9 },
-  postMeta: { fontSize: 10.5, color: C.textoTenue, fontWeight: 500 },
-
-  stats: { display: 'flex', gap: 11, marginTop: 6 },
-  stat: { fontSize: 10.5, color: C.textoTenue, fontWeight: 500 },
-
-  /* ── vacío ── */
-  vacio: {
-    textAlign: 'center', padding: '46px 20px',
-    background: C.card, borderRadius: 18, border: `1px solid ${C.borde}`,
-  },
-  vacioEmoji: { fontSize: 46, marginBottom: 12 },
-  vacioTit: { fontSize: 16.5, fontWeight: 700, color: C.texto, marginBottom: 5 },
-  vacioTxt: { fontSize: 14, color: C.textoTenue, lineHeight: 1.5 },
 
   /* ── pedidos vecinales ── */
   pedirBarra: {
@@ -731,10 +1006,7 @@ const s = {
     cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left',
   },
   pedirBarraEmoji: { fontSize: 20, flexShrink: 0, lineHeight: 1 },
-  pedirBarraTxt: {
-    display: 'flex', flexDirection: 'column', gap: 1,
-    flex: 1, minWidth: 0,
-  },
+  pedirBarraTxt: { display: 'flex', flexDirection: 'column', gap: 1, flex: 1, minWidth: 0 },
   pedirBarraTit: {
     fontSize: 13.5, fontWeight: 700, color: C.texto,
     whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
@@ -748,6 +1020,234 @@ const s = {
     background: C.verde, padding: '7px 14px',
     borderRadius: 999, flexShrink: 0,
     display: 'flex', alignItems: 'center',
+  },
+
+  /* ── alertas (tira horizontal compacta) ── */
+  verTodasBtn: {
+    marginLeft: 'auto',
+    display: 'flex', alignItems: 'center', gap: 4,
+    background: 'none', border: 'none', padding: 0,
+    fontSize: 11.5, fontWeight: 700, color: C.verde,
+    cursor: 'pointer', fontFamily: 'inherit',
+  },
+  verTodasFlecha: { fontSize: 13, lineHeight: 1 },
+  alertaVaciaStrip: {
+    display: 'flex', alignItems: 'center', gap: 10,
+    width: '100%',
+    background: '#fff',
+    border: `1px dashed ${C.rojoSuave}`,
+    borderRadius: 14, padding: '11px 14px',
+    cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left',
+  },
+  alertaVaciaTxt: {
+    flex: 1, fontSize: 12.5, color: C.textoSuave, lineHeight: 1.4,
+    display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0,
+  },
+  alertaVaciaCta: {
+    fontSize: 11.5, fontWeight: 700, color: C.verde,
+  },
+
+  alertaStrip: {
+    flexShrink: 0, width: 168,
+    borderRadius: 14, padding: '11px 12px 9px',
+    border: `1px solid ${C.borde}`,
+    display: 'flex', flexDirection: 'column', gap: 5,
+    cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left',
+    minHeight: 122,
+  },
+  alertaStripTop: {
+    display: 'flex', alignItems: 'center', gap: 5,
+  },
+  alertaStripEmoji: { fontSize: 14, lineHeight: 1 },
+  alertaStripCat: {
+    fontSize: 11.5, fontWeight: 800, letterSpacing: 0.2,
+    textTransform: 'uppercase',
+  },
+  alertaStripDesc: {
+    fontSize: 12.5, color: C.texto, fontWeight: 500, lineHeight: 1.35,
+    display: '-webkit-box', WebkitLineClamp: 2,
+    WebkitBoxOrient: 'vertical', overflow: 'hidden',
+    flex: 1, minHeight: 32,
+  },
+  /* Pie de la tarjeta de alerta: SIN flexWrap para que el pin y el
+     "hace X min" SIEMPRE queden en la misma línea, sin importar cuán
+     largo sea el texto. Si no cabe, se trunca con ellipsis en vez de
+     saltar a otra línea (lo que estaba haciendo que el pin se vaya
+     solo arriba cuando el "hace" era largo). */
+  alertaStripPie: {
+    display: 'flex', alignItems: 'center', gap: 6,
+    marginTop: 'auto',
+    whiteSpace: 'nowrap', overflow: 'hidden',
+  },
+  alertaStripTime: {
+    fontSize: 10, color: C.textoTenue, fontWeight: 500,
+    flexShrink: 0,
+  },
+  /* Pin lineal: sin fondo blanco, verde marca. Sin negrita (era 700)
+     para que visualmente pese igual que el "hace" y queden parejos. */
+  alertaStripDist: {
+    fontSize: 10, fontWeight: 500, color: C.verdeOsc,
+    display: 'inline-flex', alignItems: 'center', gap: 3,
+    whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+    minWidth: 0, flexShrink: 1,
+  },
+  alertaStripConf: {
+    fontSize: 9.5, fontWeight: 700, color: C.verdeOsc,
+    background: '#fff', padding: '1px 5px', borderRadius: 999,
+  },
+
+  alertaStripMore: {
+    flexShrink: 0, width: 78,
+    borderRadius: 14,
+    background: 'transparent',
+    border: `1.5px dashed ${C.borde}`,
+    display: 'flex', flexDirection: 'column', alignItems: 'center',
+    justifyContent: 'center', gap: 6, padding: 12,
+    cursor: 'pointer', fontFamily: 'inherit',
+    minHeight: 122,
+  },
+  alertaStripMoreEmoji: {
+    fontSize: 20, color: C.verde, fontWeight: 700, lineHeight: 1,
+  },
+  alertaStripMoreTxt: {
+    fontSize: 10.5, fontWeight: 700, color: C.verde,
+    textAlign: 'center', lineHeight: 1.3,
+  },
+
+  /* ── scroll horizontal (filas de cards) ──
+     padding vertical reducido (6/4) para que el título quede pegado
+     a sus tarjetas. El halo del pulse de alertas quedará apenas
+     clipado arriba, pero priorizamos compacidad del layout.
+     El overflowX:auto fuerza overflowY:auto (no se puede tener un eje
+     auto y el otro visible) y con este padding chico el box-shadow
+     superior queda algo recortado, pero es aceptable. */
+  scrollH: {
+    display: 'flex', gap: 10,
+    overflowX: 'auto',
+    paddingTop: 6, paddingBottom: 4,
+    WebkitOverflowScrolling: 'touch',
+    scrollbarWidth: 'none',
+    msOverflowStyle: 'none',
+    margin: '0 -16px',
+    paddingLeft: 16, paddingRight: 16,
+  },
+
+  /* ── card horizontal (scroll lateral) ──
+     Sin minHeight en título: si el título es 1 línea, no queda
+     espacio vacío debajo. La foto + título + autor se acomodan
+     uno arriba del otro sin forzar huecos. */
+  cardH: {
+    flexShrink: 0,
+    width: 140,
+    background: C.card,
+    border: `1px solid ${C.borde}`,
+    borderRadius: 14,
+    padding: 7,
+    display: 'flex', flexDirection: 'column', gap: 4,
+    cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left',
+  },
+  /* variante ancha para Eventos (1.5x): foto más alta, gap apretado */
+  cardHWide: { width: 210, gap: 4, padding: 7 },
+  cardHFoto: {
+    width: '100%', height: 80,
+    borderRadius: 10, overflow: 'hidden',
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+  },
+  cardHFotoWide: { height: 96 },
+  cardHImg: { width: '100%', height: '100%', objectFit: 'cover' },
+  cardHEmoji: { fontSize: 28 },
+  cardHPrecio: { fontSize: 12, fontWeight: 800, color: C.texto },
+  cardHPrecioAlt: {
+    fontSize: 10, fontWeight: 700, color: C.verde,
+  },
+  cardHTit: {
+    fontSize: 12.5, fontWeight: 600, color: C.texto,
+    lineHeight: 1.3,
+    display: '-webkit-box', WebkitLineClamp: 2,
+    WebkitBoxOrient: 'vertical', overflow: 'hidden',
+    /* sin minHeight: el título ocupa solo lo que necesita →
+       no queda hueco vacío abajo en Mercado */
+  },
+  cardHAutor: { display: 'flex', alignItems: 'center', gap: 4 },
+  cardHAvatar: {
+    width: 16, height: 16, borderRadius: '50%',
+    background: C.verdeSuave, color: C.verde,
+    fontSize: 7, fontWeight: 800, overflow: 'hidden',
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    flexShrink: 0,
+  },
+  cardHAvatarImg: { width: '100%', height: '100%', objectFit: 'cover' },
+  cardHAutorTxt: {
+    fontSize: 10, color: C.textoTenue, fontWeight: 500,
+    whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+  },
+
+  /* ── posts verticales (Actividad, Option A) ── */
+  postCard: {
+    display: 'flex', gap: 12,
+    background: C.card, borderRadius: 14, padding: 10,
+    border: `1px solid ${C.borde}`,
+    marginBottom: 9, cursor: 'pointer',
+  },
+  postFoto: {
+    width: 56, height: 56, borderRadius: 11, flexShrink: 0, overflow: 'hidden',
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+  },
+  postImg: { width: '100%', height: '100%', objectFit: 'cover' },
+  postEmoji: { fontSize: 24 },
+
+  postInfo: { flex: 1, minWidth: 0 },
+  postChips: { display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' },
+  chip: { fontSize: 10, fontWeight: 700, padding: '2px 6px', borderRadius: 5 },
+  precio: { fontSize: 12.5, fontWeight: 800, color: C.texto },
+  chipNeg: {
+    fontSize: 10, fontWeight: 600, color: C.textoSuave,
+    background: C.fondo, padding: '2px 6px', borderRadius: 5,
+  },
+  postTit: {
+    fontSize: 13.5, fontWeight: 700, color: C.texto,
+    lineHeight: 1.3, marginTop: 4,
+    display: '-webkit-box', WebkitLineClamp: 1,
+    WebkitBoxOrient: 'vertical', overflow: 'hidden',
+  },
+  postTxt: {
+    fontSize: 12, color: C.textoSuave, lineHeight: 1.4, marginTop: 2,
+    display: '-webkit-box', WebkitLineClamp: 1,
+    WebkitBoxOrient: 'vertical', overflow: 'hidden',
+  },
+  postPie: {
+    display: 'flex', alignItems: 'center', gap: 4,
+    marginTop: 5, flexWrap: 'wrap',
+  },
+  autorAvatar: {
+    width: 17, height: 17, borderRadius: '50%',
+    background: C.verdeSuave, color: C.verde,
+    fontSize: 8, fontWeight: 800, overflow: 'hidden', flexShrink: 0,
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+  },
+  autorImg: { width: '100%', height: '100%', objectFit: 'cover' },
+  autorNombre: { fontSize: 11, fontWeight: 700, color: C.texto },
+  badgeMini: { fontSize: 9 },
+  postMeta: { fontSize: 10.5, color: C.textoTenue, fontWeight: 500 },
+
+  /* ── vacío ── */
+  vacio: {
+    textAlign: 'center', padding: '46px 20px',
+    background: C.card, borderRadius: 18, border: `1px solid ${C.borde}`,
+  },
+  vacioEmoji: { fontSize: 46, marginBottom: 12 },
+  vacioTit: { fontSize: 16.5, fontWeight: 700, color: C.texto, marginBottom: 5 },
+  vacioTxt: { fontSize: 14, color: C.textoTenue, lineHeight: 1.5 },
+
+  /* ── ver más / ver menos ── */
+  verMasBtn: {
+    width: '100%', padding: '11px 16px',
+    background: 'transparent',
+    border: `1.5px dashed ${C.borde}`,
+    borderRadius: 12,
+    color: C.verde, fontSize: 13.5, fontWeight: 700,
+    cursor: 'pointer', fontFamily: 'inherit',
+    marginTop: 4,
   },
 }
 
