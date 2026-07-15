@@ -1,588 +1,314 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import { supabase } from './lib/supabase'
-import { C, T } from './lib/design'
-
-import Home from './screens/Home'
-import Alertas from './screens/Alertas'
-import Comercios from './screens/Comercios'            // 👈 NUEVO (1/4)
-import CreatePost from './screens/CreatePost'
-import TabBar from './components/TabBar'
-import CommerceForm from './components/CommerceForm'   // 👈 NUEVO (2/4) — ajustá la ruta si está en otro lado
-
-// 👈 MERCADO (Task 55): screens del marketplace + chat + deal
+import Splash from './screens/Splash'
+import Onboarding from './screens/Onboarding'
+import Register from './screens/Register'
+import Profile from './screens/Profile'
+import Verification from './screens/Verification'
+import Complete from './screens/Complete'
+import Feed from './screens/Feed'
+import MyProfile from './screens/MyProfile'
 import Marketplace from './screens/Marketplace'
 import ProductDetail from './screens/ProductDetail'
-import ChatList from './screens/ChatList'
 import ChatConversation from './screens/ChatConversation'
 import DealDone from './screens/DealDone'
+import CreatePost from './screens/CreatePost'
+import TabBar from './components/TabBar'
+import Barrio from './screens/Barrio'
+import ChatList from './screens/ChatList'
 
-/* ============================================================
-   App — orquestador de El Barrio.
-
-   INCLUYE el phone frame (usa las clases .phone-frame,
-   .phone-notch, .phone-content que ya están definidas en
-   index.css). No necesita wrapper externo en main.jsx.
-   ============================================================ */
-
-function Placeholder({ titulo, onBack, mensaje }) {
-  return (
-    <div style={s.placeholderWrap}>
-      <div style={s.placeholderHeader}>
-        <button style={s.placeholderBack} onClick={() => onBack('inicio')}>←</button>
-        <div style={s.placeholderTit}>{titulo}</div>
-        <div style={{ width: 40 }} />
-      </div>
-      <div style={s.placeholderBody}>
-        <div style={s.placeholderEmoji}>🚧</div>
-        <div style={s.placeholderTit2}>{titulo}</div>
-        <div style={s.placeholderTxt}>
-          {mensaje || 'Esta pantalla todavía no está integrada. Pegá tu componente acá.'}
-        </div>
-      </div>
-    </div>
-  )
+const Icon = {
+  Building: ({ size = 34, color = '#9ca3af' }) => (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="4" y="2" width="16" height="20" rx="2" />
+      <path d="M10 22v-4h4v4" />
+    </svg>
+  ),
+  Message: ({ size = 34, color = '#9ca3af' }) => (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+    </svg>
+  ),
+  Alert: ({ size = 34, color = '#9ca3af' }) => (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="10" />
+      <line x1="12" y1="8" x2="12" y2="12" />
+      <line x1="12" y1="16" x2="12.01" y2="16" />
+    </svg>
+  ),
 }
 
-function App() {
-  const [user, setUser] = useState(null)
-  const [cargandoAuth, setCargandoAuth] = useState(true)
+export default function App() {
+  const [currentScreen, setCurrentScreen] = useState('splash')
+  const [activeTab, setActiveTab] = useState('feed')
+  const [selectedPostId, setSelectedPostId] = useState(null)
+  const [selectedSellerId, setSelectedSellerId] = useState(null)
+  const [currentUser, setCurrentUser] = useState(null)
+  const [profile, setProfile] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [showCreate, setShowCreate] = useState(false)
 
-  const [screen, setScreen] = useState('inicio')
-  const [params, setParams] = useState({})
-  const [activeTab, setActiveTab] = useState('inicio')
-
-  const [createOpen, setCreateOpen] = useState(false)
-  const [createType, setCreateType] = useState(null)
-
-  const [noLeidos, setNoLeidos] = useState(0)
-  const [profile, setProfile] = useState(null)  // 👈 para pasar neighborhoodId a CommerceForm
-
-  /* ── HISTORIAL para navegación back/home (Task 55: necesario para
-     ChatConversation y DealDone, que llaman nav('back') y nav('home')) ── */
-  const historyRef = useRef([])
-
-  /* ── AUTH ── */
   useEffect(() => {
-    let mounted = true
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (!mounted) return
-      setUser(session?.user || null)
-      setCargandoAuth(false)
-    })
-    const { data: sub } = supabase.auth.onAuthStateChange((_e, session) => {
-      setUser(session?.user || null)
-    })
-    return () => {
-      mounted = false
-      sub.subscription.unsubscribe()
-    }
-  }, [])
+    checkSession()
 
-  /* ── PERFIL del user (trae neighborhood_id, is_admin, etc.) ── */
-  useEffect(() => {
-    if (!user?.id) { setProfile(null); return }
-    let active = true
-    supabase
-      .from('profiles').select('*')
-      .eq('user_id', user.id).maybeSingle()
-      .then(({ data }) => { if (active) setProfile(data) })
-    return () => { active = false }
-  }, [user?.id])
-
-  /* ── CONTADORES no leídos ── */
-  useEffect(() => {
-    if (!user) return
-    let active = true
-    const cargarNoLeidos = async () => {
-      try {
-        const { data: prof } = await supabase
-          .from('profiles').select('id')
-          .eq('user_id', user.id).maybeSingle()
-        if (!prof?.id || !active) return
-        const { count } = await supabase
-          .from('messages')
-          .select('id', { count: 'exact', head: true })
-          .eq('receiver_id', prof.id).eq('read', false)
-        if (active) setNoLeidos(count || 0)
-      } catch {}
-    }
-    cargarNoLeidos()
-    const canal = supabase
-      .channel('app-unread')
-      .on('postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'messages' },
-        cargarNoLeidos)
-      .on('postgres_changes',
-        { event: 'UPDATE', schema: 'public', table: 'messages' },
-        cargarNoLeidos)
-      .subscribe()
-    return () => {
-      active = false
-      supabase.removeChannel(canal)
-    }
-  }, [user])
-
-  /* ── NAVIGACIÓN ──
-     Soporta 'back' (vuelve a la pantalla anterior vía historial) y
-     'home' (limpia el historial y vuelve al inicio). El resto de los
-     destinos apilan la pantalla actual para poder volver. */
-  const onNavigate = useCallback((next, p = {}) => {
-    const key = String(next).toLowerCase()
-
-    const tabMap = {
-      inicio: 'inicio', mercado: 'mercado', marketplace: 'mercado',
-      servicios: 'servicios', events: 'eventos', eventos: 'eventos',
-      chat: 'chat', chatlist: 'chat',
-      comercios: 'comercios',
-    }
-
-    const scrollToTop = () => {
-      requestAnimationFrame(() => {
-        const el = document.getElementById('elbarrio-scroll')
-        if (el) el.scrollTop = 0
-      })
-    }
-
-    // BACK: pop del historial
-    if (key === 'back') {
-      const prev = historyRef.current.pop()
-      if (prev) {
-        setScreen(prev.screen)
-        setParams(prev.params || {})
-        setActiveTab(tabMap[String(prev.screen).toLowerCase()] || activeTab)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (session?.user) {
+        setCurrentUser({ id: session.user.id, email: session.user.email })
       } else {
-        historyRef.current = []
-        setScreen('inicio'); setParams({}); setActiveTab('inicio')
+        setCurrentUser(null)
+        setProfile(null)
       }
-      scrollToTop()
+    })
+
+    return () => subscription.unsubscribe()
+  }, [])
+
+  /* ============================================================
+     DECIDE DÓNDE ENTRA EL USUARIO SEGÚN EL ESTADO DE SU PERFIL.
+     Antes se iba directo a 'main' con solo tener sesión: se podía
+     entrar a la app sin nombre, sin RUT y sin verificar.
+     ============================================================ */
+  const checkSession = async () => {
+    const { data: { session } } = await supabase.auth.getSession()
+
+    if (!session?.user) {
+      setCurrentScreen('splash')
+      setLoading(false)
       return
     }
 
-    // HOME: limpia historial y vuelve al inicio
-    if (key === 'home' || key === 'inicio') {
-      historyRef.current = []
-      setScreen('inicio'); setParams({}); setActiveTab('inicio')
-      scrollToTop()
-      return
+    setCurrentUser({ id: session.user.id, email: session.user.email })
+
+    const { data: p } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('user_id', session.user.id)
+      .maybeSingle()
+
+    setProfile(p || null)
+
+    // Falta completar los datos personales
+    if (!p || !p.full_name || !p.rut) {
+      setCurrentScreen('profile')
+    }
+    // Datos listos, pero la ubicación no está confirmada → puerta cerrada
+    else if (p.verification_status !== 'verified') {
+      setCurrentScreen('verification')
+    }
+    // Todo listo
+    else {
+      setCurrentScreen('main')
     }
 
-    // Navegación normal: apilar pantalla actual antes de ir a la nueva
-    historyRef.current.push({ screen, params })
-    setScreen(next)
-    setParams(p)
-    setActiveTab(tabMap[key] || activeTab)
-    scrollToTop()
-  }, [screen, params, activeTab])
+    setLoading(false)
+  }
 
-  /* ── CREAR ── */
-  const onCrear = useCallback((type = null) => {
-    setCreateType(type)
-    setCreateOpen(true)
-  }, [])
+  const recargarPerfil = async () => {
+    if (!currentUser?.id) return null
+    const { data: p } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('user_id', currentUser.id)
+      .maybeSingle()
+    setProfile(p || null)
+    return p
+  }
 
-  const onCerrarCrear = useCallback(() => {
-    setCreateOpen(false)
-    setCreateType(null)
-  }, [])
+  const handleLogout = async () => {
+    await supabase.auth.signOut()
+    setCurrentUser(null)
+    setProfile(null)
+    setActiveTab('feed')
+    setCurrentScreen('splash')
+  }
 
-  // Cuando se crea un comercio, volvemos a la pestaña Comercios (no a inicio)
-  const onPublicadoComercio = useCallback(() => {
-    setCreateOpen(false)
-    setCreateType(null)
-    setScreen('comercios')
-    setActiveTab('comercios')
-  }, [])
+  const flowScreens = ['splash', 'onboarding', 'register', 'profile', 'verification', 'complete']
+  const modalScreens = ['productDetail', 'chatConversation', 'dealDone']
+  const isMainApp = !flowScreens.includes(currentScreen) && !modalScreens.includes(currentScreen)
 
-  const onPublicado = useCallback(() => {
-    setCreateOpen(false)
-    setCreateType(null)
-    setScreen('inicio')
-    setActiveTab('inicio')
-  }, [])
-
-  const onChangeTab = useCallback((tabId) => {
-    const screenMap = {
-      inicio: 'inicio', mercado: 'mercado', servicios: 'servicios',
-      eventos: 'eventos', chat: 'chat', comercios: 'comercios',
+  const onNavigate = (screen, params = {}) => {
+    if (screen === 'ProductDetail' && params.postId) {
+      setSelectedPostId(params.postId)
+      setCurrentScreen('productDetail')
+    } else if (screen === 'Chat' && params.postId && params.sellerId) {
+      setSelectedPostId(params.postId)
+      setSelectedSellerId(params.sellerId)
+      setCurrentScreen('chatConversation')
+    } else if (screen === 'ChatConversation') {
+      setSelectedPostId(params.postId || null)
+      setSelectedSellerId(params.otherUserId)
+      setCurrentScreen('chatConversation')
+    } else if (screen === 'DealDone') {
+      setSelectedPostId(params.postId)
+      setSelectedSellerId(params.sellerId)
+      setCurrentScreen('dealDone')
+    } else if (screen === 'Perfil') {
+      setActiveTab('profile')
+      setCurrentScreen('main')
+    } else if (screen === 'back') {
+      if (currentScreen === 'dealDone') setCurrentScreen('chatConversation')
+      else if (currentScreen === 'chatConversation') setCurrentScreen('productDetail')
+      else setCurrentScreen('main')
+    } else if (screen === 'home') {
+      setActiveTab('feed')
+      setCurrentScreen('main')
+      setSelectedPostId(null)
+      setSelectedSellerId(null)
+    } else {
+      console.log(`Navegación a ${screen} no implementada`)
     }
-    onNavigate(screenMap[tabId] || tabId)
-  }, [onNavigate])
-
-  /* ── BOOT ── */
-  if (cargandoAuth) {
-    return (
-      <div className="phone-frame">
-        <div className="phone-notch" />
-        <div className="phone-content" style={s.bootWrap}>
-          <div style={s.bootLogo}>🏘️</div>
-          <div style={s.bootTxt}>el barrio</div>
-        </div>
-        <div className="phone-home-indicator" />
-      </div>
-    )
   }
 
-  /* ── LOGIN ── */
-  if (!user) {
-    return (
-      <div className="phone-frame">
-        <div className="phone-notch" />
-        <div className="phone-content">
-          <Login />
+  const renderScreen = () => {
+    if (loading) {
+      return (
+        <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#f4f7f4' }}>
+          <img src="/isotipo.png" alt="" style={{ width: 60, opacity: 0.5 }} />
         </div>
-        <div className="phone-home-indicator" />
-      </div>
-    )
-  }
+      )
+    }
 
-  /* ── RENDER PRINCIPAL con phone-frame ── */
-  const mostrarTabBar = !createOpen
+    if (currentScreen === 'splash') return <Splash onFinish={() => setCurrentScreen('onboarding')} />
+    if (currentScreen === 'onboarding') return <Onboarding onFinish={() => setCurrentScreen('register')} />
+
+    if (currentScreen === 'register') {
+      return (
+        <Register
+          onFinish={async () => {
+            // checkSession decide sola dónde entra:
+            //   sin datos  -> profile
+            //   sin verificar -> verification (cuenta en espera)
+            //   verificado -> main
+            await checkSession()
+          }}
+          onBack={() => setCurrentScreen('onboarding')}
+        />
+      )
+    }
+
+    if (currentScreen === 'profile') {
+      return (
+        <Profile
+          onFinish={async () => {
+            await recargarPerfil()
+            setCurrentScreen('verification')
+          }}
+          onBack={handleLogout}
+        />
+      )
+    }
+
+    if (currentScreen === 'verification') {
+      // isPending = ya se había registrado antes y volvió sin verificar
+      const isPending = !!profile?.address && profile?.verification_status !== 'verified'
+      return (
+        <Verification
+          profile={profile}
+          isPending={isPending}
+          onFinish={async () => {
+            await recargarPerfil()
+            setCurrentScreen('complete')
+          }}
+          onBack={handleLogout}
+          onLogout={handleLogout}
+        />
+      )
+    }
+
+    if (currentScreen === 'complete') {
+      return <Complete onFinish={() => setCurrentScreen('main')} />
+    }
+
+    if (currentScreen === 'productDetail') return <ProductDetail postId={selectedPostId} currentUser={currentUser} onNavigate={onNavigate} />
+    if (currentScreen === 'chatConversation') return <ChatConversation postId={selectedPostId} sellerId={selectedSellerId} currentUser={currentUser} onNavigate={onNavigate} />
+    if (currentScreen === 'dealDone') return <DealDone postId={selectedPostId} sellerId={selectedSellerId} currentUser={currentUser} onNavigate={onNavigate} />
+
+    if (!currentUser) {
+      return <Register onFinish={() => checkSession()} onBack={() => setCurrentScreen('onboarding')} />
+    }
+
+    if (activeTab === 'feed') return <Feed currentUser={currentUser} onNavigate={onNavigate} />
+    if (activeTab === 'barrio') return <Barrio currentUser={currentUser} onNavigate={onNavigate} />
+    if (activeTab === 'marketplace') return <Marketplace currentUser={currentUser} onNavigate={onNavigate} />
+    if (activeTab === 'chat') return <ChatList currentUser={currentUser} onNavigate={onNavigate} />
+    if (activeTab === 'profile') return <MyProfile currentUser={currentUser} onLogout={handleLogout} />
+
+    return <PlaceholderScreen title="Pantalla no encontrada" icon="alert" />
+  }
 
   return (
     <div className="phone-frame">
-      <div className="phone-notch" />
+      <div className="phone-notch"></div>
 
-      <div className="phone-content" style={s.contentPad}>
-        <div style={s.root}>
-          <div id="elbarrio-scroll" style={s.screenArea}>
-            {renderScreen({ screen, params, user, onNavigate, onCrear })}
-          </div>
+      <div className="phone-content">{renderScreen()}</div>
 
-          {mostrarTabBar && (
-            <TabBar
-              activeTab={activeTab}
-              onChangeTab={onChangeTab}
-              onCrear={onCrear}
-              noLeidos={noLeidos}
-            />
-          )}
+      {isMainApp && currentUser && (
+        <TabBar
+          activeTab={activeTab}
+          onChangeTab={setActiveTab}
+          onPublish={() => setShowCreate(true)}
+        />
+      )}
 
-          {/* 👈 NUEVO (4/4): si es comercio, abre CommerceForm; si no, CreatePost.
-              CommerceForm acepta { commerce?, neighborhoodId, onClose, onSaved }. */}
-          {createOpen && createType === 'commerce' && (
-            <div style={s.createOverlay}>
-              <CommerceForm
-                neighborhoodId={profile?.neighborhood_id}
-                onClose={onCerrarCrear}
-                onSaved={onPublicadoComercio}
-              />
-            </div>
-          )}
-
-          {createOpen && createType !== 'commerce' && (
-            <div style={s.createOverlay}>
-              <CreatePost
-                startWith={createType}
-                onClose={onCerrarCrear}
-                onPublished={onPublicado}
-              />
-            </div>
-          )}
+      {showCreate && (
+        <div style={{
+          position: 'absolute',
+          top: 0, left: 0, right: 0, bottom: 0,
+          background: '#f4f7f4',
+          zIndex: 9999,
+          overflow: 'hidden',
+        }}>
+          <CreatePost
+            onClose={() => setShowCreate(false)}
+            onPublished={() => setShowCreate(false)}
+          />
         </div>
-      </div>
+      )}
 
-      <div className="phone-home-indicator" />
+      <div className="phone-home-indicator"></div>
     </div>
   )
 }
 
-/* ============================================================
-   renderScreen — switch de navegación
-   ============================================================ */
-function renderScreen({ screen, params, user, onNavigate, onCrear }) {
-  switch (screen) {
-    case 'inicio':
-      return <Home currentUser={user} onNavigate={onNavigate} onCrear={onCrear} />
-
-    case 'alertas':
-      return <Alertas currentUser={user} onNavigate={onNavigate} onCrear={onCrear} />
-
-    case 'alerta':
-      return (
-        <Placeholder
-          titulo="Detalle de alerta"
-          mensaje={`ID: ${params?.id || '—'}. Pegá acá tu AlertaDetail.jsx`}
-          onBack={onNavigate}
-        />
-      )
-
-    /* 👈 MERCADO (Task 55): detalle de publicación real */
-    case 'post':
-    case 'productdetail':
-      return <ProductDetail postId={params?.postId} currentUser={user} onNavigate={onNavigate} />
-
-    /* 👈 MERCADO (Task 55): listado del marketplace real */
-    case 'mercado':
-    case 'marketplace':
-      return <Marketplace currentUser={user} onNavigate={onNavigate} />
-
-    case 'servicios':
-      return <Placeholder titulo="Servicios" mensaje="Pegá acá tu Services.jsx" onBack={onNavigate} />
-
-    case 'eventos':
-    case 'events':
-      return <Placeholder titulo="Eventos" mensaje="Pegá acá tu Events.jsx" onBack={onNavigate} />
-
-    /* 👈 MERCADO (Task 55): lista de conversaciones real */
-    case 'chat':
-    case 'chatlist':
-      return <ChatList currentUser={user} onNavigate={onNavigate} />
-
-    /* 👈 MERCADO (Task 55): conversación de chat real.
-       sellerId puede venir como sellerId (desde ProductDetail) o como
-       otherUserId (desde ChatList). Aceptamos ambos. */
-    case 'chatconversation':
-      return (
-        <ChatConversation
-          postId={params?.postId}
-          sellerId={params?.sellerId || params?.otherUserId}
-          currentUser={user}
-          onNavigate={onNavigate}
-        />
-      )
-
-    /* 👈 MERCADO (Task 55): pantalla "Trato hecho" real */
-    case 'dealdone':
-      return (
-        <DealDone
-          postId={params?.postId}
-          sellerId={params?.sellerId || params?.otherUserId}
-          currentUser={user}
-          onNavigate={onNavigate}
-        />
-      )
-
-    case 'perfil':
-    case 'profile':
-      return <Placeholder titulo="Mi perfil" mensaje="Pegá acá tu Profile.jsx" onBack={onNavigate} />
-
-    case 'notificaciones':
-      return <Placeholder titulo="Notificaciones" mensaje="Pegá acá tu Notifications.jsx" onBack={onNavigate} />
-
-    /* 👈 NUEVO: la pantalla de Comercios real */
-    case 'comercios':
-      return <Comercios currentUser={user} onNavigate={onNavigate} onCrear={onCrear} />
-
-    case 'comercio':
-      return <Comercios currentUser={user} onNavigate={onNavigate} onCrear={onCrear} />
-
-    case 'noticias':
-      return <Placeholder titulo="Noticias" mensaje="Pegá acá tu Noticias.jsx" onBack={onNavigate} />
-
-    default:
-      return <Home currentUser={user} onNavigate={onNavigate} onCrear={onCrear} />
-  }
-}
-
-/* ============================================================
-   LOGIN
-   ============================================================ */
-function Login() {
-  const [modo, setModo] = useState('signin')
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [fullName, setFullName] = useState('')
-  const [cargando, setCargando] = useState(false)
-  const [error, setError] = useState('')
-
-  const submit = async (e) => {
-    e.preventDefault()
-    setError('')
-    setCargando(true)
-    try {
-      if (modo === 'signin') {
-        const { error } = await supabase.auth.signInWithPassword({ email, password })
-        if (error) throw error
-      } else {
-        const { error } = await supabase.auth.signUp({
-          email, password,
-          options: { data: { full_name: fullName } },
-        })
-        if (error) throw error
-        setError('Revisá tu email para confirmar la cuenta.')
-      }
-    } catch (err) {
-      setError(err.message || 'Algo salió mal')
-    } finally {
-      setCargando(false)
-    }
+function PlaceholderScreen({ title, icon = 'alert' }) {
+  const iconMap = {
+    building: <Icon.Building />,
+    message: <Icon.Message />,
+    alert: <Icon.Alert />,
   }
 
   return (
-    <div style={s.loginWrap}>
-      <div style={s.loginCard}>
-        <div style={s.loginLogo}>🏘️</div>
-        <div style={s.loginBrand}>el barrio</div>
-        <div style={s.loginSub}>
-          {modo === 'signin' ? 'Bienvenido de vuelta' : 'Unite a tu barrio'}
-        </div>
-
-        <form onSubmit={submit} style={s.loginForm}>
-          {modo === 'signup' && (
-            <input style={s.loginInput} placeholder="Tu nombre"
-              value={fullName} onChange={(e) => setFullName(e.target.value)} required />
-          )}
-          <input style={s.loginInput} type="email" placeholder="email@barrio.cl"
-            value={email} onChange={(e) => setEmail(e.target.value)} required />
-          <input style={s.loginInput} type="password" placeholder="••••••••"
-            value={password} onChange={(e) => setPassword(e.target.value)}
-            required minLength={6} />
-
-          {error && <div style={s.loginError}>{error}</div>}
-
-          <button type="submit"
-            style={{ ...s.loginBtn, opacity: cargando ? 0.6 : 1 }}
-            disabled={cargando}>
-            {cargando ? 'Cargando...' : (modo === 'signin' ? 'Entrar' : 'Crear cuenta')}
-          </button>
-        </form>
-
-        <button style={s.loginToggle}
-          onClick={() => {
-            setModo(modo === 'signin' ? 'signup' : 'signin')
-            setError('')
-          }}>
-          {modo === 'signin' ? '¿No tenés cuenta? Registrate' : '¿Ya tenés cuenta? Entrá'}
-        </button>
-      </div>
+    <div style={s.wrap}>
+      <div style={s.iconBox}>{iconMap[icon] || <Icon.Alert />}</div>
+      <h2 style={s.title}>{title}</h2>
+      <p style={s.text}>Próximamente</p>
     </div>
   )
 }
 
-/* ============================================================
-   ESTILOS
-   ============================================================ */
 const s = {
-  /* ── Pad del phone-content: dejar aire arriba (notch) y abajo (home indicator) ── */
-  contentPad: {
-    paddingTop: 30,   // espacio para el notch
-    paddingBottom: 0, // el home indicator va encima, no necesitamos pad
-  },
-
-  /* ── ROOT: llena el .phone-content (que ya tiene height: 100%).
-     position: relative → la TabBar (absolute; bottom: 0) se pega acá. ── */
-  root: {
-    width: '100%',
+  wrap: {
     height: '100%',
-    background: C.fondo,
-    fontFamily: T.font,
-    position: 'relative',
-    overflow: 'hidden',
     display: 'flex',
     flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+    textAlign: 'center',
+    padding: 40,
+    backgroundColor: '#f4f7f4',
+    fontFamily: 'system-ui, -apple-system, sans-serif',
   },
-
-  /* ── Área de la pantalla (todo menos la TabBar).
-     flex: 1 + minHeight: 0 → respeta el overflow interno. ── */
-  screenArea: {
-    flex: 1,
-    minHeight: 0,
-    width: '100%',
-    position: 'relative',
-    overflow: 'hidden',
+  iconBox: {
+    width: 74,
+    height: 74,
+    borderRadius: 22,
+    backgroundColor: '#fff',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    boxShadow: '0 2px 8px rgba(0,0,0,0.05)',
+    marginBottom: 18,
   },
-
-  /* ── Overlay de creación (fullscreen, tapa todo incl. TabBar) ── */
-  createOverlay: {
-    position: 'absolute',
-    top: 0, left: 0, right: 0, bottom: 0,
-    zIndex: 500,
-    background: C.fondo,
-  },
-
-  /* ── Boot ── */
-  bootWrap: {
-    width: '100%', height: '100%',
-    display: 'flex', flexDirection: 'column',
-    alignItems: 'center', justifyContent: 'center',
-    background: C.fondo, fontFamily: T.font, gap: 12,
-  },
-  bootLogo: { fontSize: 56 },
-  bootTxt: {
-    fontSize: 22, fontWeight: 700, color: C.verde,
-    letterSpacing: '-0.3px',
-  },
-
-  /* ── placeholder ── */
-  placeholderWrap: {
-    width: '100%', height: '100%',
-    background: C.fondo, fontFamily: T.font,
-    display: 'flex', flexDirection: 'column',
-  },
-  placeholderHeader: {
-    background: C.card,
-    padding: '28px 18px 12px',
-    borderBottom: `1px solid ${C.borde}`,
-    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-    flexShrink: 0,
-  },
-  placeholderBack: {
-    width: 40, height: 40, borderRadius: '50%',
-    background: C.fondo, border: `1px solid ${C.borde}`,
-    color: C.texto, cursor: 'pointer', padding: 0,
-    fontSize: 18, fontFamily: 'inherit',
-  },
-  placeholderTit: { fontSize: 17, fontWeight: 700, color: C.texto },
-  placeholderBody: {
-    flex: 1, display: 'flex', flexDirection: 'column',
-    alignItems: 'center', justifyContent: 'center',
-    padding: 40, gap: 12,
-  },
-  placeholderEmoji: { fontSize: 56 },
-  placeholderTit2: { fontSize: 20, fontWeight: 700, color: C.texto },
-  placeholderTxt: {
-    fontSize: 14, color: C.textoTenue, lineHeight: 1.5,
-    textAlign: 'center', maxWidth: 280,
-  },
-
-  /* ── login ── */
-  loginWrap: {
-    width: '100%', height: '100%',
-    background: C.fondo, fontFamily: T.font,
-    display: 'flex', alignItems: 'center', justifyContent: 'center',
-    padding: 24,
-  },
-  loginCard: {
-    width: '100%', maxWidth: 360,
-    background: C.card, borderRadius: 22,
-    padding: 32, boxShadow: '0 12px 40px rgba(0,0,0,0.06)',
-    border: `1px solid ${C.borde}`,
-  },
-  loginLogo: { fontSize: 48, textAlign: 'center' },
-  loginBrand: {
-    fontSize: 26, fontWeight: 800, color: C.verde,
-    textAlign: 'center', letterSpacing: '-0.3px',
-  },
-  loginSub: {
-    fontSize: 13.5, color: C.textoTenue, textAlign: 'center',
-    marginTop: 4, marginBottom: 24,
-  },
-  loginForm: { display: 'flex', flexDirection: 'column', gap: 10 },
-  loginInput: {
-    width: '100%', padding: '13px 15px',
-    fontSize: 14, background: C.fondo,
-    border: `1.5px solid ${C.borde}`, borderRadius: 12,
-    outline: 'none', fontFamily: 'inherit', color: C.texto,
-    boxSizing: 'border-box',
-  },
-  loginError: {
-    fontSize: 12.5, color: C.rojo,
-    background: C.rojoBg, border: `1px solid ${C.rojoSuave}`,
-    borderRadius: 10, padding: '9px 11px', lineHeight: 1.4,
-  },
-  loginBtn: {
-    width: '100%', padding: '14px 16px', marginTop: 6,
-    background: C.verde, color: '#fff',
-    border: 'none', borderRadius: 12,
-    fontSize: 15, fontWeight: 700,
-    cursor: 'pointer', fontFamily: 'inherit',
-  },
-  loginToggle: {
-    width: '100%', marginTop: 16,
-    background: 'none', border: 'none',
-    color: C.verde, fontSize: 13, fontWeight: 600,
-    cursor: 'pointer', fontFamily: 'inherit',
-  },
+  title: { fontSize: 22, fontWeight: 800, margin: 0, marginBottom: 8, color: '#111' },
+  text: { color: '#6b7280', fontSize: 14, margin: 0 },
 }
-
-export default App
