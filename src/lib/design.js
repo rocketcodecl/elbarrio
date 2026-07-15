@@ -262,3 +262,38 @@ export const saludo = () => {
   if (h < 20) return 'Hola'
   return 'Buenas noches'
 }
+
+/*
+  ADICIONES A design.js  —  pegá esto al FINAL de tu lib/design.js
+  (después de la función `saludo` que ya tenés).
+
+  Agrega 2 exports nuevos:
+    · COMERCIOS      → map de rubro → { emoji, color, bg }
+    · COMERCIOS_CATS → array de rubros (para filtros)
+*/
+
+/* Rubros de comercios (deben coincidir con CATEGORIAS de CommerceForm.jsx) */
+export const COMERCIOS = {
+  'Panadería':   { emoji: '🥖', color: C.dorado,  bg: C.doradoSuave },
+  'Almacén':     { emoji: '🏪', color: C.verde,   bg: C.verdeSuave },
+  'Verdulería':  { emoji: '🥬', color: C.verde,   bg: C.verdeSuave },
+  'Carnicería':  { emoji: '🥩', color: C.rojo,    bg: C.rojoSuave },
+  'Cafetería':   { emoji: '☕', color: C.dorado,  bg: C.doradoSuave },
+  'Restaurante': { emoji: '🍽️', color: C.naranjo, bg: C.naranjoSuave },
+  'Farmacia':    { emoji: '💊', color: C.verde,   bg: C.verdeSuave },
+  'Peluquería':  { emoji: '✂️', color: C.morado,  bg: C.moradoSuave },
+  'Ferretería':  { emoji: '🔨', color: C.naranjo, bg: C.naranjoSuave },
+  'Botillería':  { emoji: '🍷', color: C.morado,  bg: C.moradoSuave },
+  'Librería':    { emoji: '📚', color: C.azul,    bg: C.azulSuave },
+  'Lavandería':  { emoji: '🧺', color: C.azul,    bg: C.azulSuave },
+  'Veterinaria': { emoji: '🐾', color: C.morado,  bg: C.moradoSuave },
+  'Bazar':       { emoji: '🧸', color: C.dorado,  bg: C.doradoSuave },
+  'Otro':        { emoji: '🏪', color: C.textoTenue, bg: C.fondo },
+}
+
+/* Lista de rubros para los filtros (en el orden del CommerceForm) */
+export const COMERCIOS_CATS = [
+  'Panadería', 'Almacén', 'Verdulería', 'Carnicería', 'Cafetería',
+  'Restaurante', 'Farmacia', 'Peluquería', 'Ferretería', 'Botillería',
+  'Librería', 'Lavandería', 'Veterinaria', 'Bazar', 'Otro',
+]

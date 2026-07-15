@@ -4,8 +4,10 @@ import { C, T } from './lib/design'
 
 import Home from './screens/Home'
 import Alertas from './screens/Alertas'
+import Comercios from './screens/Comercios'            // 👈 NUEVO (1/4)
 import CreatePost from './screens/CreatePost'
 import TabBar from './components/TabBar'
+import CommerceForm from './components/CommerceForm'   // 👈 NUEVO (2/4) — ajustá la ruta si está en otro lado
 
 /* ============================================================
    App — orquestador de El Barrio.
@@ -46,6 +48,7 @@ function App() {
   const [createType, setCreateType] = useState(null)
 
   const [noLeidos, setNoLeidos] = useState(0)
+  const [profile, setProfile] = useState(null)  // 👈 para pasar neighborhoodId a CommerceForm
 
   /* ── AUTH ── */
   useEffect(() => {
@@ -63,6 +66,17 @@ function App() {
       sub.subscription.unsubscribe()
     }
   }, [])
+
+  /* ── PERFIL del user (trae neighborhood_id, is_admin, etc.) ── */
+  useEffect(() => {
+    if (!user?.id) { setProfile(null); return }
+    let active = true
+    supabase
+      .from('profiles').select('*')
+      .eq('user_id', user.id).maybeSingle()
+      .then(({ data }) => { if (active) setProfile(data) })
+    return () => { active = false }
+  }, [user?.id])
 
   /* ── CONTADORES no leídos ── */
   useEffect(() => {
@@ -105,6 +119,7 @@ function App() {
       inicio: 'inicio', mercado: 'mercado', marketplace: 'mercado',
       servicios: 'servicios', events: 'eventos', eventos: 'eventos',
       chat: 'chat', chatlist: 'chat',
+      comercios: 'comercios',                                    // 👈 NUEVO (3/4)
     }
     setActiveTab(tabMap[next] || activeTab)
     requestAnimationFrame(() => {
@@ -124,6 +139,14 @@ function App() {
     setCreateType(null)
   }, [])
 
+  // Cuando se crea un comercio, volvemos a la pestaña Comercios (no a inicio)
+  const onPublicadoComercio = useCallback(() => {
+    setCreateOpen(false)
+    setCreateType(null)
+    setScreen('comercios')
+    setActiveTab('comercios')
+  }, [])
+
   const onPublicado = useCallback(() => {
     setCreateOpen(false)
     setCreateType(null)
@@ -134,7 +157,7 @@ function App() {
   const onChangeTab = useCallback((tabId) => {
     const screenMap = {
       inicio: 'inicio', mercado: 'mercado', servicios: 'servicios',
-      eventos: 'eventos', chat: 'chat',
+      eventos: 'eventos', chat: 'chat', comercios: 'comercios',  // 👈 NUEVO
     }
     onNavigate(screenMap[tabId] || tabId)
   }, [onNavigate])
@@ -188,7 +211,19 @@ function App() {
             />
           )}
 
-          {createOpen && (
+          {/* 👈 NUEVO (4/4): si es comercio, abre CommerceForm; si no, CreatePost.
+              CommerceForm acepta { commerce?, neighborhoodId, onClose, onSaved }. */}
+          {createOpen && createType === 'commerce' && (
+            <div style={s.createOverlay}>
+              <CommerceForm
+                neighborhoodId={profile?.neighborhood_id}
+                onClose={onCerrarCrear}
+                onSaved={onPublicadoComercio}
+              />
+            </div>
+          )}
+
+          {createOpen && createType !== 'commerce' && (
             <div style={s.createOverlay}>
               <CreatePost
                 startWith={createType}
@@ -265,8 +300,22 @@ function renderScreen({ screen, params, user, onNavigate, onCrear }) {
     case 'notificaciones':
       return <Placeholder titulo="Notificaciones" mensaje="Pegá acá tu Notifications.jsx" onBack={onNavigate} />
 
+    /* 👈 NUEVO: la pantalla de Comercios real */
     case 'comercios':
-      return <Placeholder titulo="Comercios" mensaje="Pegá acá tu Comercios.jsx" onBack={onNavigate} />
+      return <Comercios currentUser={user} onNavigate={onNavigate} onCrear={onCrear} />
+
+    /* 👈 NUEVO: detalle de un comercio (pantalla pendiente).
+       Por ahora rebota a Comercios para no romper. Cuando armes
+       ComercioDetalle.jsx, reemplazá este case por:
+         return <ComercioDetalle
+                  currentUser={user}
+                  commerceId={params?.id}
+                  commerce={params?.commerce}
+                  onNavigate={onNavigate}
+                />
+    */
+    case 'comercio':
+      return <Comercios currentUser={user} onNavigate={onNavigate} onCrear={onCrear} />
 
     case 'noticias':
       return <Placeholder titulo="Noticias" mensaje="Pegá acá tu Noticias.jsx" onBack={onNavigate} />
