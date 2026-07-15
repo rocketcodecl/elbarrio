@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { supabase } from './lib/supabase'
 import { C, T } from './lib/design'
 
@@ -8,6 +8,13 @@ import Comercios from './screens/Comercios'            // 👈 NUEVO (1/4)
 import CreatePost from './screens/CreatePost'
 import TabBar from './components/TabBar'
 import CommerceForm from './components/CommerceForm'   // 👈 NUEVO (2/4) — ajustá la ruta si está en otro lado
+
+// 👈 MERCADO (Task 55): screens del marketplace + chat + deal
+import Marketplace from './screens/Marketplace'
+import ProductDetail from './screens/ProductDetail'
+import ChatList from './screens/ChatList'
+import ChatConversation from './screens/ChatConversation'
+import DealDone from './screens/DealDone'
 
 /* ============================================================
    App — orquestador de El Barrio.
@@ -49,6 +56,10 @@ function App() {
 
   const [noLeidos, setNoLeidos] = useState(0)
   const [profile, setProfile] = useState(null)  // 👈 para pasar neighborhoodId a CommerceForm
+
+  /* ── HISTORIAL para navegación back/home (Task 55: necesario para
+     ChatConversation y DealDone, que llaman nav('back') y nav('home')) ── */
+  const historyRef = useRef([])
 
   /* ── AUTH ── */
   useEffect(() => {
@@ -111,22 +122,57 @@ function App() {
     }
   }, [user])
 
-  /* ── NAVIGACIÓN ── */
+  /* ── NAVIGACIÓN ──
+     Soporta 'back' (vuelve a la pantalla anterior vía historial) y
+     'home' (limpia el historial y vuelve al inicio). El resto de los
+     destinos apilan la pantalla actual para poder volver. */
   const onNavigate = useCallback((next, p = {}) => {
-    setScreen(next)
-    setParams(p)
+    const key = String(next).toLowerCase()
+
     const tabMap = {
       inicio: 'inicio', mercado: 'mercado', marketplace: 'mercado',
       servicios: 'servicios', events: 'eventos', eventos: 'eventos',
       chat: 'chat', chatlist: 'chat',
-      comercios: 'comercios',                                    // 👈 NUEVO (3/4)
+      comercios: 'comercios',
     }
-    setActiveTab(tabMap[next] || activeTab)
-    requestAnimationFrame(() => {
-      const el = document.getElementById('elbarrio-scroll')
-      if (el) el.scrollTop = 0
-    })
-  }, [activeTab])
+
+    const scrollToTop = () => {
+      requestAnimationFrame(() => {
+        const el = document.getElementById('elbarrio-scroll')
+        if (el) el.scrollTop = 0
+      })
+    }
+
+    // BACK: pop del historial
+    if (key === 'back') {
+      const prev = historyRef.current.pop()
+      if (prev) {
+        setScreen(prev.screen)
+        setParams(prev.params || {})
+        setActiveTab(tabMap[String(prev.screen).toLowerCase()] || activeTab)
+      } else {
+        historyRef.current = []
+        setScreen('inicio'); setParams({}); setActiveTab('inicio')
+      }
+      scrollToTop()
+      return
+    }
+
+    // HOME: limpia historial y vuelve al inicio
+    if (key === 'home' || key === 'inicio') {
+      historyRef.current = []
+      setScreen('inicio'); setParams({}); setActiveTab('inicio')
+      scrollToTop()
+      return
+    }
+
+    // Navegación normal: apilar pantalla actual antes de ir a la nueva
+    historyRef.current.push({ screen, params })
+    setScreen(next)
+    setParams(p)
+    setActiveTab(tabMap[key] || activeTab)
+    scrollToTop()
+  }, [screen, params, activeTab])
 
   /* ── CREAR ── */
   const onCrear = useCallback((type = null) => {
@@ -157,7 +203,7 @@ function App() {
   const onChangeTab = useCallback((tabId) => {
     const screenMap = {
       inicio: 'inicio', mercado: 'mercado', servicios: 'servicios',
-      eventos: 'eventos', chat: 'chat', comercios: 'comercios',  // 👈 NUEVO
+      eventos: 'eventos', chat: 'chat', comercios: 'comercios',
     }
     onNavigate(screenMap[tabId] || tabId)
   }, [onNavigate])
@@ -260,18 +306,15 @@ function renderScreen({ screen, params, user, onNavigate, onCrear }) {
         />
       )
 
+    /* 👈 MERCADO (Task 55): detalle de publicación real */
     case 'post':
-      return (
-        <Placeholder
-          titulo="Detalle de publicación"
-          mensaje={`postId: ${params?.postId || '—'}. Pegá acá tu ProductDetail.jsx`}
-          onBack={onNavigate}
-        />
-      )
+    case 'productdetail':
+      return <ProductDetail postId={params?.postId} currentUser={user} onNavigate={onNavigate} />
 
+    /* 👈 MERCADO (Task 55): listado del marketplace real */
     case 'mercado':
     case 'marketplace':
-      return <Placeholder titulo="Mercado" mensaje="Pegá acá tu Marketplace.jsx" onBack={onNavigate} />
+      return <Marketplace currentUser={user} onNavigate={onNavigate} />
 
     case 'servicios':
       return <Placeholder titulo="Servicios" mensaje="Pegá acá tu Services.jsx" onBack={onNavigate} />
@@ -280,16 +323,32 @@ function renderScreen({ screen, params, user, onNavigate, onCrear }) {
     case 'events':
       return <Placeholder titulo="Eventos" mensaje="Pegá acá tu Events.jsx" onBack={onNavigate} />
 
+    /* 👈 MERCADO (Task 55): lista de conversaciones real */
     case 'chat':
     case 'chatlist':
-      return <Placeholder titulo="Chat" mensaje="Pegá acá tu ChatList.jsx" onBack={onNavigate} />
+      return <ChatList currentUser={user} onNavigate={onNavigate} />
 
+    /* 👈 MERCADO (Task 55): conversación de chat real.
+       sellerId puede venir como sellerId (desde ProductDetail) o como
+       otherUserId (desde ChatList). Aceptamos ambos. */
     case 'chatconversation':
       return (
-        <Placeholder
-          titulo="Conversación"
-          mensaje={`postId: ${params?.postId || '—'}. Pegá acá tu ChatConversation.jsx`}
-          onBack={onNavigate}
+        <ChatConversation
+          postId={params?.postId}
+          sellerId={params?.sellerId || params?.otherUserId}
+          currentUser={user}
+          onNavigate={onNavigate}
+        />
+      )
+
+    /* 👈 MERCADO (Task 55): pantalla "Trato hecho" real */
+    case 'dealdone':
+      return (
+        <DealDone
+          postId={params?.postId}
+          sellerId={params?.sellerId || params?.otherUserId}
+          currentUser={user}
+          onNavigate={onNavigate}
         />
       )
 
@@ -304,16 +363,6 @@ function renderScreen({ screen, params, user, onNavigate, onCrear }) {
     case 'comercios':
       return <Comercios currentUser={user} onNavigate={onNavigate} onCrear={onCrear} />
 
-    /* 👈 NUEVO: detalle de un comercio (pantalla pendiente).
-       Por ahora rebota a Comercios para no romper. Cuando armes
-       ComercioDetalle.jsx, reemplazá este case por:
-         return <ComercioDetalle
-                  currentUser={user}
-                  commerceId={params?.id}
-                  commerce={params?.commerce}
-                  onNavigate={onNavigate}
-                />
-    */
     case 'comercio':
       return <Comercios currentUser={user} onNavigate={onNavigate} onCrear={onCrear} />
 
