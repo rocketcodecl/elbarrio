@@ -15,7 +15,7 @@
   ARCHIVO UNIFICADO: base (C, T, S, TIPOS, REPORTES, AVISOS, ACCESOS,
   CATEGORIAS, RUBROS, BADGES, FARMACIAS, helpers) + COMERCIOS / COMERCIOS_CATS
   (antes en design_additions.js).
-"""
+*/
 
 // ─────────────────────────────────────────────
 // COLORES

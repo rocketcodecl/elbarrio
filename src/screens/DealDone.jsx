@@ -1,13 +1,23 @@
 import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabase";
 
+// FIX Task 54: antes este archivo usaba `animation: confettiFall ...` en los
+// piezas de confetti, pero NINGÚN <style> definía el keyframe → el confetti
+// no caía, se quedaba estático. Agregado el keyframe acá.
+const CONFETTI_STYLE = `
+@keyframes confettiFall {
+  0%   { transform: translateY(0) rotate(0deg); opacity: 1; }
+  100% { transform: translateY(110vh) rotate(720deg); opacity: 0; }
+}
+`;
+
 const Icon = {
   Package: ({ size = 24, color = "#666" }) => (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/>
     </svg>
   ),
-  User: ({ size = 24, color = "#c04a4a" }) => (
+  User: ({ size = 24, color = "#0f5f36" }) => (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
     </svg>
@@ -135,6 +145,11 @@ export default function DealDone({ postId, sellerId, currentUser, onNavigate }) 
     return post.price ? `$${Number(post.price).toLocaleString('es-CL')} CLP` : "Consultar";
   };
 
+  // FIX Task 54: antes `firstName` se declaraba DESPUÉS de openWhatsApp/openEmail.
+  // Funcionaba por closure (se evalúa al click) pero era frágil y mala práctica.
+  // Ahora se declara primero, arriba de las funciones que lo usan.
+  const firstName = seller?.full_name?.split(' ')[0] || 'tu vecino';
+
   const cleanPhone = (phone) => (phone || '').replace(/\D/g, '');
 
   const openWhatsApp = () => {
@@ -149,10 +164,9 @@ export default function DealDone({ postId, sellerId, currentUser, onNavigate }) 
     window.location.href = `mailto:${seller.email}?subject=${subject}`;
   };
 
-  const firstName = seller?.full_name?.split(' ')[0] || 'tu vecino';
-
   return (
     <div style={s.wrap}>
+      <style dangerouslySetInnerHTML={{ __html: CONFETTI_STYLE }} />
       {showConfetti && <Confetti />}
 
       <div style={s.scrollArea}>

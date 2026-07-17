@@ -49,6 +49,11 @@ function Verification({ profile, isPending, onFinish, onBack, onLogout }) {
   const [showSavedModal, setShowSavedModal] = useState(false)
   const [error, setError] = useState('')
 
+  // Atajos para el update (evita repetir coords.lat/coords.lng)
+  // DECLARADOS ARRIBA para que los handlers de más abajo los vean siempre.
+  const lat = coords?.lat ?? null
+  const lng = coords?.lng ?? null
+
   const comunasFiltradas = COMUNAS.filter((c) =>
     c.toLowerCase().includes(comuna.toLowerCase())
   )
@@ -199,10 +204,6 @@ function Verification({ profile, isPending, onFinish, onBack, onLogout }) {
       setLoading(false)
     }
   }
-
-  // Atajos para el update (evita repetir coords.lat/coords.lng)
-  const lat = coords?.lat ?? null
-  const lng = coords?.lng ?? null
 
   const puedeContinuar = gpsState === 'success' && !loading
 
@@ -419,7 +420,7 @@ function Verification({ profile, isPending, onFinish, onBack, onLogout }) {
           style={{
             ...s.primaryBtn,
             opacity: puedeContinuar ? 1 : 0.4,
-            cursor: puedeContinuar ? 'pointer' : 'not-allowed',
+            cursor: puedeContinuar ? 'cursor' : 'not-allowed',
           }}
         >
           {loading ? 'Guardando...' : 'Continuar'}

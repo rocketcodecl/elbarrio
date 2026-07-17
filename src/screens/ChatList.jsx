@@ -1,11 +1,24 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 
+// keyframes del spinner. Se inyectan una sola vez.
+const SPIN_STYLE = `
+@keyframes clSpin { to { transform: rotate(360deg); } }
+`
+
 // ===== ICONOS SVG =====
 const Icon = {
   Search: ({ size = 18, color = '#888' }) => (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+    </svg>
+  ),
+  // FIX Task 54: antes el botón "limpiar búsqueda" usaba <Icon.X /> pero
+  // Icon NO tenía la clave "X" → rompía en runtime ("Icon.X is not a function").
+  // Agregado el icono X (cruz) acá.
+  X: ({ size = 14, color = '#999' }) => (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+      <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
     </svg>
   ),
   ChevronRight: ({ size = 16, color = '#ccc' }) => (
@@ -87,7 +100,6 @@ function ChatList({ currentUser, onNavigate }) {
   const loadConversations = async () => {
     try {
       const myId = currentUser.id
-      console.log('MI USER ID EN CHATLIST:', myId)
 
       // 1. Obtener todos los mensajes donde soy emisor o receptor
       const { data: messages, error } = await supabase
@@ -199,6 +211,7 @@ function ChatList({ currentUser, onNavigate }) {
   if (loading) {
     return (
       <div style={s.loadingWrap}>
+        <style dangerouslySetInnerHTML={{ __html: SPIN_STYLE }} />
         <div style={s.spinner} />
       </div>
     )
@@ -206,6 +219,8 @@ function ChatList({ currentUser, onNavigate }) {
 
   return (
     <div style={s.wrap}>
+      <style dangerouslySetInnerHTML={{ __html: SPIN_STYLE }} />
+
       {/* HEADER PRINCIPAL */}
       <div style={s.header}>
         <div style={s.titleRow}>
@@ -348,7 +363,7 @@ const s = {
     width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#fff'
   },
   spinner: {
-    width: 28, height: 28, borderRadius: '50%', border: '3px solid #e5e7eb', borderTopColor: '#16a34a', animation: 'spin 1s linear infinite'
+    width: 28, height: 28, borderRadius: '50%', border: '3px solid #e5e7eb', borderTopColor: '#16a34a', animation: 'clSpin 1s linear infinite'
   },
 
   header: {

@@ -109,9 +109,7 @@ export default function ChatConversation({ postId, sellerId, currentUser, onNavi
     .eq("receiver_id", currentUser.id)
     .eq("read", false)
     .select();
-  
-  console.log('UPDATE READS:', updateResult);
-};
+  };
 
   const sendMessage = async (customText = null) => {
     const content = customText || text.trim();
@@ -152,7 +150,9 @@ export default function ChatConversation({ postId, sellerId, currentUser, onNavi
     <div style={s.wrap}>
       {/* HEADER */}
       <div style={s.header}>
-        <button onClick={() => nav('back')} style={s.iconBtn}>
+        {/* FIX: botón back con fondo visible (antes era invisible:
+            background:none + border:none → el usuario no lo veía). */}
+        <button onClick={() => nav('back')} style={s.backBtn} aria-label="Volver">
           <Icon.Back />
         </button>
         {seller?.avatar_url ? (
@@ -170,7 +170,7 @@ export default function ChatConversation({ postId, sellerId, currentUser, onNavi
             <span>{post?.title || 'Publicación'}</span>
           </div>
         </div>
-        <button style={s.iconBtn}>
+        <button style={s.iconBtn} aria-label="Más opciones">
           <Icon.Dots />
         </button>
       </div>
@@ -229,6 +229,7 @@ export default function ChatConversation({ postId, sellerId, currentUser, onNavi
                 placeholder="0"
                 value={offerAmount}
                 onChange={(e) => setOfferAmount(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); sendOffer(); } }}
                 style={s.offerInput}
                 autoFocus
               />
@@ -298,14 +299,28 @@ const s = {
     display: 'flex',
     alignItems: 'center',
     gap: 10,
-    padding: '48px 12px 12px',
+    /* FIX: padding superior dinámico con env(safe-area-inset-top) para
+       que el header llegue justo debajo del notch en cualquier dispositivo.
+       En el navegador (sin notch) cae a 44px. Antes era 48px fijos + 30px
+       del contentPad de App.jsx = 78px de gap (demasiado). */
+    padding: 'max(env(safe-area-inset-top, 44px), 44px) 12px 12px',
     borderBottom: '1px solid #eee',
     backgroundColor: '#fff'
+  },
+  backBtn: {
+    width: 38, height: 38,
+    borderRadius: '50%',
+    background: '#f5f5f5',
+    border: '1px solid #e5e5e5',
+    cursor: 'pointer', padding: 0,
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    flexShrink: 0,
   },
   iconBtn: {
     width: 34, height: 34,
     background: 'none', border: 'none', cursor: 'pointer',
-    display: 'flex', alignItems: 'center', justifyContent: 'center'
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    flexShrink: 0,
   },
   avatar: { width: 38, height: 38, borderRadius: '50%', objectFit: 'cover' },
   avatarFallback: {
@@ -432,12 +447,15 @@ const s = {
     justifyContent: 'center',
     gap: 6
   },
+  // FIX Task 54: antes era '#c04a4a' (rojo apagado) que chocaba con la
+  // paleta verde de El Barrio. Cambiado a verdeOsc (#0f5f36) para coincidir
+  // con DealDone.btnPrimary y el resto de la app.
   actionPrimary: {
     flex: 1,
     padding: '10px',
     borderRadius: 12,
     border: 'none',
-    backgroundColor: '#c04a4a',
+    backgroundColor: '#0f5f36',
     color: '#fff',
     fontSize: 13,
     fontWeight: 700,
@@ -573,4 +591,4 @@ const s = {
     fontWeight: 700,
     cursor: 'pointer'
   }
-}; 
+};
