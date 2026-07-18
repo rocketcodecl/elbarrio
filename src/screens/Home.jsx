@@ -23,23 +23,143 @@ import PedidoCard from '../components/PedidoCard'
   Stats (❤️ 💬 👁️) fuera del feed. Distancia solo en alertas.
 */
 
+/* ── Clima: emojis originales + tipo para SVG flat ──
+   Devolvemos AMBOS: `e` (emoji, fallback robusto) y `type` (para SVG).
+   Así, si el cache está en formato viejo (sin type), el emoji sigue
+   funcionando. El SVG se usa solo cuando type está disponible. */
 const CLIMA_EMOJI = (code) => {
-  if (code === 0) return { e: '☀️', t: 'Despejado' }
-  if (code <= 2) return { e: '🌤️', t: 'Parcial' }
-  if (code === 3) return { e: '☁️', t: 'Nublado' }
-  if (code <= 48) return { e: '🌫️', t: 'Neblina' }
-  if (code <= 67) return { e: '🌧️', t: 'Lluvia' }
-  if (code <= 77) return { e: '🌨️', t: 'Nieve' }
-  if (code <= 82) return { e: '🌦️', t: 'Chubascos' }
-  if (code <= 99) return { e: '⛈️', t: 'Tormenta' }
-  return { e: '🌤️', t: '' }
+  if (code === 0) return { e: '☀️', type: 'sun',       t: 'Despejado' }
+  if (code <= 2) return { e: '🌤️', type: 'parcial',   t: 'Parcial' }
+  if (code === 3) return { e: '☁️', type: 'nublado',  t: 'Nublado' }
+  if (code <= 48) return { e: '🌫️', type: 'neblina',  t: 'Neblina' }
+  if (code <= 67) return { e: '🌧️', type: 'lluvia',   t: 'Lluvia' }
+  if (code <= 77) return { e: '🌨️', type: 'nieve',    t: 'Nieve' }
+  if (code <= 82) return { e: '🌦️', type: 'chubascos',t: 'Chubascos' }
+  if (code <= 99) return { e: '⛈️', type: 'tormenta', t: 'Tormenta' }
+  return { e: '🌤️', type: 'parcial', t: '' }
+}
+
+/* ── SVG flat del clima (estilo referencia: nube BLANCA + gotas azul claro) ──
+   Nube BLANCA con drop-shadow suave para que se vea sobre fondo claro.
+   Gotas/rayos/nieve en azul claro / ámbar. Sin trazo, relleno plano. */
+const CLIMA_COLORS = {
+  sun:    '#f59e0b',
+  sunRay: '#fbbf24',
+  cloud:  '#ffffff',  // BLANCA como la referencia — el drop-shadow la hace visible
+  cloudG: '#94a3b8',  // gris medio para nublado
+  rain:   '#60a5fa',
+  snow:   '#93c5fd',
+  bolt:   '#fbbf24',
+}
+
+const CloudShape = ({ fill = CLIMA_COLORS.cloud }) => (
+  <g>
+    <circle cx="11" cy="17" r="6" fill={fill}/>
+    <circle cx="17" cy="13" r="7.5" fill={fill}/>
+    <circle cx="23" cy="17" r="5.5" fill={fill}/>
+    <rect x="5" y="17" width="22" height="7" rx="3.5" fill={fill}/>
+  </g>
+)
+
+const ClimaIcon = ({ type, size = 26 }) => {
+  const common = {
+    width: size, height: size, viewBox: '0 0 32 32', fill: 'none',
+    style: { display: 'block', filter: 'drop-shadow(0 1px 1.5px rgba(15,30,20,0.18))' },
+  }
+  const c = CLIMA_COLORS
+
+  if (type === 'sun') return (
+    <svg {...common}>
+      <circle cx="16" cy="16" r="5.5" fill={c.sun}/>
+      <g fill={c.sunRay}>
+        <rect x="14.8" y="1" width="2.4" height="4" rx="1.2"/>
+        <rect x="14.8" y="27" width="2.4" height="4" rx="1.2"/>
+        <rect x="1" y="14.8" width="4" height="2.4" rx="1.2"/>
+        <rect x="27" y="14.8" width="4" height="2.4" rx="1.2"/>
+        <rect x="5" y="5" width="4" height="2.4" rx="1.2" transform="rotate(-45 7 6.2)"/>
+        <rect x="23" y="5" width="4" height="2.4" rx="1.2" transform="rotate(45 25 6.2)"/>
+        <rect x="5" y="24.6" width="4" height="2.4" rx="1.2" transform="rotate(45 7 25.8)"/>
+        <rect x="23" y="24.6" width="4" height="2.4" rx="1.2" transform="rotate(-45 25 25.8)"/>
+      </g>
+    </svg>
+  )
+
+  if (type === 'parcial') return (
+    <svg {...common}>
+      <circle cx="12" cy="11" r="4" fill={c.sun}/>
+      <g fill={c.sunRay}>
+        <rect x="11" y="2" width="2" height="3" rx="1"/>
+        <rect x="3" y="10" width="3" height="2" rx="1"/>
+        <rect x="5.5" y="4.5" width="3" height="2" rx="1" transform="rotate(-45 7 5.5)"/>
+      </g>
+      <g transform="translate(0, 5)"><CloudShape/></g>
+    </svg>
+  )
+
+  if (type === 'nublado') return (
+    <svg {...common}><CloudShape fill={c.cloudG}/></svg>
+  )
+
+  if (type === 'neblina') return (
+    <svg {...common}>
+      <CloudShape/>
+      <g fill={c.cloudG}>
+        <rect x="5" y="26" width="22" height="1.6" rx="0.8"/>
+        <rect x="7" y="29" width="18" height="1.6" rx="0.8"/>
+      </g>
+    </svg>
+  )
+
+  if (type === 'lluvia') return (
+    <svg {...common}>
+      <CloudShape/>
+      <g fill={c.rain}>
+        <path d="M10 24.5c-.8 1.2-1.3 2.2-1.3 3.2a1.8 1.8 0 0 0 3.6 0c0-1-.5-2-1.3-3.2-.3-.5-.7-.5-1 0z"/>
+        <path d="M16 24.5c-.8 1.2-1.3 2.2-1.3 3.2a1.8 1.8 0 0 0 3.6 0c0-1-.5-2-1.3-3.2-.3-.5-.7-.5-1 0z"/>
+        <path d="M22 24.5c-.8 1.2-1.3 2.2-1.3 3.2a1.8 1.8 0 0 0 3.6 0c0-1-.5-2-1.3-3.2-.3-.5-.7-.5-1 0z"/>
+      </g>
+    </svg>
+  )
+
+  if (type === 'nieve') return (
+    <svg {...common}>
+      <CloudShape/>
+      <g fill={c.snow}>
+        <circle cx="11" cy="27" r="1.6"/>
+        <circle cx="16" cy="27" r="1.6"/>
+        <circle cx="21" cy="27" r="1.6"/>
+      </g>
+    </svg>
+  )
+
+  if (type === 'chubascos') return (
+    <svg {...common}>
+      <CloudShape/>
+      <g fill={c.rain}>
+        <rect x="8.5" y="24" width="1.8" height="5" rx="0.9" transform="rotate(18 9.4 26.5)"/>
+        <rect x="14.5" y="24" width="1.8" height="5" rx="0.9" transform="rotate(18 15.4 26.5)"/>
+        <rect x="20.5" y="24" width="1.8" height="5" rx="0.9" transform="rotate(18 21.4 26.5)"/>
+      </g>
+    </svg>
+  )
+
+  if (type === 'tormenta') return (
+    <svg {...common}>
+      <CloudShape/>
+      <path d="M17 23l-4 6h2.5l-1.5 5 5-7h-2.5z" fill={c.bolt}/>
+    </svg>
+  )
+
+  // Fallback: nube BLANCA con drop-shadow (si type es desconocido).
+  // SIEMPRE devuelve un SVG, nunca null, nunca emoji.
+  return <svg {...common}><CloudShape/></svg>
 }
 
 const ACCESOS_HOME = [
-  { id: 'pedidos',   emoji: '🙋', label: 'Pedidos',   bg: C.doradoSuave },
-  { id: 'comercios', emoji: '🏪', label: 'Comercios', bg: C.verdeSuave },
-  { id: 'noticias',  emoji: '📰', label: 'Noticias',  bg: C.azulSuave },
-  { id: 'alertas',   emoji: '🚨', label: 'Alertas',   bg: C.rojoSuave },
+  { id: 'pedidos',   emoji: '🙋', label: 'Pedidos' },
+  { id: 'comercios', emoji: '🏪', label: 'Comercios' },
+  { id: 'noticias',  emoji: '📰', label: 'Noticias' },
+  { id: 'alertas',   emoji: '🚨', label: 'Alertas' },
 ]
 
 /* ── Íconos lineales (verde marca) para títulos de sección ──
@@ -223,8 +343,9 @@ function Home({ currentUser, onNavigate, onCrear }) {
   }, [currentUser?.id])
 
   // GPS del usuario: pedimos una vez al montar el Home.
-  // Si lo acepta, guardamos las coords para calcular distancia a cada alerta.
-  // Si lo rechaza, las alertas sin lat/lng simplemente no muestran distancia.
+  // Si lo acepta, guardamos las coords para (a) calcular distancia a cada
+  // alerta y (b) refrescar el clima con la ubicación EXACTA del usuario
+  // (no el centro del barrio, que puede estar a kilómetros).
   useEffect(() => {
     if (!navigator.geolocation) return
     navigator.geolocation.getCurrentPosition(
@@ -235,6 +356,24 @@ function Home({ currentUser, onNavigate, onCrear }) {
       { enableHighAccuracy: false, timeout: 5000, maximumAge: 300000 }
     )
   }, [])
+
+  // Cuando llegan las coords reales del usuario, refrescamos el clima
+  // usando SU ubicación exacta (no la del barrio). open-meteo resuelve
+  // el clima a ~1km de precisión, así que esto es muy distinto al centro
+  // del barrio si el barrio es grande o el usuario se movió.
+  // Refresca si: (a) no hay cache, (b) cache sin `type` (formato viejo),
+  // o (c) cache con >10 min. Así nos aseguramos de que el SVG correcto
+  // aparezca sí o sí, sin depender de que cargar() termine.
+  useEffect(() => {
+    if (!userCoords?.lat || !userCoords?.lng) return
+    const cache = leerCache()
+    const CLIMA_FRESH = 10 * 60 * 1000  // 10 min
+    const sinType = !cache?.clima?.type
+    const fresco = cache?.clima?.ts && !sinType && (Date.now() - cache.clima.ts < CLIMA_FRESH)
+    if (!fresco) {
+      cargarClima(userCoords.lat, userCoords.lng)
+    }
+  }, [userCoords?.lat, userCoords?.lng])
 
   // neighborhoodIdOpt: si viene del cache, arrancamos las queries en paralelo
   // SIN esperar el profile del servidor (ya lo tenemos del cache). Eso
@@ -351,13 +490,22 @@ function Home({ currentUser, onNavigate, onCrear }) {
       })
 
       // Clima: se refresca si (a) no hay cache, (b) cambió el barrio,
-      // o (c) el clima cacheado tiene más de 30 min (stale). El clima
-      // cambia con el tiempo, no queremos mostrarlo stale por horas.
-      const CLIMA_TTL = 30 * 60 * 1000  // 30 min
-      const climaStale = !cache?.clima || (cache.clima?.ts && Date.now() - cache.clima.ts > CLIMA_TTL)
+      // (c) el clima cacheado tiene más de 30 min (stale), o (d) el cache
+      // está en formato viejo (sin `type` — de antes del cambio a SVG).
+      // El clima cambia con el tiempo, no queremos mostrarlo stale por horas.
+      const CLIMA_TTL = 10 * 60 * 1000  // 10 min — el clima cambia rápido
+      const climaStale = !cache?.clima
+        || !cache.clima?.type
+        || (cache.clima?.ts && Date.now() - cache.clima.ts > CLIMA_TTL)
       const barrioCambio = cache?.barrio?.id !== hoodRes.data?.id
       if (hoodRes.data && (!cache || climaStale || barrioCambio)) {
-        cargarClima(hoodRes.data?.lat, hoodRes.data?.lng)
+        // Prioridad: si el usuario ya dio permiso de GPS, usamos SU ubicación
+        // exacta. Si no (o aún no llegó), usamos el centro del barrio como
+        // fallback. Esto hace que el clima sea preciso donde está el usuario,
+        // no donde está el centro administrativo del barrio.
+        const lat = userCoords?.lat || hoodRes.data?.lat
+        const lng = userCoords?.lng || hoodRes.data?.lng
+        cargarClima(lat, lng)
       }
     } catch (err) {
       console.error('Error cargando el radar:', err)
@@ -497,7 +645,7 @@ function Home({ currentUser, onNavigate, onCrear }) {
         {clima && (
           <div style={s.tiraInfo}>
             <div style={s.climaBloque}>
-              <span style={s.climaEmoji}>{clima.e}</span>
+              <span style={s.climaEmoji}><ClimaIcon type={clima.type}/></span>
               <div>
                 <div style={s.climaTemp}>{clima.temp}°C</div>
                 <div style={s.climaTxt}>{clima.t}</div>
@@ -532,7 +680,7 @@ function Home({ currentUser, onNavigate, onCrear }) {
               style={s.acceso}
               onClick={() => onAcceso(a.id)}
             >
-              <span style={{ ...s.accesoIcono, background: a.bg }}>{a.emoji}</span>
+              <span style={s.accesoIcono}>{a.emoji}</span>
               <span style={s.accesoLabel}>{a.label}</span>
             </button>
           ))}

@@ -42,12 +42,46 @@ const Icon = {
       <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
     </svg>
   ),
-  Check: ({ size = 12, color = "#16a34a" }) => (
+  // Check simple (✓) — mensaje enviado pero no leído
+  Check: ({ size = 12, color = "#999" }) => (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
       <polyline points="20 6 9 17 4 12"/>
     </svg>
+  ),
+  // Doble check (✓✓) — mensaje leído por el otro
+  CheckDouble: ({ size = 13, color = "#3b82f6" }) => (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="18 7 9 16 4 11"/>
+      <polyline points="22 7 13 16 11 14"/>
+    </svg>
+  ),
+  // Reloj — mensaje enviándose (optimistic, aún sin confirmar en DB)
+  Clock: ({ size = 11, color = "#999" }) => (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15 14"/>
+    </svg>
+  ),
+  // Error — mensaje fallido
+  Alert: ({ size = 12, color = "#dc2626" }) => (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+    </svg>
   )
 };
+
+// Animaciones CSS: typing dots + entrada de burbuja nueva
+const CHAT_STYLE = `
+@keyframes typingBounce {
+  0%, 60%, 100% { transform: translateY(0); opacity: 0.4; }
+  30% { transform: translateY(-4px); opacity: 1; }
+}
+@keyframes bubbleIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.chat-typing-dot { animation: typingBounce 1.2s infinite; }
+.chat-bubble-in { animation: bubbleIn 0.18s ease-out; }
+`;
 
 export default function ChatConversation({ postId, sellerId, currentUser, onNavigate }) {
   const [messages, setMessages] = useState([]);
@@ -57,71 +91,172 @@ export default function ChatConversation({ postId, sellerId, currentUser, onNavi
   const [loading, setLoading] = useState(true);
   const [showOffer, setShowOffer] = useState(false);
   const [offerAmount, setOfferAmount] = useState("");
+  // "X está escribiendo..." — llega por broadcast del canal realtime
+  const [otherTyping, setOtherTyping] = useState(false);
   const scrollRef = useRef(null);
+  const channelRef = useRef(null);
+  const typingResetRef = useRef(null);
+  const lastTypingSentRef = useRef(0);
   const nav = onNavigate || (() => {});
 
   useEffect(() => {
     fetchInitial();
-    const sub = supabase.channel('chat_' + postId)
-      .on('postgres_changes', 
-        { event: 'INSERT', schema: 'public', table: 'messages', filter: `post_id=eq.${postId}` }, 
+    // Canal único por post_id. Configuramos broadcast con self:false para
+    // NO recibir nuestros propios eventos de typing.
+    const channel = supabase.channel('chat_' + postId, {
+      config: { broadcast: { self: false } }
+    });
+    channelRef.current = channel;
+
+    channel
+      // INSERT: mensaje nuevo (mío o del otro). Evitamos duplicar si ya lo
+      // agregamos optimistamente (comparamos por content + timestamp cercano).
+      .on('postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'messages', filter: `post_id=eq.${postId}` },
         (payload) => {
-          setMessages(prev => [...prev, payload.new]);
+          setMessages(prev => {
+            // Si ya existe (insert optimista con mismo content en los últimos 3s), reemplazar
+            const idx = prev.findIndex(m =>
+              m._pending &&
+              m.content === payload.new.content &&
+              m.sender_id === payload.new.sender_id &&
+              Math.abs(new Date(m.created_at) - new Date(payload.new.created_at)) < 5000
+            );
+            if (idx >= 0) {
+              const copy = [...prev];
+              copy[idx] = { ...payload.new, _justArrived: true };
+              return copy;
+            }
+            // Si ya está por id, no duplicar
+            if (prev.some(m => m.id === payload.new.id)) return prev;
+            return [...prev, { ...payload.new, _justArrived: true }];
+          });
+          // Si el mensaje es del otro, marcarlo como leído automáticamente
+          // (estoy en la conversación, lo estoy viendo).
+          if (payload.new.sender_id === sellerId && payload.new.receiver_id === currentUser.id && !payload.new.read) {
+            supabase.from('messages')
+              .update({ read: true })
+              .eq('id', payload.new.id)
+              .then(() => {});
+          }
         }
       )
+      // UPDATE: cuando el otro marca mi mensaje como leído (abre el chat).
+      // Cambiamos el check ✓ a ✓✓ azul.
+      .on('postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'messages', filter: `post_id=eq.${postId}` },
+        (payload) => {
+          setMessages(prev => prev.map(m =>
+            m.id === payload.new.id ? { ...payload.new, _justArrived: m._justArrived } : m
+          ));
+        }
+      )
+      // Broadcast: typing indicator. El otro escribe → llega este evento.
+      .on('broadcast', { event: 'typing' }, () => {
+        setOtherTyping(true);
+        // Si no llega otro typing en 3s, ocultamos el indicador.
+        if (typingResetRef.current) clearTimeout(typingResetRef.current);
+        typingResetRef.current = setTimeout(() => setOtherTyping(false), 3000);
+      })
       .subscribe();
-    return () => supabase.removeChannel(sub);
+
+    return () => {
+      supabase.removeChannel(channel);
+      if (typingResetRef.current) clearTimeout(typingResetRef.current);
+    };
   }, [postId]);
 
+  // Scroll suave al final cuando llegan mensajes nuevos o cambia el typing
   useEffect(() => {
     if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+      scrollRef.current.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
     }
-  }, [messages]);
+  }, [messages, otherTyping]);
 
   const fetchInitial = async () => {
-  setLoading(true);
-  const [msgRes, sellerRes, postRes] = await Promise.all([
-    supabase.from("messages")
-      .select("*")
-      .eq("post_id", postId)
-      .order("created_at", { ascending: true }),
-    supabase.from("profiles")
-      .select("id, full_name, avatar_url, badge_founder, reputation_score")
-      .eq("id", sellerId)
-      .single(),
-    supabase.from("posts")
-      .select("title, price, type, images")
-      .eq("id", postId)
-      .single()
-  ]);
-  if (msgRes.data) setMessages(msgRes.data);
-  if (sellerRes.data) setSeller(sellerRes.data);
-  if (postRes.data) setPost(postRes.data);
-  setLoading(false);
+    setLoading(true);
+    const [msgRes, sellerRes, postRes] = await Promise.all([
+      supabase.from("messages")
+        .select("*")
+        .eq("post_id", postId)
+        .order("created_at", { ascending: true }),
+      supabase.from("profiles")
+        .select("id, full_name, avatar_url, badge_founder, reputation_score")
+        .eq("id", sellerId)
+        .single(),
+      supabase.from("posts")
+        .select("title, price, type, images")
+        .eq("id", postId)
+        .single()
+    ]);
+    if (msgRes.data) setMessages(msgRes.data);
+    if (sellerRes.data) setSeller(sellerRes.data);
+    if (postRes.data) setPost(postRes.data);
+    setLoading(false);
 
     // Marcar como leídos los mensajes que me llegaron y aún no leo
-  const updateResult = await supabase
-    .from("messages")
-    .update({ read: true })
-    .eq("post_id", postId)
-    .eq("sender_id", sellerId)
-    .eq("receiver_id", currentUser.id)
-    .eq("read", false)
-    .select();
+    await supabase
+      .from("messages")
+      .update({ read: true })
+      .eq("post_id", postId)
+      .eq("sender_id", sellerId)
+      .eq("receiver_id", currentUser.id)
+      .eq("read", false);
   };
 
+  // Inserción optimista: el mensaje aparece INSTANTÁNEAMENTE con un reloj,
+  // luego se reemplaza por el real cuando llega por realtime (o falla).
   const sendMessage = async (customText = null) => {
-    const content = customText || text.trim();
+    const content = (customText || text).trim();
     if (!content) return;
     setText("");
-    const { error } = await supabase.from("messages").insert({
+
+    const tempId = 'temp_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
+    const optimisticMsg = {
+      id: tempId,
+      sender_id: currentUser.id,
+      receiver_id: sellerId,
+      post_id: postId,
+      content,
+      created_at: new Date().toISOString(),
+      read: false,
+      _pending: true,
+    };
+    setMessages(prev => [...prev, optimisticMsg]);
+
+    const { data, error } = await supabase.from("messages").insert({
       sender_id: currentUser.id,
       receiver_id: sellerId,
       post_id: postId,
       content
-    });
-    if (error) console.error("Error mensaje:", error);
+    }).select();
+
+    if (error) {
+      console.error("Error mensaje:", error);
+      // Marcar como fallido para mostrar el ícono de error y poder reintentar
+      setMessages(prev => prev.map(m => m.id === tempId ? { ...m, _failed: true, _pending: false } : m));
+    } else if (data && data[0]) {
+      // El INSERT llegará por realtime y reemplazará el temporal automáticamente
+      // (por el filtro de content + timestamp en el handler de INSERT).
+      // Pero si realtime tarda, reemplazamos acá directamente.
+      setMessages(prev => prev.map(m => m.id === tempId ? data[0] : m));
+    }
+  };
+
+  // Reintentar envío de un mensaje fallido
+  const retryMessage = (msg) => {
+    setMessages(prev => prev.filter(m => m.id !== msg.id));
+    sendMessage(msg.content);
+  };
+
+  // Typing indicator: mandamos broadcast 'typing' con debounce de 1.5s
+  // para no saturar el canal. El otro lo recibe y muestra "escribiendo...".
+  const handleTyping = () => {
+    const now = Date.now();
+    if (now - lastTypingSentRef.current > 1500) {
+      channelRef.current?.send({ type: 'broadcast', event: 'typing', payload: { user: currentUser.id } });
+      lastTypingSentRef.current = now;
+    }
   };
 
   const sendOffer = () => {
@@ -146,12 +281,40 @@ export default function ChatConversation({ postId, sellerId, currentUser, onNavi
     return d.toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit', hour12: true });
   };
 
+  // Agrupar mensajes por día: "Hoy", "Ayer", "12 mar"
+  // Muestra un chip de fecha entre grupos (antes era siempre "Hoy" hardcodeado).
+  const groupMessagesByDate = (msgs) => {
+    const groups = [];
+    let lastLabel = null;
+    const today = new Date();
+    const yesterday = new Date();
+    yesterday.setDate(today.getDate() - 1);
+    const meses = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+
+    for (const msg of msgs) {
+      const d = new Date(msg.created_at);
+      let label;
+      if (d.toDateString() === today.toDateString()) label = 'Hoy';
+      else if (d.toDateString() === yesterday.toDateString()) label = 'Ayer';
+      else label = `${d.getDate()} ${meses[d.getMonth()]}`;
+
+      if (label !== lastLabel) {
+        groups.push({ type: 'date', label, key: 'date_' + label });
+        lastLabel = label;
+      }
+      groups.push({ type: 'msg', msg, key: msg.id });
+    }
+    return groups;
+  };
+
+  const grouped = groupMessagesByDate(messages);
+
   return (
     <div style={s.wrap}>
+      <style dangerouslySetInnerHTML={{ __html: CHAT_STYLE }} />
+
       {/* HEADER */}
       <div style={s.header}>
-        {/* FIX: botón back con fondo visible (antes era invisible:
-            background:none + border:none → el usuario no lo veía). */}
         <button onClick={() => nav('back')} style={s.backBtn} aria-label="Volver">
           <Icon.Back />
         </button>
@@ -165,10 +328,15 @@ export default function ChatConversation({ postId, sellerId, currentUser, onNavi
             <span style={s.name}>{seller?.full_name || 'Vecino'}</span>
             {seller?.badge_founder && <Icon.Verified />}
           </div>
-          <div style={s.postRef}>
-            <Icon.Tag size={11} color="#666" />
-            <span>{post?.title || 'Publicación'}</span>
-          </div>
+          {/* Subtítulo: si está escribiendo, mostramos eso. Sino, la ref al post. */}
+          {otherTyping ? (
+            <div style={s.typingText}>escribiendo…</div>
+          ) : (
+            <div style={s.postRef}>
+              <Icon.Tag size={11} color="#666" />
+              <span>{post?.title || 'Publicación'}</span>
+            </div>
+          )}
         </div>
         <button style={s.iconBtn} aria-label="Más opciones">
           <Icon.Dots />
@@ -177,10 +345,8 @@ export default function ChatConversation({ postId, sellerId, currentUser, onNavi
 
       {/* MENSAJES */}
       <div style={s.messagesWrap} ref={scrollRef}>
-        <div style={s.dateChip}>Hoy</div>
-
         {loading ? (
-          <div style={s.emptyChat}>Cargando conversación...</div>
+          <div style={s.emptyChat}>Cargando conversación…</div>
         ) : messages.length === 0 ? (
           <div style={s.emptyChat}>
             <img src="/isotipo.png" alt="" style={{ width: 70, opacity: 0.4, marginBottom: 12 }} />
@@ -188,20 +354,43 @@ export default function ChatConversation({ postId, sellerId, currentUser, onNavi
             <div style={{ fontSize: 12, color: '#888', marginTop: 4 }}>Rompe el hielo con un saludo</div>
           </div>
         ) : (
-          messages.map(msg => {
+          grouped.map((item) => {
+            if (item.type === 'date') {
+              return <div key={item.key} style={s.dateChip}>{item.label}</div>;
+            }
+            const msg = item.msg;
             const mine = msg.sender_id === currentUser.id;
             return (
-              <div key={msg.id} style={{ display: 'flex', flexDirection: 'column', alignItems: mine ? 'flex-end' : 'flex-start' }}>
-                <div style={mine ? s.bubbleMine : s.bubbleTheirs}>
+              <div key={item.key} style={{ display: 'flex', flexDirection: 'column', alignItems: mine ? 'flex-end' : 'flex-start' }}>
+                <div className="chat-bubble-in" style={mine ? s.bubbleMine : s.bubbleTheirs}>
                   {msg.content}
                 </div>
                 <div style={s.msgTime}>
                   {formatTime(msg.created_at)}
-                  {mine && <Icon.Check />}
+                  {/* Estado del mensaje: reloj (enviando) / error (fallido) / check (enviado) / doble check (leído) */}
+                  {mine && msg._pending && <Icon.Clock />}
+                  {mine && msg._failed && (
+                    <button onClick={() => retryMessage(msg)} style={s.retryBtn} aria-label="Reintentar">
+                      <Icon.Alert />
+                    </button>
+                  )}
+                  {mine && !msg._pending && !msg._failed && msg.read && <Icon.CheckDouble />}
+                  {mine && !msg._pending && !msg._failed && !msg.read && <Icon.Check />}
                 </div>
               </div>
             );
           })
+        )}
+
+        {/* Indicador "escribiendo..." como burbuja animada de 3 puntos */}
+        {otherTyping && (
+          <div style={{ display: 'flex', justifyContent: 'flex-start', marginTop: 4 }}>
+            <div style={s.typingBubble}>
+              <span style={{ ...s.typingDot, animationDelay: '0s' }} className="chat-typing-dot" />
+              <span style={{ ...s.typingDot, animationDelay: '0.2s' }} className="chat-typing-dot" />
+              <span style={{ ...s.typingDot, animationDelay: '0.4s' }} className="chat-typing-dot" />
+            </div>
+          </div>
         )}
 
         {/* Asistente de vecindario */}
@@ -264,7 +453,10 @@ export default function ChatConversation({ postId, sellerId, currentUser, onNavi
           <textarea
             placeholder=""
             value={text}
-            onChange={(e) => setText(e.target.value)}
+            onChange={(e) => {
+              setText(e.target.value);
+              handleTyping();
+            }}
             style={s.input}
             rows={1}
             onKeyDown={(e) => {
@@ -299,10 +491,6 @@ const s = {
     display: 'flex',
     alignItems: 'center',
     gap: 10,
-    /* FIX: padding superior dinámico con env(safe-area-inset-top) para
-       que el header llegue justo debajo del notch en cualquier dispositivo.
-       En el navegador (sin notch) cae a 44px. Antes era 48px fijos + 30px
-       del contentPad de App.jsx = 78px de gap (demasiado). */
     padding: 'max(env(safe-area-inset-top, 44px), 44px) 12px 12px',
     borderBottom: '1px solid #eee',
     backgroundColor: '#fff'
@@ -336,6 +524,14 @@ const s = {
     fontSize: 11, color: '#666', fontWeight: 500, marginTop: 1,
     overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'
   },
+  // Texto "escribiendo…" reemplaza al postRef cuando el otro está tipeando
+  typingText: {
+    fontSize: 11,
+    color: '#16a34a',
+    fontWeight: 600,
+    fontStyle: 'italic',
+    marginTop: 1,
+  },
 
   messagesWrap: {
     flex: 1,
@@ -354,7 +550,7 @@ const s = {
     borderRadius: 20,
     fontWeight: 600,
     width: 'fit-content',
-    margin: '4px auto 14px'
+    margin: '14px auto 10px'
   },
   emptyChat: {
     display: 'flex',
@@ -395,6 +591,34 @@ const s = {
     display: 'flex',
     alignItems: 'center',
     gap: 4
+  },
+  // Botón de reintentar mensaje fallido
+  retryBtn: {
+    background: 'none',
+    border: 'none',
+    cursor: 'pointer',
+    padding: 0,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  // Burbuja de "escribiendo..." con 3 puntos animados
+  typingBubble: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#e8e8e8',
+    padding: '12px 16px',
+    borderRadius: 14,
+    borderBottomLeftRadius: 4,
+  },
+  typingDot: {
+    width: 6,
+    height: 6,
+    borderRadius: '50%',
+    backgroundColor: '#888',
+    display: 'inline-block',
   },
 
   assistantCard: {
@@ -447,9 +671,6 @@ const s = {
     justifyContent: 'center',
     gap: 6
   },
-  // FIX Task 54: antes era '#c04a4a' (rojo apagado) que chocaba con la
-  // paleta verde de El Barrio. Cambiado a verdeOsc (#0f5f36) para coincidir
-  // con DealDone.btnPrimary y el resto de la app.
   actionPrimary: {
     flex: 1,
     padding: '10px',

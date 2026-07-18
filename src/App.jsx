@@ -34,6 +34,9 @@ import AlertaDetail from './screens/AlertaDetail'
 import SellerProfile from './screens/SellerProfile'
 import Noticias from './screens/Noticias'
 
+/* ── Search ── */
+import Search from './screens/Search'
+
 function Placeholder({ titulo, onBack, mensaje }) {
   return (
     <div style={s.placeholderWrap}>
@@ -185,7 +188,7 @@ export default function App() {
       return
     }
 
-    const subScreens = ['post', 'productdetail', 'chatconversation', 'dealdone', 'alerta', 'notificaciones', 'sellerprofile', 'noticias']
+    const subScreens = ['post', 'productdetail', 'chatconversation', 'dealdone', 'alerta', 'notificaciones', 'sellerprofile', 'noticias', 'search']
     if (subScreens.includes(lower)) {
       historyRef.current.push({ screen: currentScreen, params })
     }
@@ -212,6 +215,8 @@ export default function App() {
       setCurrentScreen('sellerProfile')
     } else if (lower === 'noticias') {
       setCurrentScreen('noticiasScreen')
+    } else if (lower === 'search') {
+      setCurrentScreen('searchScreen')
     } else if (lower === 'chat' || lower === 'chatlist') {
       setActiveTab('chat')
       setCurrentScreen('main')
@@ -262,7 +267,7 @@ export default function App() {
 
   /* ── SCREEN RENDER ── */
   const flowScreens = ['splash', 'onboarding', 'register', 'profile', 'verification', 'complete']
-  const modalScreens = ['productDetail', 'chatConversation', 'dealDone', 'alertaDetail', 'notificaciones', 'sellerProfile', 'noticiasScreen']
+  const modalScreens = ['productDetail', 'chatConversation', 'dealDone', 'alertaDetail', 'notificaciones', 'sellerProfile', 'noticiasScreen', 'searchScreen']
   const isModalScreen = modalScreens.includes(currentScreen)
   const isMainApp = !flowScreens.includes(currentScreen) && !isModalScreen
 
@@ -370,6 +375,11 @@ export default function App() {
       return <Noticias currentUser={user} onNavigate={onNavigate} />
     }
 
+    /* ── Search ── */
+    if (currentScreen === 'searchScreen') {
+      return <Search currentUser={user} onNavigate={onNavigate} />
+    }
+
     /* ── No hay user → Register ── */
     if (!user) {
       return <Register onFinish={() => checkSession()} onBack={() => setCurrentScreen('onboarding')} />
@@ -435,7 +445,7 @@ export default function App() {
 /* ── ESTILOS ── */
 const s = {
   contentPad: { paddingTop: 30, paddingBottom: 0 },
-  /* modalScreens (chat, noticias, sellerprofile, productDetail, alertaDetail)
+  /* modalScreens (chat, noticias, sellerprofile, productDetail, alertaDetail, search)
      controlan su propio safe-area-top dentro de su header. Acá NO agregamos
      padding superior, para que la pantalla llegue hasta el borde superior del
      teléfono (fix bug: "chat no llega hasta el top del teléfono"). */

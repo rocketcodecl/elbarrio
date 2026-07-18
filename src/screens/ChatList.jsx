@@ -83,12 +83,61 @@ function ChatList({ currentUser, onNavigate }) {
     if (currentUser?.id) {
       loadConversations()
       
-      // Suscribirse a realtime para actualizar si entra un mensaje nuevo
+      // Suscripción realtime inteligente: en vez de recargar TODA la lista
+      // en cada evento (lo que hace N+1 queries), actualizamos SOLO la
+      // conversación afectada usando el payload del evento.
       const subscription = supabase
         .channel('realtime-chatlist')
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'messages' }, () => {
-          loadConversations()
-        })
+        .on('postgres_changes', 
+          { event: 'INSERT', schema: 'public', table: 'messages' }, 
+          (payload) => {
+            const msg = payload.new
+            const mine = msg.sender_id === currentUser.id
+            const otherUserId = mine ? msg.receiver_id : msg.sender_id
+            const groupKey = `${otherUserId}_${msg.post_id || 'general'}`
+            
+            // Si yo soy el receptor y no estoy en esa conversación,
+            // el mensaje no está leído → suma al badge.
+            const unreadInc = (!mine && msg.receiver_id === currentUser.id && !msg.read) ? 1 : 0
+            
+            setConversations(prev => {
+              const idx = prev.findIndex(c => 
+                `${c.otherUserId}_${c.postId || 'general'}` === groupKey
+              )
+              if (idx === -1) {
+                // Conversación nueva — recargamos todo (necesitamos profile + post)
+                loadConversations()
+                return prev
+              }
+              // Conversación existente — actualizamos solo esa
+              const copy = [...prev]
+              copy[idx] = {
+                ...copy[idx],
+                lastMessage: msg,
+                unreadCount: copy[idx].unreadCount + unreadInc
+              }
+              // Reordenar: la conversación con mensaje nuevo sube al tope
+              copy.sort((a, b) => new Date(b.lastMessage.created_at) - new Date(a.lastMessage.created_at))
+              return copy
+            })
+          }
+        )
+        .on('postgres_changes',
+          { event: 'UPDATE', schema: 'public', table: 'messages' },
+          (payload) => {
+            // Cuando un mensaje cambia de read=false → read=true
+            // (el receptor abrió el chat), actualizamos el badge.
+            if (payload.new.read && !payload.old?.read) {
+              const msg = payload.new
+              const otherUserId = msg.sender_id === currentUser.id ? msg.receiver_id : msg.sender_id
+              const groupKey = `${otherUserId}_${msg.post_id || 'general'}`
+              setConversations(prev => prev.map(c => {
+                if (`${c.otherUserId}_${c.postId || 'general'}` !== groupKey) return c
+                return { ...c, unreadCount: Math.max(0, c.unreadCount - 1) }
+              }))
+            }
+          }
+        )
         .subscribe()
 
       return () => {

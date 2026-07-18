@@ -64,9 +64,16 @@ export const C = {
 
 // ─────────────────────────────────────────────
 // TIPOGRAFÍA — nada baja de 13px
+//
+// FUENTE: Plus Jakarta Sans. Es la ÚNICA fuente de toda la app.
+// Se carga en index.css (NO hay index.html en este proyecto), con la misma
+// técnica que ya se usaba para Inter:
+//   @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+// y en html, body → font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+// El fallback (system-ui) aparece solo si no hay internet al cargar.
 // ─────────────────────────────────────────────
 export const T = {
-  font: 'system-ui, -apple-system, "Segoe UI", sans-serif',
+  font: '"Plus Jakarta Sans", system-ui, -apple-system, "Segoe UI", sans-serif',
 
   saludo:   { fontSize: 22, fontWeight: 800, color: C.texto, letterSpacing: '-0.3px' },
   titulo:   { fontSize: 18, fontWeight: 800, color: C.texto, letterSpacing: '-0.2px' },
@@ -89,7 +96,7 @@ export const S = {
     border: `1px solid ${C.borde}`,
     boxShadow: '0 2px 10px rgba(0,0,0,0.04)',
   },
-  cardTap: {
+  cardTap: {                       // tarjeta que se puede tocar
     background: C.card,
     borderRadius: 18,
     padding: 16,
@@ -107,6 +114,7 @@ export const S = {
 // EMOJIS — el lenguaje visual real de la app
 // ─────────────────────────────────────────────
 
+/* Tipos de publicación (el menú del botón +) */
 export const TIPOS = {
   sell:    { emoji: '🏷️', label: 'Vender algo',  corto: 'En venta',    color: C.naranjo, bg: C.naranjoSuave },
   gift:    { emoji: '🎁', label: 'Regalar',      corto: 'Gratis',      color: C.morado,  bg: C.moradoSuave },
@@ -117,6 +125,7 @@ export const TIPOS = {
   request: { emoji: '🙋', label: 'Pedir ayuda',  corto: 'Pedido',      color: C.dorado,  bg: C.doradoSuave },
 }
 
+/* Categorías de un reporte de vecino */
 export const REPORTES = {
   seguridad: { emoji: '🚨', label: 'Seguridad',      color: C.rojo,    bg: C.rojoSuave },
   salud:     { emoji: '🏥', label: 'Salud',          color: C.verde,   bg: C.verdeSuave },
@@ -124,6 +133,7 @@ export const REPORTES = {
   mascotas:  { emoji: '🐕', label: 'Mascotas',       color: '#db2777', bg: '#fce7f3' },
 }
 
+/* Avisos oficiales (los carga el operador) */
 export const AVISOS = {
   corte_agua: { emoji: '💧', label: 'Corte de agua', color: C.azul,   bg: C.azulSuave },
   corte_luz:  { emoji: '💡', label: 'Corte de luz',  color: C.dorado, bg: C.doradoSuave },
@@ -132,6 +142,7 @@ export const AVISOS = {
   operativo:  { emoji: '🩺', label: 'Operativo',     color: C.morado, bg: C.moradoSuave },
 }
 
+/* Accesos rápidos del Inicio */
 export const ACCESOS = [
   { id: 'mercado',   emoji: '🏷️', label: 'Mercado',   bg: C.naranjoSuave },
   { id: 'servicios', emoji: '🔧', label: 'Servicios', bg: C.azulSuave },
@@ -139,6 +150,7 @@ export const ACCESOS = [
   { id: 'comercios', emoji: '🏪', label: 'Comercios', bg: C.verdeSuave },
 ]
 
+/* Categorías del Mercado */
 export const CATEGORIAS = [
   { key: 'Electrónica', emoji: '📱' },
   { key: 'Ropa',        emoji: '👕' },
@@ -153,6 +165,7 @@ export const CATEGORIAS = [
   { key: 'Otros',       emoji: '📦' },
 ]
 
+/* Rubros de servicios */
 export const RUBROS = [
   { key: 'gasfiter',    emoji: '🔧', label: 'Gasfitería' },
   { key: 'electrico',   emoji: '💡', label: 'Electricidad' },
@@ -174,14 +187,39 @@ export const RUBROS = [
   { key: 'otro',        emoji: '🛠️', label: 'Otro' },
 ]
 
+/* Badges del perfil */
 export const BADGES = {
-  founder:     { emoji: '⭐', label: 'Fundador',    sub: 'Primeros 70', color: C.dorado,  bg: C.doradoSuave },
-  trusted:     { emoji: '✅', label: 'Confiable',   sub: 'Verificado',  color: C.verde,   bg: C.verdeSuave },
-  collaborator:{ emoji: '🤝', label: 'Colaborador', sub: 'Activo',      color: C.azul,    bg: C.azulSuave },
+  founder: {
+    emoji: '🏅', label: 'Fundador', sub: 'Primeros 70',
+    color: C.dorado, bg: C.doradoSuave,
+    icon: 'medal',
+    gradient: 'linear-gradient(135deg, #fbbf24 0%, #d97706 60%, #92400e 100%)',
+    glow: 'rgba(217,119,6,0.32)',
+  },
+  trusted: {
+    emoji: '✅', label: 'Verificado', sub: 'Cuenta verificada',
+    color: C.verde, bg: C.verdeSuave,
+    icon: 'check',
+    gradient: 'linear-gradient(135deg, #4ade80 0%, #16a34a 60%, #15803d 100%)',
+    glow: 'rgba(22,163,74,0.30)',
+  },
+  collaborator: {
+    emoji: '🤝', label: 'Colaborador', sub: 'Activo',
+    color: C.azul, bg: C.azulSuave,
+    icon: 'hand',
+    gradient: 'linear-gradient(135deg, #60a5fa 0%, #2563eb 100%)',
+    glow: 'rgba(37,99,235,0.26)',
+  },
 }
 
 // ─────────────────────────────────────────────
 // FARMACIAS DE TURNO
+//
+// Por ahora se cargan a mano. La API del MINSAL existe, pero el navegador
+// la bloquea (CORS) y obliga a una Edge Function. No vale la pena todavía.
+//
+// 👉 PARA CAMBIARLAS: edita esta lista y guarda. Nada más.
+// Cuando haya varios barrios, esto se muda a la base de datos.
 // ─────────────────────────────────────────────
 export const FARMACIAS = [
   {
@@ -247,8 +285,9 @@ export function hace(fecha) {
   const f = fecha instanceof Date ? fecha : new Date(fecha)
   if (isNaN(f.getTime())) return ''
 
+  // Si la fecha es futura (raro en alertas), la clampeamos a "recién".
   const diff = Date.now() - f.getTime()
-  const abs = Math.max(0, diff)
+  const abs = Math.max(0, diff)            // nunca negativo
   const seg = Math.max(1, Math.floor(abs / 1000))
   const min = Math.floor(seg / 60)
   const hor = Math.floor(min / 60)
