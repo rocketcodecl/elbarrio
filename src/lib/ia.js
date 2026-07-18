@@ -1,13 +1,31 @@
 // lib/ia.js
+//
+// ✨ Autocompletar con IA desde la foto.
+// Usa OPENROUTER (gratis, no pide tarjeta) — agregador de modelos con visión.
+//
+// ACTIVAR (3 pasos):
+//   1. Entrá a https://openrouter.ai/keys
+//   2. Iniciá sesión con Google o GitHub → "Create Key" → copiala
+//      (empieza con sk-or-v1-... y tiene ~70 caracteres)
+//   3. En tu .env (o .env.local), agregá:
+//        VITE_OPENROUTER_API_KEY=sk-or-v1-tu-clave-aqui
+//   Reiniciá npm run dev (Ctrl+C + npm run dev). Listo.
+//
+// LÍMITES GRATIS DE OPENROUTER:
+//   · 50 pedidos por día en modelos :free (sin agregar crédito)
+//   · 1,000 pedidos por día si agregás USD $5 de crédito (opcional)
+//   · Sin tarjeta de crédito para registrarse
+// ============================================================
 
-const GROQ_KEY = import.meta.env.VITE_GROQ_API_KEY
-const URL = 'https://api.groq.com/openai/v1/chat/completions'
+const OPENROUTER_KEY = import.meta.env.VITE_OPENROUTER_API_KEY
+const URL = 'https://openrouter.ai/api/v1/chat/completions'
 
-// Lista de modelos con visión, en orden de preferencia.
-// Si el primero da 404 (no disponible), intenta el siguiente.
+// Modelos de visión gratis en OpenRouter, en orden de preferencia.
+// Si el primero falla (404/cuota), intenta el siguiente.
 const MODELOS_VISION = [
-  'meta-llama/llama-4-scout-17b-16e-instruct',
-  'meta-llama/llama-4-maverick-17b-128e-instruct',
+  'meta-llama/llama-3.2-11b-vision-instruct:free',
+  'qwen/qwen-2.5-vl-7b-instruct:free',
+  'qwen/qwen-2-vl-7b-instruct:free',
 ]
 
 const CATEGORIAS_VALIDAS = [
@@ -39,12 +57,14 @@ REGLAS IMPORTANTES:
 - Responde SOLO el JSON. Nada más.`
 }
 
-async function llamarGroq(model, prompt, imageDataUrl) {
+async function llamarOpenRouter(model, prompt, imageDataUrl) {
   const res = await fetch(URL, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${GROQ_KEY}`,
+      'Authorization': `Bearer ${OPENROUTER_KEY}`,
+      'HTTP-Referer': 'https://elbarrio.app',
+      'X-Title': 'El Barrio',
     },
     body: JSON.stringify({
       model,
@@ -71,7 +91,7 @@ async function llamarGroq(model, prompt, imageDataUrl) {
     } catch {
       try { errorBody = await res.text() } catch {}
     }
-    const e = new Error(`Groq ${res.status}: ${errorBody}`)
+    const e = new Error(`OpenRouter ${res.status}: ${errorBody}`)
     e.status = res.status
     e.body = errorBody
     throw e
@@ -86,7 +106,7 @@ async function llamarGroq(model, prompt, imageDataUrl) {
 }
 
 export async function describirFoto(imageDataUrl, type) {
-  if (!GROQ_KEY) {
+  if (!OPENROUTER_KEY) {
     const e = new Error('NO_KEY')
     e.code = 'NO_KEY'
     throw e
@@ -97,7 +117,7 @@ export async function describirFoto(imageDataUrl, type) {
 
   for (const model of MODELOS_VISION) {
     try {
-      const content = await llamarGroq(model, prompt, imageDataUrl)
+      const content = await llamarOpenRouter(model, prompt, imageDataUrl)
       let parsed
       try {
         parsed = JSON.parse(content)
@@ -122,21 +142,23 @@ export async function describirFoto(imageDataUrl, type) {
 
       return { title, description, category, suggestedPrice, condition, lookingFor }
     } catch (e) {
-      console.error(`Groq ${model} falló:`, e.status, e.body || e.message)
+      console.error(`OpenRouter ${model} falló:`, e.status, e.body || e.message)
       lastError = e
-      if (e.status === 404) {
-        continue
-      }
+      if (e.status === 404) continue
       if (e.status === 429) {
         throw new Error('Límite por minuto. Espera 60 segundos.')
       }
       if (e.status === 401) {
-        throw new Error('Clave de Groq inválida. Revisa tu .env')
+        throw new Error('Clave de OpenRouter inválida. Revisa tu .env')
       }
+      if (e.status === 402) continue
       throw new Error(e.message || 'La IA no respondió. Intenta de nuevo.')
     }
   }
 
   console.error('Todos los modelos de visión fallaron. Último error:', lastError)
-  throw new Error('Ningún modelo de visión está disponible en tu cuenta de Groq. Revisa https://console.groq.com/docs/models')
+  if (lastError?.status === 402) {
+    throw new Error('Límite DIARIO gratis agotado en OpenRouter. Volvé mañana o agregá USD $5 de crédito en openrouter.ai/credits para 1,000 pedidos/día.')
+  }
+  throw new Error('Ningún modelo de visión gratis está disponible ahora. Revisa https://openrouter.ai/models?q=vision o intenta más tarde.')
 }
