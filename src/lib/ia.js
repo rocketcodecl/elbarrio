@@ -3,6 +3,11 @@
 // ✨ Autocompletar con IA desde la foto.
 // Usa OPENROUTER (gratis, no pide tarjeta) — agregador de modelos con visión.
 //
+// ¿POR QUÉ OPENROUTER Y NO GROQ?
+//   Groq eliminó TODOS sus modelos de visión (Llama 3.2 Vision deprecated,
+//   Llama 4 no disponible). OpenRouter tiene modelos de visión gratis de
+//   Meta (Llama 3.2 11B Vision) y Alibaba (Qwen 2.5 VL).
+//
 // ACTIVAR (3 pasos):
 //   1. Entrá a https://openrouter.ai/keys
 //   2. Iniciá sesión con Google o GitHub → "Create Key" → copiala
@@ -15,6 +20,7 @@
 //   · 50 pedidos por día en modelos :free (sin agregar crédito)
 //   · 1,000 pedidos por día si agregás USD $5 de crédito (opcional)
 //   · Sin tarjeta de crédito para registrarse
+//   · El cooldown de 65s en CreatePost.jsx protege del rate limit
 // ============================================================
 
 const OPENROUTER_KEY = import.meta.env.VITE_OPENROUTER_API_KEY
@@ -22,10 +28,14 @@ const URL = 'https://openrouter.ai/api/v1/chat/completions'
 
 // Modelos de visión gratis en OpenRouter, en orden de preferencia.
 // Si el primero falla (404/cuota), intenta el siguiente.
+// El sufijo ":free" indica tier gratis.
+// Lista actualizada el 2026-07-18 — OpenRouter rota estos modelos seguido.
+// Si vuelve a fallar con "Ningún modelo disponible", revisar:
+//   https://openrouter.ai/models?q=vision (filtrar por :free)
 const MODELOS_VISION = [
-  'meta-llama/llama-3.2-11b-vision-instruct:free',
-  'qwen/qwen-2.5-vl-7b-instruct:free',
-  'qwen/qwen-2-vl-7b-instruct:free',
+  'nvidia/nemotron-nano-12b-v2-vl:free',
+  'google/gemma-4-31b-it:free',
+  'google/gemma-4-26b-a4b-it:free',
 ]
 
 const CATEGORIAS_VALIDAS = [
@@ -58,11 +68,14 @@ REGLAS IMPORTANTES:
 }
 
 async function llamarOpenRouter(model, prompt, imageDataUrl) {
+  // Llama a OpenRouter con un modelo específico. Devuelve { content } o lanza error.
   const res = await fetch(URL, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       'Authorization': `Bearer ${OPENROUTER_KEY}`,
+      // OpenRouter pide estos headers opcionales para identificar la app
+      // (ayuda con el dashboard y rate limits, pero no son obligatorios).
       'HTTP-Referer': 'https://elbarrio.app',
       'X-Title': 'El Barrio',
     },
@@ -79,6 +92,8 @@ async function llamarOpenRouter(model, prompt, imageDataUrl) {
       ],
       temperature: 0.7,
       max_tokens: 800,
+      // OpenRouter soporta response_format en la mayoría de modelos,
+      // pero algunos :free lo ignoran. Por eso también hay fallback regex.
       response_format: { type: 'json_object' },
     }),
   })
@@ -115,9 +130,11 @@ export async function describirFoto(imageDataUrl, type) {
   const prompt = buildPrompt(type)
   let lastError = null
 
+  // Probar cada modelo de visión hasta que uno funcione.
   for (const model of MODELOS_VISION) {
     try {
       const content = await llamarOpenRouter(model, prompt, imageDataUrl)
+      // Éxito — parsear el JSON.
       let parsed
       try {
         parsed = JSON.parse(content)
@@ -144,18 +161,26 @@ export async function describirFoto(imageDataUrl, type) {
     } catch (e) {
       console.error(`OpenRouter ${model} falló:`, e.status, e.body || e.message)
       lastError = e
-      if (e.status === 404) continue
+      // Si es 404 (modelo no disponible), probar el siguiente.
+      // Si es 429 (rate limit) o 401 (clave mala), no tiene sentido probar otro.
+      if (e.status === 404) {
+        continue // probar siguiente modelo
+      }
       if (e.status === 429) {
         throw new Error('Límite por minuto. Espera 60 segundos.')
       }
       if (e.status === 401) {
         throw new Error('Clave de OpenRouter inválida. Revisa tu .env')
       }
-      if (e.status === 402) continue
+      if (e.status === 402) {
+        // 402 = Payment Required — el modelo :free se agotó por hoy.
+        continue // probar siguiente modelo free
+      }
       throw new Error(e.message || 'La IA no respondió. Intenta de nuevo.')
     }
   }
 
+  // Si llegamos acá, todos los modelos fallaron.
   console.error('Todos los modelos de visión fallaron. Último error:', lastError)
   if (lastError?.status === 402) {
     throw new Error('Límite DIARIO gratis agotado en OpenRouter. Volvé mañana o agregá USD $5 de crédito en openrouter.ai/credits para 1,000 pedidos/día.')
