@@ -111,24 +111,6 @@ function Profile({ onFinish, onBack }) {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) throw new Error('No hay usuario autenticado')
 
-      // ============================================================
-      // NUEVO: Verificar que el RUT esté en la whitelist de El Barrio.
-      // Llama a la función RPC `is_rut_allowed` definida en Supabase.
-      // Si la RPC no existe o falla, NO bloquea al usuario (fallback
-      // graceful: solo avisa por consola y sigue el flujo normal).
-      // ============================================================
-      const { data: rutAllowed, error: rpcError } = await supabase
-        .rpc('is_rut_allowed', { rut_input: rut })
-
-      if (rpcError) {
-        // La tabla/function probablemente no existe todavía → no bloqueamos.
-        console.warn('[Profile] is_rut_allowed RPC falló:', rpcError.message)
-      } else if (rutAllowed === false) {
-        setError('Tu RUT no está autorizado para unirse a El Barrio. Si crees que es un error, contacta al administrador.')
-        return
-      }
-      // ============================================================
-
       let avatarUrl = null
 
       // Subir avatar si existe

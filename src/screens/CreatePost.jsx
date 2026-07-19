@@ -258,8 +258,8 @@ function CreatePost({ onClose, onPublished, startWith }) {
   const cooldownTimer = useRef(null)
 
   // Cuenta regresiva del enfriamiento (para no topar el límite gratis
-  // de Gemini: 10 pedidos/minuto). Después de cada llamado, esperamos
-  // 8 segundos. Si viene un 429, esperamos 65 segundos.
+  // de OpenRouter: ~50 pedidos/día en modelos :free). Después de cada
+  // llamado, esperamos 8 segundos. Si viene un 429, esperamos 65 segundos.
   useEffect(() => {
     if (cooldown <= 0) return
     cooldownTimer.current = setTimeout(() => setCooldown((c) => c - 1), 1000)
@@ -340,8 +340,13 @@ function CreatePost({ onClose, onPublished, startWith }) {
   }
 
   const removeImage = (i) => {
-    setImages(images.filter((_, idx) => idx !== i))
-    setPreviews(previews.filter((_, idx) => idx !== i))
+    // Usar updater functions para no depender del closure viejo.
+    // Sino, cuando subís foto1 → IA → eliminás → subís foto2, los arrays
+    // se desincronizan y previews[0] queda apuntando a basura.
+    setImages((prev) => prev.filter((_, idx) => idx !== i))
+    setPreviews((prev) => prev.filter((_, idx) => idx !== i))
+    // Limpiar cualquier error de IA anterior al cambiar las fotos.
+    setAiError('')
   }
 
   const formatPrice = (v) =>
@@ -354,20 +359,36 @@ function CreatePost({ onClose, onPublished, startWith }) {
      max 1280px y JPEG 0.82 para que el viaje a la Edge Function
      sea rápido y no exceda el body limit. */
   const compressImage = (dataUrl, maxDim = 1280, quality = 0.82) =>
-    new Promise((resolve) => {
-      const img = new Image()
-      img.onload = () => {
-        let { width, height } = img
-        if (width > maxDim || height > maxDim) {
-          if (width > height) { height = Math.round(height * maxDim / width); width = maxDim }
-          else { width = Math.round(width * maxDim / height); height = maxDim }
-        }
-        const canvas = document.createElement('canvas')
-        canvas.width = width; canvas.height = height
-        canvas.getContext('2d').drawImage(img, 0, 0, width, height)
-        resolve(canvas.toDataURL('image/jpeg', quality))
+    new Promise((resolve, reject) => {
+      if (!dataUrl || typeof dataUrl !== 'string' || !dataUrl.startsWith('data:image')) {
+        reject(new Error('La imagen no se cargó bien. Subila de nuevo.'))
+        return
       }
-      img.onerror = () => resolve(dataUrl)
+      const img = new Image()
+      const timer = setTimeout(() => {
+        reject(new Error('La imagen tardó demasiado en cargar. Subila de nuevo.'))
+      }, 8000)
+      img.onload = () => {
+        clearTimeout(timer)
+        try {
+          let { width, height } = img
+          if (width > maxDim || height > maxDim) {
+            if (width > height) { height = Math.round(height * maxDim / width); width = maxDim }
+            else { width = Math.round(width * maxDim / height); height = maxDim }
+          }
+          const canvas = document.createElement('canvas')
+          canvas.width = width; canvas.height = height
+          canvas.getContext('2d').drawImage(img, 0, 0, width, height)
+          resolve(canvas.toDataURL('image/jpeg', quality))
+        } catch (err) {
+          clearTimeout(timer)
+          reject(new Error('No pudimos procesar la imagen. Subila de nuevo.'))
+        }
+      }
+      img.onerror = () => {
+        clearTimeout(timer)
+        reject(new Error('La imagen está corrupta o no se puede leer. Subila de nuevo.'))
+      }
       img.src = dataUrl
     })
 
@@ -395,7 +416,7 @@ function CreatePost({ onClose, onPublished, startWith }) {
   }
 
   /* ---------- IA: autocompletar título, descripción, precio y
-     categoría desde la primera foto. Llama directo a Gemini
+     categoría desde la primera foto. Llama directo a OpenRouter
      (gratis) vía lib/ia.js. No necesita Supabase Edge Functions. ---------- */
   const autoCompletarConIA = async () => {
     if (!previews[0] || aiLoading || cooldown > 0) return
@@ -428,6 +449,10 @@ function CreatePost({ onClose, onPublished, startWith }) {
         } catch (e) {
       if (e.code === 'NO_KEY' || e.message === 'NO_KEY') {
         setAiError('Falta la clave de IA. Crea .env con VITE_OPENROUTER_API_KEY=tu-clave (gratuita en openrouter.ai/keys)')
+      } else if (e.code === 'IA_VACIA') {
+        // La IA respondió pero no reconoció un objeto claro en la foto.
+        // Sin cooldown: el usuario puede cambiar la foto o reintentar ya.
+        setAiError('La IA no reconoció un objeto claro en la foto. Prueba con otra mejor iluminada, o completa a mano.')
       } else if (e.message && e.message.includes('Límite DIARIO')) {
         setAiError(e.message)
         setCooldown(300)
@@ -552,12 +577,15 @@ function CreatePost({ onClose, onPublished, startWith }) {
       if (!content.trim()) return setError('Describe qué pasó')
     } else if (t === 'sell') {
       if (!title.trim()) return setError('Ponle un título a tu producto')
+      if (!content.trim()) return setError('Agrega una descripción con el estado y detalles')
       if (!price) return setError('Ingresa un precio')
       if (images.length === 0) return setError('Agrega al menos 1 foto')
     } else if (t === 'gift') {
       if (!title.trim()) return setError('¿Qué estás regalando?')
+      if (!content.trim()) return setError('Agrega una descripción (estado, cantidad, dónde retirar)')
     } else if (t === 'trade') {
       if (!title.trim()) return setError('¿Qué ofreces?')
+      if (!content.trim()) return setError('Agrega una descripción con el estado y características')
       if (!lookingFor.trim()) return setError('¿Qué buscas a cambio?')
     }
 
@@ -1147,7 +1175,7 @@ function CreatePost({ onClose, onPublished, startWith }) {
               ))}
             </div>
 
-            <label style={s.label}>Detalles <span style={s.opt}>(opcional)</span></label>
+            <label style={s.label}>Detalles <span style={s.req}>*</span></label>
             <textarea
               placeholder="Cuenta un poco más para que te respondan mejor..."
               value={content}
@@ -1187,9 +1215,9 @@ function CreatePost({ onClose, onPublished, startWith }) {
             />
             <CharCounter value={title.length} max={TITLE_MAX} />
 
-            <label style={s.label}>Descripción <span style={s.opt}>(opcional)</span></label>
+            <label style={s.label}>Descripción <span style={s.req}>*</span></label>
             <textarea
-              placeholder="Estado, año, detalles..."
+              placeholder="Estado, año, marca, detalles..."
               value={content}
               onChange={onContentChange}
               style={{ ...s.input, minHeight: 70, resize: 'vertical' }}
@@ -1270,7 +1298,7 @@ function CreatePost({ onClose, onPublished, startWith }) {
             />
             <CharCounter value={title.length} max={TITLE_MAX} />
 
-            <label style={s.label}>Detalles</label>
+            <label style={s.label}>Detalles <span style={s.req}>*</span></label>
             <textarea
               placeholder="Estado, cantidad, dónde retirar..."
               value={content}
@@ -1280,7 +1308,7 @@ function CreatePost({ onClose, onPublished, startWith }) {
             <CharCounter value={content.length} max={CONTENT_MAX} />
 
             <div style={{ ...s.hintBox, marginTop: 18, marginBottom: 0 }}>
-              Regalar siempre es gratis en El Barrio. Y siempre lo será.
+              Regalar siempre va a ser gratis en El Barrio.
             </div>
           </div>
         )}
@@ -1322,9 +1350,9 @@ function CreatePost({ onClose, onPublished, startWith }) {
             />
             <CharCounter value={lookingFor.length} max={TITLE_MAX} />
 
-            <label style={s.label}>Descripción <span style={s.opt}>(opcional)</span></label>
+            <label style={s.label}>Descripción <span style={s.req}>*</span></label>
             <textarea
-              placeholder="Estado, características..."
+              placeholder="Estado, características, año..."
               value={content}
               onChange={onContentChange}
               style={{ ...s.input, minHeight: 70, resize: 'vertical' }}
@@ -1351,6 +1379,20 @@ function CreatePost({ onClose, onPublished, startWith }) {
             </div>
           </div>
         )}
+
+        {/* Disclaimer sobre responsabilidad del contenido — contextual
+            según el tipo de post. En regalar no hay precio; en trueque
+            se menciona "lo que buscás" en vez de precio. */}
+        <div style={s.disclaimerBox}>
+          <span style={s.disclaimerIcon}>⚠️</span>
+          <p style={s.disclaimerText}>
+            {t === 'gift'
+              ? <>El título y la descripción los ponés tú. La IA solo sugiere un borrador a partir de la foto — <strong>verificalo antes de publicar</strong>.</>
+              : t === 'trade'
+              ? <>El título, la descripción y lo que buscás los ponés tú. La IA solo sugiere un borrador a partir de la foto — <strong>verificalo antes de publicar</strong>.</>
+              : <>El título, descripción y precio los ponés tú. La IA solo sugiere un borrador a partir de la foto — <strong>verificalo antes de publicar</strong>.</>}
+          </p>
+        </div>
 
         {error && (
           <div style={s.errorBox}>
@@ -1393,9 +1435,6 @@ function PreviewCard({ emoji, title, price, priceColor, typeLabel, typeColor, ty
               <span style={{ fontSize: 28 }}>{emoji}</span>
             </div>
           )}
-          <div style={{ ...s.previewTypeBadge, background: typeBg, color: typeColor }}>
-            {emoji} {typeLabel}
-          </div>
         </div>
         <div style={s.previewBody}>
           <div style={s.previewTitle}>{title}</div>
@@ -1678,6 +1717,27 @@ const s = {
     background: C.rojoSuave, color: C.rojo,
     borderRadius: 12, fontSize: 12.5, fontWeight: 500,
     lineHeight: 1.45, marginBottom: 18,
+  },
+
+  // Asterisco rojo de campo obligatorio (reemplaza el "(opcional)").
+  req: { color: C.rojo, fontWeight: 700, marginLeft: 2 },
+
+  // Disclaimer de responsabilidad sobre título/descripción/precio.
+  // Fondo verde transparente (brand color de El Barrio), tipo alerta
+  // normal. Sin título: solo icono + párrafo.
+  disclaimerBox: {
+    display: 'flex', gap: 9, alignItems: 'flex-start',
+    padding: '11px 13px',
+    background: 'rgba(22, 163, 74, 0.08)',
+    border: `1px solid rgba(22, 163, 74, 0.22)`,
+    borderRadius: 12,
+    marginTop: 18, marginBottom: 0,
+  },
+  disclaimerIcon: { fontSize: 15, lineHeight: 1.5, flexShrink: 0, paddingTop: 1 },
+  disclaimerText: {
+    margin: 0,
+    fontSize: 12, fontWeight: 500,
+    color: C.texto, lineHeight: 1.5,
   },
 
   chipGrid2: { display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8 },
