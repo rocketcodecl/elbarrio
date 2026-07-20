@@ -509,6 +509,23 @@ export default function MyProfile({ currentUser, onNavigate, onBack, onLogout })
           </div>
         )}
 
+        {/* CERRAR SESIÓN — botón peligro al final del scroll.
+            onLogout viene de App.jsx (handleLogout). Estilo rojo
+            suave para no romper la jerarquía visual del perfil. */}
+        {onLogout && (
+          <div style={s.logoutWrap}>
+            <button
+              type="button"
+              onClick={onLogout}
+              style={s.logoutBtn}
+              aria-label="Cerrar sesión"
+            >
+              <span style={{ fontSize: 16, lineHeight: 1 }}>⏻</span>
+              <span>Cerrar sesión</span>
+            </button>
+          </div>
+        )}
+
         <div style={{ height: 72 }} />
       </div>
 
@@ -1134,6 +1151,30 @@ const s = {
   },
   emptyPostsSub: {
     fontSize: 12, color: C.textoSuave, lineHeight: 1.4,
+  },
+
+  // CERRAR SESIÓN — botón peligro suave, rojo sobre fondo rojoBg.
+  // Mismos radios/padding que las otras cards para no romper ritmo.
+  logoutWrap: {
+    padding: '4px 16px 8px',
+  },
+  logoutBtn: {
+    width: '100%',
+    background: C.rojoBg,
+    color: C.rojo,
+    border: `1px solid ${C.rojoSuave}`,
+    borderRadius: 14,
+    padding: '14px 16px',
+    fontSize: 14,
+    fontWeight: 700,
+    fontFamily: 'inherit',
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    boxShadow: '0 1px 2px rgba(0,0,0,0.03)',
+    transition: 'transform 0.12s ease, background 0.15s ease',
   },
 
   // TABS

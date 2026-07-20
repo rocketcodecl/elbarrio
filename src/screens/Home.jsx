@@ -695,7 +695,7 @@ function Home({ currentUser, onNavigate, onCrear }) {
                 <span style={s.pedirBarraTit}>¿Necesitás una mano?</span>
                 <span style={s.pedirBarraSub}>Gasfíter, flete, cuidado de perro...</span>
               </span>
-              <span style={s.pedirBarraCta}>Pedir</span>
+              <span style={s.pedirBarraCta}>¡Pídelo!</span>
             </button>
 
             {pedidos.map((p) => (

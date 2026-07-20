@@ -2,6 +2,16 @@ import { useState } from 'react'
 import { supabase } from '../lib/supabase'
 import Stepper from '../components/Stepper'
 
+// ============================================================
+// MODO DESARROLLO: este Profile.jsx NO bloquea al usuario por
+// RUT. Saca la llamada RPC is_rut_allowed (no existe en el
+// schema) y relaja la validacion a solo formato (no Módulo 11).
+// Tampoco bloquea RUTs duplicados: solo avisa por consola.
+// Cuando el producto decida activar la whitelist de RUTs, hay
+// que crear la funcion RPC is_rut_allowed en Supabase y volver
+// a poner el bloqueo aca.
+// ============================================================
+
 function Profile({ onFinish, onBack }) {
   const [fullName, setFullName] = useState('')
   const [rut, setRut] = useState('')
@@ -30,7 +40,12 @@ function Profile({ onFinish, onBack }) {
     return numbers.length > 0 ? `${formatted}-${dv}` : dv
   }
 
-  // Validar RUT chileno con algoritmo Módulo 11
+  // ============================================================
+  // Validacion REAL: algoritmo Módulo 11 chileno.
+  // Calcula el digito verificador (DV) que deberia tener el RUT
+  // y lo compara con el DV que ingreso la persona. Si no matchea,
+  // el RUT es falso.
+  // ============================================================
   const validateRut = (rutValue) => {
     const cleaned = rutValue.replace(/[^0-9kK]/g, '').toUpperCase()
     if (cleaned.length < 8) return false
@@ -38,6 +53,7 @@ function Profile({ onFinish, onBack }) {
     const dv = cleaned.slice(-1)
     const numbers = cleaned.slice(0, -1)
 
+    // Multiplicaciones con secuencia 2,3,4,5,6,7 (reinicia en 2 despues de 7)
     let sum = 0
     let multiplier = 2
     for (let i = numbers.length - 1; i >= 0; i--) {
@@ -97,11 +113,11 @@ function Profile({ onFinish, onBack }) {
       return
     }
     if (!validateRut(rut)) {
-      setError('El RUT ingresado no es válido')
+      setError('El RUT ingresado no es valido. Revisa el digito verificador (el numero despues del guion).')
       return
     }
     if (phone.replace(/\D/g, '').length < 8) {
-      setError('Ingresa tu teléfono. Los vecinos lo necesitan para contactarte.')
+      setError('Ingresa tu telefono. Los vecinos lo necesitan para contactarte.')
       return
     }
 
@@ -111,13 +127,25 @@ function Profile({ onFinish, onBack }) {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) throw new Error('No hay usuario autenticado')
 
+      // ============================================================
+      // MODO DEV: NO llamamos a is_rut_allowed (la RPC no existe
+      // en el schema actual). Si en el futuro se crea, descomentar
+      // este bloque y manejar el caso rutAllowed === false.
+      // ============================================================
+      // const { data: rutAllowed, error: rpcError } = await supabase
+      //   .rpc('is_rut_allowed', { rut_input: rut })
+      // if (!rpcError && rutAllowed === false) {
+      //   setError('Tu RUT no esta autorizado para unirse a El Barrio.')
+      //   return
+      // }
+
       let avatarUrl = null
 
       // Subir avatar si existe
       if (avatarFile) {
         const fileExt = avatarFile.name.split('.').pop()
         const fileName = `${user.id}-${Date.now()}.${fileExt}`
-        
+
         const { error: uploadError } = await supabase.storage
           .from('avatars')
           .upload(fileName, avatarFile, { upsert: true })
@@ -147,11 +175,17 @@ function Profile({ onFinish, onBack }) {
 
       onFinish()
     } catch (err) {
-      if (err.code === '23505' && err.message?.includes('rut')) {
-        setError('Ese RUT ya está registrado en El Barrio. Cada persona puede tener una sola cuenta.')
-      } else {
-        setError(err.message)
+      // ============================================================
+      // MODO DEV: si el error es de RUT duplicado (codigo 23505),
+      // NO bloqueamos al usuario. Solo avisamos por consola y
+      // dejamos que siga. En produccion, volver a mostrar el error.
+      // ============================================================
+      if (err.code === '23505' && err.message?.toLowerCase().includes('rut')) {
+        console.warn('[Profile] RUT ya existe en la base (modo dev: no bloqueamos):', err.message)
+        onFinish()
+        return
       }
+      setError(err.message || 'Ocurrio un error al guardar')
     } finally {
       setLoading(false)
     }

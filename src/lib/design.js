@@ -64,16 +64,9 @@ export const C = {
 
 // ─────────────────────────────────────────────
 // TIPOGRAFÍA — nada baja de 13px
-//
-// FUENTE: Plus Jakarta Sans. Es la ÚNICA fuente de toda la app.
-// Se carga en index.css (NO hay index.html en este proyecto), con la misma
-// técnica que ya se usaba para Inter:
-//   @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
-// y en html, body → font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
-// El fallback (system-ui) aparece solo si no hay internet al cargar.
 // ─────────────────────────────────────────────
 export const T = {
-  font: '"Plus Jakarta Sans", system-ui, -apple-system, "Segoe UI", sans-serif',
+  font: 'system-ui, -apple-system, "Segoe UI", sans-serif',
 
   saludo:   { fontSize: 22, fontWeight: 800, color: C.texto, letterSpacing: '-0.3px' },
   titulo:   { fontSize: 18, fontWeight: 800, color: C.texto, letterSpacing: '-0.2px' },
@@ -226,14 +219,14 @@ export const FARMACIAS = [
     nombre: 'Farmacias Ahumada',
     direccion: 'Av. Cristóbal Colón 5090',
     comuna: 'Las Condes',
-    horario: 'Hasta 22:00',
+    horario: '24 horas',
     telefono: '',
   },
   {
     nombre: 'Farmacia Cruz Verde',
     direccion: 'Manquehue Sur 6071',
     comuna: 'Las Condes',
-    horario: 'Hasta 22:00',
+    horario: '24 horas',
     telefono: '',
   },
 ]
