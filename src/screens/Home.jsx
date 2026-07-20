@@ -282,7 +282,34 @@ function Home({ currentUser, onNavigate, onCrear }) {
   const [noLeidos, setNoLeidos] = useState(0)
   const [clima, setClima] = useState(null)
   const [verFarmacias, setVerFarmacias] = useState(false)
+  const [farmaciasLista, setFarmaciasLista] = useState(FARMACIAS)
   const [cargando, setCargando] = useState(true)
+
+  // ── Cargar farmacias desde Supabase ──
+  // Si la query ERROR (tabla no existe, RLS cae): usamos fallback硬code.
+  // Si la query OK pero viene vacía: mostramos lista vacía (NO fallback).
+  // Así, si el admin borra todas las farmacias, el Inicio no muestre las viejas.
+  useEffect(() => {
+    let cancelado = false
+    ;(async () => {
+      try {
+        const { data, error } = await supabase
+          .from('farmacias')
+          .select('*')
+          .eq('is_active', true)
+          .order('sort_order', { ascending: true })
+          .order('nombre', { ascending: true })
+        if (error) throw error
+        // Query OK → usar lo que devolvió (aunque sea vacío).
+        if (!cancelado) setFarmaciasLista(data || [])
+      } catch (e) {
+        // Solo acá (tabla rota/no existe) caemos al fallback硬code.
+        console.warn('[home] farmacias BD falló, uso fallback:', e?.message)
+        if (!cancelado) setFarmaciasLista(FARMACIAS)
+      }
+    })()
+    return () => { cancelado = true }
+  }, [])
   const [busqueda, setBusqueda] = useState('')
   const [verBuscador, setVerBuscador] = useState(false)
   const [verMasActividad, setVerMasActividad] = useState(false)
@@ -655,17 +682,17 @@ function Home({ currentUser, onNavigate, onCrear }) {
 
             <div style={s.tiraDivisor} />
 
-            {FARMACIAS.length > 0 && (
+            {farmaciasLista.length > 0 && (
               <button style={s.farmaciaBloque} onClick={() => setVerFarmacias(true)}>
                 <div style={s.farmaciaLabel}>
                   💊 Farmacia de turno
-                  {FARMACIAS.length > 1 && (
-                    <span style={s.farmaciaMas}> +{FARMACIAS.length - 1}</span>
+                  {farmaciasLista.length > 1 && (
+                    <span style={s.farmaciaMas}> +{farmaciasLista.length - 1}</span>
                   )}
                 </div>
-                <div style={s.farmaciaNombre}>{FARMACIAS[0].nombre}</div>
+                <div style={s.farmaciaNombre}>{farmaciasLista[0].nombre}</div>
                 <div style={s.farmaciaDir}>
-                  {FARMACIAS[0].direccion} · {FARMACIAS[0].horario}
+                  {farmaciasLista[0].direccion} · {farmaciasLista[0].horario}
                 </div>
               </button>
             )}
@@ -936,20 +963,27 @@ function Home({ currentUser, onNavigate, onCrear }) {
           <div style={s.modalCaja} onClick={(e) => e.stopPropagation()}>
             <div style={s.modalTit}>💊 Farmacias de turno hoy</div>
 
-            {FARMACIAS.map((f, i) => (
-              <div key={i} style={s.farmCard}>
+            {farmaciasLista.map((f, i) => (
+              <div key={f.id || i} style={s.farmCard}>
                 <div style={s.farmNombre}>{f.nombre}</div>
-                <div style={s.farmDir}>📍 {f.direccion}, {f.comuna}</div>
-                <div style={s.farmHora}>🕐 {f.horario}</div>
+                <div style={s.farmDir}>📍 {f.direccion}{f.comuna ? ', ' + f.comuna : ''}</div>
+                <div style={s.farmHora}>🕐 {f.horario || '24 horas'}</div>
 
                 <div style={s.farmBtns}>
                   <button
                     style={s.farmBtn}
-                    onClick={() => window.open(
-                      `https://www.openstreetmap.org/search?query=${encodeURIComponent(
-                        f.direccion + ', ' + f.comuna
-                      )}`, '_blank'
-                    )}
+                    onClick={() => {
+                      // Google Maps "Cómo llegar" — igual que en ComercioDetalle.
+                      // Si hay lat/lng, usa coordenadas (más preciso).
+                      // Si no, usa la dirección textual.
+                      const dest = (f.lat != null && f.lng != null)
+                        ? `${f.lat},${f.lng}`
+                        : encodeURIComponent(`${f.direccion}${f.comuna ? ', ' + f.comuna : ', Santiago, Chile'}`)
+                      window.open(
+                        `https://www.google.com/maps/dir/?api=1&destination=${dest}`,
+                        '_blank'
+                      )
+                    }}
                   >
                     📍 Cómo llegar
                   </button>

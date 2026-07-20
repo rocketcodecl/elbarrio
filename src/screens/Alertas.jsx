@@ -130,14 +130,29 @@ function Alertas({ currentUser, onNavigate, onCrear }) {
       if (!p) return
       setProfile(p)
 
-      const res = await supabase
+      // Query robusto:
+      // · Si el user tiene neighborhood_id, mostramos incidentes de SU barrio
+      //   + los que no tengan neighborhood asignado (is.null).
+      //   Uso .or() porque .eq('col', null) en Postgres devuelve 0 rows.
+      // · Si el user NO tiene neighborhood_id, no filtramos por barrio y
+      //   mostramos TODOS los incidentes (para que la lista no quede vacía).
+      // · Status: el admin normaliza 'active' → 'pendiente' al mostrar, pero
+      //   en la DB pueden existir ambos valores. Usamos .in() para captarlos.
+      let q = supabase
         .from('incident_reports')
         .select('*, reporter:profiles!reporter_id (full_name, avatar_url, badge_founder, verified)')
-        .eq('neighborhood_id', p.neighborhood_id)
-        .eq('status', 'active')
+        .in('status', ['active', 'pendiente'])
+
+      if (p.neighborhood_id) {
+        q = q.or(`neighborhood_id.eq.${p.neighborhood_id},neighborhood_id.is.null`)
+      }
+
+      const res = await q
         .order('confirms_count', { ascending: false })
         .order('created_at', { ascending: false })
         .limit(100)
+
+      console.log('[alertas] query result:', res.data?.length, 'rows')
 
       if (res.error) {
         console.error('[el barrio] Error cargando alertas:', res.error)

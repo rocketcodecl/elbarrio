@@ -210,6 +210,7 @@ export default function SellerProfile({ sellerId, currentUser, onNavigate }) {
   const [seller, setSeller] = useState(null)
   const [posts, setPosts] = useState([])
   const [reviews, setReviews] = useState([])
+  const [promos, setPromos] = useState([])
   const [stats, setStats] = useState({ publicaciones: 0, ventas: 0, rating: 4.8, reviewsCount: 12 })
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState('')
@@ -273,10 +274,11 @@ export default function SellerProfile({ sellerId, currentUser, onNavigate }) {
 
       setSeller(profile)
 
-      // Cargar posts activos + stats en paralelo (no bloquean al perfil)
+      // Cargar posts activos + stats + reviews + promos en paralelo (no bloquean al perfil)
       cargarPosts(profile)
       cargarStats(profile)
       cargarReviews(profile)
+      cargarPromos(profile)
     } catch (err) {
       setLoadError(err?.message || 'Error inesperado')
       setLoading(false)
@@ -383,6 +385,38 @@ export default function SellerProfile({ sellerId, currentUser, onNavigate }) {
         // Tabla reviews no existe o RLS bloquea — dejamos vacio
         setReviews([])
       }
+    }
+  }
+
+  /* ─────── PROMOCIONES DEL COMERCIO ─────── */
+  const cargarPromos = async (profile) => {
+    try {
+      // sellerId puede ser el auth-uid o el row id; para commerce_promos
+      // usamos commerce_id (FK a commerces.id). Si el perfil cargado tiene
+      // id o commerce_id, usamos ese; si no, caemos a sellerId.
+      const cid = profile?.commerce_id || profile?.id || sellerId
+      const { data, error } = await supabase
+        .from('commerce_promos')
+        .select('id, title, description, image_url, starts_at, expires_at, is_active, views_count')
+        .eq('commerce_id', cid)
+        .eq('is_active', true)
+        .order('created_at', { ascending: false })
+        .limit(10)
+
+      if (error) throw error
+
+      // Filtrar en JS las promos ya vencidas (expires_at > ahora)
+      const ahora = Date.now()
+      const vigentes = (data || []).filter((p) => {
+        if (!p.expires_at) return true
+        const exp = new Date(p.expires_at)
+        return !isNaN(exp.getTime()) && exp.getTime() > ahora
+      })
+      setPromos(vigentes)
+    } catch {
+      // Si commerce_promos no existe, RLS bloquea, o cid no matchea,
+      // dejamos lista vacía — no rompe la pantalla.
+      setPromos([])
     }
   }
 
@@ -509,7 +543,10 @@ export default function SellerProfile({ sellerId, currentUser, onNavigate }) {
 
       <div style={s.scroll}>
         {/* HERO */}
-        <div style={s.hero} className="sp-fadein">
+        <div style={{ ...s.hero, position: 'relative' }} className="sp-fadein">
+          {seller.is_premium === true && (
+            <div style={s.premiumBadge}>⭐ Destacado</div>
+          )}
           <div style={s.heroAvatarWrap}>
             {avatarUrl ? (
               <img src={avatarUrl} alt={fullName} style={s.heroAvatar} />
@@ -590,6 +627,28 @@ export default function SellerProfile({ sellerId, currentUser, onNavigate }) {
               <IcoShare size={18} />
             </button>
           </div>
+
+          {/* PROMOCIONES DEL COMERCIO */}
+          <div style={s.sectionTitleRow}>
+            <span style={s.sectionTitle}>🎁 Promociones</span>
+            {promos.length > 0 && <span style={s.sectionCount}>{promos.length}</span>}
+          </div>
+
+          {promos.length === 0 ? (
+            <div style={{ ...s.emptyBox, padding: '18px 14px', marginBottom: 22 }}>
+              <div style={{ fontSize: 26, lineHeight: 1 }}>🎁</div>
+              <div style={s.emptyTitle}>Sin promociones por ahora</div>
+              <div style={s.emptyText}>
+                Cuando este comercio publique una promo, la vas a ver acá con una banda verde.
+              </div>
+            </div>
+          ) : (
+            <div style={s.promosList}>
+              {promos.map((p) => (
+                <PromoCard key={p.id} promo={p} />
+              ))}
+            </div>
+          )}
 
           {/* PUBLICACIONES ACTIVAS */}
           <div style={s.sectionTitleRow}>
@@ -788,6 +847,35 @@ function ReviewItem({ review }) {
         </div>
       </div>
       {body && <div style={s.reviewBody}>{body}</div>}
+    </div>
+  )
+}
+
+function PromoCard({ promo }) {
+  // Fecha de vencimiento legible: "Vence: 5 dic 2025" o "Vigente" si no expira
+  const expDate = promo.expires_at ? new Date(promo.expires_at) : null
+  const expValid = expDate && !isNaN(expDate.getTime())
+  const expText = expValid
+    ? `Vence: ${expDate.toLocaleDateString('es-CL', { day: 'numeric', month: 'short', year: 'numeric' })}`
+    : 'Vigente'
+  const titulo = promo.title || 'Promoción'
+  const desc = promo.description || ''
+  const img = promo.image_url
+
+  return (
+    <div style={s.promoCard} className="sp-card-hover">
+      {/* BANDA VERDE superior — la marca visual que pidió el usuario */}
+      <div style={s.promoBand} />
+      <div style={s.promoBody}>
+        {img && (
+          <img src={img} alt="" style={s.promoImg} loading="lazy" />
+        )}
+        <div style={s.promoTitle}>{titulo}</div>
+        {desc && (
+          <div style={s.promoDesc}>{desc}</div>
+        )}
+        <div style={s.promoExpiry}>⏰ {expText}</div>
+      </div>
     </div>
   )
 }
@@ -1132,6 +1220,66 @@ const s = {
     fontSize: 13, color: C.textoSuave,
     lineHeight: 1.5, marginTop: 4,
     whiteSpace: 'pre-wrap',
+  },
+
+  // PREMIUM BADGE (hero)
+  premiumBadge: {
+    position: 'absolute',
+    top: 12, right: 12,
+    background: `linear-gradient(135deg, ${C.verde}, ${C.verdeOsc})`,
+    color: '#fff',
+    fontSize: 11, fontWeight: 800,
+    padding: '5px 10px',
+    borderRadius: 20,
+    boxShadow: '0 2px 8px rgba(22,163,74,0.30)',
+    zIndex: 2,
+    display: 'inline-flex', alignItems: 'center', gap: 4,
+    letterSpacing: '0.2px',
+  },
+
+  // PROMOS
+  promosList: {
+    display: 'flex', flexDirection: 'column', gap: 10,
+    marginBottom: 22,
+  },
+  promoCard: {
+    background: C.card,
+    borderRadius: 14,
+    overflow: 'hidden',
+    border: `1px solid ${C.borde}`,
+    boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
+  },
+  promoBand: {
+    height: 4,
+    background: `linear-gradient(90deg, ${C.verde}, ${C.verdeOsc})`,
+  },
+  promoBody: {
+    padding: 14,
+    background: C.verdeBg,
+  },
+  promoImg: {
+    width: '100%',
+    maxHeight: 180,
+    objectFit: 'cover',
+    borderRadius: 10,
+    marginBottom: 10,
+    display: 'block',
+  },
+  promoTitle: {
+    fontSize: 15, fontWeight: 800, color: C.texto,
+    marginBottom: 4, letterSpacing: '-0.1px',
+  },
+  promoDesc: {
+    fontSize: 13, color: C.textoSuave, lineHeight: 1.4,
+    whiteSpace: 'pre-wrap',
+  },
+  promoExpiry: {
+    display: 'inline-block',
+    fontSize: 11.5, color: C.verdeOsc, fontWeight: 700,
+    background: C.verdeSuave,
+    padding: '3px 8px',
+    borderRadius: 6,
+    marginTop: 8,
   },
 
   // REPORT

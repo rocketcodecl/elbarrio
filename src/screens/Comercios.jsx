@@ -1,113 +1,48 @@
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import {
-  C, T, COMERCIOS, COMERCIOS_CATS, iniciales, distancia, hace,
+  C, T, COMERCIOS, COMERCIOS_CATS, iniciales, distancia,
 } from '../lib/design'
 import MiniMap from '../components/MiniMap'
-import TopBar from '../components/TopBar'
+import { DIAS_SEMANA } from '../lib/horarios'
 
 /*
-  COMERCIOS — v8 PIXEL-PERFECT
-  Traducción EXACTA del HTML de Stitch (exportado por el usuario).
-  Valores tomados literalmente del tailwind.config + clases Tailwind.
+  COMERCIOS — el directorio del barrio.
 
-  SISTEMA DE COLORES (de Stitch):
-    primary:              #006d32
-    primary-container:    #1da653
-    primary-fixed:        #7ffc9d
-    on-primary:           #ffffff
-    on-primary-container: #003113
-    on-primary-fixed:     #00210a
-    surface (fondo):      #f9f9ff
-    surface-lowest (card):#ffffff
-    surface-low (header): #f0f3ff
-    surface-high:         #e2e8f8
-    surface-highest:      #dce2f3
-    surface-variant:      #dce2f3
-    outline-variant:      #bdcabb
-    outline:              #6e7a6d
-    on-surface:           #151c27
-    on-surface-variant:   #3e4a3e
-    secondary:            #5c5e68
-    error:                #ba1a1a
-    tertiary-container:   #989083
-    on-tertiary-container:#2f2920
-    secondary-container:  #e1e1ee
-    on-secondary-container:#62646f
+  Feed:
+    · Título "Comercios de el barrio"
+    · Una SOLA lista (sin secciones). Los premium van primero
+      con card grande, el resto con card compacta.
+    · Card grande: cover bajo + ribbon + nombre + horario feed
+      (gris oscuro + verde) + descripción + beneficio + dirección
+      + categorías al final.
+    · Card compacta: logo + nombre + horario feed + dirección
+      + categorías al final.
 
-  TIPOGRAFÍA: 'Plus Jakarta Sans'
-    headline-md: 20px / 28px / 700
-    headline-sm: 16px / 24px / 600
-    body-lg:     16px / 24px / 400
-    body-md:     14px / 20px / 400
-    body-sm:     12px / 16px / 400
-    label-md:    12px / 16px / 600 (ls 0.01em)
-    label-xs:    10px / 12px / 700
+  Horario feed (formato unificado):
+    · "abierto de 09:00 a 20:00  ·  cierra en 2h 15min"
+      (gris oscuro)                    (verde marca)
+    · "cerrado  ·  abre a las 09:00"   (si abre hoy más tarde)
+    · "cerrado hoy"                    (si no abre hoy)
+    Nada en negrita.
 
-  SPACING: xs 8, sm 12, base 4, md 16, lg 24, xl 32, gutter 12, container-margin 20
-  RADIUS: lg 8px, xl 12px, full 9999px
+  Modal (PREMIUM quality):
+    · Sheet 97% del viewport → casi sin gap arriba.
+    · Cover solo si is_premium (con ribbon + gradiente inferior).
+    · Logo grande (76px) centrado, mitad sobre cover / mitad body.
+    · Nombre grande + status pill al lado.
+    · Horario feed (mismo formato).
+    · Banner de Beneficio RE-DISEÑADO: gradiente verde, badge circular
+      con icono, dos líneas tipográficas (label + beneficio).
+    · Dropdowns VER UBICACIÓN / VER HORARIOS con chevron animado.
+    · Categorías al final con header "Rubros".
+    · Footer WhatsApp full-width sticky (sin margen desperdiciado).
 */
 
-/* ── Tokens mapeados a la paleta de El Barrio (design.js) ──
-  Mismos nombres que el Stitch original para no tocar las referencias,
-  pero con los valores de C (verde #16a34a, fondo #f4f7f4, etc.). */
-const P = {
-  // Colores — mapeados a design.js
-  primary:              C.verde,        // #16a34a (antes #006d32)
-  primaryContainer:     C.verdeOsc,     // #0f5f36 (antes #1da653)
-  primaryFixed:         C.verdeSuave,   // #dcfce7 (antes #7ffc9d neón)
-  onPrimary:            '#ffffff',
-  onPrimaryContainer:   C.verdeOsc,     // #0f5f36
-  onPrimaryFixed:       C.verdeOsc,     // #0f5f36
-  surface:              C.fondo,        // #f4f7f4 (antes #f9f9ff azulado)
-  surfaceLowest:        C.card,         // #ffffff
-  surfaceLow:           C.card,         // #ffffff (header blanco como Mercado)
-  surfaceHigh:          '#f9fafb',     // bg buscador (como Mercado)
-  surfaceHighest:       C.bordeSuave,  // #f1f5f1
-  surfaceVariant:       C.bordeSuave,  // #f1f5f1
-  outlineVariant:       C.borde,       // #e8ede8
-  outline:              C.textoTenue,  // #98a49b
-  onSurface:            C.texto,       // #16211a
-  onSurfaceVariant:     C.textoSuave,  // #5f6b62
-  secondary:            C.textoSuave,  // #5f6b62
-  error:                C.rojo,        // #dc2626
-  tertiaryContainer:    C.doradoSuave, // #fef3c7
-  onTertiaryContainer:  '#92400e',
-  secondaryContainer:   C.bordeSuave,  // #f1f5f1
-  onSecondaryContainer: C.textoSuave,  // #5f6b62
-
-  // Fuente — system-ui como toda la app (NO Plus Jakarta Sans)
-  font: T.font,
-}
-
-/* ── Estilos globales ── */
-const GLOBAL_STYLES = `
-  .com-tap { transition: transform .12s ease; }
-  .com-tap:active { transform: scale(0.98); }
-  .com-chip { transition: all .14s ease; }
-  .com-chip:active { transform: scale(0.95); }
-  .com-btn { transition: transform .12s ease, background .2s ease; }
-  .com-btn:active { transform: scale(0.9); }
-  .com-cta { transition: transform .12s ease, box-shadow .2s ease; }
-  .com-cta:active { transform: scale(0.96); }
-  @keyframes comSheetUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
-  .com-sheet { animation: comSheetUp .28s cubic-bezier(0.16, 1, 0.3, 1) both; }
-  @keyframes comPulseSoft {
-    0%, 100% { transform: scale(1); opacity: 1; }
-    50% { transform: scale(1.05); opacity: 0.85; }
-  }
-  .com-pulse { animation: comPulseSoft 2.5s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
-  @keyframes comLightboxIn { from { opacity: 0; transform: scale(0.96); } to { opacity: 1; transform: scale(1); } }
-  .com-lightbox { animation: comLightboxIn .22s ease-out both; }
-  .com-scroll::-webkit-scrollbar { display: none; }
-  .com-scroll { scrollbar-width: none; -ms-overflow-style: none; }
-  .com-body-scroll::-webkit-scrollbar { width: 0; }
-`
-
-/* ── Días ── */
+/* ── Días de la semana (claves de opening_hours) ── */
 const DIAS = ['dom', 'lun', 'mar', 'mie', 'jue', 'vie', 'sab']
-const DIAS_FULL = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado']
 
+/* ── Helper: estado del horario para el FEED y el MODAL ── */
 const fmtCountdown = (mins) => {
   if (mins < 60) return `en ${mins} min`
   const hh = Math.floor(mins / 60)
@@ -115,6 +50,7 @@ const fmtCountdown = (mins) => {
   return mm > 0 ? `en ${hh}h ${mm}min` : `en ${hh}h`
 }
 
+/* Busca el próximo día con horario empezando desde `startOffset` días desde hoy */
 const proximoDiaAbierto = (hours, startOffset = 1) => {
   const now = new Date()
   for (let i = startOffset; i <= 7; i++) {
@@ -123,7 +59,7 @@ const proximoDiaAbierto = (hours, startOffset = 1) => {
     const key = DIAS[d.getDay()]
     const h = hours[key]
     if (h && h.o && h.c) {
-      const etiqueta = i === 1 ? 'mañana' : DIAS_FULL[d.getDay()].toLowerCase()
+      const etiqueta = i === 1 ? 'mañana' : key
       return { etiqueta, hora: h.o, dia: key }
     }
   }
@@ -136,40 +72,216 @@ const horarioFeed = (hours) => {
   const dia = DIAS[now.getDay()]
   const h = hours[dia]
   if (!h || !h.o || !h.c) {
+    // Hoy no abre → buscar próximo día
     const prox = proximoDiaAbierto(hours, 1)
-    if (!prox) return { principal: 'Sin horario', secundario: null, abierto: false }
-    return { principal: `Abre ${prox.etiqueta} a las ${prox.hora}`, secundario: null, abierto: false }
+    if (!prox) return { principal: 'sin horario', secundario: null, abierto: false }
+    return {
+      principal: `cierra hoy · abre ${prox.etiqueta} a las ${prox.hora}`,
+      secundario: null,
+      abierto: false,
+    }
   }
+
   const [ho, mo] = h.o.split(':').map(Number)
   const [hc, mc] = h.c.split(':').map(Number)
   const ahora = now.getHours() * 60 + now.getMinutes()
   const apertura = ho * 60 + mo
   const cierre = hc * 60 + mc
+
+  // Abierto ahora
   if (ahora >= apertura && ahora < cierre) {
     const diff = cierre - ahora
     const cierraEn = diff < 60
       ? `cierra en ${diff} min`
       : (diff % 60 > 0 ? `cierra en ${Math.floor(diff / 60)}h ${diff % 60}min` : `cierra en ${Math.floor(diff / 60)}h`)
-    return { principal: `Abierto hasta las ${h.c}`, secundario: cierraEn, abierto: true, horaCierre: h.c }
+    return {
+      principal: `abierto de ${h.o} a ${h.c}`,
+      secundario: cierraEn,
+      abierto: true,
+    }
   }
+
+  // Cerrado pero abre hoy más tarde
   if (ahora < apertura) {
-    return { principal: `Abre hoy a las ${h.o}`, secundario: fmtCountdown(apertura - ahora), abierto: false }
+    const diff = apertura - ahora
+    return {
+      principal: `abre hoy a las ${h.o}`,
+      secundario: fmtCountdown(diff),
+      abierto: false,
+    }
   }
+
+  // Ya cerró hoy → buscar próximo día
   const prox = proximoDiaAbierto(hours, 1)
-  if (!prox) return { principal: 'Cerrado', secundario: null, abierto: false }
-  return { principal: `Abre ${prox.etiqueta} a las ${prox.hora}`, secundario: null, abierto: false }
+  if (!prox) return { principal: 'cerrado', secundario: null, abierto: false }
+  return {
+    principal: `cierra hoy · abre ${prox.etiqueta} a las ${prox.hora}`,
+    secundario: null,
+    abierto: false,
+  }
 }
 
+/* ── Haversine ── */
 const haversine = (lat1, lng1, lat2, lng2) => {
   if (lat1 == null || lng1 == null || lat2 == null || lng2 == null) return null
   const R = 6371000
   const toRad = (d) => (d * Math.PI) / 180
   const dLat = toRad(lat2 - lat1)
   const dLng = toRad(lng2 - lng1)
-  const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2
   return Math.round(R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)))
 }
 
+/* ── Íconos ── */
+const Ico = {
+  back: ({ size = 20, color = C.texto }) => (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
+      stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="m15 18-6-6 6-6" />
+    </svg>
+  ),
+  search: ({ size = 16, color = C.textoTenue }) => (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
+      stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="11" cy="11" r="8" />
+      <path d="m21 21-4.3-4.3" />
+    </svg>
+  ),
+  pin: ({ size = 11, color = C.verde }) => (
+    <svg width={size} height={size + 2} viewBox="0 0 24 24" fill="none"
+      stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z" />
+      <circle cx="12" cy="10" r="3" />
+    </svg>
+  ),
+  clock: ({ size = 12, color = C.verde }) => (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
+      stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="10" />
+      <polyline points="12 6 12 12 16 14" />
+    </svg>
+  ),
+  whatsapp: ({ size = 15, color = C.whatsapp }) => (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill={color} style={{ color }}>
+      <path d="M.057 24l1.687-6.163a11.867 11.867 0 0 1-1.587-5.946C.16 5.335 5.495 0 12.05 0a11.817 11.817 0 0 1 8.413 3.488 11.824 11.824 0 0 1 3.48 8.414c-.003 6.557-5.338 11.892-11.893 11.892a11.9 11.9 0 0 1-5.688-1.448L.057 24zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884a9.86 9.86 0 0 0 1.51 5.26l-.999 3.648 3.978-1.607zm11.387-5.464c-.074-.124-.272-.198-.57-.347-.297-.149-1.758-.868-2.031-.967-.272-.099-.47-.149-.669.149-.198.297-.768.967-.941 1.165-.173.198-.347.223-.644.074-.297-.149-1.255-.462-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.297-.347.446-.521.151-.172.2-.296.3-.495.099-.198.05-.372-.025-.521-.075-.148-.669-1.611-.916-2.206-.242-.579-.487-.501-.669-.51l-.57-.01c-.198 0-.52.074-.792.372s-1.04 1.016-1.04 2.479 1.065 2.876 1.213 3.074c.149.198 2.095 3.2 5.076 4.487.709.306 1.263.489 1.694.626.712.226 1.36.194 1.872.118.571-.085 1.758-.719 2.006-1.413.248-.695.248-1.29.173-1.414z"/>
+    </svg>
+  ),
+  star: ({ size = 11, color = C.dorado }) => (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill={color}>
+      <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+    </svg>
+  ),
+  plus: ({ size = 20, color = C.verde }) => (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
+      stroke={color} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 5v14M5 12h14" />
+    </svg>
+  ),
+  gift: ({ size = 13, color = C.verde }) => (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
+      stroke={color} strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="8" width="18" height="4" rx="1" />
+      <path d="M12 8v13" />
+      <path d="M19 12v7a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-7" />
+      <path d="M7.5 8a2.5 2.5 0 0 1 0-5C11 3 12 8 12 8s1-5 4.5-5a2.5 2.5 0 0 1 0 5" />
+    </svg>
+  ),
+  close: ({ size = 22, color = C.textoTenue }) => (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
+      stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <line x1="18" y1="6" x2="6" y2="18" />
+      <line x1="6" y1="6" x2="18" y2="18" />
+    </svg>
+  ),
+  chevron: ({ size = 16, color = C.textoTenue }) => (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
+      stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="m9 18 6-6-6-6" />
+    </svg>
+  ),
+  edit: ({ size = 14, color = C.verde }) => (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
+      stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+      <path d="M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4Z" />
+    </svg>
+  ),
+  phone: ({ size = 13, color = C.textoTenue }) => (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
+      stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.37 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.33 1.85.57 2.81.7A2 2 0 0 1 22 16.92Z" />
+    </svg>
+  ),
+  /* Storefront lineal */
+  store: ({ size = 20, color = C.verde }) => (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
+      stroke={color} strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M3 9l1.5-5h15L21 9" />
+      <path d="M4 9v11a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1V9" />
+      <path d="M3 9c0 1.4 1.1 2.5 2.5 2.5S8 10.4 8 9c0 1.4 1.1 2.5 2.5 2.5S13 10.4 13 9c0 1.4 1.1 2.5 2.5 2.5S18 10.4 18 9c0 1.4 1.1 2.5 2.5 2.5S23 10.4 23 9" transform="translate(-1 0)" />
+      <path d="M9 21v-6h6v6" />
+    </svg>
+  ),
+  /* Instagram lineal */
+  instagram: ({ size = 18, color = C.texto }) => (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
+      stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="2" y="2" width="20" height="20" rx="5" ry="5" />
+      <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z" />
+      <line x1="17.5" y1="6.5" x2="17.51" y2="6.5" />
+    </svg>
+  ),
+  /* Globe / web lineal */
+  globe: ({ size = 18, color = C.texto }) => (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
+      stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="10" />
+      <line x1="2" y1="12" x2="22" y2="12" />
+      <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
+    </svg>
+  ),
+  /* Phone fill (para CTA Llamar) */
+  phoneFill: ({ size = 18, color = C.texto }) => (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill={color}>
+      <path d="M20 15.5c-1.25 0-2.45-.2-3.57-.57-.35-.11-.74-.03-1.02.24l-2.2 2.2c-2.83-1.44-5.15-3.75-6.59-6.59l2.2-2.21c.28-.26.36-.65.25-1C8.7 6.45 8.5 5.25 8.5 4c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1 0 9.39 7.61 17 17 17 .55 0 1-.45 1-1v-3.5c0-.55-.45-1-1-1z"/>
+    </svg>
+  ),
+  /* Verified check badge (premium seal) */
+  verified: ({ size = 22 }) => (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <circle cx="12" cy="12" r="11" fill={C.verde} />
+      <circle cx="12" cy="12" r="9" fill="#fff" stroke={C.verde} strokeWidth="1.5" />
+      <path d="M7 12.5l3 3 7-7" stroke={C.verde} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+    </svg>
+  ),
+  /* Chevron left para carrusel */
+  chevronLeft: ({ size = 20, color = "#fff" }) => (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
+      stroke={color} strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+      <path d="m15 18-6-6 6-6" />
+    </svg>
+  ),
+  /* Chevron right para carrusel */
+  chevronRight: ({ size = 20, color = "#fff" }) => (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
+      stroke={color} strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+      <path d="m9 18 6-6-6-6" />
+    </svg>
+  ),
+  /* Directions (cómo llegar) — flecha de navegación estilo Google Maps */
+  directions: ({ size = 18, color = "#fff" }) => (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
+      stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M21 12 12 3 3 12l9 9 9-9Z" />
+      <path d="M12 7v10" />
+      <path d="m9 14 3 3 3-3" />
+    </svg>
+  ),
+}
+
+/* ── Normaliza teléfono ── */
 const waLink = (phone) => {
   if (!phone) return null
   const limpio = phone.replace(/[^\d]/g, '')
@@ -179,970 +291,742 @@ const waLink = (phone) => {
   return `https://wa.me/${limpio}`
 }
 
-const pseudoRating = (id) => {
-  const idStr = String(id || '')
-  let hash = 0
-  for (let i = 0; i < idStr.length; i++) { hash = idStr.charCodeAt(i) + ((hash << 5) - hash); hash |= 0 }
-  return Math.round((4.3 + (Math.abs(hash) % 71) / 100) * 10) / 10
-}
-const ratingFor = (c) => (typeof c.rating === 'number' && c.rating > 0 ? c.rating : pseudoRating(c.id))
-
-const reviewCountFor = (id) => {
-  const idStr = String(id || '')
-  let hash = 0
-  for (let i = 0; i < idStr.length; i++) { hash = idStr.charCodeAt(i) + ((hash << 5) - hash); hash |= 0 }
-  return 8 + (Math.abs(hash) % 38)
-}
-
-/* ── Íconos SVG (estilo Material Symbols, lineales/filled) ── */
-const Ico = {
-  back: ({ size = 22, color = P.onSurface }) => (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M19 12H5M12 19l-7-7 7-7" />
-    </svg>
-  ),
-  share: ({ size = 18, color = P.onSurfaceVariant }) => (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <circle cx="18" cy="5" r="3" /><circle cx="6" cy="12" r="3" /><circle cx="18" cy="19" r="3" />
-      <line x1="8.6" y1="13.5" x2="15.4" y2="17.5" /><line x1="15.4" y1="6.5" x2="8.6" y2="10.5" />
-    </svg>
-  ),
-  heart: ({ size = 20, color = P.onSurfaceVariant, filled = false }) => (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill={filled ? color : 'none'} stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.6l-1-1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21l7.8-7.6 1-1a5.5 5.5 0 0 0 0-7.8z" />
-    </svg>
-  ),
-  bell: ({ size = 22, color = P.primary }) => (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.7 21a2 2 0 0 1-3.4 0" />
-    </svg>
-  ),
-  pin: ({ size = 14, color = P.primary }) => (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill={color} stroke="none">
-      <path d="M12 2C8.1 2 5 5.1 5 9c0 5.2 7 13 7 13s7-7.8 7-13c0-3.9-3.1-7-7-7zm0 9.5a2.5 2.5 0 1 1 0-5 2.5 2.5 0 0 1 0 5z" />
-    </svg>
-  ),
-  search: ({ size = 22, color = P.outline }) => (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-      <circle cx="11" cy="11" r="7" /><line x1="21" y1="21" x2="16.5" y2="16.5" />
-    </svg>
-  ),
-  star: ({ size = 14, color = P.primary, filled = true }) => (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill={filled ? color : 'none'} stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M12 2l3.1 6.3 6.9 1-5 4.9 1.2 6.8L12 17.8 5.8 21l1.2-6.8-5-4.9 6.9-1z" />
-    </svg>
-  ),
-  stars: ({ size = 18, color = P.primary }) => (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill={color} stroke="none">
-      <path d="M12 2l2.9 6.3 6.9.6-5.2 4.6 1.6 6.8L12 17.3 5.8 20.9l1.6-6.8L2.2 8.9l6.9-.6z" />
-    </svg>
-  ),
-  phone: ({ size = 18, color = '#fff' }) => (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3 19.5 19.5 0 0 1-6-6 19.8 19.8 0 0 1-3-8.6A2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1 1 .4 1.9.7 2.8a2 2 0 0 1-.5 2.1L8.1 9.9a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.1-.4c.9.3 1.8.6 2.8.7a2 2 0 0 1 1.7 2z" />
-    </svg>
-  ),
-  whatsapp: ({ size = 20, color = '#fff' }) => (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill={color} stroke="none">
-      <path d="M12 2a10 10 0 0 0-8.6 15l-1.4 5 5.1-1.3A10 10 0 1 0 12 2zm0 2a8 8 0 0 1 6.6 12.5l.3.5-.7 2.6-2.7-.7-.5.3A8 8 0 1 1 12 4zm-3.2 4.3c-.2 0-.5 0-.7.3-.3.3-1 .9-1 2.3s1 2.7 1.2 2.9c.1.2 2 3.1 4.9 4.3 2.4 1 2.9.8 3.4.8.5-.1 1.6-.7 1.9-1.3.2-.6.2-1.2.1-1.3l-.7-.4-1.7-.8c-.2-.1-.4-.1-.6.1l-.7.9c-.1.2-.3.2-.5.1-.7-.3-1.4-.6-2.1-1.4-.5-.5-.9-1.1-1-1.3-.1-.2 0-.4.1-.5l.4-.5c.1-.2.2-.3.2-.5s0-.4-.1-.5l-.8-2c-.2-.4-.4-.4-.6-.4h-.5z" />
-    </svg>
-  ),
-  nav: ({ size = 18, color = '#fff' }) => (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <polygon points="3 11 22 2 13 21 11 13 3 11" />
-    </svg>
-  ),
-  clock: ({ size = 14, color = P.onSurfaceVariant }) => (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <circle cx="12" cy="12" r="9" /><polyline points="12 7 12 12 15 14" />
-    </svg>
-  ),
-  verified: ({ size = 14, color = P.primary }) => (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill={color} stroke="none">
-      <path d="M12 1l2.4 2.1 3.2-.3 1.2 3 3 1.2-.3 3.2L23.6 12l-2.1 2.4.3 3.2-3 1.2-1.2 3-3.2-.3L12 23.6l-2.4-2.1-3.2.3-1.2-3-3-1.2.3-3.2L.4 12l2.1-2.4-.3-3.2 3-1.2 1.2-3 3.2.3L12 1zm-1.4 14.2l5.7-5.7-1.4-1.4-4.3 4.3-2.1-2.1-1.4 1.4 3.5 3.5z" />
-    </svg>
-  ),
-  plus: ({ size = 28, color = '#fff' }) => (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-      <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
-    </svg>
-  ),
-  close: ({ size = 22, color = P.onSurface }) => (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-      <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
-    </svg>
-  ),
-  arrowForward: ({ size = 16, color = P.primary }) => (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill={color} stroke="none">
-      <path d="M6.4 4.5l1.4-1.4 8.5 8.5-8.5 8.5-1.4-1.4 7.1-7.1z" />
-    </svg>
-  ),
-  edit: ({ size = 16, color = P.primary }) => (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-      <path d="M18.5 2.5a2.1 2.1 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
-    </svg>
-  ),
-}
-
-const STAR_YELLOW = '#FFC107'
-
-/* ── Rating Stars ── */
-function RatingStars({ rating, size = 13 }) {
-  const filled = Math.round(rating)
+/* ── Bloque de horario para feed y modal ── */
+function HorarioBloque({ horario, size = 'normal' }) {
+  if (!horario) return null
+  const isSm = size === 'sm'
+  const fontSize = isSm ? 11.5 : 12.5
+  const iconSize = isSm ? 11 : 12
   return (
-    <span style={{ display: 'inline-flex', gap: 1, alignItems: 'center', lineHeight: 0 }}>
-      {[0, 1, 2, 3, 4].map((i) => (
-        <Ico.star key={i} size={size} color={i < filled ? STAR_YELLOW : P.outlineVariant} filled={i < filled} />
-      ))}
+    <span style={{
+      display: 'inline-flex', alignItems: 'center', gap: 5,
+      fontSize, flexWrap: 'wrap',
+    }}>
+      <Ico.clock size={iconSize} color={C.textoTenue} />
+      <span style={{ color: C.texto, fontWeight: 400 }}>
+        {horario.principal}
+      </span>
+      {horario.secundario && (
+        <>
+          <span style={{ color: C.textoTenue }}>·</span>
+          <span style={{ color: C.verde, fontWeight: 400 }}>
+            {horario.secundario}
+          </span>
+        </>
+      )}
     </span>
   )
 }
 
-/* ── Placeholder imagen (emoji sobre gradiente suave) ── */
-function ImgPlaceholder({ cat }) {
-  const meta = COMERCIOS[cat] || COMERCIOS['Otro']
-  return (
-    <div style={{
-      width: '100%', height: '100%',
-      background: `linear-gradient(135deg, ${P.surfaceHigh} 0%, ${P.surfaceLowest} 100%)`,
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
-      fontSize: 36,
-    }}>
-      <span>{meta.emoji}</span>
-    </div>
-  )
-}
+/* ════════════════════════════════════════════════════════════
+   CARD GRANDE (premium) — feed
+   ════════════════════════════════════════════════════════════ */
+function CardGrande({ c, userCoords, onAbrir }) {
+  const cats = c.categories?.length ? c.categories : (c.category ? [c.category] : [])
+  const horario = horarioFeed(c.opening_hours)
+  const metros = haversine(userCoords?.lat, userCoords?.lng, c.lat, c.lng)
+  const dist = distancia(metros)
+  const catInfo = COMERCIOS[cats[0]] || COMERCIOS['Otro']
 
-/* ── Logo circular del comercio (32px o 72px) ── */
-function CommerceLogo({ c, size = 32 }) {
-  const cat = c.categories?.[0] || c.category || 'Otro'
-  const meta = COMERCIOS[cat] || COMERCIOS['Otro']
-  if (c.logo_url) {
-    return (
-      <div style={{
-        width: size, height: size, borderRadius: '50%',
-        background: P.tertiaryContainer, overflow: 'hidden', flexShrink: 0,
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-      }}>
-        <img src={c.logo_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-      </div>
-    )
-  }
-  return (
-    <div style={{
-      width: size, height: size, borderRadius: '50%',
-      background: P.tertiaryContainer, color: P.onTertiaryContainer,
-      overflow: 'hidden', flexShrink: 0,
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
-      fontSize: size * 0.5,
-    }}>
-      <span>{meta.emoji}</span>
-    </div>
-  )
-}
-
-/* ════════════════════════════════════════════════════════
-   CARD DESTACADA (carrusel horizontal — 260px)
-   Jerarquía clara: Imagen → Categoría → Nombre → Estado + Rating
-   · Emojis (⭐ 📍) en vez de SVGs fríos.
-   · Texto min 12px (badges) / 13px+ (body).
-   · Máx 5 elementos por tarjeta.
-   ════════════════════════════════════════════════════════ */
-function CardDestacada({ c, userCoords, onClick }) {
-  const hor = horarioFeed(c.opening_hours)
-  const cat = c.categories?.[0] || c.category || 'Otro'
-  const meta = COMERCIOS[cat] || COMERCIOS['Otro']
-  const dist = userCoords ? haversine(userCoords.lat, userCoords.lng, c.lat, c.lng) : null
-  const distTxt = distancia(dist)
-  const rating = ratingFor(c)
-  const abierto = hor?.abierto
-
-  return (
-    <div
-      onClick={onClick}
-      className="com-tap"
-      style={{
-        flexShrink: 0, width: 260, borderRadius: 16, overflow: 'hidden',
-        background: P.surfaceLowest, border: `1px solid ${P.outlineVariant}`,
-        boxShadow: '0 2px 8px rgba(0,0,0,0.06)', cursor: 'pointer',
-      }}
-    >
-      {/* ── Imagen (132px) con badge + distancia ── */}
-      <div style={{ position: 'relative', height: 132, overflow: 'hidden', background: P.surfaceHigh }}>
-        {c.cover_url
-          ? <img src={c.cover_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-          : <ImgPlaceholder cat={cat} />}
-        {/* Badge ⭐ Destacado (top-left) */}
-        <div style={{
-          position: 'absolute', top: 10, left: 10,
-          background: P.primary, color: '#fff',
-          fontSize: 11, fontWeight: 700,
-          padding: '4px 10px', borderRadius: 999,
-          boxShadow: '0 2px 6px rgba(22,163,74,0.35)',
-          display: 'flex', alignItems: 'center', gap: 3,
-        }}>⭐ Destacado</div>
-        {/* Distancia (bottom-right) */}
-        {distTxt && (
-          <div style={{
-            position: 'absolute', bottom: 8, right: 8,
-            background: 'rgba(255,255,255,0.95)', color: P.onSurface,
-            fontSize: 11, fontWeight: 700,
-            padding: '3px 9px', borderRadius: 999,
-            boxShadow: '0 1px 4px rgba(0,0,0,0.12)',
-          }}>📍 {distTxt}</div>
-        )}
-      </div>
-
-      {/* ── Body ── */}
-      <div style={{ padding: '12px 14px 14px' }}>
-        {/* Categoría (emoji + texto, chiquito, secondary) */}
-        <div style={{
-          fontSize: 12, fontWeight: 700, color: meta.color || P.secondary,
-          marginBottom: 3, display: 'flex', alignItems: 'center', gap: 4,
-        }}>
-          <span>{meta.emoji}</span> {cat}
-        </div>
-        {/* Nombre (grande, bold) */}
-        <h3 style={{
-          fontSize: 15, fontWeight: 700, color: P.onSurface,
-          lineHeight: '20px', margin: 0,
-          whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-        }}>
-          {c.name}
-        </h3>
-        {/* Estado + Rating (una sola fila, separados por ·) */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8 }}>
-          <span style={{
-            fontSize: 13, fontWeight: 700,
-            color: abierto ? P.primary : P.error,
-            display: 'inline-flex', alignItems: 'center', gap: 4,
-          }}>
-            <span style={{
-              width: 7, height: 7, borderRadius: '50%',
-              background: abierto ? P.primary : P.error,
-            }} />
-            {abierto ? 'Abierto' : 'Cerrado'}
-          </span>
-          <span style={{ color: P.outlineVariant, fontSize: 13 }}>·</span>
-          <span style={{
-            fontSize: 13, fontWeight: 600, color: P.onSurface,
-          }}>⭐ {rating.toFixed(1)}</span>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-/* ════════════════════════════════════════════════════════
-   CARD CERCA (lista vertical — HORIZONTAL: img 88px izq + body der)
-   Jerarquía clara: Imagen → Nombre → Estado → Descripción → Rating + Dist
-   · Emojis (⭐ 📍) en vez de SVGs.
-   · Texto min 12.5px. Sin uppercase, sin tracking-tighter.
-   · Máx 5 elementos por tarjeta. Sin flecha (toda la card es tap).
-   ════════════════════════════════════════════════════════ */
-function CardCerca({ c, userCoords, onClick }) {
-  const hor = horarioFeed(c.opening_hours)
-  const cat = c.categories?.[0] || c.category || 'Otro'
-  const meta = COMERCIOS[cat] || COMERCIOS['Otro']
-  const dist = userCoords ? haversine(userCoords.lat, userCoords.lng, c.lat, c.lng) : null
-  const distTxt = distancia(dist)
-  const rating = ratingFor(c)
-  const abierto = hor?.abierto
-
-  return (
-    <div
-      onClick={onClick}
-      className="com-tap"
-      style={{
-        display: 'flex', gap: 12, padding: 12,
-        borderRadius: 16, background: P.surfaceLowest,
-        border: `1px solid ${P.outlineVariant}`,
-        boxShadow: '0 1px 4px rgba(0,0,0,0.04)',
-        cursor: 'pointer',
-      }}
-    >
-      {/* ── Imagen 88x88 (rounded 12px) ── */}
-      <div style={{
-        width: 88, height: 88, flexShrink: 0, borderRadius: 12, overflow: 'hidden', background: P.surfaceHigh,
-      }}>
-        {c.cover_url
-          ? <img src={c.cover_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-          : <ImgPlaceholder cat={cat} />}
-      </div>
-
-      {/* ── Body (flex-col, justify-center, gap 4) ── */}
-      <div style={{
-        flex: 1, display: 'flex', flexDirection: 'column',
-        justifyContent: 'center', minWidth: 0, gap: 3,
-      }}>
-        {/* Nombre (grande, bold) */}
-        <h3 style={{
-          fontSize: 15.5, fontWeight: 700, color: P.onSurface,
-          lineHeight: '20px', margin: 0,
-          whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-        }}>
-          {c.name}
-        </h3>
-        {/* Estado (punto de color + texto + countdown si hay) */}
-        <div style={{
-          display: 'inline-flex', alignItems: 'center', gap: 5,
-          fontSize: 12.5, fontWeight: 700,
-          color: abierto ? P.primary : P.error,
-        }}>
-          <span style={{
-            width: 7, height: 7, borderRadius: '50%',
-            background: abierto ? P.primary : P.error,
-            flexShrink: 0,
-          }} />
-          {abierto ? 'Abierto' : 'Cerrado'}
-          {hor?.secundario && (
-            <span style={{ fontSize: 11.5, fontWeight: 500, color: P.secondary }}>
-              · {hor.secundario}
-            </span>
-          )}
-        </div>
-        {/* Descripción (1 línea, secondary) — solo si existe */}
-        {c.description && (
-          <p style={{
-            fontSize: 13, color: P.onSurfaceVariant, lineHeight: '17px', margin: 0,
-            whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-          }}>
-            {c.description}
-          </p>
-        )}
-        {/* Footer: rating + distancia (una fila, separados por ·) */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginTop: 2 }}>
-          <span style={{
-            fontSize: 12.5, fontWeight: 700, color: P.onSurface,
-          }}>⭐ {rating.toFixed(1)}</span>
-          {distTxt && (
-            <>
-              <span style={{ color: P.outlineVariant, fontSize: 12 }}>·</span>
-              <span style={{ fontSize: 12, fontWeight: 600, color: P.secondary }}>
-                📍 {distTxt}
-              </span>
-            </>
-          )}
-        </div>
-      </div>
-    </div>
-  )
-}
-
-/* ════════════════════════════════════════════════════════
-   MODAL DE DETALLE
-   ════════════════════════════════════════════════════════ */
-function ComercioDetalle({ c, userCoords, onClose, onEditar, esAdmin, currentUser }) {
-  const [fav, setFav] = useState(false)
-  const [lightboxIdx, setLightboxIdx] = useState(null)
-  const [mapaOpen, setMapaOpen] = useState(false)
-  const [opiniones, setOpiniones] = useState(null) // null=cargando, [] vacío=sin opiniones
-  const [opinando, setOpinando] = useState(false)
-  const [nuevaOpinion, setNuevaOpinion] = useState({ rating: 5, texto: '' })
-  const [enviandoOp, setEnviandoOp] = useState(false)
-  const [errorOp, setErrorOp] = useState('')
-  const galleryRef = useRef(null)
-
-  const cat = c.categories?.[0] || c.category || 'Otro'
-  const meta = COMERCIOS[cat] || COMERCIOS['Otro']
-  const hor = horarioFeed(c.opening_hours)
-  const dist = userCoords ? haversine(userCoords.lat, userCoords.lng, c.lat, c.lng) : null
-  const distTxt = distancia(dist)
-  // Rating REAL: promedio de las opiniones cargadas desde commerce_reviews.
-  // Si no hay opiniones todavía, NO inventamos — mostramos "Nuevo".
-  const reviews = opiniones?.length || 0
-  const rating = reviews > 0
-    ? Math.round((opiniones.reduce((s, o) => s + (Number(o.rating) || 0), 0) / reviews) * 10) / 10
-    : null
-  const wa = waLink(c.phone)
+  /* ── SLIDER de imágenes en el feed ──
+     Cover + gallery en un scroll horizontal con snap.
+     Si solo hay 1 imagen (o ninguna), se comporta como antes. */
   const gallery = Array.isArray(c.gallery) ? c.gallery.filter(Boolean) : []
+  const slides = []
+  if (c.cover_url) slides.push(c.cover_url)
+  gallery.forEach(url => { if (!slides.includes(url)) slides.push(url) })
+  const tieneMulti = slides.length > 1
 
-  useEffect(() => {
-    if (!galleryRef.current || gallery.length < 3) return
-    const el = galleryRef.current
-    let raf
-    let dir = 1
-    const step = () => {
-      el.scrollLeft += 0.4 * dir
-      if (el.scrollLeft >= el.scrollWidth - el.clientWidth - 1) dir = -1
-      else if (el.scrollLeft <= 1) dir = 1
-      raf = requestAnimationFrame(step)
-    }
-    const t = setTimeout(() => { raf = requestAnimationFrame(step) }, 2500)
-    return () => { clearTimeout(t); cancelAnimationFrame(raf) }
-  }, [gallery.length])
+  return (
+    <div style={s.cardGrande} onClick={() => onAbrir(c)}>
+      {/* Tira dorada superior — identidad premium inmediata */}
+      <div style={s.premiumStrip} />
 
-  useEffect(() => {
-    document.body.style.overflow = 'hidden'
-    return () => { document.body.style.overflow = '' }
-  }, [])
+      {/* Cover más alto + ribbon + gradiente + logo superpuesto */}
+      <div style={s.coverBox}>
+        {tieneMulti ? (
+          /* SLIDER: scroll horizontal con snap, múltiples imágenes */
+          <div style={s.feedSlider}>
+            {slides.map((url, i) => (
+              <div key={i} style={s.feedSliderSlide}>
+                <img src={url} alt="" style={s.coverImg} loading="lazy" />
+              </div>
+            ))}
+          </div>
+        ) : slides[0] ? (
+          <img src={slides[0]} alt="" style={s.coverImg} />
+        ) : (
+          <div style={{ ...s.coverEmpty, background: catInfo.bg }}>
+            <span style={{ fontSize: 44 }}>{catInfo.emoji}</span>
+          </div>
+        )}
+        {/* Gradiente inferior más fuerte → anclaje visual + legibilidad logo */}
+        <div style={s.coverGradient} />
+        {/* Ribbon destacado (gradiente dorado, más grande) */}
+        <div style={s.ribbonDestacado}>
+          <Ico.star size={10} color="#fff" /> <span>Destacado</span>
+        </div>
+        {/* Distancia flotante (top-right) → info rápida sin ocupar body */}
+        {dist && (
+          <div style={s.coverDistBadge}>
+            <Ico.pin size={9} color="#fff" /> a {dist}
+          </div>
+        )}
+        {/* Contador de fotos (si hay múltiples) */}
+        {tieneMulti && (
+          <div style={s.feedSliderCount}>
+            📷 {slides.length}
+          </div>
+        )}
+        {/* LOGO superpuesto bottom-right → marca visible en el feed */}
+        <div style={s.coverLogoBadge}>
+          {c.logo_url
+            ? <img src={c.logo_url} alt="" style={s.coverLogoBadgeImg} />
+            : <div style={s.coverLogoBadgeFallback}>{iniciales(c.name)}</div>}
+        </div>
+      </div>
 
-  // ── Cargar opiniones REALES desde commerce_reviews ──
-  // Si la tabla no existe todavía o RLS bloquea, cae al catch → [] (vacío).
-  // El SQL para crear la tabla está en el comentario al final del archivo.
+      <div style={s.cardGrandeBody}>
+        <div style={s.nombreGrande}>{c.name}</div>
+
+        <div style={s.horarioRowFeed}>
+          <HorarioBloque horario={horario} />
+        </div>
+
+        {c.description && <div style={s.descGrande}>{c.description}</div>}
+
+        {/* Pill de descuento (teaser en el feed) — solo si tiene discount_text.
+            El banner verde completo (premium) solo va en el detalle, no acá. */}
+        {c.discount_text && (
+          <div style={s.beneficioPill}>
+            <Ico.gift size={13} color="#fff" />
+            <span>{c.discount_text}</span>
+          </div>
+        )}
+
+        {c.address && (
+          <div style={s.ubicacionRow}>
+            <span style={s.ubicacionTxt}>
+              <Ico.pin size={11} color={C.verde} /> {c.address}
+            </span>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+/* ════════════════════════════════════════════════════════════
+   CARD COMPACTA (no premium) — feed
+   ════════════════════════════════════════════════════════════ */
+function CardCompacta({ c, userCoords, expanded, onToggle }) {
+  const cats = c.categories?.length ? c.categories : (c.category ? [c.category] : [])
+  const horario = horarioFeed(c.opening_hours)
+  const metros = haversine(userCoords?.lat, userCoords?.lng, c.lat, c.lng)
+  const dist = distancia(metros)
+  const catInfo = COMERCIOS[cats[0]] || COMERCIOS['Otro']
+  const wa = waLink(c.phone)
+  const telLink = c.phone ? `tel:${c.phone.replace(/[^\d+]/g, '')}` : null
+
+  return (
+    <div
+      style={{ ...s.cardCompacta, ...(expanded ? s.cardCompactaExpanded : null) }}
+      onClick={() => onToggle(c.id)}
+    >
+      <div style={s.cardCompactaTopRow}>
+        <div style={s.logoCuadrado}>
+          {c.logo_url || c.cover_url
+            ? <img src={c.logo_url || c.cover_url} alt="" style={s.logoCuadradoImg} />
+            : <div style={{ ...s.logoCuadradoFallback, background: catInfo.bg }}>
+                <span style={{ fontSize: 22 }}>{catInfo.emoji}</span>
+              </div>}
+        </div>
+
+        <div style={s.cardCompactaBody}>
+          <div style={s.nombreCompacto}>{c.name}</div>
+
+          {/* Pill de descuento (teaser en el feed) */}
+          {c.discount_text && (
+            <div style={s.beneficioSm}>
+              <Ico.gift size={10} color={C.verde} /> {c.discount_text}
+            </div>
+          )}
+
+          <div style={s.horarioRowFeedSm}>
+            <HorarioBloque horario={horario} size="sm" />
+          </div>
+
+          <div style={s.ubicacionRowSm}>
+            {c.address && (
+              <span style={s.ubicacionTxtSm}>
+                <Ico.pin size={10} color={C.verde} /> {c.address}
+                {dist && <span style={s.distTxtSm}> · a {dist}</span>}
+              </span>
+            )}
+          </div>
+        </div>
+
+        <div style={s.cardCompactaRight}>
+          <span style={{
+            ...s.cardCompactaChev,
+            transform: expanded ? 'rotate(90deg)' : 'none',
+          }}>
+            <Ico.chevron size={16} color={expanded ? C.verde : C.textoTenue} />
+          </span>
+        </div>
+      </div>
+
+      {/* ── Sección expandible inline (sin modal) ── */}
+      {expanded && (
+        <div style={s.cardCompactaExpand}>
+          {/* Teléfono */}
+          {c.phone && (
+            <div style={s.expandInfoRow}>
+              <span style={s.expandInfoIcon}><Ico.phone size={13} color={C.verde} /></span>
+              <a href={telLink} style={s.expandInfoLink} onClick={(e) => e.stopPropagation()}>
+                {c.phone}
+              </a>
+            </div>
+          )}
+          {/* Dirección completa (puede cortarse en el resumen) */}
+          {c.address && (
+            <div style={s.expandInfoRow}>
+              <span style={s.expandInfoIcon}><Ico.pin size={13} color={C.verde} /></span>
+              <span style={s.expandInfoText}>{c.address}</span>
+            </div>
+          )}
+          {/* Botón WhatsApp full-width */}
+          {wa && (
+            <a
+              href={wa}
+              target="_blank"
+              rel="noreferrer"
+              style={s.expandWaBtn}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <Ico.whatsapp size={16} color="#fff" />
+              <span>Contactar por WhatsApp</span>
+            </a>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+/* ════════════════════════════════════════════════════════════
+   MODAL DE DETALLE — PREMIUM QUALITY
+   · Premium: carrusel (cover + gallery) + 4 CTAs + sello verificado
+   · Normal: sin cover (solo header colorido), solo WhatsApp
+   · Dropdown VER UBICACIÓN (mapa)
+   · Horario al lado del nombre (resumen, sin dropdown semanal)
+   ════════════════════════════════════════════════════════════ */
+function ComercioDetalle({ c, userCoords, onClose, onEditar, esAdmin }) {
+  const [mapaOpen, setMapaOpen] = useState(false)
+  const [fotoIdx, setFotoIdx] = useState(0)
+  const [lightbox, setLightbox] = useState(null)
+  const mapaRef = useRef(null)
+  const galeriaRef = useRef(null)
+  const galeriaPausaRef = useRef(false)
+  const [promos, setPromos] = useState([])
+
+  // Cargar promociones del comercio (commerce_promos).
+  // Traemos TODAS las del comercio (activas + inactivas + vencidas) para que
+  // el admin pueda verlas y borrarlas. Las inactivas/vencidas se marcan pero
+  // siguen visibles solo para admin. Para usuarios normales, solo activas vigentes.
   useEffect(() => {
-    let active = true
+    if (!c?.id) return
+    let cancelado = false
     ;(async () => {
       try {
         const { data, error } = await supabase
-          .from('commerce_reviews')
-          .select('id, rating, comment, created_at, author:profiles!author_id (full_name, avatar_url)')
+          .from('commerce_promos')
+          .select('*')
           .eq('commerce_id', c.id)
           .order('created_at', { ascending: false })
-          .limit(20)
         if (error) throw error
-        if (active) setOpiniones(data || [])
-      } catch (err) {
-        // Tabla no existe o sin permisos — dejamos vacío (no rompe la UI).
-        console.warn('[commerce_reviews] no se pudo cargar:', err?.message || err)
-        if (active) setOpiniones([])
+        if (!cancelado) {
+          const ahora = Date.now()
+          // Marcar vigencia pero mostrar todas (el admin decide qué borrar)
+          const conVigencia = (data || []).map(p => ({
+            ...p,
+            _vigente: !p.expires_at ? true : new Date(p.expires_at).getTime() > ahora,
+          }))
+          setPromos(conVigencia)
+        }
+      } catch (e) {
+        console.warn('[comercio detalle] promos:', e?.message)
       }
     })()
-    return () => { active = false }
-  }, [c.id])
+    return () => { cancelado = true }
+  }, [c?.id])
 
-  // ── Enviar opinión nueva a commerce_reviews ──
-  const enviarOpinion = async () => {
-    setErrorOp('')
-    if (!nuevaOpinion.texto.trim()) {
-      setErrorOp('Escribe algo antes de enviar')
-      return
-    }
-    if (!currentUser?.id) {
-      setErrorOp('Debes iniciar sesión para opinar')
-      return
-    }
-    setEnviandoOp(true)
+  // Borrar promo (solo admin)
+  const [borrandoPromoId, setBorrandoPromoId] = useState(null)
+  const borrarPromo = async (promoId) => {
+    if (!promoId) return
+    if (!confirm('¿Eliminar esta promoción? Se borra definitivamente.')) return
+    setBorrandoPromoId(promoId)
     try {
-      // Resolvemos el profile_id del usuario actual
-      const { data: prof } = await supabase
-        .from('profiles').select('id').eq('user_id', currentUser.id).maybeSingle()
-      if (!prof?.id) throw new Error('No se encontró tu perfil')
-
-      const { data, error } = await supabase
-        .from('commerce_reviews')
-        .insert({
-          commerce_id: c.id,
-          author_id: prof.id,
-          rating: nuevaOpinion.rating,
-          comment: nuevaOpinion.texto.trim(),
-        })
-        .select('id, rating, comment, created_at, author:profiles!author_id (full_name, avatar_url)')
-        .single()
+      const { error } = await supabase
+        .from('commerce_promos')
+        .delete()
+        .eq('id', promoId)
       if (error) throw error
-
-      setOpiniones(prev => [data, ...(prev || [])])
-      setNuevaOpinion({ rating: 5, texto: '' })
-      setOpinando(false)
-    } catch (err) {
-      setErrorOp(
-        err?.code === '42P01' || /relation .* does not exist/i.test(err?.message || '')
-          ? 'La tabla commerce_reviews todavía no existe. Corre el SQL del final del archivo.'
-          : (err?.message || 'No se pudo enviar la opinión')
-      )
+      setPromos(prev => prev.filter(p => p.id !== promoId))
+    } catch (e) {
+      alert('Error al borrar: ' + (e?.message || 'desconocido'))
     } finally {
-      setEnviandoOp(false)
+      setBorrandoPromoId(null)
     }
   }
 
-  const mapsLink = (c.lat && c.lng)
-    ? `https://www.google.com/maps/dir/?api=1&destination=${c.lat},${c.lng}`
-    : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(c.name + ' ' + (c.address || ''))}`
+  // Scroll automático al mapa cuando se abre el dropdown
+  useEffect(() => {
+    if (mapaOpen && mapaRef.current) {
+      const t = setTimeout(() => {
+        mapaRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      }, 80)
+      return () => clearTimeout(t)
+    }
+  }, [mapaOpen])
+
+  // AUTO-SCROLL del carrusel de galería cuando hay más de 3 thumbnails.
+  // Avanza 1 item cada 2.4s. Al llegar al final vuelve al inicio (loop).
+  // Se pausa al hacer hover para que el user pueda mirar una foto tranquilo.
+  useEffect(() => {
+    const el = galeriaRef.current
+    if (!el) return
+    // Contar thumbnails visibles (cover + gallery items)
+    const items = el.querySelectorAll('button')
+    if (items.length <= 3) return // solo auto-scroll si hay >3
+    const STEP = 104 // 96px item + 8px gap
+    const interval = setInterval(() => {
+      if (galeriaPausaRef.current) return
+      const maxScroll = el.scrollWidth - el.clientWidth
+      if (el.scrollLeft >= maxScroll - 2) {
+        // llegó al final → vuelve al inicio
+        el.scrollTo({ left: 0, behavior: 'smooth' })
+      } else {
+        el.scrollBy({ left: STEP, behavior: 'smooth' })
+      }
+    }, 2400)
+    return () => clearInterval(interval)
+  }, [c?.id, lightbox])
+
+  if (!c) return null
+  const cats = c.categories?.length ? c.categories : (c.category ? [c.category] : [])
+  const horario = horarioFeed(c.opening_hours)
+  const metros = haversine(userCoords?.lat, userCoords?.lng, c.lat, c.lng)
+  const dist = distancia(metros)
+  const wa = waLink(c.phone)
+  const catInfo = COMERCIOS[cats[0]] || COMERCIOS['Otro']
+  const isPremium = !!c.is_premium
+
+  // Promos visibles: admin ve TODAS (para poder borrar las que no corresponden).
+  // Usuario normal: solo activas y vigentes.
+  const promosVisibles = esAdmin
+    ? promos
+    : promos.filter(p => p.is_active !== false && p._vigente)
+
+  /* Galería de fotos: array puro de gallery (sin cover, sin demos).
+     El cover_url va aparte como foto principal del hero.
+     NO metemos imágenes demo de Unsplash — confunden al usuario. */
+  const gallery = (Array.isArray(c.gallery) ? c.gallery.filter(Boolean) : [])
+  /* Foto principal del hero: cover_url, o primera de gallery si no hay cover. */
+  const fotoPrincipal = c.cover_url || gallery[0] || null
+
+  /* CTAs premium: WhatsApp, Llamar, Instagram */
+  const telLink = c.phone ? `tel:${c.phone.replace(/[^\d+]/g, '')}` : null
+  const igUrl = c.instagram
+    ? (c.instagram.startsWith('http') ? c.instagram : `https://instagram.com/${c.instagram.replace(/^@/, '')}`)
+    : null
 
   return (
-    <div
-      onClick={onClose}
-      style={{
-        position: 'absolute', inset: 0, zIndex: 1000,
-        background: 'rgba(15,25,20,0.55)', backdropFilter: 'blur(3px)',
-        display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
-      }}
-    >
-      <div
-        onClick={(e) => e.stopPropagation()}
-        className="com-sheet"
-        style={{
-          width: '100%', maxWidth: 480, maxHeight: '100%',
-          background: P.surface, borderRadius: '22px 22px 0 0',
-          overflow: 'hidden', display: 'flex', flexDirection: 'column',
-          position: 'relative',
-        }}
-      >
-        {/* Header flotante */}
-        <div style={{
-          position: 'absolute', top: 0, left: 0, right: 0, zIndex: 30,
-          padding: '12px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-        }}>
-          <button
-            onClick={onClose}
-            className="com-btn"
-            style={{
-              width: 38, height: 38, borderRadius: '50%', background: 'rgba(255,255,255,0.95)',
-              border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center',
-              boxShadow: '0 2px 10px rgba(0,0,0,0.18)', cursor: 'pointer',
-            }}
-            aria-label="Volver"
-          >
-            <Ico.back size={20} color={P.onSurface} />
-          </button>
-          <div style={{ display: 'flex', gap: 8 }}>
+    <div style={s.detalleBackdrop} onClick={onClose}>
+      <div style={s.detalleSheet} onClick={(e) => e.stopPropagation()}>
+
+        {/* ── Keyframes globales del modal (shimmer del banner de descuento) ── */}
+        <style>{`
+          @keyframes benShimmer {
+            0%   { transform: translateX(-130%) skewX(-18deg); opacity: 0; }
+            18%  { opacity: 0.55; }
+            50%  { opacity: 0.35; }
+            82%  { opacity: 0.55; }
+            100% { transform: translateX(130%) skewX(-18deg); opacity: 0; }
+          }
+          @keyframes benShineText {
+            0%, 100% { text-shadow: 0 0 0 rgba(255,255,255,0); }
+            50%      { text-shadow: 0 0 14px rgba(255,255,255,0.45); }
+          }
+        `}</style>
+
+        {/* ── COVER / HEADER ── */}
+        <div style={s.detalleCoverWrap}>
+          {isPremium ? (
+            /* PREMIUM: hero con foto principal fija (sin carrusel aquí — la galería va abajo) */
+            <div style={s.detalleCoverBox}>
+              {fotoPrincipal ? (
+                <>
+                  <img src={fotoPrincipal} alt="" style={s.detalleCoverImg} />
+                  <div style={s.detalleCoverGradient} />
+                </>
+              ) : (
+                <div style={{ ...s.detalleCoverEmpty, background: catInfo.bg }}>
+                  <span style={{ fontSize: 64 }}>{catInfo.emoji}</span>
+                </div>
+              )}
+              {/* Ribbon destacado — bottom-left (NO choca con el botón cerrar top-left) */}
+              <div style={s.ribbonDestacadoModal}>
+                <Ico.star size={10} color="#fff" /> <span>Destacado</span>
+              </div>
+            </div>
+          ) : (
+            /* NORMAL: cabecera sólida minimal (sin emoji gigante — solo color de categoría) */
+            <div style={{ ...s.detalleCoverBox, ...s.detalleCoverSolid, background: catInfo.bg }}>
+              <div style={s.detalleCoverSolidGrad} />
+            </div>
+          )}
+
+          {/* HEADER flotante (botones) encima del cover */}
+          <div style={s.detalleHeaderFloat}>
+            <button style={s.detalleClose} onClick={onClose} aria-label="Cerrar">
+              <Ico.close size={18} color="#fff" />
+            </button>
             {esAdmin && (
               <button
+                style={s.detalleEditFloat}
                 onClick={() => onEditar(c)}
-                className="com-btn"
-                style={{
-                  width: 38, height: 38, borderRadius: '50%', background: 'rgba(255,255,255,0.95)',
-                  border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  boxShadow: '0 2px 10px rgba(0,0,0,0.18)', cursor: 'pointer',
-                }}
-                aria-label="Editar"
+                aria-label="Editar comercio"
               >
-                <Ico.edit size={16} color={P.primary} />
+                <Ico.edit size={13} color="#fff" /> Editar
               </button>
             )}
-            <button
-              onClick={() => setFav(f => !f)}
-              className="com-btn"
-              style={{
-                width: 38, height: 38, borderRadius: '50%', background: 'rgba(255,255,255,0.95)',
-                border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                boxShadow: '0 2px 10px rgba(0,0,0,0.18)', cursor: 'pointer',
-              }}
-              aria-label="Favorito"
-            >
-              <Ico.heart size={18} color={fav ? P.error : P.onSurface} filled={fav} />
-            </button>
           </div>
         </div>
 
-        {/* Body scrollable */}
-        <div className="com-body-scroll" style={{ overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
-          {/* Portada */}
-          <div style={{ position: 'relative', height: 220, background: P.surfaceHigh }}>
-            {c.cover_url
-              ? <img src={c.cover_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-              : <ImgPlaceholder cat={cat} />}
-            <div style={{
-              position: 'absolute', inset: 0,
-              background: 'linear-gradient(to top, rgba(0,0,0,0.45) 0%, transparent 55%)',
-            }} />
-            {/* Logo sobrepuesto */}
-            <div style={{ position: 'absolute', left: 16, bottom: -32, zIndex: 5 }}>
-              <div style={{
-                width: 72, height: 72, borderRadius: '50%',
-                background: P.surfaceLowest, padding: 3,
-                boxShadow: '0 4px 14px rgba(0,0,0,0.2)',
-              }}>
-                <CommerceLogo c={c} size={66} />
-              </div>
-            </div>
-            {c.is_premium && (
-              <div style={{
-                position: 'absolute', top: 60, right: 14,
-                background: P.primaryContainer, color: P.onPrimaryContainer,
-                fontSize: 10, fontWeight: 700, padding: '4px 10px', borderRadius: 999,
-                boxShadow: '0 2px 6px rgba(0,0,0,0.2)',
-              }}>
-                ★ Destacado
-              </div>
-            )}
+        {/* ── LOGO grande + sello verificado (premium) ── */}
+        <div style={{ ...s.detalleLogoWrap, marginTop: isPremium ? -42 : -38 }}>
+          <div style={s.detalleLogoBox}>
+            {c.logo_url
+              ? <img src={c.logo_url} alt="" style={s.detalleLogoImg} />
+              : <div style={{ ...s.detalleLogoFallback, fontSize: 34 }}>{catInfo.emoji}</div>}
           </div>
-
-          {/* Info principal */}
-          <div style={{ padding: '44px 20px 18px' }}>
-            <h1 style={{
-              fontSize: 22, fontWeight: 700, color: P.onSurface,
-              letterSpacing: '-0.02em', margin: 0, lineHeight: '28px',
-            }}>
-              {c.name}
-            </h1>
-
-            {/* Rating + reviews + estado (rating REAL de opiniones, o "Nuevo") */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
-              {rating !== null ? (
-                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                  <RatingStars rating={rating} size={14} />
-                  <span style={{ fontSize: 13, fontWeight: 700, color: P.onSurface }}>{rating.toFixed(1)}</span>
-                  <span style={{ fontSize: 12, color: P.secondary }}>· {reviews} {reviews === 1 ? 'opinión' : 'opiniones'}</span>
-                </span>
-              ) : (
-                <span style={{
-                  fontSize: 12, fontWeight: 700, color: P.onPrimaryFixed,
-                  background: P.primaryFixed, padding: '3px 10px', borderRadius: 999,
-                }}>✨ Nuevo en el barrio</span>
-              )}
-              <span style={{ color: P.outlineVariant }}>·</span>
-              <span style={{
-                fontSize: 12, fontWeight: 700,
-                color: hor?.abierto ? P.primary : P.error,
-                display: 'inline-flex', alignItems: 'center', gap: 4,
-              }}>
-                <span style={{
-                  width: 7, height: 7, borderRadius: '50%',
-                  background: hor?.abierto ? P.primary : P.error,
-                }} />
-                {hor ? hor.principal : 'Sin horario'}
-                {/* Countdown: "cierra en X min" o "abre en X min" */}
-                {hor?.secundario && (
-                  <span style={{ fontSize: 11, fontWeight: 600, color: hor.abierto ? P.primary : P.secondary, marginLeft: 2 }}>
-                    ({hor.secundario})
-                  </span>
-                )}
-              </span>
-            </div>
-
-            {/* Categoría chip + distancia */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
-              <span style={{
-                fontSize: 12, fontWeight: 600, color: P.onSurfaceVariant,
-                background: P.surfaceVariant, padding: '4px 10px', borderRadius: 999,
-                display: 'inline-flex', alignItems: 'center', gap: 4,
-              }}>{meta.emoji} {cat}</span>
-              {distTxt && (
-                <span style={{
-                  fontSize: 12, fontWeight: 600, color: P.onSurfaceVariant,
-                  background: P.surfaceVariant, padding: '4px 10px', borderRadius: 999,
-                  display: 'inline-flex', alignItems: 'center', gap: 4,
-                }}>📍 {distTxt}</span>
-              )}
-              {c.discount_text && (
-                <span style={{
-                  fontSize: 12, fontWeight: 700, color: '#9a3412',
-                  background: '#ffedd5', padding: '4px 10px', borderRadius: 999,
-                }}>{c.discount_text}</span>
-              )}
-            </div>
-
-            {/* Dirección */}
-            {c.address && (
-              <div style={{
-                display: 'flex', alignItems: 'center', gap: 6, marginTop: 12,
-                fontSize: 13, color: P.onSurfaceVariant,
-              }}>
-                <Ico.pin size={13} color={P.primary} />
-                <span>{c.address}</span>
-              </div>
-            )}
-          </div>
-
-          {/* CTAs */}
-          <div style={{ padding: '4px 20px 20px', display: 'flex', gap: 9 }}>
-            <a
-              href={wa || '#'} target="_blank" rel="noopener noreferrer"
-              onClick={(e) => { if (!wa) e.preventDefault() }}
-              className="com-cta"
-              style={{
-                flex: 1, height: 48, borderRadius: 12,
-                background: '#25D366', color: '#fff',
-                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7,
-                fontSize: 14, fontWeight: 700, textDecoration: 'none',
-                boxShadow: '0 4px 12px rgba(37,211,102,0.3)',
-                opacity: wa ? 1 : 0.45, cursor: wa ? 'pointer' : 'not-allowed',
-              }}
-            >
-              <Ico.whatsapp size={18} /> WhatsApp
-            </a>
-            <a
-              href={c.phone ? `tel:${c.phone}` : '#'}
-              onClick={(e) => { if (!c.phone) e.preventDefault() }}
-              className="com-cta"
-              style={{
-                width: 48, height: 48, borderRadius: 12, background: P.primary,
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                boxShadow: '0 4px 12px rgba(0,109,50,0.25)',
-                opacity: c.phone ? 1 : 0.45,
-              }}
-              aria-label="Llamar"
-            >
-              <Ico.phone size={18} />
-            </a>
-            <a
-              href={mapsLink} target="_blank" rel="noopener noreferrer"
-              className="com-cta"
-              style={{
-                width: 48, height: 48, borderRadius: 12, background: '#ea580c',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                boxShadow: '0 4px 12px rgba(234,88,12,0.28)',
-              }}
-              aria-label="Cómo llegar"
-            >
-              <Ico.nav size={18} />
-            </a>
-          </div>
-
-          {/* ══ GALERÍA (ARRIBA — justo después de CTAs) ══ */}
-          {gallery.length > 0 && (
-            <div style={{ padding: '0 0 20px' }}>
-              <div style={{ padding: '0 20px' }}>
-                <SectionTitle>Galería</SectionTitle>
-              </div>
-              <div
-                ref={galleryRef}
-                className="com-scroll"
-                style={{
-                  display: 'flex', gap: 9, overflowX: 'auto',
-                  padding: '10px 20px', scrollBehavior: 'smooth',
-                }}
-              >
-                {gallery.map((src, i) => (
-                  <img
-                    key={i} src={src} alt={`Foto ${i + 1}`}
-                    onClick={() => setLightboxIdx(i)}
-                    style={{
-                      flexShrink: 0, width: 150, height: 110, objectFit: 'cover',
-                      borderRadius: 8, cursor: 'pointer', border: `1px solid ${P.outlineVariant}`,
-                    }}
-                  />
-                ))}
-              </div>
+          {isPremium && (
+            <div style={s.logoVerifiedBadge}>
+              <Ico.verified size={24} />
             </div>
           )}
+        </div>
 
-          {/* Descripción */}
-          {c.description && (
-            <div style={{ padding: '0 20px 20px' }}>
-              <SectionTitle>Sobre este lugar</SectionTitle>
-              <p style={{ fontSize: 14, color: P.onSurfaceVariant, lineHeight: '20px', margin: '8px 0 0' }}>
-                {c.description}
-              </p>
-            </div>
-          )}
+        {/* ── SCROLL CONTENT ── */}
+        <div style={s.detalleScroll}>
+          <div style={s.detalleBody}>
+            {/* Nombre centrado (sin status pill — el horario abajo ya indica el estado) */}
+            <h2 style={s.detalleNombre}>{c.name}</h2>
 
-          {/* ══ OPINIONES DE VECINOS (datos reales de commerce_reviews) ══ */}
-          <div style={{ padding: '0 20px 20px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-              <SectionTitle>Opiniones de vecinos</SectionTitle>
-              {reviews > 0 && (
-                <span style={{ fontSize: 12, color: P.secondary, fontWeight: 600 }}>{reviews} {reviews === 1 ? 'opinión' : 'opiniones'}</span>
-              )}
+            {/* Horario feed (fuente única de verdad del estado) */}
+            <div style={s.detalleHorarioRow}>
+              <HorarioBloque horario={horario} />
             </div>
 
-            {/* Botón / link para escribir opinión */}
-            {!opinando && (
-              <button
-                onClick={() => setOpinando(true)}
-                className="com-btn"
-                style={{
-                  width: '100%', padding: '11px 14px', borderRadius: 12,
-                  border: `1.5px dashed ${P.primary}`, background: P.primaryFixed,
-                  color: P.onPrimaryFixed, fontSize: 13.5, fontWeight: 700,
-                  cursor: 'pointer', fontFamily: P.font,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7,
-                  marginBottom: 14,
-                }}
-              >
-                ✍️ Escribir opinión
-              </button>
-            )}
-
-            {/* Mini-formulario de opinión (inline) */}
-            {opinando && (
-              <div style={{
-                marginBottom: 14, padding: 14, borderRadius: 12,
-                background: P.surfaceLow, border: `1px solid ${P.outlineVariant}`,
-              }}>
-                {/* Selector de estrellas */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-                  <span style={{ fontSize: 13, fontWeight: 600, color: P.onSurface }}>Tu nota:</span>
-                  <div style={{ display: 'flex', gap: 2 }}>
-                    {[1,2,3,4,5].map((n) => (
-                      <button
-                        key={n}
-                        onClick={() => setNuevaOpinion(o => ({ ...o, rating: n }))}
-                        style={{
-                          background: 'none', border: 'none', cursor: 'pointer', padding: 0,
-                          fontSize: 24, lineHeight: 1,
-                          filter: n <= nuevaOpinion.rating ? 'none' : 'grayscale(1)',
-                          opacity: n <= nuevaOpinion.rating ? 1 : 0.3,
-                        }}
-                        aria-label={`${n} estrellas`}
-                      >⭐</button>
-                    ))}
-                  </div>
-                </div>
-                {/* Textarea */}
-                <textarea
-                  value={nuevaOpinion.texto}
-                  onChange={(e) => setNuevaOpinion(o => ({ ...o, texto: e.target.value }))}
-                  placeholder="¿Cómo te fue con este comercio? Sé específico y amable."
-                  rows={3}
-                  style={{
-                    width: '100%', padding: 10, borderRadius: 8,
-                    border: `1px solid ${P.outlineVariant}`, background: P.surfaceLowest,
-                    color: P.onSurface, fontSize: 14, fontFamily: P.font,
-                    resize: 'vertical', outline: 'none', boxSizing: 'border-box',
-                  }}
-                />
-                {errorOp && (
-                  <div style={{ fontSize: 12, color: P.error, marginTop: 8, fontWeight: 600 }}>{errorOp}</div>
-                )}
-                {/* Acciones */}
-                <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
-                  <button
-                    onClick={() => { setOpinando(false); setErrorOp(''); setNuevaOpinion({ rating: 5, texto: '' }) }}
-                    style={{
-                      flex: 1, padding: '10px 0', borderRadius: 10,
-                      border: `1px solid ${P.outlineVariant}`, background: P.surfaceLowest,
-                      color: P.onSurface, fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: P.font,
-                    }}
-                  >Cancelar</button>
-                  <button
-                    onClick={enviarOpinion}
-                    disabled={enviandoOp}
-                    style={{
-                      flex: 2, padding: '10px 0', borderRadius: 10,
-                      border: 'none', background: P.primary, color: '#fff',
-                      fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: P.font,
-                      opacity: enviandoOp ? 0.6 : 1,
-                    }}
-                  >{enviandoOp ? 'Enviando…' : 'Publicar opinión'}</button>
-                </div>
-              </div>
-            )}
-
-            {/* Lista de opiniones */}
-            {opiniones === null ? (
-              <div style={{ padding: '20px 0', textAlign: 'center', fontSize: 13, color: P.secondary }}>Cargando opiniones…</div>
-            ) : opiniones.length === 0 ? (
-              <div style={{
-                padding: '24px 16px', textAlign: 'center', borderRadius: 12,
-                background: P.surfaceLow, border: `1px solid ${P.outlineVariant}`,
-              }}>
-                <div style={{ fontSize: 32, marginBottom: 6 }}>💬</div>
-                <div style={{ fontSize: 14, fontWeight: 700, color: P.onSurface, marginBottom: 2 }}>Sin opiniones todavía</div>
-                <div style={{ fontSize: 12.5, color: P.secondary, lineHeight: '18px' }}>
-                  Sé el primero en opinar sobre este comercio.
-                </div>
-              </div>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                {opiniones.map((o) => (
-                  <div key={o.id} style={{
-                    padding: 12, borderRadius: 12, background: P.surfaceLow,
-                    border: `1px solid ${P.outlineVariant}`,
-                  }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
-                      {/* Avatar del autor */}
-                      {o.author?.avatar_url
-                        ? <img src={o.author.avatar_url} alt="" style={{ width: 28, height: 28, borderRadius: '50%', objectFit: 'cover' }} />
-                        : <span style={{
-                            width: 28, height: 28, borderRadius: '50%', background: P.primary, color: '#fff',
-                            fontSize: 11, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                          }}>{iniciales(o.author?.full_name)}</span>}
-                      <span style={{ fontSize: 13, fontWeight: 700, color: P.onSurface, flex: 1, minWidth: 0,
-                        whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                        {o.author?.full_name || 'Vecino/a'}
-                      </span>
-                      <span style={{ fontSize: 12, color: P.primary, fontWeight: 700 }}>
-                        {'⭐'.repeat(Number(o.rating) || 0)}
-                      </span>
-                    </div>
-                    {o.comment && (
-                      <p style={{ fontSize: 13.5, color: P.onSurfaceVariant, lineHeight: '19px', margin: 0 }}>
-                        {o.comment}
-                      </p>
-                    )}
-                    <div style={{ fontSize: 11, color: P.outline, marginTop: 6 }}>{hace(o.created_at)}</div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* ══ UBICACIÓN (DROPDOWN — colapsado por defecto) ══ */}
-          {c.lat && c.lng && (
-            <div style={{ padding: '0 20px 24px' }}>
-              <button
-                onClick={() => setMapaOpen(v => !v)}
-                className="com-btn"
-                style={{
-                  width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                  padding: '12px 16px', borderRadius: 12,
-                  border: `1px solid ${P.outlineVariant}`, background: P.surfaceLow,
-                  cursor: 'pointer', fontFamily: P.font,
-                }}
-                aria-expanded={mapaOpen}
-              >
-                <span style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 16, fontWeight: 600, color: P.onSurface }}>
-                  <span style={{ fontSize: 18 }}>📍</span> Ubicación
-                  {distTxt && <span style={{ fontSize: 12, fontWeight: 600, color: P.secondary }}>· {distTxt}</span>}
-                </span>
-                <span style={{
-                  fontSize: 18, color: P.primary, transition: 'transform .2s ease',
-                  transform: mapaOpen ? 'rotate(180deg)' : 'none',
-                }}>⌄</span>
-              </button>
-              {mapaOpen && (
-                <div style={{ marginTop: 10 }}>
-                  <div style={{
-                    borderRadius: 12, overflow: 'hidden',
-                    border: `1px solid ${P.outlineVariant}`, height: 160,
-                  }}>
-                    <MiniMap lat={c.lat} lng={c.lng} label={c.name} />
-                  </div>
-                  {c.address && (
-                    <div style={{
-                      display: 'flex', alignItems: 'center', gap: 6, marginTop: 10,
-                      fontSize: 13, color: P.onSurfaceVariant,
-                    }}>
-                      <Ico.pin size={13} color={P.primary} />
-                      <span>{c.address}</span>
-                    </div>
+            {/* ── GALERÍA de cuadrados con scroll horizontal (premium, si hay fotos) ── */}
+            {gallery.length > 0 && (
+              <div style={s.galeriaWrap}>
+                <div
+                  ref={galeriaRef}
+                  style={s.galeriaScroll}
+                  onMouseEnter={() => { galeriaPausaRef.current = true }}
+                  onMouseLeave={() => { galeriaPausaRef.current = false }}
+                >
+                  {/* Primero el cover como thumbnail si existe y no está repetido en gallery */}
+                  {c.cover_url && !gallery.includes(c.cover_url) && (
+                    <button
+                      style={s.galeriaItem}
+                      onClick={() => setLightbox(c.cover_url)}
+                      aria-label="Ver foto"
+                    >
+                      <img src={c.cover_url} alt="" style={s.galeriaImg} />
+                    </button>
                   )}
-                  <a
-                    href={mapsLink} target="_blank" rel="noopener noreferrer"
-                    className="com-cta"
-                    style={{
-                      display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7,
-                      marginTop: 10, height: 42, borderRadius: 12,
-                      background: P.primaryFixed, color: P.onPrimaryFixed,
-                      fontSize: 14, fontWeight: 700, textDecoration: 'none',
-                    }}
-                  >
-                    <Ico.nav size={16} color={P.onPrimaryFixed} /> Cómo llegar
-                  </a>
+                  {gallery.map((url, i) => (
+                    <button
+                      key={i}
+                      style={s.galeriaItem}
+                      onClick={() => setLightbox(url)}
+                      aria-label={`Ver foto ${i + 1}`}
+                    >
+                      <img src={url} alt="" style={s.galeriaImg} />
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Descripción */}
+            {c.description && (
+              <p style={s.detalleDesc}>{c.description}</p>
+            )}
+
+            {/* ── BANNER BENEFICIO (discount_text) — RE-HABILITADO ──
+                Banner verde premium con el descuento del comercio (discount_text).
+                Mismo diseño que las promos: gradiente verde, shimmer animado,
+                patrón de puntos, badge circular con icono de regalo, deco esquina.
+                Se muestra SOLO si el comercio tiene discount_text cargado.
+                Si el descuento no corresponde, el admin lo edita en el editor
+                de comercios (campo "Texto del descuento"). */}
+            {c.discount_text && c.discount_text.trim() && (
+              <div style={s.beneficioCard}>
+                <div style={s.beneficioPattern} />
+                <div style={s.beneficioShimmer} />
+                <div style={s.beneficioInner}>
+                  <div style={s.beneficioBadge}>
+                    <Ico.gift size={20} color="#fff" />
+                  </div>
+                  <div style={s.beneficioContent}>
+                    <div style={s.beneficioLabel}>Descuento El Barrio</div>
+                    <div style={s.beneficioTextShine}>{c.discount_text}</div>
+                  </div>
+                </div>
+                <div style={s.beneficioDeco} />
+              </div>
+            )}
+
+            {/* ── PROMOCIONES — BANNER VERDE PREMIUM ──
+                Cada promo usa el MISMO banner verde que el beneficio
+                (gradiente verde, shimmer animado, patrón de puntos,
+                badge circular con icono, deco esquina).
+                El banner verde que pediste 340 veces.
+                Para admin: botón 🗑️ para borrar promo directamente. */}
+            {promosVisibles.length > 0 && (
+              <div style={{ marginTop: 14, marginBottom: 14, display: 'flex', flexDirection: 'column', gap: 10 }}>
+                {promosVisibles.map((p) => {
+                  const vigente = p._vigente
+                  return (
+                    <div key={p.id} style={{ ...s.beneficioCard, position: 'relative' }}>
+                      {/* Botón BORRAR (solo admin) — esquina sup-der del banner,
+                          MÁS GRANDE y con texto "Borrar" para que se vea claro. */}
+                      {esAdmin && (
+                        <button
+                          onClick={() => borrarPromo(p.id)}
+                          disabled={borrandoPromoId === p.id}
+                          style={{
+                            position: 'absolute', top: 8, right: 8, zIndex: 20,
+                            minHeight: 34, borderRadius: 9,
+                            padding: '6px 12px',
+                            background: 'rgba(220,38,38,0.92)',
+                            border: '1.5px solid rgba(255,255,255,0.65)',
+                            color: '#fff', fontSize: 12.5, fontWeight: 800,
+                            cursor: 'pointer',
+                            display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 5,
+                            fontFamily: 'inherit',
+                            boxShadow: '0 3px 10px rgba(0,0,0,0.28)',
+                            letterSpacing: '0.2px',
+                          }}
+                          aria-label="Borrar promoción"
+                          title="Borrar esta promoción"
+                        >
+                          {borrandoPromoId === p.id
+                            ? <span style={{ fontSize: 12 }}>Borrando…</span>
+                            : (<><span style={{ fontSize: 14 }}>🗑️</span><span>Borrar</span></>)}
+                        </button>
+                      )}
+                      {/* Imagen de la promo (si existe) — arriba del banner, redondeada */}
+                      {p.image_url && (
+                        <img src={p.image_url} alt=""
+                          style={{
+                            position: 'relative', zIndex: 2,
+                            width: '100%', height: 150, objectFit: 'cover',
+                            borderRadius: 12, marginBottom: 12, display: 'block',
+                            border: '1.5px solid rgba(255,255,255,0.3)',
+                            boxShadow: '0 2px 10px rgba(0,0,0,0.18)',
+                          }}
+                          loading="lazy" />
+                      )}
+                      <div style={s.beneficioPattern} />
+                      <div style={s.beneficioShimmer} />
+                      <div style={s.beneficioInner}>
+                        <div style={s.beneficioBadge}>
+                          <Ico.gift size={20} color="#fff" />
+                        </div>
+                        <div style={s.beneficioContent}>
+                          <div style={{
+                            fontSize: 10.5, fontWeight: 800, color: 'rgba(255,255,255,0.92)',
+                            textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 3,
+                          }}>
+                            Promoción
+                          </div>
+                          <div style={{
+                            fontSize: 16.5, fontWeight: 800, color: '#fff',
+                            lineHeight: 1.22, marginBottom: p.description ? 5 : 7,
+                            letterSpacing: '-0.2px',
+                            paddingRight: esAdmin ? 92 : 0,
+                          }}>
+                            {p.title || 'Promoción'}
+                          </div>
+                          {p.description && (
+                            <div style={{
+                              fontSize: 12.5, color: 'rgba(255,255,255,0.88)',
+                              lineHeight: 1.45, marginBottom: 8,
+                            }}>
+                              {p.description}
+                            </div>
+                          )}
+                          <div style={{
+                            display: 'inline-flex', alignItems: 'center', gap: 4,
+                            fontSize: 11, fontWeight: 800,
+                            color: '#fff',
+                            background: vigente ? 'rgba(255,255,255,0.22)' : 'rgba(0,0,0,0.22)',
+                            padding: '4px 10px', borderRadius: 999,
+                            border: '1px solid rgba(255,255,255,0.35)',
+                          }}>
+                            {vigente ? '⏰ Vigente' : '⏰ Vencida'}
+                          </div>
+                        </div>
+                      </div>
+                      <div style={s.beneficioDeco} />
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+
+            {/* Info rápida: dirección + teléfono (chips verticales) */}
+            <div style={s.detalleQuickInfo}>
+              {c.address && (
+                <div style={s.quickInfoChip}>
+                  <Ico.pin size={13} color={C.verde} />
+                  <div style={s.quickInfoAddrCol}>
+                    <span style={s.quickInfoAddr}>{c.address}</span>
+                    {dist && <span style={s.quickInfoDist}>a {dist}</span>}
+                  </div>
+                </div>
+              )}
+              {c.phone && (
+                <div style={s.quickInfoChip}>
+                  <Ico.phone size={13} color={C.textoTenue} />
+                  <span>{c.phone}</span>
                 </div>
               )}
             </div>
-          )}
 
-          {c.instagram && (
-            <div style={{ padding: '0 20px 28px', textAlign: 'center' }}>
-              <a
-                href={`https://instagram.com/${c.instagram.replace('@', '')}`}
-                target="_blank" rel="noopener noreferrer"
-                style={{ fontSize: 13, color: '#7c3aed', fontWeight: 600, textDecoration: 'none' }}
-              >📷 @{c.instagram.replace('@', '')}</a>
-            </div>
+            {/* DROPDOWN: VER UBICACIÓN */}
+            <button
+              style={s.dropdownBar}
+              onClick={() => setMapaOpen(!mapaOpen)}
+            >
+              <span style={s.dropdownBarLeft}>
+                <span style={s.dropdownIconBox}>
+                  <Ico.pin size={14} color={C.verde} />
+                </span>
+                Ver ubicación
+              </span>
+              <span style={{
+                ...s.dropdownChev,
+                transform: mapaOpen ? 'rotate(90deg)' : 'none',
+              }}>
+                <Ico.chevron size={16} color={C.textoTenue} />
+              </span>
+            </button>
+            {mapaOpen && (
+              <div ref={mapaRef} style={s.dropdownContent}>
+                {c.lat != null && c.lng != null ? (
+                  <>
+                    <div style={s.detalleMapaBox}>
+                      <MiniMap lat={c.lat} lng={c.lng} height={180} />
+                    </div>
+                    <a
+                      href={`https://www.google.com/maps/dir/?api=1&destination=${c.lat},${c.lng}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      style={s.comoLlegarBtn}
+                    >
+                      <Ico.directions size={16} color="#fff" />
+                      <span>Cómo llegar</span>
+                    </a>
+                  </>
+                ) : (
+                  <div style={s.detalleSinMapa}>
+                    Este comercio no tiene ubicación en el mapa.
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* CATEGORÍAS AL FINAL */}
+            {cats.length > 0 && (
+              <div style={s.detalleCategoriasFinal}>
+                <div style={s.detalleSectionTit}>Rubros</div>
+                <div style={s.detalleCatsRow}>
+                  {cats.map((cat) => {
+                    const ci = COMERCIOS[cat] || COMERCIOS['Otro']
+                    return (
+                      <span key={cat} style={{ ...s.rubroChipModal, background: ci.bg, color: ci.color }}>
+                        {ci.emoji} {cat}
+                      </span>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
+
+            <div style={{ height: 8 }} />
+          </div>
+        </div>
+
+        {/* ── FOOTER: BARRA DE ACCIÓN INFERIOR ──
+            Para TODOS los comercios (premium + no premium).
+            WhatsApp (verde WhatsApp) + Llamar (verde marca) + Instagram (rosa).
+            Cada botón solo se muestra si el dato existe (c.phone, c.instagram).
+            Si NO hay ninguno de los tres, mostramos un placeholder pequeño
+            para no romper el layout. */}
+        {/* ── FOOTER: BOTONES CIRCULARES ──
+            3 botones circulares (como en la referencia):
+            WhatsApp (verde WhatsApp) + Llamar (verde marca) + Instagram (rosa).
+            Solo icono, sin texto. Centrados, con gap. */}
+        <div style={s.ctaRow}>
+          {wa && (
+            <a href={wa} target="_blank" rel="noreferrer"
+              style={{ ...s.ctaBtn, ...s.ctaWhatsapp }}
+              aria-label="WhatsApp" title="WhatsApp">
+              <Ico.whatsapp size={24} color="#fff" />
+            </a>
+          )}
+          {telLink && (
+            <a href={telLink}
+              style={{ ...s.ctaBtn, ...s.ctaCall }}
+              aria-label="Llamar" title="Llamar">
+              <Ico.phoneFill size={22} color="#fff" />
+            </a>
+          )}
+          {igUrl && (
+            <a href={igUrl} target="_blank" rel="noreferrer"
+              style={{ ...s.ctaBtn, ...s.ctaInstagram }}
+              aria-label="Instagram" title="Instagram">
+              <Ico.instagram size={22} color="#fff" />
+            </a>
           )}
         </div>
       </div>
 
-      {/* Lightbox */}
-      {lightboxIdx !== null && (
-        <div
-          onClick={() => setLightboxIdx(null)}
-          className="com-lightbox"
-          style={{
-            position: 'absolute', inset: 0, zIndex: 1010,
-            background: 'rgba(0,0,0,0.92)', display: 'flex',
-            alignItems: 'center', justifyContent: 'center', padding: 20,
-          }}
-        >
+      {/* ── LIGHTBOX (fullscreen al tocar una foto de la galería) ──
+          IMPORTANTE: stopPropagation en backdrop y close para que el click
+          NO burbujee hasta detalleBackdrop (que tiene onClick={onClose}) y
+          cierre el modal entero. Solo queremos cerrar el lightbox. */}
+      {lightbox && (
+        <div style={s.lightboxBackdrop} onClick={(e) => { e.stopPropagation(); setLightbox(null) }}>
           <button
-            onClick={() => setLightboxIdx(null)}
-            style={{
-              position: 'absolute', top: 16, right: 16, width: 40, height: 40,
-              borderRadius: '50%', background: 'rgba(255,255,255,0.15)', border: 'none',
-              color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
-            }}
+            style={s.lightboxClose}
+            onClick={(e) => { e.stopPropagation(); setLightbox(null) }}
+            aria-label="Cerrar foto"
           >
             <Ico.close size={22} color="#fff" />
           </button>
           <img
-            src={gallery[lightboxIdx]} alt=""
-            style={{ maxWidth: '100%', maxHeight: '85vh', borderRadius: 12, objectFit: 'contain' }}
+            src={lightbox}
+            alt=""
+            style={s.lightboxImg}
+            onClick={(e) => e.stopPropagation()}
           />
         </div>
       )}
@@ -1150,125 +1034,9 @@ function ComercioDetalle({ c, userCoords, onClose, onEditar, esAdmin, currentUse
   )
 }
 
-function SectionTitle({ children }) {
-  return (
-    <h2 style={{
-      fontSize: 16, fontWeight: 600, color: P.onSurface,
-      lineHeight: '24px', margin: 0,
-    }}>{children}</h2>
-  )
-}
-
-/* ════════════════════════════════════════════════════════
-   🧪 DEMO — comercios de prueba (3 destacados + 3 cerca de ti)
-
-   Sirven solo para ver cómo se ve la app con varias tarjetas.
-
-   ► PARA QUITARLOS (2 pasos):
-     1. Borra todo este bloque (MOCK_COMERCIOS).
-     2. En la función cargar(), cambia la línea:
-            setComercios([...(data || []), ...MOCK_COMERCIOS])
-        de vuelta a:
-            setComercios(data || [])
-   ════════════════════════════════════════════════════════ */
-const MOCK_COMERCIOS = [
-  // ── 3 destacados (is_premium: true) ──
-  {
-    id: 'demo-dest-1',
-    name: 'Panadería Las Delicias',
-    description: 'Pan amasado al horno de barro, colambres y empanadas. Recién horneado desde las 6 am.',
-    address: 'Av. Las Hualtatas 5800, Las Condes',
-    lat: -33.3985, lng: -70.5495,
-    phone: '+56987654321',
-    categories: ['Panadería'],
-    opening_hours: { lun:{o:'06:00',c:'21:00'}, mar:{o:'06:00',c:'21:00'}, mie:{o:'06:00',c:'21:00'}, jue:{o:'06:00',c:'21:00'}, vie:{o:'06:00',c:'21:00'}, sab:{o:'06:00',c:'21:00'}, dom:{o:'07:00',c:'14:00'} },
-    is_premium: true, is_active: true,
-    logo_url: null, cover_url: null, gallery: [],
-    discount_text: '10% en pan amasado antes de las 8 am',
-    instagram: '@panaderiadelicias',
-    neighborhood_id: null,
-  },
-  {
-    id: 'demo-dest-2',
-    name: 'Café Alto El Manzano',
-    description: 'Café de especialidad, grano chileno. Tortas caseras y sándwiches para llevar.',
-    address: 'El Manzano 432, Las Condes',
-    lat: -33.3920, lng: -70.5410,
-    phone: '+56976543210',
-    categories: ['Cafetería'],
-    opening_hours: { lun:{o:'07:30',c:'20:00'}, mar:{o:'07:30',c:'20:00'}, mie:{o:'07:30',c:'20:00'}, jue:{o:'07:30',c:'20:00'}, vie:{o:'07:30',c:'21:00'}, sab:{o:'08:00',c:'21:00'}, dom:{o:'08:00',c:'17:00'} },
-    is_premium: true, is_active: true,
-    logo_url: null, cover_url: null, gallery: [],
-    discount_text: '2x1 en café latte de 4 a 6 pm',
-    instagram: '@cafealtomanzano',
-    neighborhood_id: null,
-  },
-  {
-    id: 'demo-dest-3',
-    name: 'Súper Express El Roble',
-    description: 'Almacén de barrio con todo lo que olvidaste comprar. Despacho a domicilio en el barrio.',
-    address: 'Los Dominicos 1234, Las Condes',
-    lat: -33.3890, lng: -70.5520,
-    phone: '+56965432109',
-    categories: ['Almacén'],
-    opening_hours: { lun:{o:'07:00',c:'23:00'}, mar:{o:'07:00',c:'23:00'}, mie:{o:'07:00',c:'23:00'}, jue:{o:'07:00',c:'23:00'}, vie:{o:'07:00',c:'23:30'}, sab:{o:'07:00',c:'23:30'}, dom:{o:'08:00',c:'23:00'} },
-    is_premium: true, is_active: true,
-    logo_url: null, cover_url: null, gallery: [],
-    discount_text: 'Despacho gratis en el barrio desde $15.000',
-    instagram: '',
-    neighborhood_id: null,
-  },
-  // ── 3 cerca de ti (is_premium: false) ──
-  {
-    id: 'demo-cerca-1',
-    name: 'Verdulería Doña Rosa',
-    description: 'Verduras y frutas frescas de la Vega. Surco nuevo cada lunes y jueves.',
-    address: 'Av. Cristóbal Colón 5210, Las Condes',
-    lat: -33.4010, lng: -70.5460,
-    phone: '+56954321098',
-    categories: ['Verdulería'],
-    opening_hours: { lun:{o:'08:00',c:'20:00'}, mar:{o:'08:00',c:'20:00'}, mie:{o:'08:00',c:'20:00'}, jue:{o:'08:00',c:'20:00'}, vie:{o:'08:00',c:'20:30'}, sab:{o:'08:00',c:'20:30'}, dom:{o:'09:00',c:'14:00'} },
-    is_premium: false, is_active: true,
-    logo_url: null, cover_url: null, gallery: [],
-    discount_text: '',
-    instagram: '',
-    neighborhood_id: null,
-  },
-  {
-    id: 'demo-cerca-2',
-    name: 'Botillería El Sol',
-    description: 'Cervezas nacionales y artesanales, vinos y todo para el once o carrete. Hasta tarde.',
-    address: 'Enrique Foster 2150, Las Condes',
-    lat: -33.3960, lng: -70.5430,
-    phone: '+56943210987',
-    categories: ['Botillería'],
-    opening_hours: { lun:{o:'09:00',c:'23:00'}, mar:{o:'09:00',c:'23:00'}, mie:{o:'09:00',c:'23:00'}, jue:{o:'09:00',c:'23:00'}, vie:{o:'09:00',c:'04:00'}, sab:{o:'09:00',c:'04:00'}, dom:{o:'10:00',c:'23:00'} },
-    is_premium: false, is_active: true,
-    logo_url: null, cover_url: null, gallery: [],
-    discount_text: '',
-    instagram: '',
-    neighborhood_id: null,
-  },
-  {
-    id: 'demo-cerca-3',
-    name: 'Carnicería Don Pedro',
-    description: 'Corte a pedido, carne madurada y pollo de campo. Calidad de mercado oriente.',
-    address: 'Av. Américo Vespucio 1800, Las Condes',
-    lat: -33.4030, lng: -70.5500,
-    phone: '+56932109876',
-    categories: ['Carnicería'],
-    opening_hours: { lun:{o:'08:00',c:'19:00'}, mar:{o:'08:00',c:'19:00'}, mie:{o:'08:00',c:'19:00'}, jue:{o:'08:00',c:'19:00'}, vie:{o:'08:00',c:'19:30'}, sab:{o:'08:00',c:'19:30'}, dom:{o:'09:00',c:'14:00'} },
-    is_premium: false, is_active: true,
-    logo_url: null, cover_url: null, gallery: [],
-    discount_text: '',
-    instagram: '',
-    neighborhood_id: null,
-  },
-]
-
-/* ════════════════════════════════════════════════════════
-   COMPONENTE PRINCIPAL — estructura EXACTA del HTML de Stitch
-   ════════════════════════════════════════════════════════ */
+/* ════════════════════════════════════════════════════════════
+   COMERCIOS — componente principal
+   ════════════════════════════════════════════════════════════ */
 function Comercios({ currentUser, onNavigate, onCrear, onEditar }) {
   const [profile, setProfile] = useState(null)
   const [comercios, setComercios] = useState([])
@@ -1277,6 +1045,10 @@ function Comercios({ currentUser, onNavigate, onCrear, onEditar }) {
   const [cat, setCat] = useState('Todas')
   const [userCoords, setUserCoords] = useState(null)
   const [seleccionado, setSeleccionado] = useState(null)
+  const [expandedId, setExpandedId] = useState(null)
+
+  // Toggle acordeón: si se clickea la misma card, se colapsa; si es otra, se expande.
+  const onToggleCompacta = (id) => setExpandedId((prev) => (prev === id ? null : id))
 
   useEffect(() => { cargar() }, [currentUser?.id])
 
@@ -1290,24 +1062,32 @@ function Comercios({ currentUser, onNavigate, onCrear, onEditar }) {
   }, [])
 
   const cargar = async () => {
-    if (!currentUser?.id) { setCargando(false); return }
+    if (!currentUser?.id) {
+      setCargando(false)
+      return
+    }
     setCargando(true)
     try {
       const { data: p } = await supabase
         .from('profiles').select('*')
         .eq('user_id', currentUser.id).maybeSingle()
-      if (!p) { setProfile(null); setComercios([]); return }
+      if (!p) {
+        setProfile(null)
+        setComercios([])
+        return
+      }
       setProfile(p)
+
       const { data, error } = await supabase
-        .from('commerces').select('*')
+        .from('commerces')
+        .select('*')
         .eq('neighborhood_id', p.neighborhood_id)
         .eq('is_active', true)
         .order('is_premium', { ascending: false })
         .order('name', { ascending: true })
-      if (error) console.error('[comercios] Error:', error)
-      // 🧪 DEMO: el spread ...MOCK_COMERCIOS agrega 6 comercios de prueba.
-      // Para quitarlos, borra el spread y deja solo: setComercios(data || [])
-      setComercios([...(data || []), ...MOCK_COMERCIOS])
+
+      if (error) console.error('[comercios] Error cargando:', error)
+      setComercios(data || [])
     } catch (err) {
       console.error('Error cargando comercios:', err)
     } finally {
@@ -1328,215 +1108,131 @@ function Comercios({ currentUser, onNavigate, onCrear, onEditar }) {
     return true
   })
 
-  const destacados = filtrados.filter((c) => c.is_premium)
-  const resto = filtrados.filter((c) => !c.is_premium)
-  const restoOrdenado = userCoords
-    ? [...resto].sort((a, b) => {
-        const da = haversine(userCoords.lat, userCoords.lng, a.lat, a.lng) ?? Infinity
-        const db = haversine(userCoords.lat, userCoords.lng, b.lat, b.lng) ?? Infinity
-        return da - db
-      })
-    : resto
+  const esAdmin = profile?.role === 'admin' || profile?.is_admin === true
 
-  const esAdmin = profile?.is_admin || profile?.role === 'admin' || profile?.is_operator
-  const tieneFiltro = busqueda || cat !== 'Todas'
-  const nombreUsuario = profile?.full_name?.split(' ')[0] || profile?.name?.split(' ')[0] || 'vecino'
-  const ubicacionTxt = 'El Barrio' + (profile?.comuna ? ', ' + profile.comuna : ', Las Condes')
-  const avatarUrl = profile?.avatar_url
+  const onAbrirComercio = (c) => setSeleccionado(c)
+
+  const onEditarComercio = (c) => {
+    setSeleccionado(null)
+    if (onEditar) onEditar(c)
+    else if (onCrear) onCrear('commerce', c)
+  }
+
+  const onAgregar = () => {
+    if (onCrear) onCrear('commerce')
+    else if (onEditar) onEditar(null)
+  }
 
   return (
-    <div style={{
-      height: '100%', display: 'flex', flexDirection: 'column',
-      background: P.surface, fontFamily: P.font, color: P.onSurface,
-      position: 'relative', overflow: 'hidden',
-    }}>
-      <style>{GLOBAL_STYLES}</style>
-
-      {/* ══════ HEADER — TopBar del Mercado (brand 🏘️ el barrio + campana + avatar) ══════ */}
-      <div style={{ flexShrink: 0, boxShadow: '0 2px 8px rgba(0,0,0,0.04)', position: 'relative', zIndex: 10 }}>
-        <TopBar
-          notifCount={3}
-          onAvatar={() => nav('perfil')}
-          onNavigate={onNavigate}
-          userName={profile?.full_name || currentUser?.user_metadata?.full_name || ''}
-          avatarUrl={avatarUrl}
-        />
+    <div style={s.wrap}>
+      {/* HEADER */}
+      <div style={s.header}>
+        <button style={s.backBtn} onClick={() => nav('inicio')} aria-label="Volver">
+          <Ico.back />
+        </button>
+        <div style={s.headerTit}>
+          <Ico.store size={20} color={C.verde} />
+          <span>
+            Comercios de <span style={{ color: C.verde }}>el barrio</span>
+          </span>
+        </div>
+        {esAdmin ? (
+          <button style={s.addBtn} onClick={onAgregar} aria-label="Agregar comercio">
+            <Ico.plus />
+          </button>
+        ) : (
+          <div style={{ width: 36 }} />
+        )}
       </div>
 
-      {/* ══════ CONTENIDO SCROLLABLE (flex:1 + overflowY auto — scroll propio, no escapa del phone-frame) ══════ */}
-      <div className="com-scroll" style={{
-        flex: 1, minHeight: 0, overflowY: 'auto',
-        WebkitOverflowScrolling: 'touch',
-        paddingLeft: 20, paddingRight: 20,
-        paddingBottom: esAdmin ? 96 : 32,
-      }}>
-      {/* ══════ SEARCH BAR ══════ */}
-      <div style={{ position: 'relative', marginBottom: 24, marginTop: 4 }}>
-        <span style={{
-          position: 'absolute', left: 16, top: '50%', transform: 'translateY(-50%)',
-          display: 'flex', alignItems: 'center', pointerEvents: 'none',
-        }}>
-          <Ico.search size={22} color={P.outline} />
-        </span>
+      {/* BUSCADOR */}
+      <div style={s.searchRow}>
+        <div style={s.searchIcon}><Ico.search /></div>
         <input
+          placeholder="Buscar por nombre, rubro o dirección..."
           value={busqueda}
           onChange={(e) => setBusqueda(e.target.value)}
-          placeholder="Buscar tiendas, panaderías..."
-          type="text"
-          style={{
-            width: '100%', paddingLeft: 48, paddingRight: 16, paddingTop: 12, paddingBottom: 12,
-            borderRadius: 12, border: '2px solid transparent',
-            background: P.surfaceHigh, color: P.onSurface,
-            fontSize: 14, fontWeight: 400, lineHeight: '20px',
-            fontFamily: P.font, outline: 'none',
-            boxSizing: 'border-box',
-          }}
+          style={s.searchInput}
         />
       </div>
 
-      {/* ══════ CATEGORIES CHIP SCROLL ══════ */}
-      <div className="com-scroll" style={{
-        display: 'flex', gap: 12, overflowX: 'auto',
-        marginBottom: 32, paddingTop: 4, paddingBottom: 4,
-      }}>
-        {['Todas', ...COMERCIOS_CATS].map((cName) => {
-          const active = cat === cName
+      {/* FILTROS POR RUBRO */}
+      <div style={s.filtrosScroll}>
+        {['Todas', ...COMERCIOS_CATS].map((c) => {
+          const activo = cat === c
+          const ci = c === 'Todas' ? null : (COMERCIOS[c] || COMERCIOS['Otro'])
           return (
             <button
-              key={cName}
-              onClick={() => setCat(cName)}
-              className="com-chip"
+              key={c}
               style={{
-                flexShrink: 0, padding: '8px 16px', borderRadius: 999,
-                fontSize: 12, fontWeight: 600, lineHeight: '16px',
-                letterSpacing: '0.01em', fontFamily: P.font,
-                border: 'none', cursor: 'pointer', whiteSpace: 'nowrap',
-                background: active ? P.primary : P.surfaceHighest,
-                color: active ? P.onPrimary : P.onSurfaceVariant,
-                boxShadow: active ? '0 2px 4px rgba(0,109,50,0.2)' : 'none',
+                ...s.filtroChip,
+                background: activo ? C.verde : C.card,
+                color: activo ? '#fff' : C.textoSuave,
+                border: activo ? `1px solid ${C.verde}` : `1px solid ${C.borde}`,
               }}
+              onClick={() => setCat(c)}
             >
-              {cName}
+              {ci && <span style={{ fontSize: 12 }}>{ci.emoji}</span>}
+              {c}
             </button>
           )
         })}
       </div>
 
-      {/* ══════ CONTENIDO ══════ */}
-      {cargando ? (
-        <div style={{ padding: '40px 0', textAlign: 'center' }}>
-          <div style={{ fontSize: 14, color: P.onSurfaceVariant }}>Cargando comercios…</div>
-        </div>
-      ) : filtrados.length === 0 ? (
-        <div style={{ padding: '50px 16px', textAlign: 'center' }}>
-          <div style={{ fontSize: 44, marginBottom: 12 }}>🏪</div>
-          <div style={{ fontSize: 16, fontWeight: 700, color: P.onSurface, marginBottom: 4 }}>
-            {tieneFiltro ? 'Sin resultados' : 'Aún no hay comercios'}
+      {/* LISTADO — una sola lista, sin secciones */}
+      <div style={s.scroll}>
+        {cargando ? (
+          <div style={s.cargando}>
+            <img src="/isotipo.png" alt="" style={{ width: 58, opacity: 0.4 }} />
           </div>
-          <div style={{ fontSize: 13, color: P.onSurfaceVariant, lineHeight: '20px' }}>
-            {tieneFiltro ? 'Prueba con otra búsqueda o categoría.' : 'Los primeros comercios del barrio aparecerán acá.'}
+        ) : filtrados.length === 0 ? (
+          <div style={s.vacio}>
+            <div style={s.vacioEmoji}>🏪</div>
+            <div style={s.vacioTit}>
+              {busqueda || cat !== 'Todas'
+                ? 'No hay comercios con ese filtro'
+                : 'Todavía no hay comercios en el barrio'}
+            </div>
+            <div style={s.vacioTxt}>
+              {busqueda || cat !== 'Todas'
+                ? 'Probá con otro rubro o cambiá la búsqueda.'
+                : 'Si tenés un local o conocés uno, sumalo al directorio.'}
+            </div>
+            {esAdmin && !busqueda && cat === 'Todas' && (
+              <button style={s.vacioBtn} onClick={onAgregar}>
+                <Ico.plus size={16} color="#fff" /> Agregar comercio
+              </button>
+            )}
           </div>
-        </div>
-      ) : (
-        <div>
-          {/* ── DESTACADOS (carrusel horizontal) ── */}
-          {!tieneFiltro && destacados.length > 0 && (
-            <section style={{ marginBottom: 32 }}>
-              <div style={{
-                display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end',
-                marginBottom: 16,
-              }}>
-                <h2 style={{
-                  fontSize: 16, fontWeight: 600, color: P.onSurface,
-                  lineHeight: '24px', margin: 0,
-                  display: 'flex', alignItems: 'center', gap: 8,
-                }}>
-                  <span style={{ fontSize: 18, lineHeight: 1 }}>⭐</span>
-                  Comercios Destacados
-                </h2>
-                <button
-                  onClick={() => setBusqueda('')}
-                  style={{
-                    fontSize: 12, fontWeight: 600, color: P.primary,
-                    background: 'transparent', border: 'none', cursor: 'pointer',
-                    fontFamily: P.font, padding: 0,
-                  }}
-                >
-                  Ver todos
-                </button>
-              </div>
-              <div className="com-scroll" style={{
-                display: 'flex', gap: 12, overflowX: 'auto',
-                paddingBottom: 4, paddingLeft: 1, paddingRight: 1,
-              }}>
-                {destacados.map((c) => (
-                  <CardDestacada
+        ) : (
+          <div style={{ marginBottom: 120 }}>
+            {filtrados.map((c) => (
+              c.is_premium
+                ? <CardGrande
                     key={c.id}
                     c={c}
                     userCoords={userCoords}
-                    onClick={() => setSeleccionado(c)}
+                    onAbrir={onAbrirComercio}
                   />
-                ))}
-              </div>
-            </section>
-          )}
+                : <CardCompacta
+                    key={c.id}
+                    c={c}
+                    userCoords={userCoords}
+                    expanded={expandedId === c.id}
+                    onToggle={onToggleCompacta}
+                  />
+            ))}
+          </div>
+        )}
+      </div>
 
-          {/* ── CERCA DE TI (lista vertical, cards horizontales) ── */}
-          <section>
-            <h2 style={{
-              fontSize: 16, fontWeight: 600, color: P.onSurface,
-              lineHeight: '24px', margin: '0 0 16px',
-              display: 'flex', alignItems: 'center', gap: 8,
-            }}>
-              {tieneFiltro
-                ? <><span style={{ fontSize: 18, lineHeight: 1 }}>🔎</span>Resultados</>
-                : <><span style={{ fontSize: 18, lineHeight: 1 }}>📍</span>Cerca de ti</>}
-            </h2>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-              {(tieneFiltro ? filtrados : restoOrdenado).map((c) => (
-                <CardCerca
-                  key={c.id}
-                  c={c}
-                  userCoords={userCoords}
-                  onClick={() => setSeleccionado(c)}
-                />
-              ))}
-            </div>
-          </section>
-        </div>
-      )}
-      </div>{/* end contenido scrollable */}
-
-      {/* ══════ FAB admin (absolute dentro del root relativo — queda sobre el contenido, sobre el TabBar) ══════ */}
-      {esAdmin && (
-        <button
-          onClick={() => onCrear ? onCrear('commerce') : (onEditar && onEditar(null))}
-          className="com-cta"
-          style={{
-            position: 'absolute', bottom: 20, right: 20, zIndex: 40,
-            width: 56, height: 56, borderRadius: 16,
-            background: P.primary, border: 'none', cursor: 'pointer',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            boxShadow: '0 6px 18px rgba(0,109,50,0.4)',
-          }}
-          aria-label="Agregar comercio"
-        >
-          <Ico.plus size={28} color="#fff" />
-        </button>
-      )}
-
-      {/* ══════ MODAL DETALLE ══════ */}
+      {/* MODAL DE DETALLE */}
       {seleccionado && (
         <ComercioDetalle
           c={seleccionado}
           userCoords={userCoords}
-          currentUser={currentUser}
           onClose={() => setSeleccionado(null)}
-          onEditar={(c) => {
-            setSeleccionado(null)
-            if (onEditar) onEditar(c)
-            else if (onCrear) onCrear('commerce', c)
-          }}
+          onEditar={onEditarComercio}
           esAdmin={esAdmin}
         />
       )}
@@ -1544,44 +1240,862 @@ function Comercios({ currentUser, onNavigate, onCrear, onEditar }) {
   )
 }
 
+// ═════════════════════════════════════════════════
+const s = {
+  wrap: {
+    width: '100%', height: '100%',
+    background: C.fondo, fontFamily: T.font,
+    display: 'flex', flexDirection: 'column', overflow: 'hidden',
+    position: 'relative',
+  },
+
+  /* ── header ── */
+  header: {
+    background: `linear-gradient(180deg, ${C.card} 0%, ${C.verdeBg} 100%)`,
+    padding: '26px 14px 12px',
+    display: 'flex', alignItems: 'center', gap: 10,
+    borderBottom: `1px solid ${C.borde}`,
+    flexShrink: 0,
+  },
+  backBtn: {
+    width: 36, height: 36, borderRadius: '50%',
+    background: C.card, border: `1px solid ${C.borde}`,
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    cursor: 'pointer', padding: 0,
+    boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+  },
+  headerTit: {
+    fontSize: 17.5, fontWeight: 800, color: C.texto,
+    flex: 1,
+    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7,
+    letterSpacing: '-0.2px',
+  },
+  addBtn: {
+    width: 36, height: 36, borderRadius: '50%',
+    background: C.verdeSuave, border: `1px solid ${C.verde}`,
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    cursor: 'pointer', padding: 0,
+    boxShadow: '0 1px 3px rgba(22,163,74,0.15)',
+  },
+
+  /* ── buscador ── */
+  searchRow: {
+    position: 'relative',
+    margin: '12px 16px 8px',
+    flexShrink: 0,
+  },
+  searchIcon: {
+    position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)',
+    display: 'flex', alignItems: 'center',
+  },
+  searchInput: {
+    width: '100%', padding: '12px 16px 12px 40px',
+    fontSize: 14, background: C.card,
+    border: `1.5px solid ${C.borde}`, borderRadius: 999,
+    outline: 'none', fontFamily: 'inherit', color: C.texto,
+    boxSizing: 'border-box',
+  },
+
+  /* ── filtros ── */
+  filtrosScroll: {
+    display: 'flex', gap: 7,
+    overflowX: 'auto',
+    padding: '4px 16px 10px',
+    flexShrink: 0,
+    scrollbarWidth: 'none',
+    msOverflowStyle: 'none',
+    WebkitOverflowScrolling: 'touch',
+  },
+  filtroChip: {
+    flexShrink: 0,
+    padding: '8px 14px',
+    borderRadius: 999,
+    fontSize: 12.5, fontWeight: 700,
+    cursor: 'pointer', fontFamily: 'inherit',
+    display: 'flex', alignItems: 'center', gap: 5,
+    whiteSpace: 'nowrap',
+  },
+
+  /* ── scroll principal ── */
+  scroll: {
+    flex: 1, overflowY: 'auto',
+    padding: '6px 16px 0',
+  },
+  cargando: {
+    flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
+    padding: 60,
+  },
+
+  /* ── vacío ── */
+  vacio: {
+    textAlign: 'center', padding: '46px 20px',
+    background: C.card, borderRadius: 18, border: `1px solid ${C.borde}`,
+  },
+  vacioEmoji: { fontSize: 46, marginBottom: 12 },
+  vacioTit: { fontSize: 16.5, fontWeight: 700, color: C.texto, marginBottom: 5 },
+  vacioTxt: { fontSize: 14, color: C.textoTenue, lineHeight: 1.5 },
+  vacioBtn: {
+    marginTop: 16,
+    display: 'inline-flex', alignItems: 'center', gap: 6,
+    background: C.verde, color: '#fff',
+    padding: '11px 18px', borderRadius: 999,
+    fontSize: 13.5, fontWeight: 700,
+    border: 'none', cursor: 'pointer', fontFamily: 'inherit',
+  },
+
+  /* ══════ CARD GRANDE (premium) ══════ */
+  cardGrande: {
+    position: 'relative',
+    background: C.card,
+    borderRadius: 18,
+    border: `1px solid ${C.borde}`,
+    overflow: 'hidden',
+    marginBottom: 14,
+    cursor: 'pointer',
+    boxShadow: '0 6px 20px rgba(217,119,6,0.08), 0 2px 6px rgba(0,0,0,0.04)',
+  },
+
+  /* Tira dorada superior — identidad premium inmediata */
+  premiumStrip: {
+    height: 3,
+    width: '100%',
+    background: `linear-gradient(90deg, ${C.dorado}, ${C.doradoSuave}, ${C.dorado})`,
+    flexShrink: 0,
+  },
+
+  coverBox: {
+    position: 'relative',
+    width: '100%',
+    height: 170,
+    background: C.fondo,
+    overflow: 'hidden',
+  },
+  coverImg: { width: '100%', height: '100%', objectFit: 'cover' },
+
+  /* ── SLIDER de imágenes en el feed (CardGrande) ── */
+  feedSlider: {
+    display: 'flex',
+    width: '100%',
+    height: '100%',
+    overflowX: 'auto',
+    scrollSnapType: 'x mandatory',
+    scrollbarWidth: 'none',
+    WebkitOverflowScrolling: 'touch',
+    cursor: 'grab',
+  },
+  feedSliderSlide: {
+    flex: '0 0 100%',
+    width: '100%',
+    height: '100%',
+    scrollSnapAlign: 'start',
+    overflow: 'hidden',
+  },
+  feedSliderCount: {
+    position: 'absolute',
+    top: 8, right: 8,
+    background: 'rgba(0,0,0,0.55)',
+    color: '#fff',
+    fontSize: 11, fontWeight: 700,
+    padding: '3px 9px', borderRadius: 999,
+    display: 'flex', alignItems: 'center', gap: 3,
+    backdropFilter: 'blur(4px)',
+  },
+  coverEmpty: {
+    width: '100%', height: '100%',
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+  },
+  /* Gradiente inferior más fuerte → anclaje + legibilidad del logo */
+  coverGradient: {
+    position: 'absolute', left: 0, right: 0, bottom: 0, height: 60,
+    background: 'linear-gradient(to top, rgba(0,0,0,0.45), transparent)',
+    pointerEvents: 'none',
+  },
+
+  /* RIBBON "Destacado" — feed (más grande, gradiente dorado) */
+  ribbonDestacado: {
+    position: 'absolute',
+    top: 0, left: 0,
+    background: `linear-gradient(135deg, ${C.dorado}, ${C.doradoSuave})`,
+    color: '#fff',
+    padding: '7px 22px 7px 13px',
+    fontSize: 11, fontWeight: 800,
+    letterSpacing: '0.4px',
+    display: 'flex', alignItems: 'center', gap: 4,
+    boxShadow: '0 3px 10px rgba(217,119,6,0.4)',
+    clipPath: 'polygon(0 0, 100% 0, calc(100% - 10px) 50%, 100% 100%, 0 100%)',
+    zIndex: 2,
+  },
+
+  /* Badge de distancia flotante (top-right del cover) */
+  coverDistBadge: {
+    position: 'absolute',
+    top: 10, right: 10,
+    display: 'inline-flex', alignItems: 'center', gap: 4,
+    background: 'rgba(0,0,0,0.55)',
+    backdropFilter: 'blur(6px)',
+    WebkitBackdropFilter: 'blur(6px)',
+    color: '#fff',
+    padding: '4px 9px', borderRadius: 999,
+    fontSize: 10.5, fontWeight: 700,
+    zIndex: 2,
+  },
+
+  /* LOGO superpuesto (bottom-right del cover, DENTRO del cover para que no se corte) */
+  coverLogoBadge: {
+    position: 'absolute',
+    bottom: 12, right: 12,
+    width: 48, height: 48, borderRadius: 12,
+    background: C.card, padding: 2,
+    boxShadow: '0 4px 12px rgba(0,0,0,0.25)',
+    overflow: 'hidden',
+    border: `2px solid ${C.card}`,
+    zIndex: 3,
+  },
+  coverLogoBadgeImg: { width: '100%', height: '100%', borderRadius: 10, objectFit: 'cover' },
+  coverLogoBadgeFallback: {
+    width: '100%', height: '100%', borderRadius: 10,
+    background: `linear-gradient(135deg, ${C.verde}, ${C.verdeOsc})`,
+    color: '#fff', fontSize: 16, fontWeight: 800,
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+  },
+
+  cardGrandeBody: { padding: '14px 16px 14px' },
+  nombreGrande: {
+    fontSize: 17.5, fontWeight: 800, color: C.texto,
+    lineHeight: 1.25, marginBottom: 4,
+  },
+
+  horarioRowFeed: { marginBottom: 8 },
+  horarioRowFeedSm: { marginBottom: 4 },
+
+  descGrande: {
+    fontSize: 13, color: C.textoSuave, lineHeight: 1.45,
+    marginBottom: 9,
+    display: '-webkit-box', WebkitLineClamp: 2,
+    WebkitBoxOrient: 'vertical', overflow: 'hidden',
+  },
+
+  beneficioPill: {
+    display: 'inline-flex', alignItems: 'center', gap: 6,
+    background: `linear-gradient(135deg, ${C.verde}, ${C.verdeOsc})`,
+    color: '#fff',
+    border: 'none',
+    padding: '6px 12px', borderRadius: 9,
+    fontSize: 12.5, fontWeight: 800,
+    marginBottom: 9,
+    boxShadow: '0 2px 8px rgba(22,163,74,0.25)',
+  },
+
+  ubicacionRow: {
+    display: 'flex', alignItems: 'center', gap: 5,
+    marginBottom: 10, flexWrap: 'wrap',
+  },
+  ubicacionTxt: {
+    fontSize: 12, color: C.textoTenue, fontWeight: 500,
+    display: 'inline-flex', alignItems: 'center', gap: 3,
+  },
+  distTxt: { fontSize: 12, color: C.verde, fontWeight: 700 },
+
+  rubrosRowFinal: {
+    display: 'flex', flexWrap: 'wrap', gap: 5,
+    paddingTop: 8,
+    borderTop: `1px solid ${C.borde}`,
+  },
+  rubroChipFinal: {
+    fontSize: 10.5, fontWeight: 700,
+    padding: '3px 7px', borderRadius: 6,
+    display: 'inline-flex', alignItems: 'center', gap: 3,
+  },
+  rubroChip: {
+    fontSize: 11, fontWeight: 700,
+    padding: '3px 8px', borderRadius: 7,
+    display: 'inline-flex', alignItems: 'center', gap: 3,
+  },
+
+  /* ══════ CARD COMPACTA (no premium) ══════ */
+  cardCompacta: {
+    display: 'flex', flexDirection: 'column',
+    background: C.card, borderRadius: 14, padding: 10,
+    border: `1px solid ${C.borde}`,
+    marginBottom: 8, cursor: 'pointer',
+    transition: 'border-color .15s ease, box-shadow .15s ease',
+  },
+  cardCompactaExpanded: {
+    border: `1.5px solid ${C.verde}`,
+    boxShadow: '0 3px 12px rgba(22,163,74,0.12)',
+  },
+  cardCompactaTopRow: {
+    display: 'flex', alignItems: 'center', gap: 12,
+  },
+  logoCuadrado: {
+    width: 54, height: 54, borderRadius: 12, flexShrink: 0,
+    overflow: 'hidden', background: C.fondo,
+  },
+  logoCuadradoImg: { width: '100%', height: '100%', objectFit: 'cover' },
+  logoCuadradoFallback: {
+    width: '100%', height: '100%',
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+  },
+  cardCompactaBody: { flex: 1, minWidth: 0 },
+  nombreCompacto: {
+    fontSize: 14, fontWeight: 700, color: C.texto,
+    marginBottom: 3,
+    whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+  },
+  beneficioSm: {
+    display: 'inline-flex', alignItems: 'center', gap: 4,
+    color: C.verde, fontSize: 11, fontWeight: 600,
+    marginBottom: 4,
+  },
+  ubicacionRowSm: { marginBottom: 5 },
+  ubicacionTxtSm: {
+    fontSize: 11, color: C.textoTenue, fontWeight: 500,
+    display: 'inline-flex', alignItems: 'center', gap: 3,
+    whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+    maxWidth: '100%',
+  },
+  distTxtSm: { color: C.verde, fontWeight: 700 },
+  rubrosRowSmFinal: {
+    display: 'flex', flexWrap: 'wrap', gap: 4,
+  },
+  rubroChipSm: {
+    fontSize: 10, fontWeight: 700,
+    padding: '2px 6px', borderRadius: 5,
+  },
+  cardCompactaRight: {
+    flexShrink: 0, display: 'flex', alignItems: 'center',
+  },
+  cardCompactaChev: {
+    display: 'inline-flex', transition: 'transform .2s ease',
+  },
+
+  /* ── Sección expandible inline (acordeón, sin modal) ── */
+  cardCompactaExpand: {
+    marginTop: 10,
+    paddingTop: 10,
+    borderTop: `1px dashed ${C.borde}`,
+    display: 'flex', flexDirection: 'column', gap: 8,
+  },
+  expandInfoRow: {
+    display: 'flex', alignItems: 'center', gap: 8,
+  },
+  expandInfoIcon: {
+    width: 26, height: 26, borderRadius: 7,
+    background: C.verdeSuave,
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    flexShrink: 0,
+  },
+  expandInfoLink: {
+    fontSize: 13, color: C.texto, fontWeight: 600,
+    textDecoration: 'none',
+  },
+  expandInfoText: {
+    fontSize: 13, color: C.texto, fontWeight: 500,
+    lineHeight: 1.4,
+  },
+  expandWaBtn: {
+    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+    background: C.whatsapp, color: '#fff',
+    padding: '11px 14px', borderRadius: 11,
+    fontSize: 13.5, fontWeight: 700,
+    textDecoration: 'none',
+    marginTop: 2,
+  },
+
+  /* ════════════════════════════════════════════════
+     MODAL DE DETALLE — PREMIUM
+     ════════════════════════════════════════════════ */
+  detalleBackdrop: {
+    position: 'absolute',
+    top: 0, left: 0, right: 0, bottom: 0,
+    background: 'rgba(17,24,39,0.6)',
+    zIndex: 600,
+    display: 'flex', alignItems: 'flex-end',
+  },
+  /* Sheet 100% → sin gap gris arriba, fullscreen limpio */
+  detalleSheet: {
+    width: '100%',
+    height: '100%',
+    background: C.fondo,
+    borderTopLeftRadius: 0, borderTopRightRadius: 0,
+    display: 'flex', flexDirection: 'column',
+    fontFamily: T.font,
+    overflow: 'hidden',
+    boxShadow: '0 -8px 30px rgba(0,0,0,0.25)',
+  },
+
+  /* ── Cover wrap (contiene cover + header flotante) ── */
+  detalleCoverWrap: {
+    position: 'relative',
+    flexShrink: 0,
+  },
+  detalleCoverBox: {
+    position: 'relative',
+    width: '100%',
+    height: 200,
+    background: C.fondo,
+    overflow: 'hidden',
+    borderTopLeftRadius: 0, borderTopRightRadius: 0,
+  },
+  detalleCoverImg: { width: '100%', height: '100%', objectFit: 'cover' },
+  detalleCoverEmpty: {
+    width: '100%', height: '100%',
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+  },
+  /* Gradiente inferior del cover → da profundidad + anclaje visual */
+  detalleCoverGradient: {
+    position: 'absolute', left: 0, right: 0, bottom: 0, height: 70,
+    background: 'linear-gradient(to top, rgba(0,0,0,0.42), transparent)',
+    pointerEvents: 'none',
+  },
+  /* Cover sólido (no premium): cabecera minimal — solo color de categoría, sin emoji gigante */
+  detalleCoverSolid: {
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    position: 'relative',
+    height: 100,
+  },
+  detalleCoverSolidGrad: {
+    position: 'absolute', left: 0, right: 0, bottom: 0, height: 40,
+    background: 'linear-gradient(to top, rgba(0,0,0,0.18), transparent)',
+    pointerEvents: 'none',
+  },
+
+  /* Ribbon destacado — modal (bottom-left pegado al borde, no choca con botón cerrar top-left) */
+  ribbonDestacadoModal: {
+    position: 'absolute',
+    bottom: 12, left: 0,
+    background: `linear-gradient(135deg, ${C.dorado}, ${C.doradoSuave})`,
+    color: '#fff',
+    padding: '7px 22px 7px 13px',
+    fontSize: 11, fontWeight: 800,
+    letterSpacing: '0.4px',
+    display: 'flex', alignItems: 'center', gap: 5,
+    boxShadow: '0 3px 10px rgba(217,119,6,0.45)',
+    clipPath: 'polygon(0 0, 100% 0, calc(100% - 11px) 50%, 100% 100%, 0 100%)',
+    zIndex: 4,
+  },
+
+  /* Header flotante (X + Editar) sobre el cover */
+  detalleHeaderFloat: {
+    position: 'absolute',
+    top: 14, left: 14, right: 14,
+    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+    zIndex: 5,
+  },
+  detalleClose: {
+    width: 38, height: 38, borderRadius: '50%',
+    background: 'rgba(0,0,0,0.45)',
+    backdropFilter: 'blur(8px)',
+    WebkitBackdropFilter: 'blur(8px)',
+    border: '1px solid rgba(255,255,255,0.18)',
+    color: '#fff',
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    cursor: 'pointer', padding: 0,
+  },
+  detalleEditFloat: {
+    display: 'inline-flex', alignItems: 'center', gap: 5,
+    background: 'rgba(0,0,0,0.45)',
+    backdropFilter: 'blur(8px)',
+    WebkitBackdropFilter: 'blur(8px)',
+    color: '#fff',
+    border: '1px solid rgba(255,255,255,0.18)',
+    padding: '8px 14px', borderRadius: 999,
+    fontSize: 12.5, fontWeight: 700,
+    cursor: 'pointer', fontFamily: 'inherit',
+  },
+
+  /* LOGO grande + sello verificado (premium) — contenedor wrapper */
+  detalleLogoWrap: {
+    position: 'relative',
+    zIndex: 6,
+    width: 84,
+    marginLeft: 'auto',
+    marginRight: 'auto',
+  },
+  detalleLogoBox: {
+    width: 84, height: 84, borderRadius: 20,
+    background: C.card, padding: 4,
+    boxShadow: '0 6px 20px rgba(0,0,0,0.18), 0 2px 6px rgba(0,0,0,0.08)',
+    overflow: 'hidden',
+    border: `3px solid ${C.card}`,
+  },
+  detalleLogoImg: { width: '100%', height: '100%', borderRadius: 16, objectFit: 'cover' },
+  detalleLogoFallback: {
+    width: '100%', height: '100%', borderRadius: 16,
+    background: `linear-gradient(135deg, ${C.verde}, ${C.verdeOsc})`,
+    color: '#fff',
+    fontSize: 26, fontWeight: 800,
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+  },
+  /* Sello verificado (check verde, premium only) — sobresale del logo bottom-right */
+  logoVerifiedBadge: {
+    position: 'absolute',
+    bottom: -4, right: -4,
+    zIndex: 7,
+    filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.25))',
+  },
+
+  /* SCROLL content */
+  detalleScroll: {
+    flex: 1, minHeight: 0, overflowY: 'auto',
+    WebkitOverflowScrolling: 'touch',
+  },
+
+  /* BODY del modal */
+  detalleBody: {
+    padding: '14px 18px 16px',
+  },
+
+  /* Nombre del comercio (centrado, sin status pill) */
+  detalleNombre: {
+    fontSize: 21, fontWeight: 800, color: C.texto,
+    lineHeight: 1.2, margin: 0, padding: 0,
+    textAlign: 'center',
+    letterSpacing: '-0.3px',
+  },
+  detalleHorarioRow: {
+    display: 'flex', justifyContent: 'center',
+    marginBottom: 12,
+  },
+  detalleDesc: {
+    fontSize: 14, color: C.textoSuave, lineHeight: 1.55,
+    margin: '0 0 14px',
+    textAlign: 'center',
+  },
+
+  /* ════════════════════════════════════════════════
+     BANNER BENEFICIO — PREMIUM REDESIGN
+     ════════════════════════════════════════════════ */
+  beneficioCard: {
+    position: 'relative',
+    overflow: 'hidden',
+    borderRadius: 16,
+    background: `linear-gradient(135deg, ${C.verde} 0%, ${C.verdeOsc} 100%)`,
+    padding: '14px 16px',
+    marginBottom: 14,
+    boxShadow: '0 4px 14px rgba(22,163,74,0.28)',
+  },
+  /* Patrón decorativo sutil (puntos) */
+  beneficioPattern: {
+    position: 'absolute',
+    top: 0, left: 0, right: 0, bottom: 0,
+    backgroundImage: 'radial-gradient(circle, rgba(255,255,255,0.08) 1px, transparent 1px)',
+    backgroundSize: '14px 14px',
+    pointerEvents: 'none',
+  },
+  beneficioInner: {
+    position: 'relative',
+    display: 'flex', alignItems: 'center', gap: 13,
+    zIndex: 2, /* encima del shimmer (zIndex 1) y el pattern */
+  },
+  /* Badge circular con icono */
+  beneficioBadge: {
+    width: 44, height: 44, borderRadius: '50%',
+    background: 'rgba(255,255,255,0.18)',
+    border: '1.5px solid rgba(255,255,255,0.35)',
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    flexShrink: 0,
+  },
+  beneficioContent: {
+    flex: 1, minWidth: 0,
+  },
+  beneficioLine: {
+    display: 'flex', alignItems: 'center', gap: 8,
+    flexWrap: 'wrap',
+  },
+  beneficioLabel: {
+    fontSize: 11, fontWeight: 800, color: 'rgba(255,255,255,0.92)',
+    textTransform: 'uppercase', letterSpacing: '0.4px',
+  },
+  beneficioSep: {
+    fontSize: 13, fontWeight: 400, color: 'rgba(255,255,255,0.45)',
+    lineHeight: 1,
+  },
+  beneficioText: {
+    fontSize: 14.5, fontWeight: 800, color: '#fff',
+    lineHeight: 1.3,
+    letterSpacing: '-0.1px',
+  },
+  /* Variante con shine animado (text-shadow pulsante tenue) */
+  beneficioTextShine: {
+    fontSize: 14.5, fontWeight: 800, color: '#fff',
+    lineHeight: 1.3,
+    letterSpacing: '-0.1px',
+    animation: 'benShineText 3.6s ease-in-out infinite',
+  },
+  /* Overlay shimmer — franja diagonal de luz que atraviesa el banner.
+     Tenue: max opacity 0.55, blanco semi-transparente, skew -18deg.
+     Duración 3.8s para que se note pero no sea molesto. */
+  beneficioShimmer: {
+    position: 'absolute',
+    top: 0, bottom: 0,
+    left: 0,
+    width: '45%',
+    background: 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.55) 50%, transparent 100%)',
+    pointerEvents: 'none',
+    animation: 'benShimmer 3.8s ease-in-out infinite',
+    zIndex: 1,
+  },
+  /* Deco esquina superior derecha */
+  beneficioDeco: {
+    position: 'absolute',
+    top: -20, right: -20,
+    width: 70, height: 70, borderRadius: '50%',
+    background: 'rgba(255,255,255,0.07)',
+    pointerEvents: 'none',
+  },
+
+  /* ── Quick info chips (dirección + teléfono) ── */
+  detalleQuickInfo: {
+    display: 'flex', flexDirection: 'column', gap: 7,
+    marginBottom: 14,
+  },
+  quickInfoChip: {
+    display: 'flex', alignItems: 'flex-start', gap: 8,
+    background: C.card,
+    border: `1px solid ${C.borde}`,
+    padding: '10px 12px', borderRadius: 11,
+    fontSize: 12.5, color: C.texto, fontWeight: 500,
+  },
+  quickInfoAddrCol: {
+    display: 'flex', flexDirection: 'column', gap: 2,
+    flex: 1, minWidth: 0,
+  },
+  quickInfoAddr: {
+    fontSize: 12.5, color: C.texto, fontWeight: 500,
+    lineHeight: 1.35,
+  },
+  quickInfoDist: {
+    fontSize: 11, color: C.verde, fontWeight: 700,
+    letterSpacing: '0.1px',
+  },
+
+  /* DROPDOWN BARS */
+  dropdownBar: {
+    width: '100%',
+    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+    padding: '14px 4px',
+    background: 'transparent',
+    border: 'none',
+    borderTop: `1px solid ${C.borde}`,
+    fontSize: 14, fontWeight: 700, color: C.texto,
+    cursor: 'pointer', fontFamily: 'inherit',
+    textAlign: 'left',
+  },
+  dropdownBarLeft: {
+    display: 'flex', alignItems: 'center', gap: 10,
+    textTransform: 'capitalize',
+  },
+  dropdownIconBox: {
+    width: 30, height: 30, borderRadius: 9,
+    background: C.verdeSuave,
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+  },
+  dropdownChev: {
+    display: 'flex', alignItems: 'center',
+    transition: 'transform .25s ease',
+  },
+  dropdownContent: {
+    padding: '4px 0 14px',
+    background: 'transparent',
+  },
+
+  detalleMapaBox: {
+    width: '100%', borderRadius: 14, overflow: 'hidden',
+    border: `1px solid ${C.borde}`,
+    background: C.card,
+  },
+  detalleSinMapa: {
+    fontSize: 13, color: C.textoTenue, fontStyle: 'italic',
+    padding: '8px 0',
+  },
+
+  /* Horario semanal */
+  horarioBox: {
+    background: C.card, borderRadius: 14, padding: 8,
+    border: `1px solid ${C.borde}`,
+    display: 'flex', flexDirection: 'column', gap: 2,
+  },
+  horarioDiaRow: {
+    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+    padding: '8px 10px', borderRadius: 8,
+  },
+  horarioDia: {
+    fontSize: 13, color: C.texto,
+    display: 'inline-flex', alignItems: 'center', gap: 6,
+    textTransform: 'capitalize',
+  },
+  hoyTag: {
+    fontSize: 9, fontWeight: 800, color: '#fff',
+    background: C.verde, padding: '1px 6px', borderRadius: 999,
+    textTransform: 'uppercase', letterSpacing: '0.3px',
+  },
+  horarioRango: {
+    fontSize: 13, fontWeight: 600, color: C.texto,
+    fontVariantNumeric: 'tabular-nums',
+  },
+  horarioCerrado: {
+    fontSize: 13, color: C.textoTenue, fontWeight: 500,
+  },
+
+  /* Categorías al final del modal */
+  detalleCategoriasFinal: {
+    marginTop: 14,
+    paddingTop: 14,
+    borderTop: `1px solid ${C.borde}`,
+  },
+  detalleSectionTit: {
+    fontSize: 11, fontWeight: 800, color: C.textoTenue,
+    textTransform: 'uppercase', letterSpacing: '0.5px',
+    marginBottom: 10,
+  },
+  detalleCatsRow: {
+    display: 'flex', flexWrap: 'wrap', gap: 6,
+  },
+  rubroChipModal: {
+    fontSize: 12, fontWeight: 700,
+    padding: '5px 10px', borderRadius: 8,
+    display: 'inline-flex', alignItems: 'center', gap: 4,
+  },
+
+  /* Footer WhatsApp — full-width sticky, sin margen desperdiciado */
+  detalleWaBtn: {
+    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 9,
+    background: C.whatsapp, color: '#fff',
+    padding: '16px 20px',
+    width: '100%',
+    fontSize: 15.5, fontWeight: 800,
+    textDecoration: 'none',
+    flexShrink: 0,
+    boxShadow: '0 -4px 14px rgba(37,211,102,0.25)',
+    border: 'none',
+    cursor: 'pointer',
+    fontFamily: 'inherit',
+  },
+  detalleWaPlaceholder: {
+    height: 12,
+    flexShrink: 0,
+  },
+
+  /* ══════ BOTONES CIRCULARES INFERIORES (WhatsApp + Llamar + Instagram) ══════
+     Botones circulares con solo icono, centrados, con gap.
+     Como en la referencia que mandó el usuario. */
+  ctaRow: {
+    display: 'flex',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 16,
+    padding: '16px 20px 20px',
+    flexShrink: 0,
+    background: C.card,
+    borderTop: `1px solid ${C.borde}`,
+  },
+  ctaBtn: {
+    width: 56,
+    height: 56,
+    borderRadius: '50%',
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+    textDecoration: 'none',
+    border: 'none',
+    cursor: 'pointer',
+    color: '#fff',
+    transition: 'transform .15s ease, filter .15s ease',
+    fontFamily: 'inherit',
+    boxShadow: '0 3px 10px rgba(0,0,0,0.15)',
+  },
+  ctaWhatsapp: {
+    background: C.whatsapp,
+  },
+  ctaCall: {
+    background: C.verde,
+  },
+  ctaInstagram: {
+    background: '#E1306C',
+  },
+
+  /* Botón "Cómo llegar" debajo del mapa */
+  comoLlegarBtn: {
+    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+    background: C.verde, color: '#fff',
+    padding: '12px 16px', borderRadius: 11,
+    fontSize: 13.5, fontWeight: 700,
+    textDecoration: 'none',
+    marginTop: 10,
+    boxShadow: '0 2px 8px rgba(22,163,74,0.25)',
+    transition: 'filter .15s ease',
+  },
+
+  /* ════════════════════════════════════════════════
+     GALERÍA — cuadrados con scroll horizontal (premium)
+     ════════════════════════════════════════════════ */
+  galeriaWrap: {
+    marginBottom: 14,
+    marginTop: 2,
+  },
+  galeriaScroll: {
+    display: 'flex',
+    gap: 8,
+    overflowX: 'auto',
+    paddingBottom: 4,
+    scrollSnapType: 'x mandatory',
+    WebkitOverflowScrolling: 'touch',
+    /* scrollbar sutil */
+    scrollbarWidth: 'thin',
+    msOverflowStyle: 'none',
+  },
+  galeriaItem: {
+    flexShrink: 0,
+    width: 96,
+    height: 96,
+    borderRadius: 12,
+    overflow: 'hidden',
+    padding: 0,
+    border: `1px solid ${C.borde}`,
+    background: C.fondo,
+    cursor: 'pointer',
+    scrollSnapAlign: 'start',
+    transition: 'transform .15s ease, box-shadow .15s ease',
+  },
+  galeriaImg: {
+    width: '100%', height: '100%',
+    objectFit: 'cover',
+    display: 'block',
+  },
+
+  /* ════════════════════════════════════════════════
+     LIGHTBOX — fullscreen al tocar una foto
+     ════════════════════════════════════════════════ */
+  lightboxBackdrop: {
+    position: 'fixed',
+    top: 0, left: 0, right: 0, bottom: 0,
+    background: 'rgba(0,0,0,0.92)',
+    zIndex: 9999,
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    padding: 20,
+  },
+  lightboxClose: {
+    position: 'absolute',
+    top: 20, right: 20,
+    width: 42, height: 42, borderRadius: '50%',
+    background: 'rgba(255,255,255,0.15)',
+    backdropFilter: 'blur(8px)',
+    WebkitBackdropFilter: 'blur(8px)',
+    border: '1px solid rgba(255,255,255,0.25)',
+    color: '#fff',
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    cursor: 'pointer', padding: 0,
+    zIndex: 2,
+  },
+  lightboxImg: {
+    maxWidth: '100%',
+    maxHeight: '85vh',
+    objectFit: 'contain',
+    borderRadius: 8,
+  },
+}
+
 export default Comercios
-
-/* ════════════════════════════════════════════════════════════════════
-   🗄️  SQL — CREAR LA TABLA commerce_reviews EN SUPABASE
-
-   Corre esto UNA VEZ en el SQL Editor de tu Supabase para activar
-   las Opiniones de Vecinos. Hasta que no lo corras, la sección
-   "Opiniones" del detalle mostrará "Sin opiniones todavía" y no
-   podrá guardar opiniones nuevas (mostrará un error claro).
-
-   ────────────────────────────────────────────────────────────────────
-   create table if not exists public.commerce_reviews (
-     id uuid primary key default gen_random_uuid(),
-     commerce_id uuid not null references public.commerces(id) on delete cascade,
-     author_id uuid not null references public.profiles(id) on delete cascade,
-     rating smallint not null check (rating between 1 and 5),
-     comment text,
-     created_at timestamptz not null default now(),
-     unique (commerce_id, author_id)   -- un vecino opina una sola vez por comercio
-   );
-
-   create index if not exists commerce_reviews_commerce_id_idx
-     on public.commerce_reviews(commerce_id);
-
-   -- RLS: cualquiera logueado puede leer; solo el autor puede borrar/editar lo suyo.
-   alter table public.commerce_reviews enable row level security;
-
-   create policy "cualquiera puede leer opiniones"
-     on public.commerce_reviews for select
-     using (true);
-
-   create policy "vecino puede opinar"
-     on public.commerce_reviews for insert
-     with check (author_id = auth.uid() OR exists (
-       select 1 from public.profiles p where p.id = author_id and p.user_id = auth.uid()
-     ));
-
-   create policy "autor puede borrar su opinion"
-     on public.commerce_reviews for delete
-     using (author_id = auth.uid());
-   ════════════════════════════════════════════════════════════════════ */

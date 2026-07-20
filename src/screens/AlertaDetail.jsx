@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import MiniMap from '../components/MiniMap'
-import { C, T, S, TIPOS, iniciales, hace, distancia } from '../lib/design'
+import { C, T, S, TIPOS, REPORTES, iniciales, hace, distancia } from '../lib/design'
 
 /*
   AlertaDetail — pantalla de Detalle de Alerta para El Barrio.
@@ -9,10 +9,10 @@ import { C, T, S, TIPOS, iniciales, hace, distancia } from '../lib/design'
   Se monta desde App.jsx en el case 'alerta' con:
     <AlertaDetail alertId={params.id} currentUser={user} onNavigate={onNavigate} />
 
-  Carga la alerta desde Supabase (tabla posts, type='alert') con join a profiles,
-  muestra hero color-coded segun tipo_alerta, descripcion, mapa (si tiene lat/lng),
-  badge de severidad, comentarios con realtime, boton marcar resuelta (solo dueno),
-  boton compartir y reportar contenido.
+  Carga la alerta desde Supabase (tabla incident_reports) con join a profiles
+  via reporter_id, muestra hero color-coded segun category, descripcion, mapa
+  (si tiene lat/lng), badge de severidad, comentarios con realtime, boton
+  marcar resuelta (solo dueno), boton compartir y reportar contenido.
 
   Convive con tablas que quizas no existen aun (comments) — si la query de
   comentarios falla, muestra "Sin comentarios todavia" sin romper la pantalla.
@@ -89,11 +89,18 @@ const FALLBACK_TIPO = { emoji: '🚨', label: 'Alerta', color: C.textoTenue, bg:
 
 function getTipoInfo(alert) {
   const t = alert?.tipo_alerta
-  if (!t) return FALLBACK_TIPO
-  if (TIPOS[t]) return TIPOS[t]
-  if (ALERT_SUBTYPES[t]) return ALERT_SUBTYPES[t]
-  // Clave desconocida → mostramos gris pero conservamos el label
-  return { ...FALLBACK_TIPO, label: t.replace(/_/g, ' ') }
+  if (t) {
+    if (TIPOS[t]) return TIPOS[t]
+    if (ALERT_SUBTYPES[t]) return ALERT_SUBTYPES[t]
+    // Clave desconocida → mostramos gris pero conservamos el label
+    return { ...FALLBACK_TIPO, label: t.replace(/_/g, ' ') }
+  }
+  // incident_reports usa `category` (seguridad, salud, infra, mascotas, ...).
+  // Si no hay tipo_alerta, probamos con REPORTES[category] y luego ALERT_SUBTYPES.
+  const cat = alert?.category
+  if (cat && REPORTES && REPORTES[cat]) return REPORTES[cat]
+  if (cat && ALERT_SUBTYPES[cat]) return ALERT_SUBTYPES[cat]
+  return FALLBACK_TIPO
 }
 
 const SEVERIDAD = {
@@ -163,12 +170,12 @@ function AlertaDetail({ alertId, currentUser, onNavigate }) {
     setLoading(true)
     setLoadError('')
     setNotFound(false)
+    console.log('[alerta detail] cargando incidente:', alertId)
     try {
       const { data, error } = await supabase
-        .from('posts')
-        .select('*, profiles!posts_user_id_fkey(*)')
+        .from('incident_reports')
+        .select('*, reporter:profiles!reporter_id (full_name, avatar_url, badge_founder, verified)')
         .eq('id', alertId)
-        .eq('type', 'alert')
         .single()
 
       if (error) {
@@ -194,14 +201,25 @@ function AlertaDetail({ alertId, currentUser, onNavigate }) {
     setCommentsLoading(true)
     setCommentsError(false)
     try {
-      const { data, error } = await supabase
+      // El esquema nominal de `comments` usa post_id + author_id + content.
+      // Si por algun motivo la columna post_id no existe (algun deploy usa
+      // incident_id), reintentamos con esa columna. Si ambos fallan, mostramos
+      // "Sin comentarios todavia" sin romper la pantalla.
+      const sel = '*, profiles!comments_author_id_fkey(full_name, avatar_url)'
+      let r = await supabase
         .from('comments')
-        .select('*, profiles!comments_user_id_fkey(*)')
+        .select(sel)
         .eq('post_id', alertId)
         .order('created_at', { ascending: true })
-
-      if (error) throw error
-      setComments(data || [])
+      if (r.error) {
+        r = await supabase
+          .from('comments')
+          .select(sel)
+          .eq('incident_id', alertId)
+          .order('created_at', { ascending: true })
+      }
+      if (r.error) throw r.error
+      setComments(r.data || [])
     } catch (err) {
       // Si la tabla comments no existe o RLS bloquea → mostramos estado vacio
       // amable en vez de romper la pantalla.
@@ -244,8 +262,8 @@ function AlertaDetail({ alertId, currentUser, onNavigate }) {
           try {
             const { data: prof } = await supabase
               .from('profiles')
-              .select('*')
-              .eq('id', nuevo.user_id)
+              .select('full_name, avatar_url, verified')
+              .eq('id', nuevo.author_id)
               .maybeSingle()
             if (prof) {
               setComments((prev) =>
@@ -283,8 +301,8 @@ function AlertaDetail({ alertId, currentUser, onNavigate }) {
     const optimisticComment = {
       id: tempId,
       post_id: alertId,
-      user_id: currentUser.id,
-      body: textoLocal,
+      author_id: currentUser.id,
+      content: textoLocal,
       created_at: new Date().toISOString(),
       profiles: null, // se hidrata despues
       _optimistic: true,
@@ -292,16 +310,19 @@ function AlertaDetail({ alertId, currentUser, onNavigate }) {
     setComments((prev) => [...prev, optimisticComment])
 
     try {
-      const { data, error } = await supabase
-        .from('comments')
-        .insert({
-          post_id: alertId,
-          user_id: currentUser.id,
-          body: textoLocal,
-        })
-        .select('*, profiles!comments_user_id_fkey(*)')
-        .single()
-
+      // El esquema nominal usa post_id + author_id + content. Si post_id no
+      // existe en el deploy del user, reintentamos con incident_id.
+      const sel = '*, profiles!comments_author_id_fkey(full_name, avatar_url)'
+      const build = (col) => ({
+        [col]: alertId,
+        author_id: currentUser.id,
+        content: textoLocal,
+      })
+      let r = await supabase.from('comments').insert(build('post_id')).select(sel).single()
+      if (r.error) {
+        r = await supabase.from('comments').insert(build('incident_id')).select(sel).single()
+      }
+      const { data, error } = r
       if (error) throw error
 
       // Reemplazar el optimistic por el real (mismo id viene de la DB).
@@ -317,7 +338,7 @@ function AlertaDetail({ alertId, currentUser, onNavigate }) {
         try {
           const { data: prof } = await supabase
             .from('profiles')
-            .select('*')
+            .select('full_name, avatar_url, verified')
             .eq('id', currentUser.id)
             .maybeSingle()
           if (prof) {
@@ -339,15 +360,19 @@ function AlertaDetail({ alertId, currentUser, onNavigate }) {
 
   /* ─────────── MARCAR COMO RESUELTA ─────────── */
   const marcarResuelta = async () => {
-    if (!alert || alert.user_id !== currentUser?.id || resolving) return
+    if (!alert || alert.reporter_id !== currentUser?.id || resolving) return
     setResolving(true)
     try {
       const { error } = await supabase
-        .from('posts')
-        .update({ status: 'resolved' })
+        .from('incident_reports')
+        .update({
+          status: 'resuelto',
+          resolved_at: new Date().toISOString(),
+          resolved_by: currentUser?.id,
+        })
         .eq('id', alert.id)
       if (error) throw error
-      setAlert({ ...alert, status: 'resolved' })
+      setAlert({ ...alert, status: 'resuelto' })
       showToast('Alerta marcada como resuelta')
     } catch (err) {
       showToast('No se pudo actualizar la alerta')
@@ -360,8 +385,8 @@ function AlertaDetail({ alertId, currentUser, onNavigate }) {
   const compartir = async () => {
     const url = typeof window !== 'undefined' ? window.location.href : ''
     const shareData = {
-      title: alert?.title || 'Alerta en el barrio',
-      text: alert?.content || 'Mirá esta alerta del barrio',
+      title: alert?.title || alert?.category || 'Alerta en el barrio',
+      text: alert?.description || 'Mirá esta alerta del barrio',
       url,
     }
     if (typeof navigator !== 'undefined' && navigator.share) {
@@ -421,13 +446,13 @@ function AlertaDetail({ alertId, currentUser, onNavigate }) {
 
   /* ─────────── DATOS DERIVADOS ─────────── */
   const tipo = getTipoInfo(alert)
-  const autor = alert.profiles || {}
-  const esAutor = alert.user_id === currentUser?.id
-  const estaResuelta = alert.status === 'resolved'
+  const autor = alert.reporter || alert.profiles || {}
+  const esAutor = alert.reporter_id === currentUser?.id
+  const estaResuelta = alert.status === 'resuelto'
   const severidad = alert.severity ? SEVERIDAD[alert.severity] : null
   const tieneMapa = alert.lat != null && alert.lng != null &&
     !Number.isNaN(Number(alert.lat)) && !Number.isNaN(Number(alert.lng))
-  const titulo = alert.title || tipo.label || 'Alerta'
+  const titulo = alert.title || alert.category || tipo.label || 'Alerta'
 
   return (
     <div style={s.wrap}>
@@ -505,11 +530,11 @@ function AlertaDetail({ alertId, currentUser, onNavigate }) {
           </div>
 
           {/* ── DESCRIPCION ── */}
-          {alert.content && (
+          {alert.description && (
             <div style={s.section}>
               <div style={s.sectionTit}>Qué está pasando</div>
               <div style={s.descBox}>
-                <div style={s.descTxt}>{alert.content}</div>
+                <div style={s.descTxt}>{alert.description}</div>
               </div>
             </div>
           )}
@@ -690,7 +715,7 @@ function CommentItem({ comment }) {
           <span style={s.commentTime}>{hace(comment.created_at)}</span>
         </div>
         <div style={{ ...s.commentText, opacity: esOptimistic ? 0.6 : 1 }}>
-          {comment.body}
+          {comment.content}
         </div>
       </div>
     </div>

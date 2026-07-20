@@ -34,8 +34,12 @@ import AlertaDetail from './screens/AlertaDetail'
 import SellerProfile from './screens/SellerProfile'
 import Noticias from './screens/Noticias'
 
-/* ── Search ── */
-import Search from './screens/Search'
+/* ── ADMIN PANEL: pantallas de administracion ── */
+import Admin from './screens/Admin'
+import AdminFarmacias from './screens/AdminFarmacias'
+import AdminComercios from './screens/AdminComercios'
+import AdminUsuarios from './screens/AdminUsuarios'
+import AdminIncidentes from './screens/AdminIncidentes'
 
 function Placeholder({ titulo, onBack, mensaje }) {
   return (
@@ -188,7 +192,7 @@ export default function App() {
       return
     }
 
-    const subScreens = ['post', 'productdetail', 'chatconversation', 'dealdone', 'alerta', 'notificaciones', 'sellerprofile', 'noticias', 'search']
+    const subScreens = ['post', 'productdetail', 'chatconversation', 'dealdone', 'alerta', 'notificaciones', 'sellerprofile', 'noticias', 'admin', 'adminfarmacias', 'admincomercios', 'adminusuarios', 'adminincidentes']
     if (subScreens.includes(lower)) {
       historyRef.current.push({ screen: currentScreen, params })
     }
@@ -215,8 +219,16 @@ export default function App() {
       setCurrentScreen('sellerProfile')
     } else if (lower === 'noticias') {
       setCurrentScreen('noticiasScreen')
-    } else if (lower === 'search') {
-      setCurrentScreen('searchScreen')
+    } else if (lower === 'admin') {
+      setCurrentScreen('admin')
+    } else if (lower === 'adminfarmacias') {
+      setCurrentScreen('adminFarmacias')
+    } else if (lower === 'admincomercios') {
+      setCurrentScreen('adminComercios')
+    } else if (lower === 'adminusuarios') {
+      setCurrentScreen('adminUsuarios')
+    } else if (lower === 'adminincidentes') {
+      setCurrentScreen('adminIncidentes')
     } else if (lower === 'chat' || lower === 'chatlist') {
       setActiveTab('chat')
       setCurrentScreen('main')
@@ -267,7 +279,7 @@ export default function App() {
 
   /* ── SCREEN RENDER ── */
   const flowScreens = ['splash', 'onboarding', 'register', 'profile', 'verification', 'complete']
-  const modalScreens = ['productDetail', 'chatConversation', 'dealDone', 'alertaDetail', 'notificaciones', 'sellerProfile', 'noticiasScreen', 'searchScreen']
+  const modalScreens = ['productDetail', 'chatConversation', 'dealDone', 'alertaDetail', 'notificaciones', 'sellerProfile', 'noticiasScreen', 'admin', 'adminFarmacias', 'adminComercios', 'adminUsuarios', 'adminIncidentes']
   const isModalScreen = modalScreens.includes(currentScreen)
   const isMainApp = !flowScreens.includes(currentScreen) && !isModalScreen
 
@@ -375,9 +387,21 @@ export default function App() {
       return <Noticias currentUser={user} onNavigate={onNavigate} />
     }
 
-    /* ── Search ── */
-    if (currentScreen === 'searchScreen') {
-      return <Search currentUser={user} onNavigate={onNavigate} />
+    /* ── ADMIN PANEL: pantallas de administracion ── */
+    if (currentScreen === 'admin') {
+      return <Admin currentUser={user} profile={profile} onNavigate={onNavigate} onLogout={handleLogout} />
+    }
+    if (currentScreen === 'adminFarmacias') {
+      return <AdminFarmacias currentUser={user} profile={profile} onNavigate={onNavigate} />
+    }
+    if (currentScreen === 'adminComercios') {
+      return <AdminComercios currentUser={user} profile={profile} onNavigate={onNavigate} />
+    }
+    if (currentScreen === 'adminUsuarios') {
+      return <AdminUsuarios currentUser={user} profile={profile} onNavigate={onNavigate} />
+    }
+    if (currentScreen === 'adminIncidentes') {
+      return <AdminIncidentes currentUser={user} profile={profile} onNavigate={onNavigate} />
     }
 
     /* ── No hay user → Register ── */
@@ -393,8 +417,8 @@ export default function App() {
     if (activeTab === 'chat') return <ChatList currentUser={user} onNavigate={onNavigate} />
     if (activeTab === 'comercios') return <Comercios currentUser={user} onNavigate={onNavigate} onCrear={onCrear} />
     if (activeTab === 'alertas') return <Alertas currentUser={user} onNavigate={onNavigate} onCrear={onCrear} />
-    if (activeTab === 'perfil') return <MyProfile currentUser={user} onLogout={handleLogout} />
-
+    if (activeTab === 'perfil') return <MyProfile currentUser={user} onNavigate={onNavigate} onLogout={handleLogout} />
+    
     return <Home currentUser={user} onNavigate={onNavigate} onCrear={onCrear} />
   }
 
@@ -445,7 +469,7 @@ export default function App() {
 /* ── ESTILOS ── */
 const s = {
   contentPad: { paddingTop: 30, paddingBottom: 0 },
-  /* modalScreens (chat, noticias, sellerprofile, productDetail, alertaDetail, search)
+  /* modalScreens (chat, noticias, sellerprofile, productDetail, alertaDetail)
      controlan su propio safe-area-top dentro de su header. Acá NO agregamos
      padding superior, para que la pantalla llegue hasta el borde superior del
      teléfono (fix bug: "chat no llega hasta el top del teléfono"). */

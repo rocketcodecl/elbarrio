@@ -509,6 +509,23 @@ export default function MyProfile({ currentUser, onNavigate, onBack, onLogout })
           </div>
         )}
 
+        {/* PANEL DE ADMINISTRACIÓN — solo visible si profile.role === 'admin'.
+            Boton verde destacado que lleva al panel admin (farmacias, comercios, etc). */}
+        {profile?.role === 'admin' && (
+          <div style={s.adminWrap}>
+            <button
+              type="button"
+              onClick={() => onNavigate && onNavigate('admin')}
+              style={s.adminBtn}
+              aria-label="Panel de administración"
+            >
+              <span style={{ fontSize: 16, lineHeight: 1 }}>🛠️</span>
+              <span>Panel de administración</span>
+              <span style={{ fontSize: 16, lineHeight: 1, marginLeft: 'auto' }}>→</span>
+            </button>
+          </div>
+        )}
+
         {/* CERRAR SESIÓN — botón peligro al final del scroll.
             onLogout viene de App.jsx (handleLogout). Estilo rojo
             suave para no romper la jerarquía visual del perfil. */}
@@ -1174,6 +1191,29 @@ const s = {
     justifyContent: 'center',
     gap: 8,
     boxShadow: '0 1px 2px rgba(0,0,0,0.03)',
+    transition: 'transform 0.12s ease, background 0.15s ease',
+  },
+
+  // PANEL DE ADMINISTRACIÓN — boton verde destacado para admins.
+  // Mismo patron que logoutBtn pero con colores de marca (verde).
+  adminWrap: {
+    padding: '4px 16px 12px',
+  },
+  adminBtn: {
+    width: '100%',
+    background: C.verdeBg,
+    color: C.verdeOsc,
+    border: `1px solid ${C.verdeSuave}`,
+    borderRadius: 14,
+    padding: '14px 16px',
+    fontSize: 14,
+    fontWeight: 700,
+    fontFamily: 'inherit',
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    gap: 10,
+    boxShadow: '0 2px 8px rgba(22,163,74,0.12), inset 0 1px 0 rgba(255,255,255,0.6)',
     transition: 'transform 0.12s ease, background 0.15s ease',
   },
 
