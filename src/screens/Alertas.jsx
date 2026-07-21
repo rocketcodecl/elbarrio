@@ -11,7 +11,7 @@ import {
   Estructura:
     1. Header con back + título "Alertas"
     2. CTA grande "Reportar una alerta" (invoca onCrear('alert'))
-    3. Filtros por categoría (Todas, Seguridad, Salud, Infra, Mascotas, Otro)
+    3. Filtros por categoría (Todas, Seguridad, Infra, Mascotas, Otro)
     4. Lista vertical de alertas activas (cards full-width, color-coded)
     5. Empty state con CTA
 
@@ -77,7 +77,6 @@ const IcoUbicacion = ({ size = 12 }) => (
 const CATS = [
   { key: 'todas',     label: 'Todas',     emoji: '📋' },
   { key: 'seguridad', label: 'Seguridad', emoji: REPORTES.seguridad?.emoji || '🔒' },
-  { key: 'salud',     label: 'Salud',     emoji: REPORTES.salud?.emoji || '💊' },
   { key: 'infra',     label: 'Infra',     emoji: REPORTES.infra?.emoji || '🚧' },
   { key: 'mascotas',  label: 'Mascotas',  emoji: REPORTES.mascotas?.emoji || '🐾' },
   { key: 'otro',      label: 'Otro',      emoji: REPORTES.otro?.emoji || '📌' },

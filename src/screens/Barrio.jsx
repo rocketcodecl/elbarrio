@@ -312,7 +312,6 @@ Icon.Trash = ({ size = 15, color = 'currentColor' }) => (
 
 const REPORT_CATS = [
   { key: 'seguridad', label: 'Seguridad',       color: '#dc2626', bg: '#fee2e2', Icon: Icon.ShieldAlert, desc: 'Robos, peleas, sospechosos' },
-  { key: 'salud',     label: 'Salud',           color: '#059669', bg: '#d1fae5', Icon: Icon.HeartPulse,  desc: 'Emergencia, riesgo sanitario' },
   { key: 'infra',     label: 'Infraestructura', color: '#d97706', bg: '#fef3c7', Icon: Icon.Hammer,      desc: 'Baches, luminarias, basura' },
   { key: 'mascotas',  label: 'Mascotas',        color: '#ec4899', bg: '#fce7f3', Icon: Icon.PawPrint,    desc: 'Animal perdido o maltrato' }
 ]
@@ -367,6 +366,9 @@ function Barrio({ currentUser, onNavigate }) {
   const [showReportModal, setShowReportModal] = useState(false)
   const [reportCat, setReportCat] = useState(null)
   const [reportText, setReportText] = useState('')
+  // Título del incidente — obligatorio. Se muestra en el feed (card compacta)
+  // y en el detalle arriba de la descripción ("¿Qué pasó?").
+  const [reportTitle, setReportTitle] = useState('')
   const [reportAnon, setReportAnon] = useState(false)
   const [reportError, setReportError] = useState('')
   const [reportSending, setReportSending] = useState(false)
@@ -757,6 +759,7 @@ function Barrio({ currentUser, onNavigate }) {
   const openReportModal = () => {
     setReportCat(null)
     setReportText('')
+    setReportTitle('')
     setReportAnon(false)
     setReportError('')
     setReportSent(false)
@@ -770,6 +773,7 @@ function Barrio({ currentUser, onNavigate }) {
 
   const submitReport = async () => {
     if (!reportCat) { setReportError('Elige una categoría'); return }
+    if (!reportTitle.trim()) { setReportError('Ponle un título al reporte'); return }
     if (!reportText.trim()) { setReportError('Describe qué está pasando'); return }
     if (!reportLocText.trim() && !reportLat) {
       setReportError('Indica dónde está pasando: usa tu ubicación o escribe la referencia')
@@ -784,6 +788,7 @@ function Barrio({ currentUser, onNavigate }) {
       const { error } = await supabase.from('incident_reports').insert([{
         reporter_id: currentProfile.id,
         neighborhood_id: currentProfile.neighborhood_id,
+        title: reportTitle.trim(),
         category: reportCat,
         description: reportText.trim(),
         is_anonymous: reportAnon,
@@ -827,198 +832,54 @@ function Barrio({ currentUser, onNavigate }) {
     )
   }
 
-  /* Tarjeta de reporte de VECINO. Se ve distinta a un aviso oficial:
-     sin check verde, etiqueta "Reportado por vecinos", y contador de
-     confirmaciones. La credibilidad la dan los vecinos, no la autoridad. */
+  /* Tarjeta de reporte de VECINO (huincha horizontal compacta, full-width).
+     Color de fondo y acentos según la categoría (seguridad=rojo, infra=amarillo,
+     mascotas=rosa). Muestra: icono + categoría + TÍTULO + descripción (2 líneas)
+     + metadata (ubicación, tiempo, confirmaciones). Las acciones de
+     confirmar/denunciar/editar/borrar/resolver/mapa se mueven al detalle. */
   const renderIncidente = (item) => {
     const cat = REPORT_CATS.find(c => c.key === item.category) || REPORT_CATS[0]
-    const yaConfirme = myConfirms.includes(item.id)
-    const yaDenuncie = myFlags.includes(item.id)
-    const esMio = item.reporter_id === currentProfile?.id
-    const esAdmin = currentProfile?.user_type === 'admin'
     const confirmado = item.confirms_count >= 3
     const CIcon = cat.Icon
+    const titulo = item.title?.trim() || item.description?.slice(0, 60) || 'Reporte'
+    const descripcion = item.description
 
     return (
-      <div key={item.id} style={{ ...s.card, borderLeft: `3px solid ${cat.color}` }}>
-        <div style={s.cardTop}>
-          <span style={{ ...s.typeBadge, backgroundColor: cat.bg, color: cat.color }}>
-            {cat.label.toUpperCase()}
-          </span>
-          <div style={s.cardTopRight}>
-            {expiraEn(item.expires_at) && (
-              <span style={s.expiraText}>{expiraEn(item.expires_at)}</span>
-            )}
-            <span style={s.timeText}>{tiempoRelativo(item.created_at)}</span>
-          </div>
+      <div
+        key={item.id}
+        style={{ ...s.incRow, background: cat.bg, borderColor: cat.color }}
+        onClick={() => onNavigate?.('alerta', { id: item.id })}
+      >
+        <div style={{ ...s.incRowIcon, color: cat.color }}>
+          <CIcon size={20} color={cat.color} />
         </div>
-
-        {editingId === item.id ? (
-          <div style={s.editBox}>
-            <textarea
-              value={editText}
-              onChange={(e) => setEditText(e.target.value)}
-              style={s.editArea}
-              maxLength={500}
-              autoFocus
-            />
-            <div style={s.editActions}>
-              <button
-                style={s.editCancel}
-                onClick={() => { setEditingId(null); setEditText('') }}
-              >
-                Cancelar
-              </button>
-              <button
-                style={s.editSave}
-                onClick={() => saveEdit(item.id)}
-                disabled={actingOn === item.id || !editText.trim()}
-              >
-                {actingOn === item.id ? 'Guardando...' : 'Guardar'}
-              </button>
-            </div>
-          </div>
-        ) : (
-          <div style={s.cardDesc}>{item.description}</div>
-        )}
-
-        {(item.location_text || item.lat) && (
-          <div style={s.incidentLocRow}>
-            <Icon.MapPinSm color="#9ca3af" />
-            <span style={s.incidentLocText}>
-              {item.location_text || 'Ubicación marcada en el mapa'}
+        <div style={s.incRowBody}>
+          <div style={s.incRowTop}>
+            <span style={{ ...s.incRowCat, color: cat.color }}>
+              {cat.label.toUpperCase()}
             </span>
-            {item.lat && (
-              <button
-                style={s.mapToggleBtn}
-                onClick={() => setOpenMapId(openMapId === item.id ? null : item.id)}
-              >
-                {openMapId === item.id ? 'Ocultar mapa' : 'Ver en el mapa'}
-              </button>
-            )}
+            <span style={s.incRowTime}>{tiempoRelativo(item.created_at)}</span>
           </div>
-        )}
-
-        {openMapId === item.id && item.lat && (
-          <div style={{ marginTop: 10 }}>
-            <MiniMap lat={item.lat} lng={item.lng} height={155} color={cat.color} />
-          </div>
-        )}
-
-        {confirmDelete === item.id && (
-          <div style={s.deleteBox}>
-            <div style={s.deleteText}>¿Borrar este reporte? No se puede deshacer.</div>
-            <div style={s.editActions}>
-              <button style={s.editCancel} onClick={() => setConfirmDelete(null)}>
-                Cancelar
-              </button>
-              <button
-                style={s.deleteConfirm}
-                onClick={() => deleteIncident(item.id)}
-                disabled={actingOn === item.id}
-              >
-                {actingOn === item.id ? 'Borrando...' : 'Sí, borrar'}
-              </button>
-            </div>
-          </div>
-        )}
-
-        {confirmado && (
-          <div style={s.confirmedTag}>
-            <Icon.VerifiedGreen size={12} />
-            <span style={s.confirmedTagText}>
-              Confirmado por {item.confirms_count} vecinos
-            </span>
-          </div>
-        )}
-
-        <div style={s.cardDivider} />
-
-        <div style={s.cardBottom}>
-          <div style={s.authorRow}>
-            <div style={{ ...s.authorAvatar, backgroundColor: cat.color, opacity: 0.9 }}>
-              {item.is_anonymous ? '?' : getInitials(item.reporter?.full_name)}
-            </div>
-            <div>
-              <span style={s.authorName}>
-                {item.is_anonymous ? 'Vecino anónimo' : (item.reporter?.full_name || 'Vecino')}
-              </span>
-              <div style={s.vecinoTag}>Reportado por vecinos</div>
-            </div>
-          </div>
-
-          {esMio || esAdmin ? (
-            <div style={s.accionesRow}>
-              {/* Editar: solo mientras NADIE lo haya confirmado.
-                  Después el texto se congela. */}
-              {esMio && item.confirms_count === 0 && editingId !== item.id && (
-                <button
-                  onClick={() => startEdit(item)}
-                  title="Editar"
-                  style={s.iconAccion}
-                >
-                  <Icon.Edit />
-                </button>
-              )}
-
-              {esMio && item.confirms_count > 0 && (
-                <span style={s.lockedTag} title="Ya hay vecinos que lo confirmaron">
-                  Texto bloqueado
-                </span>
-              )}
-
-              <button
-                onClick={() => setConfirmDelete(item.id)}
-                title="Borrar"
-                style={{ ...s.iconAccion, color: '#dc2626' }}
-              >
-                <Icon.Trash />
-              </button>
-
-              <button
-                onClick={() => resolveIncident(item.id)}
-                disabled={actingOn === item.id}
-                style={s.resolveBtn}
-              >
-                {actingOn === item.id ? '...' : 'Marcar resuelto'}
-              </button>
-            </div>
-          ) : (
-            <div style={s.accionesRow}>
-              <button
-                onClick={() => flagIncident(item.id)}
-                disabled={yaDenuncie || actingOn === item.id}
-                title="Denunciar contenido"
-                style={{
-                  ...s.flagBtn,
-                  color: yaDenuncie ? '#dc2626' : '#c7cdc7',
-                  cursor: yaDenuncie ? 'default' : 'pointer',
-                }}
-              >
-                <Icon.Flag />
-              </button>
-
-              <button
-                onClick={() => confirmIncident(item.id)}
-                disabled={yaConfirme || confirming === item.id}
-                style={{
-                  ...s.confirmBtn,
-                  backgroundColor: yaConfirme ? '#dcfce7' : '#fff',
-                  borderColor: yaConfirme ? '#16a34a' : '#e5e7eb',
-                  color: yaConfirme ? '#16a34a' : '#374151',
-                  cursor: yaConfirme ? 'default' : 'pointer',
-                }}
-              >
-                {yaConfirme
-                  ? <><Icon.VerifiedGreen size={12} /> <span>Confirmado</span></>
-                  : <span>Yo también lo veo</span>}
-                {item.confirms_count > 0 && (
-                  <span style={s.confirmCount}>{item.confirms_count}</span>
-                )}
-              </button>
-            </div>
+          <div style={s.incRowTitle}>{titulo}</div>
+          {descripcion && descripcion !== titulo && (
+            <div style={s.incRowDesc}>{descripcion}</div>
           )}
+          <div style={s.incRowPie}>
+            {item.location_text && (
+              <span style={s.incRowLoc}>
+                <Icon.MapPinSm size={11} color="#9ca3af" />
+                <span>{item.location_text}</span>
+              </span>
+            )}
+            {confirmado && (
+              <span style={s.incRowConfirm}>
+                <Icon.VerifiedGreen size={11} />
+                <span>{item.confirms_count}</span>
+              </span>
+            )}
+          </div>
         </div>
+        <span style={s.incRowFlecha}>›</span>
       </div>
     )
   }
@@ -1593,7 +1454,7 @@ function Barrio({ currentUser, onNavigate }) {
 
   const renderReportModal = () => {
     if (!showReportModal) return null
-    const canSubmit = reportCat && reportText.trim().length > 0 && !reportSending
+    const canSubmit = reportCat && reportTitle.trim().length > 0 && reportText.trim().length > 0 && !reportSending
 
     // Pantalla de éxito
     if (reportSent) {
@@ -1654,6 +1515,17 @@ function Barrio({ currentUser, onNavigate }) {
                 )
               })}
             </div>
+
+            <div style={s.reportSectionTitle}>Título <span style={{ color: '#dc2626' }}>*</span></div>
+            <input
+              type="text"
+              value={reportTitle}
+              onChange={(e) => setReportTitle(e.target.value.slice(0, 60))}
+              placeholder="Ej: Corte de agua en Av. Italia"
+              style={s.reportInput}
+              maxLength={60}
+            />
+            <div style={s.reportCounter}>{reportTitle.length}/60</div>
 
             <div style={s.reportSectionTitle}>¿Qué está pasando?</div>
             <textarea
@@ -2059,6 +1931,75 @@ const s = {
   scrollArea: { flex: 1, overflowY: 'auto', overflowX: 'hidden', WebkitOverflowScrolling: 'touch', padding: '0 18px' },
 
   card: { backgroundColor: '#fff', borderRadius: 16, padding: 16, marginTop: 14, boxShadow: '0 2px 8px rgba(0,0,0,0.05)', cursor: 'pointer' },
+
+  /* ── Huincha de incidente (alerta de vecino) en el feed ──
+     Tarjeta horizontal delgada, full-width, con color de fondo y borde
+     según la categoría. Layout: icono | body (cat+título+desc+metadata) | ›.
+     Al click abre el detalle (AlertaDetail). */
+  incRow: {
+    display: 'flex', alignItems: 'stretch', gap: 11,
+    width: '100%',
+    borderRadius: 13,
+    border: '1.5px solid',
+    padding: '10px 12px',
+    marginTop: 9,
+    cursor: 'pointer',
+    textAlign: 'left',
+  },
+  incRowIcon: {
+    width: 38, height: 38, borderRadius: 10,
+    background: 'rgba(255,255,255,0.65)',
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    flexShrink: 0, alignSelf: 'flex-start',
+  },
+  incRowBody: {
+    flex: 1, minWidth: 0,
+    display: 'flex', flexDirection: 'column', gap: 2,
+  },
+  incRowTop: {
+    display: 'flex', alignItems: 'center', gap: 8,
+    marginBottom: 1,
+  },
+  incRowCat: {
+    fontSize: 10.5, fontWeight: 800, letterSpacing: 0.4,
+    textTransform: 'uppercase',
+  },
+  incRowTime: {
+    fontSize: 10.5, color: '#9ca3af', fontWeight: 500,
+    marginLeft: 'auto', flexShrink: 0,
+  },
+  incRowTitle: {
+    fontSize: 14, fontWeight: 700, color: '#111',
+    lineHeight: 1.3, marginBottom: 1,
+    whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+  },
+  incRowDesc: {
+    fontSize: 12, color: '#6b7280', fontWeight: 500, lineHeight: 1.4,
+    display: '-webkit-box', WebkitLineClamp: 2,
+    WebkitBoxOrient: 'vertical', overflow: 'hidden',
+    marginBottom: 2,
+  },
+  incRowPie: {
+    display: 'flex', alignItems: 'center', gap: 12,
+    marginTop: 2,
+    flexWrap: 'wrap',
+  },
+  incRowLoc: {
+    display: 'inline-flex', alignItems: 'center', gap: 4,
+    fontSize: 10.5, color: '#9ca3af', fontWeight: 500,
+    whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+    minWidth: 0, maxWidth: 180,
+  },
+  incRowConfirm: {
+    display: 'inline-flex', alignItems: 'center', gap: 3,
+    fontSize: 10.5, fontWeight: 700, color: '#16a34a',
+    background: '#fff', padding: '1px 6px', borderRadius: 999,
+    whiteSpace: 'nowrap',
+  },
+  incRowFlecha: {
+    fontSize: 20, fontWeight: 600, color: '#9ca3af',
+    alignSelf: 'center', flexShrink: 0, lineHeight: 1,
+  },
   cardTop: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
   typeBadge: { fontSize: 9.5, fontWeight: 800, padding: '3px 8px', borderRadius: 6, letterSpacing: 0.4 },
   timeText: { fontSize: 11, color: '#999', fontWeight: 500 },
@@ -2171,6 +2112,7 @@ const s = {
   reportCatLabel: { fontSize: 14, fontWeight: 800 },
   reportCatDesc: { fontSize: 10.5, color: '#888', lineHeight: 1.3 },
   reportTextarea: { width: '100%', minHeight: 100, padding: 12, borderRadius: 12, border: '1.5px solid #e5e5e5', fontSize: 13.5, fontFamily: 'inherit', resize: 'vertical', outline: 'none', boxSizing: 'border-box' },
+  reportInput: { width: '100%', padding: 12, borderRadius: 12, border: '1.5px solid #e5e5e5', fontSize: 13.5, fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box' },
   reportCounter: { fontSize: 10.5, color: '#aaa', textAlign: 'right', marginTop: 4, marginBottom: 22, fontWeight: 600 },
   reportLocationBox: { display: 'flex', alignItems: 'center', gap: 8, padding: '12px 14px', backgroundColor: '#f9fafb', borderRadius: 12, marginBottom: 22 },
   reportLocationText: { fontSize: 13, fontWeight: 700, color: '#111', flex: 1 },

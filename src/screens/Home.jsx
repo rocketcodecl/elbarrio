@@ -739,11 +739,13 @@ function Home({ currentUser, onNavigate, onCrear }) {
           </div>
         )}
 
-        {/* ══════ ALERTAS (tira horizontal compacta, máx 3) ══════
+        {/* ══════ ALERTAS (lista vertical compacta, huincha full-width, máx 3) ══════
             Título: solo "Alertas".
+            Layout: tarjetas horizontales delgadas (huincha), una arriba de
+            la otra, ocupando todo el ancho disponible. NO grilla de 2 columnas.
             Pin: lineal verde marca, sin fondo blanco.
             Texto: "Estás a xx m" (metros desde el user vía Haversine).
-            Radial: clase .alerta-pulse anima un halo rojo suave. */}
+            Radial: clase .alerta-pulse anima un halo suave del color de la cat. */}
         {!buscando && (
           <div style={s.seccion}>
             <div style={s.seccionTit}>
@@ -769,7 +771,7 @@ function Home({ currentUser, onNavigate, onCrear }) {
                 </span>
               </button>
             ) : (
-              <div style={s.scrollH}>
+              <div style={s.alertaLista}>
                 {alertas.slice(0, 3).map((a) => {
                   const cat = REPORTES[a.category] || REPORTES.seguridad
                   // Distancia: preferimos la calculada con Haversine desde
@@ -783,47 +785,46 @@ function Home({ currentUser, onNavigate, onCrear }) {
                       key={a.id}
                       className="alerta-pulse"
                       style={{
-                        ...s.alertaStrip,
+                        ...s.alertaRow,
                         background: cat.bg,
                         // El halo del pulse toma el color de la categoría.
                         '--pulse-color': hexToRgba(cat.color, 0.35),
                       }}
                       onClick={() => nav('alerta', { id: a.id })}
                     >
-                      <div style={s.alertaStripTop}>
-                        <span style={s.alertaStripEmoji}>{cat.emoji}</span>
-                        <span style={{ ...s.alertaStripCat, color: cat.color }}>
-                          {cat.label}
-                        </span>
+                      <div style={{ ...s.alertaRowIcon, color: cat.color }}>
+                        <span style={{ fontSize: 18 }}>{cat.emoji}</span>
                       </div>
-                      <div style={s.alertaStripDesc}>
-                        {a.description}
-                      </div>
-                      <div style={s.alertaStripPie}>
-                        {metros != null && (
-                          <span style={s.alertaStripDist}>
-                            <Ico.pin size={11} color={C.verde} /> Estás a {metros} m
+                      <div style={s.alertaRowBody}>
+                        <div style={s.alertaRowTop}>
+                          <span style={{ ...s.alertaRowCat, color: cat.color }}>
+                            {cat.label}
                           </span>
+                          <span style={s.alertaRowTime}>{hace(a.created_at)}</span>
+                        </div>
+                        <div style={s.alertaRowTitle}>
+                          {(a.title && a.title.trim()) || a.description?.slice(0, 60) || 'Alerta'}
+                        </div>
+                        {a.title && a.description && a.description !== a.title && (
+                          <div style={s.alertaRowDesc}>
+                            {a.description}
+                          </div>
                         )}
-                        <span style={s.alertaStripTime}>| {hace(a.created_at)}</span>
-                        {a.confirms_count >= 3 && (
-                          <span style={s.alertaStripConf}>✅ {a.confirms_count}</span>
-                        )}
+                        <div style={s.alertaRowPie}>
+                          {metros != null && (
+                            <span style={s.alertaRowDist}>
+                              <Ico.pin size={11} color={C.verde} /> Estás a {metros} m
+                            </span>
+                          )}
+                          {a.confirms_count >= 3 && (
+                            <span style={s.alertaRowConf}>✅ {a.confirms_count} vecinos</span>
+                          )}
+                        </div>
                       </div>
+                      <span style={s.alertaRowFlecha}>›</span>
                     </button>
                   )
                 })}
-
-                {/* Pill "Ver todas" al final de la tira */}
-                <button
-                  style={s.alertaStripMore}
-                  onClick={() => nav('alertas')}
-                >
-                  <span style={s.alertaStripMoreEmoji}>→</span>
-                  <span style={s.alertaStripMoreTxt}>
-                    Ver todas<br />las alertas
-                  </span>
-                </button>
               </div>
             )}
           </div>
@@ -1276,6 +1277,77 @@ const s = {
   alertaStripConf: {
     fontSize: 9.5, fontWeight: 700, color: C.verdeOsc,
     background: '#fff', padding: '1px 5px', borderRadius: 999,
+  },
+
+  /* ── Alertas en el feed: lista vertical de huinchas full-width ──
+     Reemplaza al antiguo scrollH de tarjetas cuadradas de 168px.
+     Ahora cada alerta es una huincha horizontal delgada (icono a la
+     izquierda + body + flecha), una arriba de la otra, ocupando todo
+     el ancho disponible. Al pinchar abre el detalle. */
+  alertaLista: {
+    display: 'flex', flexDirection: 'column', gap: 8,
+    width: '100%',
+  },
+  alertaRow: {
+    display: 'flex', alignItems: 'stretch', gap: 10,
+    width: '100%',
+    borderRadius: 12,
+    border: `1px solid ${C.borde}`,
+    padding: '9px 11px 9px 9px',
+    cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left',
+    position: 'relative',
+  },
+  alertaRowIcon: {
+    width: 34, height: 34, borderRadius: 9,
+    background: 'rgba(255,255,255,0.7)',
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    flexShrink: 0, alignSelf: 'flex-start',
+  },
+  alertaRowBody: {
+    flex: 1, minWidth: 0,
+    display: 'flex', flexDirection: 'column', gap: 2,
+  },
+  alertaRowTop: {
+    display: 'flex', alignItems: 'center', gap: 8,
+    marginBottom: 1,
+  },
+  alertaRowCat: {
+    fontSize: 11, fontWeight: 800, letterSpacing: 0.3,
+    textTransform: 'uppercase',
+  },
+  alertaRowTime: {
+    fontSize: 10, color: C.textoTenue, fontWeight: 500,
+    marginLeft: 'auto', flexShrink: 0,
+  },
+  alertaRowTitle: {
+    fontSize: 13.5, fontWeight: 700, color: '#111', lineHeight: 1.3,
+    whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+    marginBottom: 1,
+  },
+  alertaRowDesc: {
+    fontSize: 12.5, color: C.texto, fontWeight: 500, lineHeight: 1.35,
+    display: '-webkit-box', WebkitLineClamp: 2,
+    WebkitBoxOrient: 'vertical', overflow: 'hidden',
+    marginBottom: 2,
+  },
+  alertaRowPie: {
+    display: 'flex', alignItems: 'center', gap: 10,
+    marginTop: 1,
+  },
+  alertaRowDist: {
+    fontSize: 10, fontWeight: 500, color: C.verdeOsc,
+    display: 'inline-flex', alignItems: 'center', gap: 3,
+    whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+    minWidth: 0,
+  },
+  alertaRowConf: {
+    fontSize: 9.5, fontWeight: 700, color: C.verdeOsc,
+    background: '#fff', padding: '1px 6px', borderRadius: 999,
+    whiteSpace: 'nowrap',
+  },
+  alertaRowFlecha: {
+    fontSize: 18, fontWeight: 600, color: C.textoTenue,
+    alignSelf: 'center', flexShrink: 0, lineHeight: 1,
   },
 
   alertaStripMore: {

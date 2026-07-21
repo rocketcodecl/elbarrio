@@ -74,6 +74,15 @@ export default function App() {
   const [createType, setCreateType] = useState(null)
   const [noLeidos, setNoLeidos] = useState(0)
   const historyRef = useRef([])
+  // Track del tab previo para que el back desde tabs con flecha (ej: perfil) funcione.
+  // El perfil es un tab, no una sub-pantalla, así que no entra en historyRef.
+  // Sin esto, el back desde el perfil no hace nada visible (activeTab sigue siendo 'perfil').
+  const prevTabRef = useRef('inicio')
+  const activeTabRef = useRef('inicio')
+
+  // Mantiene activeTabRef sincronizado con activeTab para poder leerlo
+  // dentro de useCallback sin agregarlo a las dependencias.
+  useEffect(() => { activeTabRef.current = activeTab }, [activeTab])
 
   /* ── AUTH + checkSession (decide pantalla inicial según perfil) ── */
   const checkSession = useCallback(async () => {
@@ -135,6 +144,7 @@ export default function App() {
     setActiveTab('inicio')
     setCurrentScreen('splash')
     historyRef.current = []
+    prevTabRef.current = 'inicio'
   }, [])
 
   /* ── CONTADORES no leídos ── */
@@ -177,10 +187,22 @@ export default function App() {
     if (lower === 'back') {
       const prev = historyRef.current.pop()
       if (prev) {
+        if (prev.tab) setActiveTab(prev.tab)
         setCurrentScreen(prev.screen || 'main')
         setParams(prev.params || {})
       } else {
+        // Sin sub-pantalla en historial: si estamos en un tab con flecha back
+        // (ej: perfil), volver al tab previo para que el back sea efectivo.
+        // Sin esto, el back desde el perfil no cambia nada visible porque
+        // currentScreen ya era 'main' y activeTab seguía siendo 'perfil'.
         setCurrentScreen('main')
+        const currentTab = activeTabRef.current
+        if (currentTab && currentTab !== 'inicio') {
+          const fallback = prevTabRef.current && prevTabRef.current !== currentTab
+            ? prevTabRef.current
+            : 'inicio'
+          setActiveTab(fallback)
+        }
       }
       return
     }
@@ -230,9 +252,11 @@ export default function App() {
     } else if (lower === 'adminincidentes') {
       setCurrentScreen('adminIncidentes')
     } else if (lower === 'chat' || lower === 'chatlist') {
+      if (activeTabRef.current !== 'chat') prevTabRef.current = activeTabRef.current
       setActiveTab('chat')
       setCurrentScreen('main')
     } else if (tabMap[lower]) {
+      if (activeTabRef.current !== tabMap[lower]) prevTabRef.current = activeTabRef.current
       setActiveTab(tabMap[lower])
       setCurrentScreen('main')
     } else {
@@ -271,6 +295,11 @@ export default function App() {
   }, [])
 
   const onChangeTab = useCallback((tabId) => {
+    // Track del tab previo para que el back desde tabs con flecha (perfil) vuelva aquí.
+    const current = activeTabRef.current
+    if (tabId !== current) {
+      prevTabRef.current = current
+    }
     historyRef.current = []
     setActiveTab(tabId)
     setCurrentScreen('main')

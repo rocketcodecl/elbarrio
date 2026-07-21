@@ -97,6 +97,29 @@ const limpiarHoras = (horas) => {
   return tiene ? limpio : null
 }
 
+// ── Geocodifica una dirección con Nominatim (OpenStreetMap, gratis). ──
+// Devuelve { lat, lng } o null si no encuentra o hay error.
+// Se usa al guardar un comercio: si el admin escribió dirección pero no
+// fijó lat/lng en el mapa, intentamos geocodificar automáticamente para
+// que el comercio no quede "sin ubicación".
+const geocodificar = async (direccionStr) => {
+  const q = (direccionStr || '').trim()
+  if (!q) return null
+  try {
+    const query = q.toLowerCase().includes('chile') ? q : `${q}, Chile`
+    const url = `https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=cl&q=${encodeURIComponent(query)}`
+    const res = await fetch(url, { headers: { 'Accept-Language': 'es' } })
+    if (!res.ok) return null
+    const arr = await res.json()
+    if (arr && arr[0] && arr[0].lat && arr[0].lon) {
+      return { lat: parseFloat(arr[0].lat), lng: parseFloat(arr[0].lon) }
+    }
+    return null
+  } catch (_) {
+    return null
+  }
+}
+
 // ── Convierte un string/number a número o null ──
 const toNum = (v) => {
   if (v == null || v === '') return null
@@ -312,6 +335,16 @@ export default function AdminComercios({ currentUser, onNavigate, params }) {
       showToast('Falta el nombre del comercio.')
       return
     }
+    // [FIX] La ubicación es OBLIGATORIA. El usuario tiene que escribir la
+    // dirección, apretar "Buscar en el mapa" y confirmar que el pin quedó
+    // bien puesto. Sin esto, el comercio no se guarda — nunca más un comercio
+    // "sin ubicación" que rompe el "cómo llegar" y "a cuántos metros".
+    let latFinal = toNum(nueva.lat)
+    let lngFinal = toNum(nueva.lng)
+    if (latFinal == null || lngFinal == null) {
+      showToast('Falta la ubicación. Escribí la dirección y apretá "Buscar en el mapa" para que quede el pin.')
+      return
+    }
     setGuardando(true)
     try {
       const payload = {
@@ -330,8 +363,8 @@ export default function AdminComercios({ currentUser, onNavigate, params }) {
           : null,
         discount_text: nueva.discount_text.trim() || null,
         opening_hours: limpiarHoras(nueva.opening_hours),
-        lat: toNum(nueva.lat),
-        lng: toNum(nueva.lng),
+        lat: latFinal,
+        lng: lngFinal,
         is_active: !!nueva.is_active,
         is_premium: !!nueva.is_premium,
         neighborhood_id: profile?.neighborhood_id || null,
@@ -397,6 +430,13 @@ export default function AdminComercios({ currentUser, onNavigate, params }) {
       showToast('Falta el nombre del comercio.')
       return
     }
+    // [FIX] Mismo criterion que alta: la ubicación es obligatoria.
+    let latFinal = toNum(editDraft.lat)
+    let lngFinal = toNum(editDraft.lng)
+    if (latFinal == null || lngFinal == null) {
+      showToast('Falta la ubicación. Escribí la dirección y apretá "Buscar en el mapa" para que quede el pin.')
+      return
+    }
     setGuardando(true)
     try {
       const payload = {
@@ -415,8 +455,8 @@ export default function AdminComercios({ currentUser, onNavigate, params }) {
           : null,
         discount_text: editDraft.discount_text.trim() || null,
         opening_hours: limpiarHoras(editDraft.opening_hours),
-        lat: toNum(editDraft.lat),
-        lng: toNum(editDraft.lng),
+        lat: latFinal,
+        lng: lngFinal,
         is_active: !!editDraft.is_active,
         is_premium: !!editDraft.is_premium,
         neighborhood_id: profile?.neighborhood_id || null,
@@ -843,12 +883,16 @@ function FormComercio({ titulo, values, onChange, onGuardar, onCancelar, guardan
       </Field>
 
       {/* Dirección */}
-      <Field label='Dirección'>
-        <input
-          style={s.input}
+      <Field
+        label='Dirección'
+        helper='Escribí calle + número + comuna. Ej: «Av Las Condes 4646, Las Condes». Después tocá «Buscar en el mapa» más abajo.'
+      >
+        <textarea
+          style={{ ...s.textarea, minHeight: 56, height: 56, resize: 'vertical' }}
           value={values.address}
           onChange={(e) => set('address', e.target.value)}
-          placeholder='Av. Las Hualtatas 1234'
+          placeholder='Av Las Condes 4646, Las Condes'
+          rows={2}
         />
       </Field>
 
@@ -1106,10 +1150,7 @@ function FormComercio({ titulo, values, onChange, onGuardar, onCancelar, guardan
           lat={values.lat}
           lng={values.lng}
           direccion={values.address}
-          onPick={(la, ln) => {
-            set('lat', String(la))
-            set('lng', String(ln))
-          }}
+          onPick={(la, ln) => onChange({ ...values, lat: la, lng: ln })}
         />
       </Field>
 
@@ -1300,16 +1341,21 @@ function Field({ label, helper, children }) {
 // Controller interno: captura clicks Y recientra el mapa cuando
 // lat/lng cambian desde afuera (ej: después de buscar una dirección).
 // DEFINIDO AFUERA de MapaPicker para evitar remounts en cada render.
+//
+// [FIX] Idéntico al de AdminFarmacias (que SÍ funciona). El problema de
+// AdminComercios era que tenía flyTo + invalidateSize + key dinámico en
+// MapContainer + Marker condicional, y algo de eso rompía el reposicionamiento.
+// Volvemos a la versión simple: setView + Marker sin key. Probado y funcionando.
 function MapController({ lat, lng, onPick }) {
   const map = useMap()
   useEffect(() => {
-    if (lat != null && lng != null && !isNaN(lat) && !isNaN(lng)) {
+    if (!isNaN(lat) && !isNaN(lng)) {
       map.setView([lat, lng], 16, { animate: true })
     }
   }, [lat, lng, map])
   useMapEvents({
     click(e) {
-      if (onPick) onPick(e.latlng.lat, e.latlng.lng)
+      onPick(e.latlng.lat, e.latlng.lng)
     },
   })
   return null
@@ -1318,64 +1364,41 @@ function MapController({ lat, lng, onPick }) {
 function MapaPicker({ lat, lng, onPick, direccion }) {
   const [busqueda, setBusqueda] = useState(direccion || '')
   const [buscando, setBuscando] = useState(false)
-  const [errorBusq, setErrorBusq] = useState('')
-  const [mostrarManual, setMostrarManual] = useState(false)
-  const ultimaDirSync = useRef(direccion || '')
 
-  // SINCRONIZAR el input de búsqueda con el campo "Dirección" del formulario.
-  // Si el usuario cambia la dirección en el form y la búsqueda está vacía
-  // o coincide con el valor anterior, la actualizamos para que pueda
-  // buscar directamente sin re-escribir.
-  useEffect(() => {
-    const d = direccion || ''
-    if (d && (busqueda === ultimaDirSync.current || !busqueda)) {
-      setBusqueda(d)
-    }
-    ultimaDirSync.current = d
-  }, [direccion]) // eslint-disable-line react-hooks/exhaustive-deps
-
-  // invalidateSize: si el mapa nace dentro de un form/scroll, Leaflet no
-  // calcula bien su tamaño. Disparamos un resize event para forzar el recálculo.
-  useEffect(() => {
-    const t = setTimeout(() => window.dispatchEvent(new Event('resize')), 250)
-    return () => clearTimeout(t)
-  }, [])
-
-  // Parseo robusto: si el input no es un número válido, cae al default Santiago.
   const la = parseFloat(lat)
   const ln = parseFloat(lng)
   const tienePos = !isNaN(la) && !isNaN(ln)
   const numLat = tienePos ? la : -33.4489
   const numLng = tienePos ? ln : -70.6693
 
-  // Geocoding con Nominatim (OpenStreetMap). Gratis, sin API key.
-  // Mostramos el error real (no un mensaje genérico) para que el usuario
-  // sepa si fue red, rate-limit, o dirección no encontrada.
+  // Geocoding con Nominatim STRUCTURED. Es estricto: si la calle no existe
+  // en esa comuna, devuelve [] en vez de fuzzy-matchear otra cosa.
+  // Esperamos input con coma: "calle + número, comuna".
   const buscarDireccion = async () => {
-    const q = busqueda.trim()
+    const q = (busqueda || '').trim()
     if (!q) {
-      setErrorBusq('Escribí una dirección primero.')
+      alert('Escribí una dirección. Formato: calle + número, comuna. Ej: Av Las Condes 4646, Las Condes')
       return
     }
+    const partes = q.split(',').map((p) => p.trim()).filter(Boolean)
+    if (partes.length < 2) {
+      alert('Falta la comuna. Formato: calle + número, comuna. Ej: Av Las Condes 4646, Las Condes')
+      return
+    }
+    const city = partes[partes.length - 1]
+    const street = partes.slice(0, -1).join(', ')
     setBuscando(true)
-    setErrorBusq('')
     try {
-      // Agregamos ", Chile" si no está, para mejorar precisión.
-      const query = q.toLowerCase().includes('chile') ? q : `${q}, Chile`
-      const url = `https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=cl&q=${encodeURIComponent(query)}`
+      const url = `https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=cl&street=${encodeURIComponent(street)}&city=${encodeURIComponent(city)}`
       const res = await fetch(url, { headers: { 'Accept-Language': 'es' } })
-      if (!res.ok) throw new Error(`HTTP ${res.status}`)
       const arr = await res.json()
-      if (arr && arr[0] && arr[0].lat && arr[0].lon) {
-        const rLat = parseFloat(arr[0].lat)
-        const rLon = parseFloat(arr[0].lon)
-        onPick(rLat, rLon)
+      if (arr && arr[0]) {
+        onPick(parseFloat(arr[0].lat), parseFloat(arr[0].lon))
       } else {
-        setErrorBusq(`No se encontró "${q}". Probá con más detalle, ej: "Av Las Condes 1234, Santiago".`)
+        alert(`No se encontró "${street}" en ${city}. Revisá el nombre de la calle y la comuna.`)
       }
     } catch (e) {
-      const msg = (e && e.message) || String(e)
-      setErrorBusq(`Error al buscar: ${msg}. Revisá tu conexión a internet.`)
+      alert('Error al buscar la dirección. Revisá tu conexión a internet.')
     } finally {
       setBuscando(false)
     }
@@ -1383,7 +1406,7 @@ function MapaPicker({ lat, lng, onPick, direccion }) {
 
   return (
     <div>
-      {/* Buscador de dirección */}
+      {/* Buscador — input + botón, mismo layout que AdminFarmacias */}
       <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
         <input
           style={{
@@ -1393,9 +1416,9 @@ function MapaPicker({ lat, lng, onPick, direccion }) {
             boxSizing: 'border-box',
           }}
           value={busqueda}
-          onChange={(e) => { setBusqueda(e.target.value); setErrorBusq('') }}
+          onChange={(e) => setBusqueda(e.target.value)}
           onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); buscarDireccion() } }}
-          placeholder='Ej: Av Las Condes 1234, Santiago'
+          placeholder='Ej: Av Las Condes 4646, Las Condes'
           autoComplete='off'
         />
         <button
@@ -1410,21 +1433,11 @@ function MapaPicker({ lat, lng, onPick, direccion }) {
           onClick={buscarDireccion}
           disabled={buscando}
         >
-          {buscando ? 'Buscando…' : '🔍 Buscar'}
+          {buscando ? '…' : '🔍 Buscar en el mapa'}
         </button>
       </div>
 
-      {/* Mensaje de error (si lo hay) */}
-      {errorBusq && (
-        <div style={{
-          fontSize: 12, color: '#dc2626', background: '#fef2f2',
-          border: '1px solid #fecaca', borderRadius: 8,
-          padding: '8px 10px', marginBottom: 8, lineHeight: 1.4,
-        }}>
-          ⚠️ {errorBusq}
-        </div>
-      )}
-
+      {/* Mapa — IDÉNTICO a AdminFarmacias (que funciona) */}
       <MapContainer
         center={[numLat, numLng]}
         zoom={16}
@@ -1439,64 +1452,9 @@ function MapaPicker({ lat, lng, onPick, direccion }) {
         <Marker position={[numLat, numLng]} />
       </MapContainer>
 
-      {/* Coordenadas actuales + toggle manual */}
-      <div style={{
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        gap: 8, marginTop: 8, flexWrap: 'wrap',
-      }}>
-        <div style={{ fontSize: 11.5, color: C.textoTenue, lineHeight: 1.4 }}>
-          {tienePos
-            ? <>📍 Lat <strong style={{ color: C.texto }}>{la.toFixed(5)}</strong> · Lng <strong style={{ color: C.texto }}>{ln.toFixed(5)}</strong></>
-            : '💡 Buscá la dirección arriba o tocá el mapa para fijar la ubicación.'}
-        </div>
-        <button
-          type='button'
-          onClick={() => setMostrarManual(!mostrarManual)}
-          style={{
-            background: 'transparent', border: 'none', color: C.verde,
-            fontSize: 11.5, fontWeight: 700, cursor: 'pointer',
-            fontFamily: 'inherit', padding: 0, textDecoration: 'underline',
-          }}
-        >
-          {mostrarManual ? '− Ocultar manual' : '+ Ingresar coordenadas manual'}
-        </button>
+      <div style={{ fontSize: 11.5, color: C.textoTenue, marginTop: 6, lineHeight: 1.4 }}>
+        💡 Buscá la dirección arriba o tocá el mapa para mover el marcador.
       </div>
-
-      {/* Inputs manuales de lat/lng (fallback si la búsqueda falla) */}
-      {mostrarManual && (
-        <div style={{
-          display: 'flex', gap: 8, marginTop: 8,
-          background: C.fondo, padding: 10, borderRadius: 10,
-          border: `1px solid ${C.borde}`,
-        }}>
-          <label style={{ flex: 1, fontSize: 11.5, color: C.textoTenue, display: 'flex', flexDirection: 'column', gap: 4 }}>
-            Latitud
-            <input
-              type='number' step='any'
-              style={{ ...s.input, height: 36, marginTop: 0 }}
-              value={lat || ''}
-              onChange={(e) => {
-                const v = parseFloat(e.target.value)
-                if (!isNaN(v)) onPick(v, ln)
-              }}
-              placeholder='-33.4489'
-            />
-          </label>
-          <label style={{ flex: 1, fontSize: 11.5, color: C.textoTenue, display: 'flex', flexDirection: 'column', gap: 4 }}>
-            Longitud
-            <input
-              type='number' step='any'
-              style={{ ...s.input, height: 36, marginTop: 0 }}
-              value={lng || ''}
-              onChange={(e) => {
-                const v = parseFloat(e.target.value)
-                if (!isNaN(v)) onPick(la, v)
-              }}
-              placeholder='-70.6693'
-            />
-          </label>
-        </div>
-      )}
     </div>
   )
 }

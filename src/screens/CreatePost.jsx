@@ -173,9 +173,6 @@ const ALERT_CATEGORIES = [
   { key: 'seguridad', label: REPORTES.seguridad.label, emoji: REPORTES.seguridad.emoji,
     hours: 6, color: REPORTES.seguridad.color, bg: REPORTES.seguridad.bg,
     desc: 'Robo, sospecha, intrusión' },
-  { key: 'salud', label: REPORTES.salud.label, emoji: REPORTES.salud.emoji,
-    hours: 3, color: REPORTES.salud.color, bg: REPORTES.salud.bg,
-    desc: 'Brotes, agua o alimento' },
   { key: 'infra', label: REPORTES.infra.label, emoji: REPORTES.infra.emoji,
     hours: 48, color: REPORTES.infra.color, bg: REPORTES.infra.bg,
     desc: 'Luz, agua, bache, vereda' },
@@ -574,6 +571,7 @@ function CreatePost({ onClose, onPublished, startWith }) {
       if (!budgetOpen && !budget) return setError('Indica un presupuesto o marca "A convenir"')
     } else if (t === 'alert') {
       if (!alertCategory) return setError('Elige un tipo de alerta')
+      if (!title.trim()) return setError('Ponle un título a la alerta')
       if (!content.trim()) return setError('Describe qué pasó')
     } else if (t === 'sell') {
       if (!title.trim()) return setError('Ponle un título a tu producto')
@@ -620,6 +618,7 @@ function CreatePost({ onClose, onPublished, startWith }) {
         const incident = {
           reporter_id: profile.id,
           neighborhood_id: profile.neighborhood_id,
+          title: title.trim(),
           description: content.trim(),
           category: alertCategory,
           location_text: alertLocation.trim() || null,
@@ -635,10 +634,15 @@ function CreatePost({ onClose, onPublished, startWith }) {
           .insert([incident])
         if (alertErr) {
           if (alertErr.code === '42703' || alertErr.message?.includes('column')) {
+            // La BD no tiene alguna columna (esquema viejo). Reintentamos
+            // sin las columnas opcionales (images, lat, lng, title).
+            // title se incluye acá porque puede faltar en esquemas previos
+            // a la incorporación del campo título en alertas.
             const stripped = { ...incident }
             delete stripped.images
             delete stripped.latitude
             delete stripped.longitude
+            delete stripped.title
             const { error: retryErr } = await supabase
               .from('incident_reports')
               .insert([stripped])
@@ -848,12 +852,19 @@ function CreatePost({ onClose, onPublished, startWith }) {
   // ---- Preview card data ----
   const previewEmoji = t === 'alert' ? (alertCatElegida?.emoji || '🚨')
     : selectedType.emoji
-  const previewTitle = title.trim() || (t === 'request' ? '¿Qué necesitas?' : t === 'alert' ? 'Tu alerta' : 'Tu título')
+  // Para alertas ahora hay campo "Título" (obligatorio). Lo mostramos en el
+  // preview; si está vacío, placeholder claro.
+  const previewTitle = t === 'alert'
+    ? (title.trim() || 'Tu alerta aparecerá acá')
+    : title.trim() || (t === 'request' ? '¿Qué necesitas?' : 'Tu título')
   const previewPrice = t === 'sell' ? (price ? plata(toNumber(price)) : '$0')
     : t === 'gift' ? 'Gratis'
     : t === 'trade' ? 'Trueque'
     : t === 'request' ? (budgetOpen ? 'A convenir' : budget ? plata(toNumber(budget)) : 'A convenir')
     : ''
+  // Para alertas, la "categoría" del preview es la categoría de la alerta
+  // (Seguridad / Infra / Mascotas / Otro), no la categoría de marketplace.
+  const previewCategory = t === 'alert' ? (alertCatElegida?.label || null) : category
 
   return (
     <div style={s.container}>
@@ -884,7 +895,7 @@ function CreatePost({ onClose, onPublished, startWith }) {
           typeColor={selectedType.color}
           typeBg={selectedType.bg}
           imgPreview={previews[0]}
-          category={category}
+          category={previewCategory}
           lookingFor={t === 'trade' && lookingFor ? lookingFor : null}
         />
 
@@ -933,6 +944,16 @@ function CreatePost({ onClose, onPublished, startWith }) {
                 )
               })}
             </div>
+
+            <label style={s.label}>Título <span style={s.req}>*</span></label>
+            <input
+              type="text"
+              placeholder="Ej: Corte de agua en Av. Italia"
+              value={title}
+              onChange={onTitleChange}
+              style={s.input}
+            />
+            <CharCounter value={title.length} max={TITLE_MAX} />
 
             <label style={s.label}>¿Qué pasó?</label>
             <textarea
@@ -1382,17 +1403,21 @@ function CreatePost({ onClose, onPublished, startWith }) {
 
         {/* Disclaimer sobre responsabilidad del contenido — contextual
             según el tipo de post. En regalar no hay precio; en trueque
-            se menciona "lo que buscás" en vez de precio. */}
-        <div style={s.disclaimerBox}>
-          <span style={s.disclaimerIcon}>⚠️</span>
-          <p style={s.disclaimerText}>
-            {t === 'gift'
-              ? <>El título y la descripción los ponés tú. La IA solo sugiere un borrador a partir de la foto — <strong>verificalo antes de publicar</strong>.</>
-              : t === 'trade'
-              ? <>El título, la descripción y lo que buscás los ponés tú. La IA solo sugiere un borrador a partir de la foto — <strong>verificalo antes de publicar</strong>.</>
-              : <>El título, descripción y precio los ponés tú. La IA solo sugiere un borrador a partir de la foto — <strong>verificalo antes de publicar</strong>.</>}
-          </p>
-        </div>
+            se menciona "lo que buscás" en vez de precio.
+            NOTA: Las alertas NO usan IA (no tienen botón AiButton, no tienen
+            título ni precio), así que el disclaimer no aplica y se oculta. */}
+        {t !== 'alert' && (
+          <div style={s.disclaimerBox}>
+            <span style={s.disclaimerIcon}>⚠️</span>
+            <p style={s.disclaimerText}>
+              {t === 'gift'
+                ? <>El título y la descripción los ponés tú. La IA solo sugiere un borrador a partir de la foto — <strong>verificalo antes de publicar</strong>.</>
+                : t === 'trade'
+                ? <>El título, la descripción y lo que buscás los ponés tú. La IA solo sugiere un borrador a partir de la foto — <strong>verificalo antes de publicar</strong>.</>
+                : <>El título, descripción y precio los ponés tú. La IA solo sugiere un borrador a partir de la foto — <strong>verificalo antes de publicar</strong>.</>}
+            </p>
+          </div>
+        )}
 
         {error && (
           <div style={s.errorBox}>

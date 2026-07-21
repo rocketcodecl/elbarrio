@@ -328,15 +328,6 @@ function CardGrande({ c, userCoords, onAbrir }) {
   const dist = distancia(metros)
   const catInfo = COMERCIOS[cats[0]] || COMERCIOS['Otro']
 
-  /* ── SLIDER de imágenes en el feed ──
-     Cover + gallery en un scroll horizontal con snap.
-     Si solo hay 1 imagen (o ninguna), se comporta como antes. */
-  const gallery = Array.isArray(c.gallery) ? c.gallery.filter(Boolean) : []
-  const slides = []
-  if (c.cover_url) slides.push(c.cover_url)
-  gallery.forEach(url => { if (!slides.includes(url)) slides.push(url) })
-  const tieneMulti = slides.length > 1
-
   return (
     <div style={s.cardGrande} onClick={() => onAbrir(c)}>
       {/* Tira dorada superior — identidad premium inmediata */}
@@ -344,22 +335,11 @@ function CardGrande({ c, userCoords, onAbrir }) {
 
       {/* Cover más alto + ribbon + gradiente + logo superpuesto */}
       <div style={s.coverBox}>
-        {tieneMulti ? (
-          /* SLIDER: scroll horizontal con snap, múltiples imágenes */
-          <div style={s.feedSlider}>
-            {slides.map((url, i) => (
-              <div key={i} style={s.feedSliderSlide}>
-                <img src={url} alt="" style={s.coverImg} loading="lazy" />
-              </div>
-            ))}
-          </div>
-        ) : slides[0] ? (
-          <img src={slides[0]} alt="" style={s.coverImg} />
-        ) : (
-          <div style={{ ...s.coverEmpty, background: catInfo.bg }}>
-            <span style={{ fontSize: 44 }}>{catInfo.emoji}</span>
-          </div>
-        )}
+        {c.cover_url
+          ? <img src={c.cover_url} alt="" style={s.coverImg} />
+          : <div style={{ ...s.coverEmpty, background: catInfo.bg }}>
+              <span style={{ fontSize: 44 }}>{catInfo.emoji}</span>
+            </div>}
         {/* Gradiente inferior más fuerte → anclaje visual + legibilidad logo */}
         <div style={s.coverGradient} />
         {/* Ribbon destacado (gradiente dorado, más grande) */}
@@ -370,12 +350,6 @@ function CardGrande({ c, userCoords, onAbrir }) {
         {dist && (
           <div style={s.coverDistBadge}>
             <Ico.pin size={9} color="#fff" /> a {dist}
-          </div>
-        )}
-        {/* Contador de fotos (si hay múltiples) */}
-        {tieneMulti && (
-          <div style={s.feedSliderCount}>
-            📷 {slides.length}
           </div>
         )}
         {/* LOGO superpuesto bottom-right → marca visible en el feed */}
@@ -395,11 +369,9 @@ function CardGrande({ c, userCoords, onAbrir }) {
 
         {c.description && <div style={s.descGrande}>{c.description}</div>}
 
-        {/* Pill de descuento (teaser en el feed) — solo si tiene discount_text.
-            El banner verde completo (premium) solo va en el detalle, no acá. */}
         {c.discount_text && (
           <div style={s.beneficioPill}>
-            <Ico.gift size={13} color="#fff" />
+            <Ico.gift size={13} color={C.verde} />
             <span>{c.discount_text}</span>
           </div>
         )}
@@ -445,16 +417,15 @@ function CardCompacta({ c, userCoords, expanded, onToggle }) {
         <div style={s.cardCompactaBody}>
           <div style={s.nombreCompacto}>{c.name}</div>
 
-          {/* Pill de descuento (teaser en el feed) */}
+          <div style={s.horarioRowFeedSm}>
+            <HorarioBloque horario={horario} size="sm" />
+          </div>
+
           {c.discount_text && (
             <div style={s.beneficioSm}>
               <Ico.gift size={10} color={C.verde} /> {c.discount_text}
             </div>
           )}
-
-          <div style={s.horarioRowFeedSm}>
-            <HorarioBloque horario={horario} size="sm" />
-          </div>
 
           <div style={s.ubicacionRowSm}>
             {c.address && (
@@ -528,58 +499,6 @@ function ComercioDetalle({ c, userCoords, onClose, onEditar, esAdmin }) {
   const mapaRef = useRef(null)
   const galeriaRef = useRef(null)
   const galeriaPausaRef = useRef(false)
-  const [promos, setPromos] = useState([])
-
-  // Cargar promociones del comercio (commerce_promos).
-  // Traemos TODAS las del comercio (activas + inactivas + vencidas) para que
-  // el admin pueda verlas y borrarlas. Las inactivas/vencidas se marcan pero
-  // siguen visibles solo para admin. Para usuarios normales, solo activas vigentes.
-  useEffect(() => {
-    if (!c?.id) return
-    let cancelado = false
-    ;(async () => {
-      try {
-        const { data, error } = await supabase
-          .from('commerce_promos')
-          .select('*')
-          .eq('commerce_id', c.id)
-          .order('created_at', { ascending: false })
-        if (error) throw error
-        if (!cancelado) {
-          const ahora = Date.now()
-          // Marcar vigencia pero mostrar todas (el admin decide qué borrar)
-          const conVigencia = (data || []).map(p => ({
-            ...p,
-            _vigente: !p.expires_at ? true : new Date(p.expires_at).getTime() > ahora,
-          }))
-          setPromos(conVigencia)
-        }
-      } catch (e) {
-        console.warn('[comercio detalle] promos:', e?.message)
-      }
-    })()
-    return () => { cancelado = true }
-  }, [c?.id])
-
-  // Borrar promo (solo admin)
-  const [borrandoPromoId, setBorrandoPromoId] = useState(null)
-  const borrarPromo = async (promoId) => {
-    if (!promoId) return
-    if (!confirm('¿Eliminar esta promoción? Se borra definitivamente.')) return
-    setBorrandoPromoId(promoId)
-    try {
-      const { error } = await supabase
-        .from('commerce_promos')
-        .delete()
-        .eq('id', promoId)
-      if (error) throw error
-      setPromos(prev => prev.filter(p => p.id !== promoId))
-    } catch (e) {
-      alert('Error al borrar: ' + (e?.message || 'desconocido'))
-    } finally {
-      setBorrandoPromoId(null)
-    }
-  }
 
   // Scroll automático al mapa cuando se abre el dropdown
   useEffect(() => {
@@ -623,16 +542,19 @@ function ComercioDetalle({ c, userCoords, onClose, onEditar, esAdmin }) {
   const catInfo = COMERCIOS[cats[0]] || COMERCIOS['Otro']
   const isPremium = !!c.is_premium
 
-  // Promos visibles: admin ve TODAS (para poder borrar las que no corresponden).
-  // Usuario normal: solo activas y vigentes.
-  const promosVisibles = esAdmin
-    ? promos
-    : promos.filter(p => p.is_active !== false && p._vigente)
-
-  /* Galería de fotos: array puro de gallery (sin cover, sin demos).
+  /* Galería de fotos (premium): array puro de gallery (sin cover).
      El cover_url va aparte como foto principal del hero.
-     NO metemos imágenes demo de Unsplash — confunden al usuario. */
-  const gallery = (Array.isArray(c.gallery) ? c.gallery.filter(Boolean) : [])
+     DEMO: si el comercio es premium y tiene al menos 1 foto propia, se le
+     agregan 3 imágenes demo (de Unsplash) para que el carrusel se vea más
+     lleno durante las pruebas. En producción esto se reemplaza por fotos
+     reales subidas por el comercio. */
+  const galleryRaw = isPremium ? (Array.isArray(c.gallery) ? c.gallery.filter(Boolean) : []) : []
+  const DEMO_GALLERY = [
+    'https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=600&h=600&fit=crop&q=80',
+    'https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?w=600&h=600&fit=crop&q=80',
+    'https://images.unsplash.com/photo-1567521464027-f127ff144326?w=600&h=600&fit=crop&q=80',
+  ]
+  const gallery = galleryRaw.length > 0 ? [...galleryRaw, ...DEMO_GALLERY] : []
   /* Foto principal del hero: cover_url, o primera de gallery si no hay cover. */
   const fotoPrincipal = c.cover_url || gallery[0] || null
 
@@ -710,7 +632,7 @@ function ComercioDetalle({ c, userCoords, onClose, onEditar, esAdmin }) {
           <div style={s.detalleLogoBox}>
             {c.logo_url
               ? <img src={c.logo_url} alt="" style={s.detalleLogoImg} />
-              : <div style={{ ...s.detalleLogoFallback, fontSize: 34 }}>{catInfo.emoji}</div>}
+              : <div style={s.detalleLogoFallback}>{iniciales(c.name)}</div>}
           </div>
           {isPremium && (
             <div style={s.logoVerifiedBadge}>
@@ -768,126 +690,25 @@ function ComercioDetalle({ c, userCoords, onClose, onEditar, esAdmin }) {
               <p style={s.detalleDesc}>{c.description}</p>
             )}
 
-            {/* ── BANNER BENEFICIO (discount_text) — RE-HABILITADO ──
-                Banner verde premium con el descuento del comercio (discount_text).
-                Mismo diseño que las promos: gradiente verde, shimmer animado,
-                patrón de puntos, badge circular con icono de regalo, deco esquina.
-                Se muestra SOLO si el comercio tiene discount_text cargado.
-                Si el descuento no corresponde, el admin lo edita en el editor
-                de comercios (campo "Texto del descuento"). */}
-            {c.discount_text && c.discount_text.trim() && (
+            {/* ── BANNER BENEFICIO RE-DISEÑADO (premium quality) ── */}
+            {c.discount_text && (
               <div style={s.beneficioCard}>
                 <div style={s.beneficioPattern} />
+                {/* Overlay shimmer — franja de luz que pasa de izq a der, tenue */}
                 <div style={s.beneficioShimmer} />
                 <div style={s.beneficioInner}>
                   <div style={s.beneficioBadge}>
                     <Ico.gift size={20} color="#fff" />
                   </div>
                   <div style={s.beneficioContent}>
-                    <div style={s.beneficioLabel}>Descuento El Barrio</div>
-                    <div style={s.beneficioTextShine}>{c.discount_text}</div>
+                    <div style={s.beneficioLine}>
+                      <span style={s.beneficioLabel}>Descuento el barrio</span>
+                      <span style={s.beneficioSep}>|</span>
+                      <span style={s.beneficioTextShine}>{c.discount_text}</span>
+                    </div>
                   </div>
                 </div>
                 <div style={s.beneficioDeco} />
-              </div>
-            )}
-
-            {/* ── PROMOCIONES — BANNER VERDE PREMIUM ──
-                Cada promo usa el MISMO banner verde que el beneficio
-                (gradiente verde, shimmer animado, patrón de puntos,
-                badge circular con icono, deco esquina).
-                El banner verde que pediste 340 veces.
-                Para admin: botón 🗑️ para borrar promo directamente. */}
-            {promosVisibles.length > 0 && (
-              <div style={{ marginTop: 14, marginBottom: 14, display: 'flex', flexDirection: 'column', gap: 10 }}>
-                {promosVisibles.map((p) => {
-                  const vigente = p._vigente
-                  return (
-                    <div key={p.id} style={{ ...s.beneficioCard, position: 'relative' }}>
-                      {/* Botón BORRAR (solo admin) — esquina sup-der del banner,
-                          MÁS GRANDE y con texto "Borrar" para que se vea claro. */}
-                      {esAdmin && (
-                        <button
-                          onClick={() => borrarPromo(p.id)}
-                          disabled={borrandoPromoId === p.id}
-                          style={{
-                            position: 'absolute', top: 8, right: 8, zIndex: 20,
-                            minHeight: 34, borderRadius: 9,
-                            padding: '6px 12px',
-                            background: 'rgba(220,38,38,0.92)',
-                            border: '1.5px solid rgba(255,255,255,0.65)',
-                            color: '#fff', fontSize: 12.5, fontWeight: 800,
-                            cursor: 'pointer',
-                            display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 5,
-                            fontFamily: 'inherit',
-                            boxShadow: '0 3px 10px rgba(0,0,0,0.28)',
-                            letterSpacing: '0.2px',
-                          }}
-                          aria-label="Borrar promoción"
-                          title="Borrar esta promoción"
-                        >
-                          {borrandoPromoId === p.id
-                            ? <span style={{ fontSize: 12 }}>Borrando…</span>
-                            : (<><span style={{ fontSize: 14 }}>🗑️</span><span>Borrar</span></>)}
-                        </button>
-                      )}
-                      {/* Imagen de la promo (si existe) — arriba del banner, redondeada */}
-                      {p.image_url && (
-                        <img src={p.image_url} alt=""
-                          style={{
-                            position: 'relative', zIndex: 2,
-                            width: '100%', height: 150, objectFit: 'cover',
-                            borderRadius: 12, marginBottom: 12, display: 'block',
-                            border: '1.5px solid rgba(255,255,255,0.3)',
-                            boxShadow: '0 2px 10px rgba(0,0,0,0.18)',
-                          }}
-                          loading="lazy" />
-                      )}
-                      <div style={s.beneficioPattern} />
-                      <div style={s.beneficioShimmer} />
-                      <div style={s.beneficioInner}>
-                        <div style={s.beneficioBadge}>
-                          <Ico.gift size={20} color="#fff" />
-                        </div>
-                        <div style={s.beneficioContent}>
-                          <div style={{
-                            fontSize: 10.5, fontWeight: 800, color: 'rgba(255,255,255,0.92)',
-                            textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 3,
-                          }}>
-                            Promoción
-                          </div>
-                          <div style={{
-                            fontSize: 16.5, fontWeight: 800, color: '#fff',
-                            lineHeight: 1.22, marginBottom: p.description ? 5 : 7,
-                            letterSpacing: '-0.2px',
-                            paddingRight: esAdmin ? 92 : 0,
-                          }}>
-                            {p.title || 'Promoción'}
-                          </div>
-                          {p.description && (
-                            <div style={{
-                              fontSize: 12.5, color: 'rgba(255,255,255,0.88)',
-                              lineHeight: 1.45, marginBottom: 8,
-                            }}>
-                              {p.description}
-                            </div>
-                          )}
-                          <div style={{
-                            display: 'inline-flex', alignItems: 'center', gap: 4,
-                            fontSize: 11, fontWeight: 800,
-                            color: '#fff',
-                            background: vigente ? 'rgba(255,255,255,0.22)' : 'rgba(0,0,0,0.22)',
-                            padding: '4px 10px', borderRadius: 999,
-                            border: '1px solid rgba(255,255,255,0.35)',
-                          }}>
-                            {vigente ? '⏰ Vigente' : '⏰ Vencida'}
-                          </div>
-                        </div>
-                      </div>
-                      <div style={s.beneficioDeco} />
-                    </div>
-                  )
-                })}
               </div>
             )}
 
@@ -974,39 +795,42 @@ function ComercioDetalle({ c, userCoords, onClose, onEditar, esAdmin }) {
           </div>
         </div>
 
-        {/* ── FOOTER: BARRA DE ACCIÓN INFERIOR ──
-            Para TODOS los comercios (premium + no premium).
-            WhatsApp (verde WhatsApp) + Llamar (verde marca) + Instagram (rosa).
-            Cada botón solo se muestra si el dato existe (c.phone, c.instagram).
-            Si NO hay ninguno de los tres, mostramos un placeholder pequeño
-            para no romper el layout. */}
-        {/* ── FOOTER: BOTONES CIRCULARES ──
-            3 botones circulares (como en la referencia):
-            WhatsApp (verde WhatsApp) + Llamar (verde marca) + Instagram (rosa).
-            Solo icono, sin texto. Centrados, con gap. */}
-        <div style={s.ctaRow}>
-          {wa && (
-            <a href={wa} target="_blank" rel="noreferrer"
-              style={{ ...s.ctaBtn, ...s.ctaWhatsapp }}
-              aria-label="WhatsApp" title="WhatsApp">
-              <Ico.whatsapp size={24} color="#fff" />
+        {/* ── FOOTER: CTAs ── */}
+        {isPremium ? (
+          /* PREMIUM: fila de CTAs (WhatsApp + Llamar + Instagram) */
+          <div style={s.ctaRow}>
+            {wa && (
+              <a href={wa} target="_blank" rel="noreferrer" style={{ ...s.ctaBtn, ...s.ctaWhatsapp }} aria-label="WhatsApp">
+                <Ico.whatsapp size={22} color="#fff" />
+              </a>
+            )}
+            {telLink && (
+              <a href={telLink} style={{ ...s.ctaBtn, ...s.ctaCall }} aria-label="Llamar">
+                <Ico.phoneFill size={20} color="#fff" />
+              </a>
+            )}
+            {igUrl && (
+              <a href={igUrl} target="_blank" rel="noreferrer" style={{ ...s.ctaBtn, ...s.ctaInstagram }} aria-label="Instagram">
+                <Ico.instagram size={20} color="#fff" />
+              </a>
+            )}
+          </div>
+        ) : (
+          /* NORMAL: solo botón WhatsApp grande full-width */
+          wa ? (
+            <a
+              href={wa}
+              target="_blank"
+              rel="noreferrer"
+              style={s.detalleWaBtn}
+            >
+              <Ico.whatsapp size={20} color="#fff" />
+              <span>Contactar por WhatsApp</span>
             </a>
-          )}
-          {telLink && (
-            <a href={telLink}
-              style={{ ...s.ctaBtn, ...s.ctaCall }}
-              aria-label="Llamar" title="Llamar">
-              <Ico.phoneFill size={22} color="#fff" />
-            </a>
-          )}
-          {igUrl && (
-            <a href={igUrl} target="_blank" rel="noreferrer"
-              style={{ ...s.ctaBtn, ...s.ctaInstagram }}
-              aria-label="Instagram" title="Instagram">
-              <Ico.instagram size={22} color="#fff" />
-            </a>
-          )}
-        </div>
+          ) : (
+            <div style={s.detalleWaPlaceholder} />
+          )
+        )}
       </div>
 
       {/* ── LIGHTBOX (fullscreen al tocar una foto de la galería) ──
@@ -1108,7 +932,7 @@ function Comercios({ currentUser, onNavigate, onCrear, onEditar }) {
     return true
   })
 
-  const esAdmin = profile?.role === 'admin' || profile?.is_admin === true
+  const esAdmin = profile?.is_admin || profile?.role === 'admin' || profile?.is_operator
 
   const onAbrirComercio = (c) => setSeleccionado(c)
 
@@ -1371,35 +1195,6 @@ const s = {
     overflow: 'hidden',
   },
   coverImg: { width: '100%', height: '100%', objectFit: 'cover' },
-
-  /* ── SLIDER de imágenes en el feed (CardGrande) ── */
-  feedSlider: {
-    display: 'flex',
-    width: '100%',
-    height: '100%',
-    overflowX: 'auto',
-    scrollSnapType: 'x mandatory',
-    scrollbarWidth: 'none',
-    WebkitOverflowScrolling: 'touch',
-    cursor: 'grab',
-  },
-  feedSliderSlide: {
-    flex: '0 0 100%',
-    width: '100%',
-    height: '100%',
-    scrollSnapAlign: 'start',
-    overflow: 'hidden',
-  },
-  feedSliderCount: {
-    position: 'absolute',
-    top: 8, right: 8,
-    background: 'rgba(0,0,0,0.55)',
-    color: '#fff',
-    fontSize: 11, fontWeight: 700,
-    padding: '3px 9px', borderRadius: 999,
-    display: 'flex', alignItems: 'center', gap: 3,
-    backdropFilter: 'blur(4px)',
-  },
   coverEmpty: {
     width: '100%', height: '100%',
     display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -1477,13 +1272,11 @@ const s = {
 
   beneficioPill: {
     display: 'inline-flex', alignItems: 'center', gap: 6,
-    background: `linear-gradient(135deg, ${C.verde}, ${C.verdeOsc})`,
-    color: '#fff',
-    border: 'none',
-    padding: '6px 12px', borderRadius: 9,
-    fontSize: 12.5, fontWeight: 800,
+    background: C.verdeSuave, color: C.verde,
+    border: `1px solid ${C.verde}30`,
+    padding: '5px 10px', borderRadius: 9,
+    fontSize: 12, fontWeight: 700,
     marginBottom: 9,
-    boxShadow: '0 2px 8px rgba(22,163,74,0.25)',
   },
 
   ubicacionRow: {
@@ -1977,35 +1770,24 @@ const s = {
     flexShrink: 0,
   },
 
-  /* ══════ BOTONES CIRCULARES INFERIORES (WhatsApp + Llamar + Instagram) ══════
-     Botones circulares con solo icono, centrados, con gap.
-     Como en la referencia que mandó el usuario. */
+  /* ══════ CTAs premium (fila de 4 botones) ══════ */
   ctaRow: {
     display: 'flex',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 16,
-    padding: '16px 20px 20px',
+    width: '100%',
     flexShrink: 0,
-    background: C.card,
-    borderTop: `1px solid ${C.borde}`,
+    gap: 1,
+    background: C.borde,
+    boxShadow: '0 -4px 14px rgba(0,0,0,0.08)',
   },
   ctaBtn: {
-    width: 56,
-    height: 56,
-    borderRadius: '50%',
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-    justifyContent: 'center',
+    flex: 1,
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    padding: '16px 8px',
     textDecoration: 'none',
     border: 'none',
     cursor: 'pointer',
     color: '#fff',
-    transition: 'transform .15s ease, filter .15s ease',
-    fontFamily: 'inherit',
-    boxShadow: '0 3px 10px rgba(0,0,0,0.15)',
+    transition: 'filter .15s ease',
   },
   ctaWhatsapp: {
     background: C.whatsapp,
