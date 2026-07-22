@@ -27,7 +27,7 @@ import { DIAS_SEMANA } from '../lib/horarios'
     · "cerrado hoy"                    (si no abre hoy)
     Nada en negrita.
 
-  Modal (PREMIUM quality):
+  Ficha completa (solo comercios destacados):
     · Sheet 97% del viewport → casi sin gap arriba.
     · Cover solo si is_premium (con ribbon + gradiente inferior).
     · Logo grande (76px) centrado, mitad sobre cover / mitad body.
@@ -373,7 +373,11 @@ function CardGrande({ c, userCoords, onAbrir }) {
           <div style={s.nombreGrande}>{c.name}</div>
         </div>
         <div style={s.featuredMeta}>
-          <span><Ico.star size={10} color="#687069" /> {Number(c.rating) > 0 ? Number(c.rating).toFixed(1) : 'Nuevo'}{dist ? ` · ${dist}` : ''}</span>
+          <span style={s.feedSocialMeta}>
+            <span style={s.feedRatingMeta}><Ico.star size={10} color="#687069" /> {Number(c.rating) > 0 ? Number(c.rating).toFixed(1) : 'Nuevo'}</span>
+            <span style={s.feedFavoriteMeta}>♥ {Number(c.favorites_count) || 0}</span>
+            {dist && <span>· {dist}</span>}
+          </span>
           <span style={{ color: horario?.abierto ? C.verdeOsc : C.textoTenue }}>{horario?.abierto ? 'Abierto' : 'Cerrado'}</span>
         </div>
       </div>
@@ -384,64 +388,124 @@ function CardGrande({ c, userCoords, onAbrir }) {
 /* ════════════════════════════════════════════════════════════
    CARD COMPACTA (no premium) — feed
    ════════════════════════════════════════════════════════════ */
-function CardCompacta({ c, userCoords, onToggle }) {
+function CardCompacta({ c, userCoords, expanded, onToggle }) {
   const cats = c.categories?.length ? c.categories : (c.category ? [c.category] : [])
   const horario = horarioFeed(c.opening_hours)
   const metros = haversine(userCoords?.lat, userCoords?.lng, c.lat, c.lng)
   const dist = distancia(metros)
   const catInfo = COMERCIOS[cats[0]] || COMERCIOS['Otro']
-  const resumen = c.description || cats[0] || 'Comercio del barrio'
+  const resumen = cats.length ? `${catInfo.emoji} ${cats.join(' · ')}` : 'Comercio del barrio'
+  const whatsapp = waLink(c.whatsapp || c.phone)
+  const mapsUrl = c.lat != null && c.lng != null
+    ? `https://www.google.com/maps/search/?api=1&query=${c.lat},${c.lng}`
+    : (c.address ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(c.address)}` : null)
 
   return (
-    <div style={s.cardCompacta} onClick={() => onToggle(c.id)}>
-      <div style={s.logoCuadrado}>
-        {c.cover_url || c.logo_url
-          ? <img src={c.cover_url || c.logo_url} alt="" style={s.logoCuadradoImg} />
-          : <div style={{ ...s.logoCuadradoFallback, background: catInfo.bg }}>
-              <span style={{ fontSize: 22 }}>{catInfo.emoji}</span>
-            </div>}
+    <div style={{ ...s.cardCompacta, ...(expanded ? s.cardCompactaExpanded : {}) }} onClick={() => onToggle(c.id)}>
+      <div style={s.cardCompactaTopRow}>
+        <div style={s.logoCuadrado}>
+          {c.cover_url || c.logo_url
+            ? <img src={c.cover_url || c.logo_url} alt="" style={s.logoCuadradoImg} />
+            : <div style={{ ...s.logoCuadradoFallback, background: catInfo.bg }}>
+                <span style={{ fontSize: 22 }}>{catInfo.emoji}</span>
+              </div>}
+        </div>
+
+        <div style={s.cardCompactaBody}>
+          <div style={s.compactTitleRow}>
+            <div style={s.nombreCompacto}>{c.name}</div>
+            <span style={{
+              ...s.estadoBadge,
+              background: horario?.abierto ? '#86efac' : '#dbe3ef',
+              color: horario?.abierto ? '#075b2c' : '#46515e',
+            }}>{horario?.abierto ? 'ABIERTO' : 'CERRADO'}</span>
+          </div>
+          <div style={s.compactDescription}>{resumen}</div>
+          <div style={s.compactMeta}>
+            <Ico.star size={10} color={C.verdeOsc} />
+            <strong>{Number(c.rating) > 0 ? Number(c.rating).toFixed(1) : 'Nuevo'}</strong>
+            <span style={s.feedFavoriteMeta}>♥ {Number(c.favorites_count) || 0}</span>
+            {dist && <><span>·</span><span>{dist}</span></>}
+          </div>
+        </div>
+
+        <span style={{ ...s.cardCompactaChev, transform: expanded ? 'rotate(90deg)' : 'none' }}>
+          <Ico.chevron size={22} color={C.verdeOsc} />
+        </span>
       </div>
 
-      <div style={s.cardCompactaBody}>
-        <div style={s.compactTitleRow}>
-          <div style={s.nombreCompacto}>{c.name}</div>
-          <span style={{
-            ...s.estadoBadge,
-            background: horario?.abierto ? '#86efac' : '#dbe3ef',
-            color: horario?.abierto ? '#075b2c' : '#46515e',
-          }}>{horario?.abierto ? 'ABIERTO' : 'CERRADO'}</span>
-        </div>
-        <div style={s.compactDescription}>{resumen}</div>
-        <div style={s.compactMeta}>
-          <Ico.star size={10} color={C.verdeOsc} />
-          <strong>{Number(c.rating) > 0 ? Number(c.rating).toFixed(1) : 'Nuevo'}</strong>
-          {dist && <><span>·</span><span>{dist}</span></>}
+      <div
+        className="commerce-basic-motion"
+        aria-hidden={!expanded}
+        style={{
+          ...s.expandMotion,
+          maxHeight: expanded ? 420 : 0,
+          opacity: expanded ? 1 : 0,
+          transform: expanded ? 'translateY(0)' : 'translateY(-6px)',
+          pointerEvents: expanded ? 'auto' : 'none',
+        }}
+      >
+        <div style={s.expandMotionInner}>
+          <div
+            style={{
+              ...s.cardCompactaExpand,
+              transform: expanded ? 'translateY(0)' : 'translateY(-8px)',
+            }}
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div style={s.expandCategories}>
+              {cats.map(category => {
+                const info = COMERCIOS[category] || COMERCIOS['Otro']
+                return <span key={category} style={{ ...s.expandCategoryChip, background: info.bg, color: info.color }}>{info.emoji} {category}</span>
+              })}
+            </div>
+            {c.description && <p style={s.expandDescription}>{c.description}</p>}
+            {horario && (
+              <div style={s.expandInfoRow}>
+                <span style={s.expandInfoIcon}><Ico.clock size={14} color={C.verdeOsc} /></span>
+                <HorarioBloque horario={horario} size="sm" />
+              </div>
+            )}
+            {c.address && (
+              <div style={s.expandInfoRow}>
+                <span style={s.expandInfoIcon}><Ico.pin size={14} color={C.verdeOsc} /></span>
+                <span style={s.expandInfoText}>{c.address}{dist ? ` · ${dist}` : ''}</span>
+              </div>
+            )}
+            <div style={s.basicActions}>
+              {whatsapp && <a href={whatsapp} target="_blank" rel="noreferrer" tabIndex={expanded ? 0 : -1} style={s.basicWhatsapp}><Ico.whatsapp size={16} color="#fff" /> WhatsApp</a>}
+              {mapsUrl && <a href={mapsUrl} target="_blank" rel="noreferrer" tabIndex={expanded ? 0 : -1} style={s.basicMaps}><Ico.pin size={16} color={C.verdeOsc} /> Cómo llegar</a>}
+            </div>
+          </div>
         </div>
       </div>
-
-      <span style={s.cardCompactaChev}>
-        <Ico.chevron size={22} color={C.verdeOsc} />
-      </span>
     </div>
   )
 }
 
 /* ════════════════════════════════════════════════════════════
-   MODAL DE DETALLE — PREMIUM QUALITY
-   · Premium: carrusel (cover + gallery) + 4 CTAs + sello verificado
-   · Normal: sin cover (solo header colorido), solo WhatsApp
+   MODAL DE DETALLE — COMERCIOS DESTACADOS
+   · Carrusel (cover + gallery) + CTAs + sello destacado
    · Dropdown VER UBICACIÓN (mapa)
    · Horario al lado del nombre (resumen, sin dropdown semanal)
    ════════════════════════════════════════════════════════════ */
-function ComercioDetalle({ c, userCoords, onClose, onEditar, esAdmin }) {
+function ComercioDetalle({ c, userCoords, profile, onClose, onEditar, esAdmin, closing = false }) {
   const [mapaOpen, setMapaOpen] = useState(false)
   const [fotoIdx, setFotoIdx] = useState(0)
   const [lightbox, setLightbox] = useState(null)
   const [favorito, setFavorito] = useState(false)
+  const [favoriteCount, setFavoriteCount] = useState(Number(c.favorites_count) || 0)
+  const [favoriteSaving, setFavoriteSaving] = useState(false)
   const [shareOpen, setShareOpen] = useState(false)
   const [copiado, setCopiado] = useState(false)
   const [promos, setPromos] = useState([])
+  const [products, setProducts] = useState([])
   const [reviews, setReviews] = useState([])
+  const [reviewOpen, setReviewOpen] = useState(false)
+  const [reviewDraft, setReviewDraft] = useState({ rating: 0, comment: '' })
+  const [reviewSaving, setReviewSaving] = useState(false)
+  const [reviewError, setReviewError] = useState('')
+  const [showAllProducts, setShowAllProducts] = useState(false)
   const mapaRef = useRef(null)
   const galeriaRef = useRef(null)
   const galeriaPausaRef = useRef(false)
@@ -450,14 +514,114 @@ function ComercioDetalle({ c, userCoords, onClose, onEditar, esAdmin }) {
     let active = true
     Promise.all([
       supabase.from('commerce_promos').select('*').eq('commerce_id', c.id).eq('is_active', true).order('created_at', { ascending: false }).limit(8),
-      supabase.from('commerce_reviews').select('*').eq('commerce_id', c.id).order('created_at', { ascending: false }).limit(6),
-    ]).then(([promoResult, reviewResult]) => {
+      supabase.from('commerce_reviews').select('*').eq('commerce_id', c.id).order('created_at', { ascending: false }).limit(20),
+      supabase.from('commerce_products').select('*').eq('commerce_id', c.id).eq('is_available', true).order('is_featured', { ascending: false }).order('sort_order', { ascending: true }).order('created_at', { ascending: false }).limit(12),
+    ]).then(([promoResult, reviewResult, productResult]) => {
       if (!active) return
       setPromos(promoResult.data || [])
       setReviews(reviewResult.data || [])
+      setProducts(productResult.data || [])
     })
     return () => { active = false }
   }, [c.id])
+
+  useEffect(() => {
+    setFavoriteCount(Number(c.favorites_count) || 0)
+    if (!profile?.id) {
+      setFavorito(false)
+      return
+    }
+
+    let active = true
+    supabase
+      .from('commerce_favorites')
+      .select('id')
+      .eq('commerce_id', c.id)
+      .eq('profile_id', profile.id)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (active) setFavorito(!!data)
+      })
+    return () => { active = false }
+  }, [c.id, c.favorites_count, profile?.id])
+
+  const toggleFavorite = async () => {
+    if (!profile?.id || favoriteSaving) return
+    const nextFavorite = !favorito
+    setFavoriteSaving(true)
+    setFavorito(nextFavorite)
+    setFavoriteCount(current => Math.max(0, current + (nextFavorite ? 1 : -1)))
+
+    const request = nextFavorite
+      ? supabase.from('commerce_favorites').insert({ commerce_id: c.id, profile_id: profile.id })
+      : supabase.from('commerce_favorites').delete().eq('commerce_id', c.id).eq('profile_id', profile.id)
+    const { error } = await request
+    setFavoriteSaving(false)
+
+    if (error) {
+      setFavorito(!nextFavorite)
+      setFavoriteCount(current => Math.max(0, current + (nextFavorite ? -1 : 1)))
+      console.error('[commerce_favorites] No se pudo actualizar el favorito:', error)
+    }
+  }
+
+  const ownReview = profile?.id
+    ? reviews.find(review => review.reviewer_id === profile.id)
+    : null
+
+  const openReview = () => {
+    setReviewDraft({
+      rating: Number(ownReview?.rating) || 0,
+      comment: ownReview?.comment || '',
+    })
+    setReviewError('')
+    setReviewOpen(true)
+  }
+
+  const saveReview = async event => {
+    event.preventDefault()
+    const comment = reviewDraft.comment.trim()
+    if (!profile?.id) {
+      setReviewError('Necesitas un perfil verificado para opinar.')
+      return
+    }
+    if (reviewDraft.rating < 1 || reviewDraft.rating > 5) {
+      setReviewError('Selecciona entre 1 y 5 estrellas.')
+      return
+    }
+    if (comment.length < 4) {
+      setReviewError('Cuéntanos un poco más sobre tu experiencia.')
+      return
+    }
+
+    setReviewSaving(true)
+    setReviewError('')
+    const payload = {
+      commerce_id: c.id,
+      author_id: profile.id,
+      reviewer_id: profile.id,
+      reviewer_name: profile.full_name || 'Vecino del barrio',
+      reviewer_avatar_url: profile.avatar_url || null,
+      rating: reviewDraft.rating,
+      comment,
+      updated_at: new Date().toISOString(),
+    }
+    const { data, error } = await supabase
+      .from('commerce_reviews')
+      .upsert(payload, { onConflict: 'commerce_id,reviewer_id' })
+      .select()
+      .single()
+    setReviewSaving(false)
+
+    if (error) {
+      console.error('[commerce_reviews] No se pudo guardar la opinión:', error)
+      setReviewError(`No pudimos guardar tu opinión: ${error.message || 'error desconocido'}`)
+      return
+    }
+
+    setReviews(current => [data, ...current.filter(review => review.id !== data.id && review.reviewer_id !== profile.id)])
+    setReviewOpen(false)
+  }
 
   // Scroll automático al mapa cuando se abre el dropdown
   useEffect(() => {
@@ -514,14 +678,13 @@ function ComercioDetalle({ c, userCoords, onClose, onEditar, esAdmin }) {
     setTimeout(() => setCopiado(false), 1800)
   }
 
-  /* Galería real del comercio. El cover_url se usa aparte como hero. */
+  /* Galería real del comercio. La portada pertenece solo al hero y no debe
+     crear una tarjeta de galería cuando no hay imágenes adicionales. */
   const galleryRaw = Array.isArray(c.gallery) ? c.gallery.filter(Boolean) : []
-  const gallery = [
-    c.cover_url ? { url: c.cover_url, label: null } : null,
-    ...galleryRaw.map((item) => typeof item === 'string'
+  const gallery = galleryRaw
+    .map((item) => typeof item === 'string'
       ? { url: item, label: null }
-      : { url: item?.url || item?.image_url, label: item?.label || item?.title || null }),
-  ]
+      : { url: item?.url || item?.image_url, label: item?.label || item?.title || null })
     .filter(item => item?.url)
     .filter((item, index, all) => all.findIndex(candidate => candidate.url === item.url) === index)
   /* Foto principal del hero: cover_url, o primera de gallery si no hay cover. */
@@ -531,10 +694,32 @@ function ComercioDetalle({ c, userCoords, onClose, onEditar, esAdmin }) {
   const igUrl = c.instagram
     ? (c.instagram.startsWith('http') ? c.instagram : `https://instagram.com/${c.instagram.replace(/^@/, '')}`)
     : null
+  const formatProductPrice = (product) => {
+    if (product.price == null) return 'Consultar'
+    const price = Number(product.price)
+    if (!Number.isFinite(price)) return 'Consultar'
+    const formatted = `$${Math.round(price).toLocaleString('es-CL')}`
+    return product.unit_label ? `${formatted} / ${product.unit_label}` : formatted
+  }
+  const featuredProducts = products.filter(product => product.is_featured)
+  const regularProducts = products.filter(product => !product.is_featured)
+  const visibleRegularProducts = showAllProducts ? regularProducts : regularProducts.slice(0, 4)
 
   return (
-    <div style={s.detalleBackdrop} onClick={onClose}>
-      <div style={s.detalleSheet} onClick={(e) => e.stopPropagation()}>
+    <div
+      style={{
+        ...s.detalleBackdrop,
+        animation: `${closing ? 'commerceDetailBackdropOut' : 'commerceDetailBackdropIn'} ${closing ? 260 : 320}ms ease both`,
+      }}
+      onClick={onClose}
+    >
+      <div
+        style={{
+          ...s.detalleSheet,
+          animation: `${closing ? 'commerceDetailSlideOut' : 'commerceDetailSlideIn'} ${closing ? 260 : 320}ms cubic-bezier(0.22, 1, 0.36, 1) both`,
+        }}
+        onClick={(e) => e.stopPropagation()}
+      >
         <div style={s.detalleScroll}>
 
         {/* ── Keyframes globales del modal (shimmer del banner de descuento) ── */}
@@ -599,7 +784,8 @@ function ComercioDetalle({ c, userCoords, onClose, onEditar, esAdmin }) {
             </button>
             <button
               style={{ ...s.detalleShareFloat, ...(favorito ? s.detalleFavoriteActive : {}) }}
-              onClick={() => setFavorito(v => !v)}
+              onClick={toggleFavorite}
+              disabled={favoriteSaving}
               aria-label={favorito ? 'Quitar de favoritos' : 'Guardar como favorito'}
             >
               <Ico.heart size={18} color={favorito ? '#fff' : '#fff'} filled={favorito} />
@@ -612,7 +798,10 @@ function ComercioDetalle({ c, userCoords, onClose, onEditar, esAdmin }) {
             <section style={s.commerceInfoCard}>
               <div style={s.commerceTitleRow}>
                 <h2 style={s.commerceTitle}>{c.name}</h2>
-                {Number(c.rating) > 0 && <span style={s.commerceRating}>★ {Number(c.rating).toFixed(1)}</span>}
+                <div style={s.commerceSocialStats}>
+                  {Number(c.rating) > 0 && <span style={s.commerceRating}>★ {Number(c.rating).toFixed(1)}</span>}
+                  <span style={{ ...s.commerceFavoriteCount, ...(favorito ? s.commerceFavoriteCountActive : {}) }}>♥ {favoriteCount}</span>
+                </div>
               </div>
               <div style={s.commerceStatus}><HorarioBloque horario={horario} /></div>
               {c.address && (
@@ -674,6 +863,61 @@ function ComercioDetalle({ c, userCoords, onClose, onEditar, esAdmin }) {
               </section>
             )}
 
+            {featuredProducts.length > 0 && (
+              <section style={s.commerceProductsSection}>
+                <div style={s.commerceSectionHeader}>
+                  <div style={s.commerceSectionTitles}><strong>Productos destacados</strong><small>Selección del comercio</small></div>
+                </div>
+                <div style={s.commerceProductsScroll}>
+                  {featuredProducts.map(product => (
+                    <article key={product.id} style={s.commerceProductCard}>
+                      <div style={s.commerceProductImageWrap}>
+                        {product.image_url
+                          ? <img src={product.image_url} alt={product.name} style={s.commerceProductImage} />
+                          : <div style={s.commerceProductFallback}><Ico.gift size={24} color={C.verde} /></div>}
+                        <span style={s.commerceProductFeaturedBadge}>★ Recomendado</span>
+                      </div>
+                      <div style={s.commerceProductBody}>
+                        <strong style={s.commerceProductName}>{product.name}</strong>
+                        {product.description && <span style={s.commerceProductDescription}>{product.description}</span>}
+                        <span style={s.commerceProductPrice}>{formatProductPrice(product)}</span>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              </section>
+            )}
+
+            {regularProducts.length > 0 && (
+              <section style={s.commerceProductListSection}>
+                <div style={s.commerceSectionHeader}>
+                  <div style={s.commerceSectionTitles}>
+                    <strong>{featuredProducts.length ? 'Más productos' : 'Productos del comercio'}</strong>
+                    <small>{regularProducts.length} {regularProducts.length === 1 ? 'producto disponible' : 'productos disponibles'}</small>
+                  </div>
+                </div>
+                <div style={s.commerceProductList}>
+                  {visibleRegularProducts.map(product => (
+                    <article key={product.id} style={s.commerceProductRow}>
+                      {product.image_url
+                        ? <img src={product.image_url} alt={product.name} style={s.commerceProductRowImage} />
+                        : <div style={s.commerceProductRowFallback}><Ico.gift size={18} color={C.verde} /></div>}
+                      <div style={s.commerceProductRowBody}>
+                        <strong>{product.name}</strong>
+                        {product.description && <span>{product.description}</span>}
+                      </div>
+                      <strong style={s.commerceProductRowPrice}>{formatProductPrice(product)}</strong>
+                    </article>
+                  ))}
+                </div>
+                {regularProducts.length > 4 && (
+                  <button type="button" style={s.commerceProductShowAll} onClick={() => setShowAllProducts(value => !value)}>
+                    {showAllProducts ? 'Ver menos' : `Ver todo el catálogo (${regularProducts.length})`}
+                  </button>
+                )}
+              </section>
+            )}
+
             {gallery.length > 0 && (
               <section style={s.commerceGallerySection}>
                 <div style={s.commerceSectionHeader}>
@@ -694,6 +938,14 @@ function ComercioDetalle({ c, userCoords, onClose, onEditar, esAdmin }) {
               <div style={s.commerceSectionHeader}>
                 <div style={s.commerceSectionTitles}><strong>Opiniones de vecinos</strong><small>{reviews.length ? `${reviews.length} opiniones` : 'La confianza se construye entre vecinos'}</small></div>
               </div>
+              <button type="button" style={s.commerceReviewAction} onClick={openReview}>
+                <span style={s.commerceReviewActionIcon}>★</span>
+                <span style={s.commerceReviewActionCopy}>
+                  <strong>{ownReview ? 'Editar mi opinión' : 'Deja tu opinión'}</strong>
+                  <small>{ownReview ? 'Actualiza tu experiencia' : 'Ayuda a otros vecinos a elegir'}</small>
+                </span>
+                <span style={s.commerceReviewActionArrow}>›</span>
+              </button>
               {reviews.length > 0 ? reviews.map((review) => {
                 const score = Math.max(0, Math.min(5, Number(review.rating) || 0))
                 return (
@@ -861,6 +1113,50 @@ function ComercioDetalle({ c, userCoords, onClose, onEditar, esAdmin }) {
           </div>
         </div>
       )}
+
+      {reviewOpen && (
+        <div style={s.reviewFormBackdrop} onClick={() => !reviewSaving && setReviewOpen(false)}>
+          <form style={s.reviewFormSheet} onSubmit={saveReview} onClick={event => event.stopPropagation()}>
+            <div style={s.reviewFormHandle} />
+            <div style={s.reviewFormHeader}>
+              <div style={s.reviewFormTitles}>
+                <strong style={s.reviewFormTitle}>{ownReview ? 'Edita tu opinión' : 'Deja tu opinión'}</strong>
+                <span style={s.reviewFormSubtitle}>{c.name}</span>
+              </div>
+              <button type="button" style={s.reviewFormClose} onClick={() => setReviewOpen(false)} disabled={reviewSaving}>×</button>
+            </div>
+            <div style={s.reviewStarsPicker} aria-label="Calificación">
+              {[1, 2, 3, 4, 5].map(star => (
+                <button
+                  type="button"
+                  key={star}
+                  style={s.reviewStarButton}
+                  onClick={() => setReviewDraft(current => ({ ...current, rating: star }))}
+                  aria-label={`${star} ${star === 1 ? 'estrella' : 'estrellas'}`}
+                  aria-pressed={reviewDraft.rating === star}
+                >
+                  {star <= reviewDraft.rating ? '★' : '☆'}
+                </button>
+              ))}
+            </div>
+            <textarea
+              style={s.reviewFormTextarea}
+              value={reviewDraft.comment}
+              onChange={event => setReviewDraft(current => ({ ...current, comment: event.target.value }))}
+              placeholder="Cuéntales a tus vecinos cómo fue tu experiencia…"
+              maxLength={800}
+              rows={4}
+            />
+            <div style={s.reviewFormMeta}>
+              <span>{reviewDraft.comment.length}/800</span>
+              {reviewError && <strong>{reviewError}</strong>}
+            </div>
+            <button type="submit" style={s.reviewFormSubmit} disabled={reviewSaving}>
+              {reviewSaving ? 'Guardando…' : ownReview ? 'Guardar cambios' : 'Publicar opinión'}
+            </button>
+          </form>
+        </div>
+      )}
     </div>
   )
 }
@@ -875,8 +1171,15 @@ function Comercios({ currentUser, onNavigate, onCrear, onEditar }) {
   const [cat, setCat] = useState('Todas')
   const [userCoords, setUserCoords] = useState(null)
   const [seleccionado, setSeleccionado] = useState(null)
+  const [cerrandoDetalle, setCerrandoDetalle] = useState(false)
+  const [expandidoId, setExpandidoId] = useState(null)
   const [searchOpen, setSearchOpen] = useState(false)
   const [busqueda, setBusqueda] = useState('')
+  const [featuredIndex, setFeaturedIndex] = useState(0)
+  const [featuredOrder, setFeaturedOrder] = useState([])
+  const featuredScrollRef = useRef(null)
+  const featuredPausedRef = useRef(false)
+  const featuredResumeTimerRef = useRef(null)
 
   useEffect(() => { cargar() }, [currentUser?.id])
 
@@ -915,7 +1218,14 @@ function Comercios({ currentUser, onNavigate, onCrear, onEditar }) {
         .order('name', { ascending: true })
 
       if (error) console.error('[comercios] Error cargando:', error)
-      setComercios(data || [])
+      const loadedCommerces = data || []
+      const premiumIds = loadedCommerces.filter(commerce => commerce.is_premium).map(commerce => commerce.id)
+      for (let index = premiumIds.length - 1; index > 0; index -= 1) {
+        const randomIndex = Math.floor(Math.random() * (index + 1))
+        ;[premiumIds[index], premiumIds[randomIndex]] = [premiumIds[randomIndex], premiumIds[index]]
+      }
+      setFeaturedOrder(premiumIds)
+      setComercios(loadedCommerces)
     } catch (err) {
       console.error('Error cargando comercios:', err)
     } finally {
@@ -935,9 +1245,89 @@ function Comercios({ currentUser, onNavigate, onCrear, onEditar }) {
   })
 
   const esAdmin = profile?.is_admin || profile?.role === 'admin' || profile?.is_operator
-  const destacados = filtrados.filter(c => c.is_premium)
+  const destacados = filtrados
+    .filter(c => c.is_premium)
+    .sort((first, second) => {
+      const firstPosition = featuredOrder.indexOf(first.id)
+      const secondPosition = featuredOrder.indexOf(second.id)
+      if (firstPosition === -1 || secondPosition === -1) return 0
+      return firstPosition - secondPosition
+    })
   const cercanos = filtrados.filter(c => !c.is_premium)
-  const onAbrirComercio = (c) => setSeleccionado(c)
+
+  const scrollFeaturedTo = (index) => {
+    const container = featuredScrollRef.current
+    const card = container?.children?.[index]
+    if (!container || !card) return
+    container.scrollTo({ left: Math.max(0, card.offsetLeft - 16), behavior: 'smooth' })
+    setFeaturedIndex(index)
+  }
+
+  const pauseFeatured = () => {
+    featuredPausedRef.current = true
+    if (featuredResumeTimerRef.current) clearTimeout(featuredResumeTimerRef.current)
+  }
+
+  const resumeFeatured = () => {
+    if (featuredResumeTimerRef.current) clearTimeout(featuredResumeTimerRef.current)
+    featuredResumeTimerRef.current = setTimeout(() => {
+      featuredPausedRef.current = false
+    }, 2600)
+  }
+
+  const syncFeaturedIndex = () => {
+    const container = featuredScrollRef.current
+    if (!container?.children?.length) return
+    const target = container.scrollLeft + 16
+    let nearest = 0
+    let nearestDistance = Infinity
+    Array.from(container.children).forEach((card, index) => {
+      const distanceToCard = Math.abs(card.offsetLeft - target)
+      if (distanceToCard < nearestDistance) {
+        nearest = index
+        nearestDistance = distanceToCard
+      }
+    })
+    setFeaturedIndex(nearest)
+  }
+
+  useEffect(() => {
+    if (destacados.length <= 1) {
+      setFeaturedIndex(0)
+      return undefined
+    }
+    const interval = setInterval(() => {
+      if (featuredPausedRef.current) return
+      setFeaturedIndex(current => {
+        const next = (current + 1) % destacados.length
+        const container = featuredScrollRef.current
+        const card = container?.children?.[next]
+        if (container && card) {
+          container.scrollTo({ left: Math.max(0, card.offsetLeft - 16), behavior: 'smooth' })
+        }
+        return next
+      })
+    }, 4200)
+    return () => {
+      clearInterval(interval)
+      if (featuredResumeTimerRef.current) clearTimeout(featuredResumeTimerRef.current)
+    }
+  }, [destacados.length])
+
+  const onAbrirComercio = (c) => {
+    setCerrandoDetalle(false)
+    setSeleccionado(c)
+  }
+  const onToggleComercio = (id) => setExpandidoId(current => current === id ? null : id)
+
+  const onCerrarDetalle = () => {
+    if (cerrandoDetalle) return
+    setCerrandoDetalle(true)
+    setTimeout(() => {
+      setSeleccionado(null)
+      setCerrandoDetalle(false)
+    }, 260)
+  }
 
   const onEditarComercio = (c) => {
     setSeleccionado(null)
@@ -960,8 +1350,30 @@ function Comercios({ currentUser, onNavigate, onCrear, onEditar }) {
           from { background-position: 0 0; }
           to { background-position: 112px -68px; }
         }
+        @keyframes commerceDetailSlideIn {
+          from { transform: translate3d(100%, 0, 0); }
+          to { transform: translate3d(0, 0, 0); }
+        }
+        @keyframes commerceDetailSlideOut {
+          from { transform: translate3d(0, 0, 0); }
+          to { transform: translate3d(100%, 0, 0); }
+        }
+        @keyframes commerceDetailBackdropIn {
+          from { background-color: rgba(17,24,39,0); }
+          to { background-color: rgba(17,24,39,0.6); }
+        }
+        @keyframes commerceDetailBackdropOut {
+          from { background-color: rgba(17,24,39,0.6); }
+          to { background-color: rgba(17,24,39,0); }
+        }
+        @keyframes commerceReviewSheetIn {
+          from { opacity: 0.7; transform: translate3d(0, 100%, 0); }
+          to { opacity: 1; transform: translate3d(0, 0, 0); }
+        }
         @media (prefers-reduced-motion: reduce) {
           .commerce-feed-header { animation: none !important; }
+          .commerce-basic-motion,
+          .commerce-basic-motion * { transition: none !important; }
         }
       `}</style>
       <header className="commerce-feed-header" style={s.feedHeader}>
@@ -1064,16 +1476,37 @@ function Comercios({ currentUser, onNavigate, onCrear, onEditar }) {
                   <span style={s.feedHeadingTitle}><span style={s.featuredSectionIcon}><Ico.star size={10} color="#fff" /></span>Comercios Destacados</span>
                   <button style={s.seeAllBtn} onClick={() => setCat('Todas')}>Ver todos</button>
                 </div>
-                <div style={s.featuredScroll}>
+                <div
+                  ref={featuredScrollRef}
+                  style={s.featuredScroll}
+                  onScroll={syncFeaturedIndex}
+                  onPointerEnter={pauseFeatured}
+                  onPointerLeave={resumeFeatured}
+                  onTouchStart={pauseFeatured}
+                  onTouchEnd={resumeFeatured}
+                >
                   {destacados.map(c => <CardGrande key={c.id} c={c} userCoords={userCoords} onAbrir={onAbrirComercio} />)}
                 </div>
+                {destacados.length > 1 && (
+                  <div style={s.featuredDots} aria-label="Comercios destacados">
+                    {destacados.map((commerce, index) => (
+                      <button
+                        type="button"
+                        key={commerce.id}
+                        style={{ ...s.featuredDot, ...(featuredIndex === index ? s.featuredDotActive : {}) }}
+                        onClick={() => scrollFeaturedTo(index)}
+                        aria-label={`Ver destacado ${index + 1}`}
+                      />
+                    ))}
+                  </div>
+                )}
               </section>
             )}
             {cercanos.length > 0 && (
               <section style={s.feedSection}>
                 <div style={s.nearbyHeading}>Cerca de ti</div>
                 {cercanos.map(c => (
-                  <CardCompacta key={c.id} c={c} userCoords={userCoords} onToggle={() => onAbrirComercio(c)} />
+                  <CardCompacta key={c.id} c={c} userCoords={userCoords} expanded={expandidoId === c.id} onToggle={onToggleComercio} />
                 ))}
               </section>
             )}
@@ -1081,23 +1514,27 @@ function Comercios({ currentUser, onNavigate, onCrear, onEditar }) {
         )}
       </div>
 
-      {/* MODAL DE DETALLE */}
+      {/* FICHA COMPLETA — solo se abre desde comercios destacados */}
       {seleccionado && (phonePortal ? createPortal(
         <ComercioDetalle
           c={seleccionado}
           userCoords={userCoords}
-          onClose={() => setSeleccionado(null)}
+          profile={profile}
+          onClose={onCerrarDetalle}
           onEditar={onEditarComercio}
           esAdmin={esAdmin}
+          closing={cerrandoDetalle}
         />,
         phonePortal,
       ) : (
         <ComercioDetalle
           c={seleccionado}
           userCoords={userCoords}
-          onClose={() => setSeleccionado(null)}
+          profile={profile}
+          onClose={onCerrarDetalle}
           onEditar={onEditarComercio}
           esAdmin={esAdmin}
+          closing={cerrandoDetalle}
         />
       ))}
     </div>
@@ -1226,8 +1663,11 @@ const s = {
   featuredScroll: {
     display: 'flex', gap: 10, overflowX: 'auto',
     margin: '0 -16px', padding: '0 16px 4px',
-    WebkitOverflowScrolling: 'touch', scrollbarWidth: 'none',
+    WebkitOverflowScrolling: 'touch', scrollbarWidth: 'none', scrollSnapType: 'x mandatory', scrollBehavior: 'smooth',
   },
+  featuredDots: { minHeight: 14, marginTop: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5 },
+  featuredDot: { width: 6, height: 6, padding: 0, borderRadius: 999, background: '#cbd5ce', transition: 'width .22s ease, background .22s ease' },
+  featuredDotActive: { width: 18, background: C.verde },
   cargando: {
     flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
     padding: 60,
@@ -1260,7 +1700,7 @@ const s = {
     marginBottom: 0,
     cursor: 'pointer',
     boxShadow: '0 1px 3px rgba(15,23,42,.06)',
-    width: '66%', minWidth: '66%', flexShrink: 0,
+    width: 'calc(100% - 32px)', minWidth: 'calc(100% - 32px)', flexShrink: 0, scrollSnapAlign: 'start',
   },
 
   /* Tira dorada superior — identidad premium inmediata */
@@ -1341,6 +1781,9 @@ const s = {
   featuredCategoryIcon: { width: 27, height: 27, borderRadius: '50%', display: 'grid', placeItems: 'center', flexShrink: 0, overflow: 'hidden', fontSize: 12 },
   featuredCategoryImg: { width: '100%', height: '100%', objectFit: 'cover' },
   featuredMeta: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginTop: 10, fontSize: 10.5, color: '#657068', fontWeight: 600 },
+  feedSocialMeta: { minWidth: 0, display: 'flex', alignItems: 'center', gap: 5, whiteSpace: 'nowrap' },
+  feedRatingMeta: { display: 'inline-flex', alignItems: 'center', gap: 3 },
+  feedFavoriteMeta: { color: '#d93667', fontWeight: 700, whiteSpace: 'nowrap' },
   nombreGrande: {
     minWidth: 0, fontSize: 11.5, fontWeight: 700, color: C.texto,
     lineHeight: 1.25, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
@@ -1393,18 +1836,18 @@ const s = {
 
   /* ══════ CARD COMPACTA (no premium) ══════ */
   cardCompacta: {
-    minHeight: 100, display: 'grid', gridTemplateColumns: '80px minmax(0, 1fr) 22px', alignItems: 'center', gap: 11,
+    minHeight: 100, display: 'block',
     background: C.card, borderRadius: 10, padding: 9,
     border: '1px solid #c7d4c7',
     marginBottom: 10, cursor: 'pointer',
-    transition: 'border-color .15s ease, box-shadow .15s ease',
+    transition: 'border-color .22s ease, box-shadow .22s ease, transform .22s ease',
   },
   cardCompactaExpanded: {
     border: `1.5px solid ${C.verde}`,
     boxShadow: '0 3px 12px rgba(22,163,74,0.12)',
   },
   cardCompactaTopRow: {
-    display: 'flex', alignItems: 'center', gap: 12,
+    minHeight: 80, display: 'grid', gridTemplateColumns: '80px minmax(0, 1fr) 22px', alignItems: 'center', gap: 11,
   },
   logoCuadrado: {
     width: 80, height: 80, borderRadius: 8, flexShrink: 0,
@@ -1449,14 +1892,27 @@ const s = {
   },
   cardCompactaChev: {
     display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+    transition: 'transform .24s cubic-bezier(.2,.8,.2,1)',
   },
 
   /* ── Sección expandible inline (acordeón, sin modal) ── */
+  expandMotion: {
+    display: 'block', overflow: 'hidden',
+    transition: 'max-height .38s cubic-bezier(.22,1,.36,1), opacity .28s ease, transform .38s cubic-bezier(.22,1,.36,1)',
+    willChange: 'max-height, opacity, transform',
+  },
+  expandMotionInner: { minHeight: 0, overflow: 'hidden' },
   cardCompactaExpand: {
     marginTop: 10,
-    paddingTop: 10,
+    padding: '11px 3px 2px',
     borderTop: `1px dashed ${C.borde}`,
     display: 'flex', flexDirection: 'column', gap: 8,
+    transition: 'transform .26s cubic-bezier(.2,.8,.2,1)',
+  },
+  expandCategories: { display: 'flex', flexWrap: 'wrap', gap: 6 },
+  expandCategoryChip: { padding: '4px 8px', borderRadius: 8, fontSize: 9.5, fontWeight: 700 },
+  expandDescription: {
+    margin: 0, color: C.textoSuave, fontSize: 12, lineHeight: 1.45,
   },
   expandInfoRow: {
     display: 'flex', alignItems: 'center', gap: 8,
@@ -1472,8 +1928,22 @@ const s = {
     textDecoration: 'none',
   },
   expandInfoText: {
-    fontSize: 13, color: C.texto, fontWeight: 500,
+    fontSize: 11.5, color: C.texto, fontWeight: 500,
     lineHeight: 1.4,
+  },
+  basicActions: {
+    display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 8,
+    marginTop: 3,
+  },
+  basicWhatsapp: {
+    minHeight: 38, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+    borderRadius: 9, background: C.whatsapp, color: '#fff',
+    textDecoration: 'none', fontSize: 11.5, fontWeight: 700,
+  },
+  basicMaps: {
+    minHeight: 38, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+    borderRadius: 9, background: C.verdeSuave, color: C.verdeOsc,
+    border: `1px solid ${C.verde}30`, textDecoration: 'none', fontSize: 11.5, fontWeight: 700,
   },
   expandWaBtn: {
     display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
@@ -1491,7 +1961,7 @@ const s = {
     position: 'absolute',
     top: 0, left: 0, right: 0, bottom: 0,
     background: 'rgba(17,24,39,0.6)',
-    zIndex: 90,
+    zIndex: 400,
     display: 'flex', alignItems: 'flex-end',
   },
   /* Sheet 100% → sin gap gris arriba, fullscreen limpio */
@@ -1599,6 +2069,35 @@ const s = {
   promoImage: { width: '100%', height: 105, objectFit: 'cover', display: 'block' },
   promoFallback: { width: '100%', height: 105, background: C.verdeSuave, display: 'flex', alignItems: 'center', justifyContent: 'center' },
   promoBody: { padding: 10, display: 'flex', flexDirection: 'column', gap: 3, fontSize: 11.5, lineHeight: 1.35, color: C.textoSuave },
+  commerceProductsSection: {
+    marginTop: 14, marginBottom: 22, padding: 14,
+    background: 'rgba(255,255,255,0.78)', border: `1px solid ${C.borde}`, borderRadius: 13,
+    boxShadow: '0 2px 8px rgba(15,23,42,0.04)',
+  },
+  commerceProductsScroll: { display: 'flex', gap: 9, overflowX: 'auto', paddingBottom: 3, scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch' },
+  commerceProductCard: {
+    width: 165, minWidth: 165, overflow: 'hidden', borderRadius: 11,
+    background: '#fff', border: `1px solid ${C.borde}`, boxShadow: '0 2px 7px rgba(15,23,42,0.05)',
+  },
+  commerceProductImageWrap: { position: 'relative', width: '100%', height: 105, overflow: 'hidden' },
+  commerceProductImage: { width: '100%', height: 105, objectFit: 'cover', display: 'block' },
+  commerceProductFallback: { width: '100%', height: 105, background: C.verdeSuave, display: 'grid', placeItems: 'center' },
+  commerceProductFeaturedBadge: { position: 'absolute', left: 7, top: 7, padding: '4px 7px', borderRadius: 999, background: C.verde, color: '#fff', fontSize: 8.5, fontWeight: 800, boxShadow: '0 2px 7px rgba(0,0,0,.18)' },
+  commerceProductBody: { minHeight: 79, padding: 10, display: 'flex', flexDirection: 'column', gap: 4 },
+  commerceProductName: { color: C.texto, fontSize: 11.5, lineHeight: 1.3 },
+  commerceProductDescription: {
+    color: C.textoSuave, fontSize: 10.5, lineHeight: 1.35,
+    display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden',
+  },
+  commerceProductPrice: { marginTop: 'auto', color: C.verde, fontSize: 13.5, lineHeight: 1.25, fontWeight: 700 },
+  commerceProductListSection: { marginTop: 14, marginBottom: 22, padding: 14, borderRadius: 13, background: 'rgba(255,255,255,0.78)', border: `1px solid ${C.borde}`, boxShadow: '0 2px 8px rgba(15,23,42,0.04)' },
+  commerceProductList: { display: 'flex', flexDirection: 'column', gap: 8 },
+  commerceProductRow: { minHeight: 62, display: 'grid', gridTemplateColumns: '56px minmax(0,1fr) auto', alignItems: 'center', gap: 10, padding: 7, borderRadius: 10, background: '#fff', border: `1px solid ${C.borde}` },
+  commerceProductRowImage: { width: 56, height: 56, borderRadius: 8, objectFit: 'cover', display: 'block' },
+  commerceProductRowFallback: { width: 56, height: 56, borderRadius: 8, display: 'grid', placeItems: 'center', background: C.verdeSuave },
+  commerceProductRowBody: { minWidth: 0, display: 'flex', flexDirection: 'column', gap: 3, color: C.texto, fontSize: 11.5, lineHeight: 1.3 },
+  commerceProductRowPrice: { color: C.verde, fontSize: 11.5, whiteSpace: 'nowrap' },
+  commerceProductShowAll: { width: '100%', marginTop: 10, padding: '9px 12px', borderRadius: 9, background: C.verdeSuave, color: C.verdeOsc, fontSize: 11, fontWeight: 800, fontFamily: 'inherit' },
   detalleClose: {
     width: 38, height: 38, borderRadius: '50%',
     background: 'rgba(255,255,255,0.92)',
@@ -1678,7 +2177,10 @@ const s = {
   commerceFeaturedPill: { padding: '4px 9px', borderRadius: 999, background: C.verdeSuave, color: C.verdeOsc, fontSize: 10.5, fontWeight: 700 },
   commerceTitleRow: { display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10 },
   commerceTitle: { margin: 0, color: C.texto, fontSize: 18.5, lineHeight: 1.2, fontWeight: 700, letterSpacing: '-0.3px' },
+  commerceSocialStats: { display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 },
   commerceRating: { flexShrink: 0, padding: '5px 8px', borderRadius: 9, background: '#f7f4ee', color: '#554b3d', fontSize: 12, fontWeight: 700 },
+  commerceFavoriteCount: { flexShrink: 0, padding: '5px 8px', borderRadius: 9, background: '#fff0f3', color: '#a3455b', fontSize: 12, fontWeight: 700 },
+  commerceFavoriteCountActive: { background: '#e91e63', color: '#fff' },
   commerceStatus: { marginTop: 4, minHeight: 18 },
   commerceAddressRow: {
     display: 'grid', gridTemplateColumns: '18px 1fr auto', alignItems: 'center', gap: 7,
@@ -1720,6 +2222,39 @@ const s = {
   commerceReviewStars: { color: '#8a7658', fontSize: 12, letterSpacing: 1, whiteSpace: 'nowrap' },
   commerceReviewText: { margin: '9px 0 0', color: C.textoSuave, fontSize: 12.5, lineHeight: 1.5, fontStyle: 'italic' },
   commerceReviewsEmpty: { padding: '18px 14px', borderRadius: 13, background: '#f5f7fb', color: C.textoSuave, textAlign: 'center', fontSize: 12.5 },
+  commerceReviewAction: {
+    width: '100%', minHeight: 52, marginBottom: 12, padding: '9px 12px', borderRadius: 12,
+    display: 'flex', alignItems: 'center', gap: 10, textAlign: 'left',
+    background: C.verde, color: '#fff', border: 0,
+    boxShadow: '0 5px 14px rgba(22,163,74,0.22)',
+    fontFamily: 'inherit', cursor: 'pointer',
+  },
+  commerceReviewActionIcon: { width: 32, height: 32, flexShrink: 0, borderRadius: '50%', display: 'grid', placeItems: 'center', background: 'rgba(255,255,255,0.18)', color: '#fff', fontSize: 17 },
+  commerceReviewActionCopy: { flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 2 },
+  commerceReviewActionArrow: { fontSize: 24, fontWeight: 400, lineHeight: 1 },
+  reviewFormBackdrop: {
+    position: 'absolute', inset: 0, zIndex: 950,
+    background: 'rgba(15,23,42,0.48)', display: 'flex', alignItems: 'flex-end',
+  },
+  reviewFormSheet: {
+    width: '100%', padding: '10px 18px calc(env(safe-area-inset-bottom, 0px) + 18px)',
+    maxHeight: 'calc(100% - 24px)', overflowY: 'auto', overscrollBehavior: 'contain',
+    boxSizing: 'border-box', WebkitOverflowScrolling: 'touch',
+    borderRadius: '22px 22px 0 0', background: '#fff',
+    boxShadow: '0 -12px 34px rgba(15,23,42,0.2)', fontFamily: T.font,
+    animation: 'commerceReviewSheetIn 280ms cubic-bezier(.22,1,.36,1) both',
+  },
+  reviewFormHandle: { width: 38, height: 4, borderRadius: 999, background: '#d7ddd9', margin: '0 auto 15px' },
+  reviewFormHeader: { display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 },
+  reviewFormTitles: { display: 'flex', flexDirection: 'column', gap: 3 },
+  reviewFormTitle: { color: C.texto, fontSize: 17 },
+  reviewFormSubtitle: { color: C.textoSuave, fontSize: 11.5 },
+  reviewFormClose: { width: 34, height: 34, borderRadius: '50%', background: '#f1f5f2', color: C.texto, fontSize: 22, lineHeight: 1 },
+  reviewStarsPicker: { display: 'flex', justifyContent: 'center', gap: 8, margin: '20px 0 16px' },
+  reviewStarButton: { padding: 0, color: '#d69b22', fontSize: 35, lineHeight: 1, fontFamily: 'inherit' },
+  reviewFormTextarea: { width: '100%', padding: 13, border: `1px solid ${C.borde}`, borderRadius: 12, background: '#f8faf9', color: C.texto, fontSize: 13, lineHeight: 1.5, resize: 'none', boxSizing: 'border-box' },
+  reviewFormMeta: { minHeight: 24, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, color: C.textoTenue, fontSize: 9.5 },
+  reviewFormSubmit: { width: '100%', minHeight: 46, borderRadius: 12, background: C.verde, color: '#fff', fontSize: 13.5, fontWeight: 800, fontFamily: 'inherit' },
 
   /* Nombre del comercio (centrado, sin status pill) */
   detalleNombre: {

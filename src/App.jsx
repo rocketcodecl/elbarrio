@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { supabase } from './lib/supabase'
 import { C, T } from './lib/design'
+import './App.css'
 
 /* ── LOGIN FLOW (tu Login completo, intacto) ── */
 import Splash from './screens/Splash'
@@ -77,6 +78,7 @@ export default function App() {
   const [editingPost, setEditingPost] = useState(null)
   const [eventsRevision, setEventsRevision] = useState(0)
   const [noLeidos, setNoLeidos] = useState(0)
+  const [navigationMotion, setNavigationMotion] = useState('forward')
   const historyRef = useRef([])
   // Track del tab previo para que el back desde tabs con flecha (ej: perfil) funcione.
   // El perfil es un tab, no una sub-pantalla, así que no entra en historyRef.
@@ -189,6 +191,7 @@ export default function App() {
     const lower = typeof next === 'string' ? next.toLowerCase() : next
 
     if (lower === 'back') {
+      setNavigationMotion('back')
       const prev = historyRef.current.pop()
       if (prev) {
         if (prev.tab) setActiveTab(prev.tab)
@@ -211,6 +214,7 @@ export default function App() {
       return
     }
     if (lower === 'home') {
+      setNavigationMotion('back')
       historyRef.current = []
       setActiveTab('inicio')
       setCurrentScreen('main')
@@ -220,6 +224,7 @@ export default function App() {
 
     const subScreens = ['post', 'productdetail', 'eventdetail', 'chatconversation', 'dealdone', 'alerta', 'notificaciones', 'sellerprofile', 'noticias', 'admin', 'adminfarmacias', 'admincomercios', 'adminusuarios', 'adminincidentes', 'settings', 'about', 'terms', 'prohibited', 'invite', 'contact']
     if (subScreens.includes(lower)) {
+      setNavigationMotion('forward')
       historyRef.current.push({ screen: currentScreen, params })
     }
 
@@ -270,10 +275,12 @@ export default function App() {
     } else if (lower === 'contact' || lower === 'contactanos') {
       setCurrentScreen('contact')
     } else if (lower === 'chat' || lower === 'chatlist') {
+      setNavigationMotion('tab')
       if (activeTabRef.current !== 'chat') prevTabRef.current = activeTabRef.current
       setActiveTab('chat')
       setCurrentScreen('main')
     } else if (tabMap[lower]) {
+      setNavigationMotion('tab')
       if (activeTabRef.current !== tabMap[lower]) prevTabRef.current = activeTabRef.current
       setActiveTab(tabMap[lower])
       setCurrentScreen('main')
@@ -340,6 +347,7 @@ export default function App() {
       prevTabRef.current = current
     }
     historyRef.current = []
+    setNavigationMotion('tab')
     setActiveTab(tabId)
     setCurrentScreen('main')
     setParams({})
@@ -351,6 +359,9 @@ export default function App() {
   const isModalScreen = modalScreens.includes(currentScreen)
   const isCommunityScreen = ['settings', 'about', 'terms', 'prohibited', 'invite', 'contact'].includes(currentScreen)
   const isMainApp = !flowScreens.includes(currentScreen) && !isModalScreen
+  const screenIdentity = currentScreen === 'main'
+    ? `main-${activeTab}`
+    : `${currentScreen}-${params?.postId || params?.id || params?.sellerId || ''}`
 
   const renderScreen = () => {
     if (loading) {
@@ -507,7 +518,12 @@ export default function App() {
       <div className="phone-content" style={isCommunityScreen ? s.contentPad : (isModalScreen ? s.contentPadModal : s.contentPad)}>
         <div style={s.root}>
           <div id="elbarrio-scroll" style={s.screenArea}>
-            {renderScreen()}
+            <div
+              key={screenIdentity}
+              className={`app-screen-transition app-screen-transition--${navigationMotion}`}
+            >
+              {renderScreen()}
+            </div>
           </div>
 
           {isMainApp && user && (
@@ -521,7 +537,7 @@ export default function App() {
           )}
 
           {createOpen && createType === 'commerce' && (
-            <div style={s.createOverlay}>
+            <div className="app-create-transition" style={s.createOverlay}>
               <CommerceForm
                 neighborhoodId={profile?.neighborhood_id}
                 onClose={onCerrarCrear}
@@ -531,7 +547,7 @@ export default function App() {
           )}
 
           {createOpen && createType !== 'commerce' && (
-            <div style={s.createOverlay}>
+            <div className="app-create-transition" style={s.createOverlay}>
               <CreatePost
                 startWith={createType}
                 existingPost={editingPost}

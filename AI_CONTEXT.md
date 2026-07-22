@@ -6,6 +6,7 @@
 ## Arquitectura actual
 
 - Aplicación web móvil construida con Vite 8, React 19 y JavaScript/JSX.
+- Existe una aplicación web administrativa independiente en `admin-panel/`, conectada al mismo Supabase y orientada al uso desde computador.
 - La interfaz se presenta dentro de un marco de teléfono en escritorio y ocupa la pantalla disponible en móvil.
 - `src/main.jsx` monta `src/App.jsx`.
 - `App.jsx` funciona como orquestador: controla autenticación, navegación, tabs, historial interno, overlays y usuario activo.
@@ -119,6 +120,12 @@ El botón de creación abre `CreatePost.jsx`, salvo la creación de comercios, q
 - Los eventos contemplan opciones como entrada gratuita o pagada y condiciones como pet friendly.
 - El feed de eventos debe mostrar inmediatamente un evento recién publicado sin exigir refrescar manualmente.
 - La página del comercio debe priorizar información, contacto, imágenes, promociones, productos y opiniones; su diseño no debe reutilizar estructuras antiguas deficientes.
+- En el feed de Comercios, los destacados abren la ficha completa. Los comercios normales despliegan una ficha básica dentro del listado con descripción, horario, ubicación, WhatsApp y cómo llegar; solo uno puede estar abierto a la vez.
+- Un comercio puede pertenecer a varios rubros. El panel conserva el primero como `category` principal y guarda el conjunto completo en `categories`; los emojis se asignan de forma consistente por rubro.
+- Los productos de un comercio pertenecen a un catálogo propio (`commerce_products`) y no son publicaciones del Mercado. Su lectura es pública cuando están disponibles; su gestión queda reservada a administradores o al perfil vinculado mediante `commerces.owner_id → profiles.id`.
+- En comercios destacados, los productos marcados como destacados aparecen en un carrusel visual con badge; los productos normales forman un catálogo compacto independiente.
+- La monetización de comercios se basa en visibilidad y herramientas comerciales: los destacados ocupan el carrusel superior y acceden a ficha completa, galería, productos, promociones y descuento. Los comercios gratuitos permanecen en “Cerca de ti” con ficha desplegable, rubros, descripción, horario, ubicación, valoración, favoritos y contacto. La confianza (opiniones y valoración) no se bloquea por pago.
+- El carrusel de comercios destacados muestra una tarjeta de ancho completo por vez, avanza automáticamente con transición lateral, se pausa durante la interacción y muestra indicadores. El orden se aleatoriza de forma estable al cargar el feed para repartir la exposición pagada sin repetir comercios antes de completar la ronda.
 - Invitar vecinos debe permanecer pendiente de habilitación aunque exista una pantalla implementada.
 - Las páginas comunitarias comparten la identidad visual vigente, el header simple con retorno y scroll independiente.
 - Los feeds de Mercado, Servicios, Eventos, Chat y Comercios usan un header interno común: botón volver, título centrado en gris carbón con `el barrio` en verde de marca, un ícono lineal grande y translúcido propio de la sección hacia el lado izquierdo, y una línea verde inferior. Inicio conserva su header propio.
@@ -139,6 +146,7 @@ El botón de creación abre `CreatePost.jsx`, salvo la creación de comercios, q
 - Estilos locales mediante objetos `style`; CSS global solo para frame, safe areas, comportamiento general y animaciones compartidas.
 - Iconografía coherente con la interfaz actual, preferentemente SVG inline o símbolos claramente reconocibles.
 - Los cambios de schema deben quedar respaldados por una migración SQL; no asumir que una tabla listada está siendo usada por la interfaz.
+- La navegación visual se anima desde `App.jsx`: las subpantallas y formularios entran lateralmente a ancho completo, el regreso usa la dirección inversa y los cambios de pestaña usan una transición lateral más breve. Las fichas abiertas mediante portales deben aplicar el mismo patrón dentro de su componente, como ocurre en `Comercios.jsx`.
 
 ## Archivos críticos
 
@@ -163,6 +171,8 @@ El botón de creación abre `CreatePost.jsx`, salvo la creación de comercios, q
 - `src/screens/MyProfile.jsx`
 - `src/screens/CommunityPagesV2.jsx`
 - `supabase/migrations/`
+- `admin-panel/ADMIN_CONTEXT.md`
+- `admin-panel/src/App.jsx`
 
 ## Funcionalidades terminadas
 
@@ -177,6 +187,13 @@ El botón de creación abre `CreatePost.jsx`, salvo la creación de comercios, q
 - Feed de eventos, detalle independiente y confirmación de asistencia.
 - Actualización automática del feed después de publicar un evento.
 - Feed y detalle funcional de comercios, con promociones y opiniones consultadas desde Supabase.
+- Los vecinos verificados pueden publicar o editar una opinión por comercio, con calificación de 1 a 5 estrellas y comentario; el promedio se actualiza desde Supabase.
+- Los vecinos verificados pueden guardar comercios como favoritos. La relación es privada, el contador agregado es público y se muestra junto a la calificación.
+- El detalle de comercio está preparado para consultar y mostrar productos destacados reales cuando exista el catálogo del comercio.
+- La tabla `commerce_products` y sus políticas están aplicadas en Supabase; el catálogo permanece vacío hasta cargar productos.
+- Base independiente del panel web administrativo con login, validación de rol, navegación lateral y resumen general.
+- Módulo web administrativo de comercios separado en directorio, editor completo y catálogo de productos, incluida la subida de fotografías.
+- El editor web de comercios incluye búsqueda de dirección y selector cartográfico con marcador móvil; al cambiar el punto sincroniza dirección, latitud y longitud.
 - Alertas, detalle de alerta, noticias y notificaciones.
 - Perfil propio, perfil público y módulos administrativos conectados.
 - Plus Jakarta Sans instalada y aplicada globalmente.
@@ -185,6 +202,9 @@ El botón de creación abre `CreatePost.jsx`, salvo la creación de comercios, q
 ## Funcionalidades pendientes
 
 - Terminar y aprobar visualmente la página de detalle del comercio.
+- Cargar productos reales de prueba en `commerce_products`.
+- Validar el módulo web de Comercios y luego migrar Eventos, Farmacias, Incidentes y Usuarios.
+- Unificar el formato de `opening_hours`: el editor web guarda claves numéricas y `Comercios.jsx` todavía interpreta claves abreviadas en español.
 - Habilitar el flujo real de Invitar vecinos; la pantalla existe, pero el acceso está marcado como próximo.
 - Conectar el formulario de contacto con un canal real de soporte; actualmente solo confirma localmente.
 - Definir y conectar enlaces oficiales de redes sociales y soporte.
