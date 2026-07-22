@@ -1901,7 +1901,7 @@ function Barrio({ currentUser, onNavigate }) {
 }
 
 const s = {
-  wrap: { width: '100%', height: '100%', backgroundColor: '#f4f7f4', fontFamily: 'system-ui, -apple-system, sans-serif', display: 'flex', flexDirection: 'column', overflow: 'hidden', position: 'relative' },
+  wrap: { width: '100%', height: '100%', backgroundColor: '#f4f7f4', fontFamily: '"Plus Jakarta Sans", system-ui, -apple-system, sans-serif', display: 'flex', flexDirection: 'column', overflow: 'hidden', position: 'relative' },
   stickyTop: { flexShrink: 0, backgroundColor: '#fff', zIndex: 10, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' },
   header: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '52px 18px 14px' },
   headerLeft: { display: 'flex', alignItems: 'center', gap: 10 },

@@ -453,7 +453,7 @@ const s = {
     padding: '0 24px 40px',
     display: 'flex',
     flexDirection: 'column',
-    fontFamily: 'system-ui, -apple-system, sans-serif',
+    fontFamily: '"Plus Jakarta Sans", system-ui, -apple-system, sans-serif',
   },
   header: { display: 'flex', alignItems: 'center', paddingTop: 50, paddingBottom: 20 },
   backBtn: {

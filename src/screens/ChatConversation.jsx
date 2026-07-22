@@ -7,19 +7,9 @@ const Icon = {
       <line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/>
     </svg>
   ),
-  Dots: ({ size = 20, color = "#111" }) => (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill={color}>
-      <circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/>
-    </svg>
-  ),
   Send: ({ size = 20, color = "#fff" }) => (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
       <line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>
-    </svg>
-  ),
-  Plus: ({ size = 22, color = "#666" }) => (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/>
     </svg>
   ),
   Tag: ({ size = 15, color = "#111" }) => (
@@ -83,7 +73,7 @@ const CHAT_STYLE = `
 .chat-bubble-in { animation: bubbleIn 0.18s ease-out; }
 `;
 
-export default function ChatConversation({ postId, sellerId, currentUser, onNavigate }) {
+export default function ChatConversation({ postId, sellerId, currentUser, previewMode = false, onNavigate }) {
   const [messages, setMessages] = useState([]);
   const [text, setText] = useState("");
   const [seller, setSeller] = useState(null);
@@ -98,12 +88,36 @@ export default function ChatConversation({ postId, sellerId, currentUser, onNavi
   const typingResetRef = useRef(null);
   const lastTypingSentRef = useRef(0);
   const nav = onNavigate || (() => {});
+  const myProfileId = currentUser?.profileId || currentUser?.id;
+  const myIds = [...new Set([myProfileId, currentUser?.id].filter(Boolean))];
+  const otherUserId = previewMode ? '__demo_neighbor__' : sellerId;
+
+  const isConversationMessage = (message) => {
+    if (!message || message.post_id !== postId) return false;
+    return (
+      (myIds.includes(message.sender_id) && message.receiver_id === otherUserId) ||
+      (message.sender_id === otherUserId && myIds.includes(message.receiver_id))
+    );
+  };
 
   useEffect(() => {
+    if (previewMode) {
+      const now = Date.now();
+      setSeller({ full_name: 'Camila, vecina', avatar_url: null, badge_founder: false });
+      setMessages([
+        { id: 'demo_1', sender_id: otherUserId, receiver_id: myProfileId, post_id: postId, content: '¡Hola! ¿Todavía está disponible?', created_at: new Date(now - 8 * 60000).toISOString(), read: true },
+        { id: 'demo_2', sender_id: myProfileId, receiver_id: otherUserId, post_id: postId, content: 'Hola, sí. Está disponible 😊', created_at: new Date(now - 6 * 60000).toISOString(), read: true },
+        { id: 'demo_3', sender_id: otherUserId, receiver_id: myProfileId, post_id: postId, content: 'Perfecto, ¿podemos coordinar para mañana?', created_at: new Date(now - 3 * 60000).toISOString(), read: true },
+      ]);
+      supabase.from('posts').select('title, price, type, images, author_id, status').eq('id', postId).maybeSingle()
+        .then(({ data }) => { if (data) setPost(data); setLoading(false); });
+      return;
+    }
     fetchInitial();
-    // Canal único por post_id. Configuramos broadcast con self:false para
-    // NO recibir nuestros propios eventos de typing.
-    const channel = supabase.channel('chat_' + postId, {
+    // Canal aislado por publicación y por los dos participantes.
+    // Así tampoco se cruza el indicador de escritura entre interesados.
+    const participantKey = [myProfileId, otherUserId].sort().join('_');
+    const channel = supabase.channel(`chat_${postId}_${participantKey}`, {
       config: { broadcast: { self: false } }
     });
     channelRef.current = channel;
@@ -112,9 +126,10 @@ export default function ChatConversation({ postId, sellerId, currentUser, onNavi
       // INSERT: mensaje nuevo (mío o del otro). Evitamos duplicar si ya lo
       // agregamos optimistamente (comparamos por content + timestamp cercano).
       .on('postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'messages', filter: `post_id=eq.${postId}` },
+        { event: 'INSERT', schema: 'public', table: 'messages', filter: `sender_id=eq.${otherUserId}` },
         (payload) => {
           setMessages(prev => {
+            if (!isConversationMessage(payload.new)) return prev;
             // Si ya existe (insert optimista con mismo content en los últimos 3s), reemplazar
             const idx = prev.findIndex(m =>
               m._pending &&
@@ -133,7 +148,7 @@ export default function ChatConversation({ postId, sellerId, currentUser, onNavi
           });
           // Si el mensaje es del otro, marcarlo como leído automáticamente
           // (estoy en la conversación, lo estoy viendo).
-          if (payload.new.sender_id === sellerId && payload.new.receiver_id === currentUser.id && !payload.new.read) {
+          if (payload.new.sender_id === otherUserId && payload.new.receiver_id === myProfileId && !payload.new.read) {
             supabase.from('messages')
               .update({ read: true })
               .eq('id', payload.new.id)
@@ -141,18 +156,38 @@ export default function ChatConversation({ postId, sellerId, currentUser, onNavi
           }
         }
       )
+      .on('postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'messages', filter: `sender_id=eq.${myProfileId}` },
+        (payload) => {
+          if (!isConversationMessage(payload.new)) return;
+          setMessages(prev => {
+            const idx = prev.findIndex(m =>
+              m._pending && m.content === payload.new.content &&
+              Math.abs(new Date(m.created_at) - new Date(payload.new.created_at)) < 5000
+            );
+            if (idx >= 0) {
+              const copy = [...prev];
+              copy[idx] = payload.new;
+              return copy;
+            }
+            return prev.some(m => m.id === payload.new.id) ? prev : [...prev, payload.new];
+          });
+        }
+      )
       // UPDATE: cuando el otro marca mi mensaje como leído (abre el chat).
       // Cambiamos el check ✓ a ✓✓ azul.
       .on('postgres_changes',
-        { event: 'UPDATE', schema: 'public', table: 'messages', filter: `post_id=eq.${postId}` },
+        { event: 'UPDATE', schema: 'public', table: 'messages', filter: `sender_id=eq.${myProfileId}` },
         (payload) => {
+          if (!isConversationMessage(payload.new)) return;
           setMessages(prev => prev.map(m =>
             m.id === payload.new.id ? { ...payload.new, _justArrived: m._justArrived } : m
           ));
         }
       )
       // Broadcast: typing indicator. El otro escribe → llega este evento.
-      .on('broadcast', { event: 'typing' }, () => {
+      .on('broadcast', { event: 'typing' }, ({ payload }) => {
+        if (payload?.senderId !== otherUserId || payload?.receiverId !== myProfileId) return;
         setOtherTyping(true);
         // Si no llega otro typing en 3s, ocultamos el indicador.
         if (typingResetRef.current) clearTimeout(typingResetRef.current);
@@ -164,7 +199,7 @@ export default function ChatConversation({ postId, sellerId, currentUser, onNavi
       supabase.removeChannel(channel);
       if (typingResetRef.current) clearTimeout(typingResetRef.current);
     };
-  }, [postId]);
+  }, [postId, myProfileId, otherUserId, previewMode]);
 
   // Scroll suave al final cuando llegan mensajes nuevos o cambia el typing
   useEffect(() => {
@@ -179,13 +214,17 @@ export default function ChatConversation({ postId, sellerId, currentUser, onNavi
       supabase.from("messages")
         .select("*")
         .eq("post_id", postId)
+        .or(myIds.flatMap(myId => [
+          `and(sender_id.eq.${myId},receiver_id.eq.${otherUserId})`,
+          `and(sender_id.eq.${otherUserId},receiver_id.eq.${myId})`
+        ]).join(','))
         .order("created_at", { ascending: true }),
       supabase.from("profiles")
         .select("id, full_name, avatar_url, badge_founder, reputation_score")
-        .eq("id", sellerId)
-        .single(),
+        .or(`id.eq.${otherUserId},user_id.eq.${otherUserId}`)
+        .maybeSingle(),
       supabase.from("posts")
-        .select("title, price, type, images")
+        .select("title, price, type, images, author_id, status")
         .eq("id", postId)
         .single()
     ]);
@@ -199,8 +238,8 @@ export default function ChatConversation({ postId, sellerId, currentUser, onNavi
       .from("messages")
       .update({ read: true })
       .eq("post_id", postId)
-      .eq("sender_id", sellerId)
-      .eq("receiver_id", currentUser.id)
+      .eq("sender_id", otherUserId)
+      .eq("receiver_id", myProfileId)
       .eq("read", false);
   };
 
@@ -211,11 +250,19 @@ export default function ChatConversation({ postId, sellerId, currentUser, onNavi
     if (!content) return;
     setText("");
 
+    if (previewMode) {
+      setMessages(prev => [...prev, {
+        id: 'demo_' + Date.now(), sender_id: myProfileId, receiver_id: otherUserId,
+        post_id: postId, content, created_at: new Date().toISOString(), read: true
+      }]);
+      return;
+    }
+
     const tempId = 'temp_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
     const optimisticMsg = {
       id: tempId,
-      sender_id: currentUser.id,
-      receiver_id: sellerId,
+      sender_id: myProfileId,
+      receiver_id: otherUserId,
       post_id: postId,
       content,
       created_at: new Date().toISOString(),
@@ -225,8 +272,8 @@ export default function ChatConversation({ postId, sellerId, currentUser, onNavi
     setMessages(prev => [...prev, optimisticMsg]);
 
     const { data, error } = await supabase.from("messages").insert({
-      sender_id: currentUser.id,
-      receiver_id: sellerId,
+      sender_id: myProfileId,
+      receiver_id: otherUserId,
       post_id: postId,
       content
     }).select();
@@ -254,7 +301,11 @@ export default function ChatConversation({ postId, sellerId, currentUser, onNavi
   const handleTyping = () => {
     const now = Date.now();
     if (now - lastTypingSentRef.current > 1500) {
-      channelRef.current?.send({ type: 'broadcast', event: 'typing', payload: { user: currentUser.id } });
+      channelRef.current?.send({
+        type: 'broadcast',
+        event: 'typing',
+        payload: { senderId: myProfileId, receiverId: otherUserId }
+      });
       lastTypingSentRef.current = now;
     }
   };
@@ -266,8 +317,18 @@ export default function ChatConversation({ postId, sellerId, currentUser, onNavi
     setShowOffer(false);
   };
 
-  const goToDeal = () => {
-    nav('DealDone', { postId, sellerId });
+  const proposeMeeting = () => {
+    sendMessage('🤝 Me gustaría que coordinemos el encuentro. ¿Qué día, hora y lugar público te acomoda?');
+  };
+
+  const postType = (post?.type || '').toLowerCase();
+  const isGift = ['regalo', 'gratis', 'gift'].includes(postType);
+  const isTrade = ['trueque', 'intercambio', 'trade'].includes(postType);
+  const quickActionLabel = isGift ? 'Solicitar regalo' : isTrade ? 'Proponer trueque' : 'Hacer oferta';
+  const sendQuickAction = () => {
+    if (isGift) sendMessage('🎁 Me interesa este regalo. ¿Sigue disponible?');
+    else if (isTrade) sendMessage('🔄 Me interesa hacer un trueque. ¿Qué tipo de intercambio buscas?');
+    else setShowOffer(true);
   };
 
   const getInitials = (name) => {
@@ -338,10 +399,12 @@ export default function ChatConversation({ postId, sellerId, currentUser, onNavi
             </div>
           )}
         </div>
-        <button style={s.iconBtn} aria-label="Más opciones">
-          <Icon.Dots />
-        </button>
+        {post?.images?.[0] && <img src={post.images[0]} alt="" style={s.postThumb} />}
       </div>
+
+      {previewMode && (
+        <div style={s.previewBanner}>Vista previa · nada de este chat se guardará</div>
+      )}
 
       {/* MENSAJES */}
       <div style={s.messagesWrap} ref={scrollRef}>
@@ -359,7 +422,7 @@ export default function ChatConversation({ postId, sellerId, currentUser, onNavi
               return <div key={item.key} style={s.dateChip}>{item.label}</div>;
             }
             const msg = item.msg;
-            const mine = msg.sender_id === currentUser.id;
+            const mine = myIds.includes(msg.sender_id);
             return (
               <div key={item.key} style={{ display: 'flex', flexDirection: 'column', alignItems: mine ? 'flex-end' : 'flex-start' }}>
                 <div className="chat-bubble-in" style={mine ? s.bubbleMine : s.bubbleTheirs}>
@@ -400,7 +463,7 @@ export default function ChatConversation({ postId, sellerId, currentUser, onNavi
             <span style={s.assistantTitle}>Asistente de Vecindario</span>
           </div>
           <div style={s.assistantText}>
-            Punto de encuentro sugerido: <b>Plaza Italia</b>. Recomendamos coordinar de día y en un lugar público.
+            Coordinen de día y en un lugar público. No pagues por adelantado ni compartas claves o códigos de verificación.
           </div>
         </div>
       </div>
@@ -435,23 +498,19 @@ export default function ChatConversation({ postId, sellerId, currentUser, onNavi
       {/* ACCIONES + INPUT */}
       <div style={s.bottomBar}>
         <div style={s.actionsRow}>
-          <button onClick={() => setShowOffer(true)} style={s.actionGhost}>
+          <button onClick={sendQuickAction} style={s.actionGhost}>
             <Icon.Tag />
-            <span>Enviar Oferta</span>
+            <span>{quickActionLabel}</span>
           </button>
-          <button onClick={goToDeal} style={s.actionPrimary}>
+          <button onClick={proposeMeeting} style={s.actionPrimary}>
             <Icon.Handshake />
-            <span>Acordar Encuentro</span>
+            <span>Proponer encuentro</span>
           </button>
         </div>
 
-        <div style={s.inputLabel}>Escribe tu mensaje</div>
         <div style={s.inputRow}>
-          <button style={s.plusBtn}>
-            <Icon.Plus />
-          </button>
           <textarea
-            placeholder=""
+            placeholder="Escribe un mensaje…"
             value={text}
             onChange={(e) => {
               setText(e.target.value);
@@ -480,7 +539,7 @@ const s = {
     width: '100%',
     height: '100%',
     backgroundColor: '#fff',
-    fontFamily: 'system-ui, -apple-system, sans-serif',
+    fontFamily: '"Plus Jakarta Sans", system-ui, -apple-system, sans-serif',
     display: 'flex',
     flexDirection: 'column',
     overflow: 'hidden'
@@ -494,6 +553,11 @@ const s = {
     padding: 'max(env(safe-area-inset-top, 44px), 44px) 12px 12px',
     borderBottom: '1px solid #eee',
     backgroundColor: '#fff'
+  },
+  previewBanner: {
+    flexShrink: 0, background: '#fff7d6', color: '#7c5b00',
+    borderBottom: '1px solid #f2df99', padding: '7px 12px',
+    fontSize: 11.5, fontWeight: 600, textAlign: 'center',
   },
   backBtn: {
     width: 38, height: 38,
@@ -511,6 +575,7 @@ const s = {
     flexShrink: 0,
   },
   avatar: { width: 38, height: 38, borderRadius: '50%', objectFit: 'cover' },
+  postThumb: { width: 38, height: 38, borderRadius: 9, objectFit: 'cover', flexShrink: 0, border: '1px solid #e5e7eb' },
   avatarFallback: {
     width: 38, height: 38, borderRadius: '50%',
     backgroundColor: '#16a34a', color: '#fff',

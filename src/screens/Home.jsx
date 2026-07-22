@@ -61,9 +61,10 @@ const CloudShape = ({ fill = CLIMA_COLORS.cloud }) => (
   </g>
 )
 
-const ClimaIcon = ({ type, size = 26 }) => {
+const ClimaIcon = ({ type, size = 34 }) => {
   const common = {
     width: size, height: size, viewBox: '0 0 32 32', fill: 'none',
+    className: `clima-svg clima-${type || 'parcial'}`,
     style: { display: 'block', filter: 'drop-shadow(0 1px 1.5px rgba(15,30,20,0.18))' },
   }
   const c = CLIMA_COLORS
@@ -113,10 +114,10 @@ const ClimaIcon = ({ type, size = 26 }) => {
   if (type === 'lluvia') return (
     <svg {...common}>
       <CloudShape/>
-      <g fill={c.rain}>
-        <path d="M10 24.5c-.8 1.2-1.3 2.2-1.3 3.2a1.8 1.8 0 0 0 3.6 0c0-1-.5-2-1.3-3.2-.3-.5-.7-.5-1 0z"/>
-        <path d="M16 24.5c-.8 1.2-1.3 2.2-1.3 3.2a1.8 1.8 0 0 0 3.6 0c0-1-.5-2-1.3-3.2-.3-.5-.7-.5-1 0z"/>
-        <path d="M22 24.5c-.8 1.2-1.3 2.2-1.3 3.2a1.8 1.8 0 0 0 3.6 0c0-1-.5-2-1.3-3.2-.3-.5-.7-.5-1 0z"/>
+      <g className="clima-precipitacion" fill={c.rain}>
+        <path className="clima-gota clima-gota-1" d="M10 24.5c-.8 1.2-1.3 2.2-1.3 3.2a1.8 1.8 0 0 0 3.6 0c0-1-.5-2-1.3-3.2-.3-.5-.7-.5-1 0z"/>
+        <path className="clima-gota clima-gota-2" d="M16 24.5c-.8 1.2-1.3 2.2-1.3 3.2a1.8 1.8 0 0 0 3.6 0c0-1-.5-2-1.3-3.2-.3-.5-.7-.5-1 0z"/>
+        <path className="clima-gota clima-gota-3" d="M22 24.5c-.8 1.2-1.3 2.2-1.3 3.2a1.8 1.8 0 0 0 3.6 0c0-1-.5-2-1.3-3.2-.3-.5-.7-.5-1 0z"/>
       </g>
     </svg>
   )
@@ -124,7 +125,7 @@ const ClimaIcon = ({ type, size = 26 }) => {
   if (type === 'nieve') return (
     <svg {...common}>
       <CloudShape/>
-      <g fill={c.snow}>
+      <g className="clima-nieve-copos" fill={c.snow}>
         <circle cx="11" cy="27" r="1.6"/>
         <circle cx="16" cy="27" r="1.6"/>
         <circle cx="21" cy="27" r="1.6"/>
@@ -135,7 +136,7 @@ const ClimaIcon = ({ type, size = 26 }) => {
   if (type === 'chubascos') return (
     <svg {...common}>
       <CloudShape/>
-      <g fill={c.rain}>
+      <g className="clima-precipitacion" fill={c.rain}>
         <rect x="8.5" y="24" width="1.8" height="5" rx="0.9" transform="rotate(18 9.4 26.5)"/>
         <rect x="14.5" y="24" width="1.8" height="5" rx="0.9" transform="rotate(18 15.4 26.5)"/>
         <rect x="20.5" y="24" width="1.8" height="5" rx="0.9" transform="rotate(18 21.4 26.5)"/>
@@ -319,7 +320,7 @@ function Home({ currentUser, onNavigate, onCrear }) {
   // La primera vez que entra, baja todo y lo guarda en localStorage con
   // timestamp. La segunda vez, pinta INSTANTANEAMENTE con el cache viejo
   // y refresca en segundo plano. Así el Home "vuela" cuando volvés.
-  const CACHE_KEY = 'elbarrio_home_v1'
+  const CACHE_KEY = 'elbarrio_home_v2'
 
   // Lee el cache del localStorage. Si hay, pinta todo instantáneamente
   // (sin spinner) y deja cargando=false. Después cargar() refresca en
@@ -469,15 +470,25 @@ function Home({ currentUser, onNavigate, onCrear }) {
 
       setBarrio(hoodRes.data)
 
-      // Alertas: filtrar expiradas en JS (no en el servidor) para no romper
-      // si la columna expires_at no existe en el schema.
+      // Alertas: SOLO aparecen en la sección "Alertas" del feed las
+      // alertas OFICIALES (is_official = true), que las sube el admin
+      // (tú) desde el panel de administración o directo en Supabase.
+      // Las alertas que publican vecinos comunes (is_official != true)
+      // se consultan desde el centro de alertas, pero no se mezclan con
+      // la portada ni con el feed social de Actividad.
+      // Filtramos expiradas en JS (no en el servidor) para no romper si
+      // la columna expires_at no existe en el schema.
       if (alertRes.error) {
         console.error('[el barrio] Error cargando alertas:', alertRes.error)
       }
       const ahoraMs = Date.now()
-      const alertasActivas = (alertRes.data || []).filter((a) => {
+      const todasLasAlertas = (alertRes.data || []).filter((a) => {
         if (!a.expires_at) return true
         return new Date(a.expires_at).getTime() > ahoraMs
+      })
+      // Oficiales → sección "Alertas" (arriba)
+      const alertasActivas = todasLasAlertas.filter((a) => {
+        return a.is_official === true || a.is_official === 'true'
       })
       setAlertas(alertasActivas)
 
@@ -496,6 +507,8 @@ function Home({ currentUser, onNavigate, onCrear }) {
       const ventas = todos.filter((x) => x.type === 'sell').slice(0, 10)
       const regalos = todos.filter((x) => x.type === 'gift' || x.type === 'trade').slice(0, 10)
       const eventos = todos.filter((x) => x.type === 'event').slice(0, 10)
+      // Actividad es el feed social: solo publicaciones generales.
+      // Pedidos, alertas, mercado y eventos ya tienen su propia sección.
       const actividad = todos.filter((x) => x.type === 'general').slice(0, 20)
 
       setPedidos(pedidosActivos)
@@ -622,6 +635,51 @@ function Home({ currentUser, onNavigate, onCrear }) {
           100% { box-shadow: 0 0 0 0 transparent; }
         }
         .alerta-pulse { animation: elBarrioPulse 2.4s ease-out infinite; }
+
+        @keyframes climaFlotar {
+          0%, 100% { transform: translateY(1px) scale(1); }
+          50% { transform: translateY(-4px) scale(1.04); }
+        }
+        @keyframes climaGirar {
+          0% { transform: rotate(-8deg) scale(1); }
+          50% { transform: rotate(8deg) scale(1.06); }
+          100% { transform: rotate(-8deg) scale(1); }
+        }
+        @keyframes climaLlover {
+          0% { transform: translateY(-1px); opacity: 0.25; }
+          45% { opacity: 1; }
+          100% { transform: translateY(3px); opacity: 0.2; }
+        }
+        .clima-svg { transform-origin: center; }
+        .clima-sun { animation: climaGirar 3.2s ease-in-out infinite; }
+        .clima-parcial,
+        .clima-nublado,
+        .clima-neblina,
+        .clima-lluvia,
+        .clima-nieve,
+        .clima-chubascos,
+        .clima-tormenta { animation: climaFlotar 2.8s ease-in-out infinite; }
+        .clima-gota {
+          animation: climaLlover 1.25s ease-in infinite;
+          transform-box: fill-box;
+          transform-origin: center;
+        }
+        .clima-gota-2 { animation-delay: 0.35s; }
+        .clima-gota-3 { animation-delay: 0.7s; }
+        .clima-precipitacion {
+          animation: climaLlover 0.95s linear infinite;
+          transform-box: fill-box;
+          transform-origin: center;
+        }
+        .clima-nieve-copos {
+          animation: climaLlover 1.6s ease-in-out infinite;
+          transform-box: fill-box;
+          transform-origin: center;
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+          .alerta-pulse { animation: none !important; }
+        }
       `}</style>
 
       {/* ══════ CABECERA ══════ */}
@@ -739,18 +797,18 @@ function Home({ currentUser, onNavigate, onCrear }) {
           </div>
         )}
 
-        {/* ══════ ALERTAS (lista vertical compacta, huincha full-width, máx 3) ══════
-            Título: solo "Alertas".
+        {/* ══════ ALERTA OFICIAL (solo del panel admin, huincha full-width, máx 1) ══════
+            La portada muestra una sola alerta para mantener la jerarquía visual.
             Layout: tarjetas horizontales delgadas (huincha), una arriba de
             la otra, ocupando todo el ancho disponible. NO grilla de 2 columnas.
             Pin: lineal verde marca, sin fondo blanco.
             Texto: "Estás a xx m" (metros desde el user vía Haversine).
             Radial: clase .alerta-pulse anima un halo suave del color de la cat. */}
         {!buscando && (
-          <div style={s.seccion}>
-            <div style={s.seccionTit}>
+          <div style={{ ...s.seccion, marginBottom: 16 }}>
+            <div style={{ ...s.seccionTit, marginBottom: 7 }}>
               <Ico.alerta />
-              <span style={s.seccionTxt}>Alertas</span>
+              <span style={s.seccionTxt}>Alerta oficial</span>
               {alertas.length > 0 && (
                 <button
                   style={s.verTodasBtn}
@@ -766,13 +824,13 @@ function Home({ currentUser, onNavigate, onCrear }) {
               <button style={s.alertaVaciaStrip} onClick={() => nav('alertas')}>
                 <span style={{ fontSize: 18, lineHeight: 1 }}>🚨</span>
                 <span style={s.alertaVaciaTxt}>
-                  No hay alertas activas ahora.
+                  No hay alertas oficiales ahora.
                   <span style={s.alertaVaciaCta}>Ver centro de alertas →</span>
                 </span>
               </button>
             ) : (
               <div style={s.alertaLista}>
-                {alertas.slice(0, 3).map((a) => {
+                {alertas.slice(0, 1).map((a) => {
                   const cat = REPORTES[a.category] || REPORTES.seguridad
                   // Distancia: preferimos la calculada con Haversine desde
                   // el GPS del user hasta la lat/lng de la alerta. Si no hay
@@ -787,37 +845,29 @@ function Home({ currentUser, onNavigate, onCrear }) {
                       style={{
                         ...s.alertaRow,
                         background: cat.bg,
+                        borderColor: cat.color,
+                        borderLeft: `3px solid ${cat.color}`,
                         // El halo del pulse toma el color de la categoría.
                         '--pulse-color': hexToRgba(cat.color, 0.35),
                       }}
                       onClick={() => nav('alerta', { id: a.id })}
                     >
                       <div style={{ ...s.alertaRowIcon, color: cat.color }}>
-                        <span style={{ fontSize: 18 }}>{cat.emoji}</span>
+                        <span style={{ fontSize: 14, lineHeight: 1 }}>{cat.emoji}</span>
                       </div>
                       <div style={s.alertaRowBody}>
-                        <div style={s.alertaRowTop}>
-                          <span style={{ ...s.alertaRowCat, color: cat.color }}>
-                            {cat.label}
-                          </span>
-                          <span style={s.alertaRowTime}>{hace(a.created_at)}</span>
-                        </div>
                         <div style={s.alertaRowTitle}>
                           {(a.title && a.title.trim()) || a.description?.slice(0, 60) || 'Alerta'}
                         </div>
-                        {a.title && a.description && a.description !== a.title && (
-                          <div style={s.alertaRowDesc}>
-                            {a.description}
-                          </div>
-                        )}
                         <div style={s.alertaRowPie}>
+                          <span style={s.alertaRowTime}>{hace(a.created_at)}</span>
                           {metros != null && (
                             <span style={s.alertaRowDist}>
-                              <Ico.pin size={11} color={C.verde} /> Estás a {metros} m
+                              <Ico.pin size={10} color={C.verde} /> Estás a {metros} m
                             </span>
                           )}
                           {a.confirms_count >= 3 && (
-                            <span style={s.alertaRowConf}>✅ {a.confirms_count} vecinos</span>
+                            <span style={s.alertaRowConf}>✅ {a.confirms_count}</span>
                           )}
                         </div>
                       </div>
@@ -832,13 +882,20 @@ function Home({ currentUser, onNavigate, onCrear }) {
 
         {/* ══════ MERCADO (scroll lateral: ventas + regalos + trueques juntos) ══════
             Card sin minHeight en título → no queda espacio vacío abajo.
+            Botón "ver más" navega al Marketplace completo.
             marginBottom: 20 inline para separar bien de Actividad de el barrio. */}
         {!buscando && mercado.length > 0 && (
           <div style={{ ...s.seccion, marginBottom: 20 }}>
             <div style={s.seccionTit}>
               <Ico.mercado />
               <span style={s.seccionTxt}>Mercado</span>
-              {mercado.length > 6 && <span style={s.cantidad}>{mercado.length}</span>}
+              <button
+                style={s.verTodasBtn}
+                onClick={() => nav('mercado')}
+              >
+                + ver más
+                <span style={s.verTodasFlecha}>→</span>
+              </button>
             </div>
             <div style={s.scrollH}>
               {mercado.slice(0, 15).map((p) => (
@@ -853,7 +910,8 @@ function Home({ currentUser, onNavigate, onCrear }) {
         )}
 
         {/* ══════ ACTIVIDAD DE EL BARRIO (vertical, 6 + "+ ver más") ══════
-            Feed principal — ahora queda ARRIBA de Eventos para que no se pierda. */}
+            Feed principal — publicaciones generales de vecinos.
+            Ahora queda ARRIBA de Eventos para que no se pierda. */}
         <div style={s.seccion}>
           <div style={s.seccionTit}>
             <Ico.actividad />
@@ -1085,7 +1143,11 @@ const s = {
     borderRadius: 14, padding: '12px 14px', marginBottom: 14,
   },
   climaBloque: { display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 },
-  climaEmoji: { fontSize: 26, lineHeight: 1 },
+  climaEmoji: {
+    width: 36, height: 36, lineHeight: 1,
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    flexShrink: 0,
+  },
   climaTemp: { fontSize: 19, fontWeight: 700, color: C.texto, lineHeight: 1.1 },
   climaTxt: { fontSize: 11, color: C.textoTenue, fontWeight: 500, marginTop: 2 },
   tiraDivisor: { width: 1, height: 34, background: C.tiraBorde, margin: '0 12px', flexShrink: 0 },
@@ -1169,7 +1231,7 @@ const s = {
   // sus tarjetas. El scrollH ya aporta 14px de paddingTop (para el halo
   // del pulse de alertas), así que no hace falta más gap aquí.
   seccionTit: { display: 'flex', alignItems: 'center', marginBottom: 3, gap: 8 },
-  seccionTxt: { fontSize: 15, fontWeight: 700, color: C.texto },
+  seccionTxt: { fontSize: 15, fontWeight: 600, color: C.texto },
   pulso: {
     width: 8, height: 8, borderRadius: '50%', background: C.rojo,
     marginLeft: 'auto', boxShadow: `0 0 0 4px ${C.rojoSuave}`,
@@ -1285,69 +1347,69 @@ const s = {
      izquierda + body + flecha), una arriba de la otra, ocupando todo
      el ancho disponible. Al pinchar abre el detalle. */
   alertaLista: {
-    display: 'flex', flexDirection: 'column', gap: 8,
+    display: 'flex', flexDirection: 'column', gap: 6,
     width: '100%',
   },
   alertaRow: {
-    display: 'flex', alignItems: 'stretch', gap: 10,
+    display: 'flex', alignItems: 'center', gap: 9,
     width: '100%',
-    borderRadius: 12,
+    borderRadius: 10,
     border: `1px solid ${C.borde}`,
-    padding: '9px 11px 9px 9px',
+    padding: '7px 10px 7px 8px',
     cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left',
-    position: 'relative',
+    position: 'relative', overflow: 'hidden',
   },
   alertaRowIcon: {
-    width: 34, height: 34, borderRadius: 9,
-    background: 'rgba(255,255,255,0.7)',
+    width: 28, height: 28, borderRadius: 8,
+    background: 'rgba(255,255,255,0.85)',
     display: 'flex', alignItems: 'center', justifyContent: 'center',
-    flexShrink: 0, alignSelf: 'flex-start',
+    flexShrink: 0, alignSelf: 'center',
   },
   alertaRowBody: {
     flex: 1, minWidth: 0,
-    display: 'flex', flexDirection: 'column', gap: 2,
+    display: 'flex', flexDirection: 'column', gap: 0,
   },
   alertaRowTop: {
-    display: 'flex', alignItems: 'center', gap: 8,
+    display: 'flex', alignItems: 'center', gap: 6,
     marginBottom: 1,
   },
   alertaRowCat: {
-    fontSize: 11, fontWeight: 800, letterSpacing: 0.3,
+    fontSize: 9.5, fontWeight: 800, letterSpacing: 0.4,
     textTransform: 'uppercase',
   },
   alertaRowTime: {
-    fontSize: 10, color: C.textoTenue, fontWeight: 500,
+    fontSize: 9.5, color: C.textoTenue, fontWeight: 500,
     marginLeft: 'auto', flexShrink: 0,
   },
   alertaRowTitle: {
-    fontSize: 13.5, fontWeight: 700, color: '#111', lineHeight: 1.3,
+    fontSize: 13, fontWeight: 500, color: '#111', lineHeight: 1.3,
     whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-    marginBottom: 1,
-  },
-  alertaRowDesc: {
-    fontSize: 12.5, color: C.texto, fontWeight: 500, lineHeight: 1.35,
-    display: '-webkit-box', WebkitLineClamp: 2,
-    WebkitBoxOrient: 'vertical', overflow: 'hidden',
     marginBottom: 2,
   },
+  alertaRowDesc: {
+    fontSize: 11.5, color: C.textoTenue, fontWeight: 500, lineHeight: 1.3,
+    display: '-webkit-box', WebkitLineClamp: 1,
+    WebkitBoxOrient: 'vertical', overflow: 'hidden',
+    marginTop: 1, marginBottom: 0,
+  },
   alertaRowPie: {
-    display: 'flex', alignItems: 'center', gap: 10,
-    marginTop: 1,
+    display: 'flex', alignItems: 'center', gap: 8,
+    marginTop: 2,
   },
   alertaRowDist: {
-    fontSize: 10, fontWeight: 500, color: C.verdeOsc,
-    display: 'inline-flex', alignItems: 'center', gap: 3,
+    fontSize: 9.5, fontWeight: 600, color: C.verdeOsc,
+    display: 'inline-flex', alignItems: 'center', gap: 2,
     whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
     minWidth: 0,
   },
   alertaRowConf: {
-    fontSize: 9.5, fontWeight: 700, color: C.verdeOsc,
-    background: '#fff', padding: '1px 6px', borderRadius: 999,
+    fontSize: 9, fontWeight: 700, color: C.verdeOsc,
+    background: '#fff', padding: '1px 5px', borderRadius: 999,
     whiteSpace: 'nowrap',
   },
   alertaRowFlecha: {
-    fontSize: 18, fontWeight: 600, color: C.textoTenue,
-    alignSelf: 'center', flexShrink: 0, lineHeight: 1,
+    fontSize: 16, fontWeight: 500, color: C.textoTenue,
+    alignSelf: 'center', flexShrink: 0, lineHeight: 1, marginLeft: 2,
   },
 
   alertaStripMore: {
@@ -1410,7 +1472,7 @@ const s = {
   cardHFotoWide: { height: 96 },
   cardHImg: { width: '100%', height: '100%', objectFit: 'cover' },
   cardHEmoji: { fontSize: 28 },
-  cardHPrecio: { fontSize: 12, fontWeight: 800, color: C.texto },
+  cardHPrecio: { fontSize: 12, fontWeight: 800, color: C.verde },
   cardHPrecioAlt: {
     fontSize: 10, fontWeight: 700, color: C.verde,
   },
@@ -1422,7 +1484,7 @@ const s = {
     /* sin minHeight: el título ocupa solo lo que necesita →
        no queda hueco vacío abajo en Mercado */
   },
-  cardHAutor: { display: 'flex', alignItems: 'center', gap: 4 },
+  cardHAutor: { display: 'flex', alignItems: 'center', gap: 4, marginTop: 3 },
   cardHAvatar: {
     width: 16, height: 16, borderRadius: '50%',
     background: C.verdeSuave, color: C.verde,

@@ -314,16 +314,14 @@ export default function MyProfile({ currentUser, onNavigate, onBack, onLogout })
   /* ─────── POSTS PROPIOS ─────── */
   const cargarPosts = async (uid, profileId) => {
     try {
-      // Defensive .or(user_id, author_id) — algunos schemas usan user_id,
-      // otros author_id. Si profileId != uid, agregamos ambos.
-      const filtro = (profileId && profileId !== uid)
-        ? `user_id.eq.${uid},author_id.eq.${profileId},user_id.eq.${profileId}`
-        : `user_id.eq.${uid},author_id.eq.${uid}`
+      // posts usa author_id. Consultar user_id hacía fallar toda la query
+      // en el schema actual y el perfil terminaba mostrando cero posts.
+      const autores = [...new Set([uid, profileId].filter(Boolean))]
 
       const { data, error } = await supabase
         .from('posts')
         .select('id, title, type, price, images, created_at, likes_count, comments_count, views_count, status')
-        .or(filtro)
+        .in('author_id', autores)
         .order('created_at', { ascending: false })
         .limit(40)
 
@@ -493,6 +491,45 @@ export default function MyProfile({ currentUser, onNavigate, onBack, onLogout })
           </div>
         )}
 
+        {myPosts.length > 0 && (
+          <div style={s.myPostsWrap}>
+            <div style={s.myPostsHeader}>
+              <span style={s.myPostsTitle}>Mis publicaciones</span>
+              <span style={s.myPostsHint}>Toca una para administrarla</span>
+            </div>
+            <div style={s.myPostsGrid}>
+              {myPosts.map((post) => {
+                const tipo = tipoDePost(post.type)
+                const estado = post.status === 'sold' ? 'Vendida' : post.status === 'paused' ? 'Pausada' : 'Activa'
+                return (
+                  <button
+                    key={post.id}
+                    style={s.myPostCard}
+                    onClick={() => nav('productdetail', { postId: post.id })}
+                  >
+                    <div style={{ ...s.myPostImage, background: tipo.bg }}>
+                      {post.images?.[0]
+                        ? <img src={post.images[0]} alt="" style={s.myPostImg} />
+                        : <span style={s.myPostEmoji}>{tipo.emoji}</span>}
+                      <span style={{
+                        ...s.myPostStatus,
+                        background: estado === 'Activa' ? C.verde : estado === 'Vendida' ? C.textoSuave : C.dorado,
+                      }}>
+                        {estado}
+                      </span>
+                    </div>
+                    <div style={s.myPostBody}>
+                      <div style={{ ...s.myPostPrice, color: tipo.color }}>{precioDe(post)}</div>
+                      <div style={s.myPostTitle}>{post.title || 'Sin título'}</div>
+                      <div style={s.myPostMeta}>{hace(post.created_at)}</div>
+                    </div>
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        )}
+
         {/* SIN PUBLICACIONES — empty state cuando el vecino aún no publica.
             Se muestra solo si myStats.posts === 0 (sin contar loading inicial). */}
         {myStats.posts === 0 && (
@@ -525,6 +562,31 @@ export default function MyProfile({ currentUser, onNavigate, onBack, onLogout })
             </button>
           </div>
         )}
+
+        {/* INFORMACIÓN Y AYUDA — accesos visibles a las páginas institucionales. */}
+        <section style={s.infoHelpWrap}>
+          <div style={s.infoHelpTitle}>Información y ayuda</div>
+          <div style={s.infoHelpCard}>
+            {[
+              ['about', '🏘️', 'Nosotros'],
+              ['invite', '👥', 'Invitar vecinos', true],
+              ['terms', '📄', 'Términos y condiciones'],
+              ['prohibited', '🛡️', 'Productos prohibidos'],
+              ['contact', '✉️', 'Contáctanos'],
+            ].map(([route, icon, label, pending], index, all) => (
+              <button
+                key={route}
+                type="button"
+                onClick={() => pending ? showToast('Invitar vecinos estará disponible próximamente') : nav(route)}
+                style={{ ...s.infoHelpRow, opacity: pending ? 0.62 : 1, borderBottom: index === all.length - 1 ? 'none' : `1px solid ${C.borde}` }}
+              >
+                <span style={s.infoHelpIcon}>{icon}</span>
+                <span>{label}</span>
+                {pending ? <span style={s.infoHelpPending}>Próximamente</span> : <span style={s.infoHelpArrow}>›</span>}
+              </button>
+            ))}
+          </div>
+        </section>
 
         {/* CERRAR SESIÓN — botón peligro al final del scroll.
             onLogout viene de App.jsx (handleLogout). Estilo rojo
@@ -1138,6 +1200,44 @@ const s = {
     color: C.verde, fontWeight: 800,
   },
 
+  // MIS PUBLICACIONES
+  myPostsWrap: { padding: '0 16px 20px' },
+  myPostsHeader: {
+    display: 'flex', alignItems: 'baseline', justifyContent: 'space-between',
+    gap: 10, marginBottom: 10,
+  },
+  myPostsTitle: { fontSize: 16, fontWeight: 600, color: C.texto },
+  myPostsHint: { fontSize: 10.5, color: C.textoTenue },
+  myPostsGrid: {
+    display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 9,
+  },
+  myPostCard: {
+    padding: 0, overflow: 'hidden', textAlign: 'left',
+    borderRadius: 14, border: `1px solid ${C.borde}`,
+    background: C.card, cursor: 'pointer', fontFamily: T.font,
+    boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
+  },
+  myPostImage: {
+    position: 'relative', width: '100%', aspectRatio: '4/3',
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  myPostImg: { width: '100%', height: '100%', objectFit: 'cover' },
+  myPostEmoji: { fontSize: 32 },
+  myPostStatus: {
+    position: 'absolute', top: 7, right: 7,
+    padding: '3px 6px', borderRadius: 999,
+    color: '#fff', fontSize: 9, fontWeight: 600,
+    border: '1px solid rgba(255,255,255,0.9)',
+  },
+  myPostBody: { padding: '8px 9px 9px' },
+  myPostPrice: { fontSize: 12, fontWeight: 700, marginBottom: 2 },
+  myPostTitle: {
+    fontSize: 12, fontWeight: 600, color: C.texto, lineHeight: 1.3,
+    overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+  },
+  myPostMeta: { fontSize: 9.5, color: C.textoTenue, marginTop: 5 },
+
   // SIN PUBLICACIONES — empty state
   emptyPostsWrap: {
     padding: '0 16px 24px',
@@ -1216,6 +1316,13 @@ const s = {
     boxShadow: '0 2px 8px rgba(22,163,74,0.12), inset 0 1px 0 rgba(255,255,255,0.6)',
     transition: 'transform 0.12s ease, background 0.15s ease',
   },
+  infoHelpWrap: { padding: '8px 16px 16px' },
+  infoHelpTitle: { fontSize: 15, fontWeight: 700, color: C.texto, marginBottom: 10 },
+  infoHelpCard: { background: C.card, border: `1px solid ${C.borde}`, borderRadius: 15, overflow: 'hidden', boxShadow: '0 2px 8px rgba(0,0,0,0.04)' },
+  infoHelpRow: { width: '100%', minHeight: 52, padding: '0 14px', background: C.card, border: 0, display: 'flex', alignItems: 'center', gap: 10, color: C.texto, fontSize: 13.5, fontWeight: 600, fontFamily: 'inherit', cursor: 'pointer', textAlign: 'left' },
+  infoHelpIcon: { width: 28, height: 28, borderRadius: 8, background: C.verdeBg, display: 'grid', placeItems: 'center', fontSize: 14 },
+  infoHelpArrow: { marginLeft: 'auto', color: C.textoTenue, fontSize: 22, fontWeight: 400 },
+  infoHelpPending: { marginLeft: 'auto', color: C.textoTenue, fontSize: 10.5, fontWeight: 700 },
 
   // TABS
   tabsWrap: {

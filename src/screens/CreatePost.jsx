@@ -158,6 +158,18 @@ const POST_TYPES = [
     sub: 'Cambia con un vecino',
     color: TIPOS.trade.color, bg: TIPOS.trade.bg,
   },
+  {
+    id: 'service', label: 'Ofrecer servicio', emoji: '🛠️',
+    Icon: IcoVender,
+    sub: 'Ofrece tu oficio a vecinos cercanos',
+    color: C.verde, bg: C.verdeSuave,
+  },
+  {
+    id: 'event', label: 'Crear evento', emoji: '📅',
+    Icon: IcoUbicacion,
+    sub: 'Invita a tu barrio a participar',
+    color: C.verde, bg: C.verdeSuave,
+  },
 ]
 
 const PLAZOS = [
@@ -165,6 +177,14 @@ const PLAZOS = [
   { key: 'manana', label: 'Mañana', hours: 36 },
   { key: 'semana', label: 'Esta semana', hours: 168 },
   { key: 'sin_apuro', label: 'Sin apuro', hours: null },
+]
+
+const EVENT_TYPES = [
+  { key: 'asambleas', label: 'Asamblea', emoji: '🏛️' },
+  { key: 'ferias', label: 'Feria', emoji: '🥬' },
+  { key: 'talleres', label: 'Taller', emoji: '🎨' },
+  { key: 'deportes', label: 'Deporte', emoji: '⚽' },
+  { key: 'otros', label: 'Otro', emoji: '📌' },
 ]
 
 /* Categorías de alerta — alineadas a REPORTES del design.js (con emojis).
@@ -211,23 +231,25 @@ const DRAFT_KEY = 'elbarrio-draft-createpost'
 // startWith='request'  -> abre directo el formulario de Pedido
 // startWith='alert'    -> abre directo el formulario de Alerta
 // sin startWith         -> muestra Vender / Regalar / Intercambiar
-function CreatePost({ onClose, onPublished, startWith }) {
-  const initialType = startWith
-    ? POST_TYPES.find((t) => t.id === startWith)
+function CreatePost({ onClose, onPublished, startWith, existingPost = null }) {
+  const editing = !!existingPost?.id
+  const initialTypeId = existingPost?.type || startWith
+  const initialType = initialTypeId
+    ? POST_TYPES.find((t) => t.id === initialTypeId)
     : null
 
   const [step, setStep] = useState(initialType ? 'form' : 'type')
   const [selectedType, setSelectedType] = useState(initialType)
 
-  const [title, setTitle] = useState('')
-  const [content, setContent] = useState('')
-  const [price, setPrice] = useState('')
-  const [isNegotiable, setIsNegotiable] = useState(false)
-  const [category, setCategory] = useState('')
-  const [lookingFor, setLookingFor] = useState('')
+  const [title, setTitle] = useState(existingPost?.title || '')
+  const [content, setContent] = useState(existingPost?.content || '')
+  const [price, setPrice] = useState(existingPost?.price != null ? Number(existingPost.price).toLocaleString('es-CL') : '')
+  const [isNegotiable, setIsNegotiable] = useState(existingPost?.is_negotiable === true)
+  const [category, setCategory] = useState(existingPost?.category || '')
+  const [lookingFor, setLookingFor] = useState(existingPost?.looking_for || '')
 
   // Pedido Vecinal
-  const [rubro, setRubro] = useState('')
+  const [rubro, setRubro] = useState(existingPost?.service_key || '')
   const [budget, setBudget] = useState('')
   const [budgetOpen, setBudgetOpen] = useState(false)
   const [plazo, setPlazo] = useState('')
@@ -242,9 +264,21 @@ function CreatePost({ onClose, onPublished, startWith }) {
   const [searchQ, setSearchQ] = useState('')
   const [results, setResults] = useState([])
   const [loadingAddr, setLoadingAddr] = useState(false)
+  const [eventType, setEventType] = useState(existingPost?.event_type || existingPost?.category || '')
+  const [eventStartsAt, setEventStartsAt] = useState(
+    existingPost?.starts_at ? new Date(existingPost.starts_at).toISOString().slice(0, 16) : ''
+  )
+  const [eventEntryType, setEventEntryType] = useState(existingPost?.event_entry_type || 'free')
+  const [eventPrice, setEventPrice] = useState(existingPost?.event_price ? Number(existingPost.event_price).toLocaleString('es-CL') : '')
+  const [eventPetFriendly, setEventPetFriendly] = useState(existingPost?.event_pet_friendly === true)
+  const [eventAccessible, setEventAccessible] = useState(existingPost?.event_accessible === true)
+  const [eventFamilyFriendly, setEventFamilyFriendly] = useState(existingPost?.event_family_friendly === true)
+  const [eventRequiresRegistration, setEventRequiresRegistration] = useState(existingPost?.event_requires_registration === true)
+  const [eventCapacity, setEventCapacity] = useState(existingPost?.event_capacity || '')
+  const [eventRegistrationUrl, setEventRegistrationUrl] = useState(existingPost?.event_registration_url || '')
 
-  const [images, setImages] = useState([])
-  const [previews, setPreviews] = useState([])
+  const [images, setImages] = useState(existingPost?.images || [])
+  const [previews, setPreviews] = useState(existingPost?.images || [])
   const [error, setError] = useState('')
 
   // ---- IA: autocompletar desde la foto ----
@@ -268,7 +302,7 @@ function CreatePost({ onClose, onPublished, startWith }) {
   // Si el user cierra sin querer, no pierde su trabajo.
   const draftTimer = useRef(null)
   useEffect(() => {
-    if (step !== 'form' || !selectedType) return
+    if (editing || step !== 'form' || !selectedType) return
     if (draftTimer.current) clearTimeout(draftTimer.current)
     draftTimer.current = setTimeout(() => {
       try {
@@ -283,12 +317,12 @@ function CreatePost({ onClose, onPublished, startWith }) {
       } catch {}
     }, 800)
     return () => { if (draftTimer.current) clearTimeout(draftTimer.current) }
-  }, [step, selectedType, title, content, price, isNegotiable, category, lookingFor,
+  }, [editing, step, selectedType, title, content, price, isNegotiable, category, lookingFor,
       rubro, budget, budgetOpen, plazo, alertCategory, alertLocation])
 
   // Cargar draft al montar (solo si no hay startWith)
   useEffect(() => {
-    if (startWith || !selectedType) return
+    if (editing || startWith || !selectedType) return
     try {
       const raw = localStorage.getItem(DRAFT_KEY)
       if (!raw) return
@@ -309,7 +343,7 @@ function CreatePost({ onClose, onPublished, startWith }) {
         if (draft.alertLocation) setAlertLocation(draft.alertLocation)
       }
     } catch {}
-  }, [])
+  }, [editing])
 
   const clearDraft = () => {
     try { localStorage.removeItem(DRAFT_KEY) } catch {}
@@ -559,6 +593,31 @@ function CreatePost({ onClose, onPublished, startWith }) {
     setSearchQ('')
   }
 
+  const buscarDireccionEvento = async () => {
+    const direccion = alertLocation.trim()
+    if (!direccion || loadingAddr) return
+    setLoadingAddr(true)
+    setError('')
+    try {
+      const query = /chile/i.test(direccion) ? direccion : `${direccion}, Chile`
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}` +
+        `&format=json&limit=1&countrycodes=cl&accept-language=es`
+      )
+      const data = await response.json()
+      if (!data?.[0]) {
+        setError('No encontramos esa dirección. Prueba agregando comuna y número, o marca el punto en el mapa.')
+        return
+      }
+      const result = data[0]
+      setPinCoords({ lat: Number(result.lat), lng: Number(result.lon) })
+    } catch {
+      setError('No pudimos buscar la dirección. Puedes marcar el punto directamente en el mapa.')
+    } finally {
+      setLoadingAddr(false)
+    }
+  }
+
   /* ---------- PUBLICAR ---------- */
   const handlePublish = async () => {
     setError('')
@@ -585,6 +644,18 @@ function CreatePost({ onClose, onPublished, startWith }) {
       if (!title.trim()) return setError('¿Qué ofreces?')
       if (!content.trim()) return setError('Agrega una descripción con el estado y características')
       if (!lookingFor.trim()) return setError('¿Qué buscas a cambio?')
+    } else if (t === 'service') {
+      if (!title.trim()) return setError('Escribe qué servicio ofreces')
+      if (!rubro) return setError('Elige tu rubro')
+      if (!content.trim()) return setError('Cuenta qué incluye tu servicio')
+    } else if (t === 'event') {
+      if (!title.trim()) return setError('Ponle un nombre al evento')
+      if (!eventType) return setError('Elige un tipo de evento')
+      if (!eventStartsAt) return setError('Indica la fecha y hora')
+      if (new Date(eventStartsAt).getTime() <= Date.now()) return setError('La fecha debe ser futura')
+      if (!alertLocation.trim()) return setError('Indica dónde será')
+      if (!content.trim()) return setError('Cuenta de qué se trata')
+      if (eventEntryType === 'paid' && !eventPrice) return setError('Indica el valor de la entrada')
     }
 
     setStep('publishing')
@@ -604,6 +675,10 @@ function CreatePost({ onClose, onPublished, startWith }) {
 
       const urls = []
       for (const img of images) {
+        if (typeof img === 'string') {
+          urls.push(img)
+          continue
+        }
         const ext = img.name.split('.').pop()
         const fileName = `${user.id}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`
         const { error: upErr } = await supabase.storage
@@ -679,16 +754,51 @@ function CreatePost({ onClose, onPublished, startWith }) {
       } else if (t === 'trade') {
         post.looking_for = lookingFor.trim()
         post.category = category || null
+      } else if (t === 'service') {
+        post.service_key = rubro
+        post.category = rubro
+        post.price = price ? toNumber(price) : null
+      } else if (t === 'event') {
+        post.category = eventType
+        post.starts_at = new Date(eventStartsAt).toISOString()
+        post.location_text = alertLocation.trim()
+        post.lat = pinCoords?.lat || null
+        post.lng = pinCoords?.lng || null
+        post.event_entry_type = eventEntryType
+        post.event_price = eventEntryType === 'paid' ? toNumber(eventPrice) : null
+        post.event_pet_friendly = eventPetFriendly
+        post.event_accessible = eventAccessible
+        post.event_family_friendly = eventFamilyFriendly
+        post.event_requires_registration = eventRequiresRegistration
+        post.event_capacity = eventCapacity ? Number(eventCapacity) : null
+        post.event_registration_url = eventRequiresRegistration && eventRegistrationUrl.trim() ? eventRegistrationUrl.trim() : null
       }
 
-      const { error: insErr } = await supabase.from('posts').insert([post])
-      if (insErr) throw insErr
+      if (editing) {
+        const updatePost = { ...post }
+        delete updatePost.author_id
+        delete updatePost.neighborhood_id
+        const { error: updateErr } = await supabase
+          .from('posts')
+          .update(updatePost)
+          .eq('id', existingPost.id)
+        if (updateErr) throw updateErr
+      } else {
+        const { error: insErr } = await supabase.from('posts').insert([post])
+        if (insErr) throw insErr
+      }
 
       clearDraft()
       setStep('success')
-      setTimeout(() => { onPublished?.(); onClose?.() }, 1400)
+      setTimeout(() => { onPublished?.(selectedType.id); onClose?.() }, 1400)
     } catch (err) {
-      setError(err.message || 'Algo salió mal. Intenta de nuevo.')
+      console.error('[CreatePost] No se pudo publicar:', err)
+      const message = err?.code === '42501'
+        ? 'No tienes permisos para publicar este evento. Revisa tu sesión e inténtalo nuevamente.'
+        : err?.message?.includes('column') || err?.code === 'PGRST204'
+          ? 'La base de datos todavía no reconoce uno de los datos del evento.'
+          : err.message || 'Algo salió mal. Intenta de nuevo.'
+      setError(message)
       setStep('form')
     }
   }
@@ -832,10 +942,14 @@ function CreatePost({ onClose, onPublished, startWith }) {
           </div>
           <div style={{ ...s.successTitle, animation: 'ebFadeUp 0.4s ease-out 0.4s both' }}>Listo</div>
           <div style={{ ...s.successText, animation: 'ebFadeUp 0.4s ease-out 0.55s both' }}>
-            {selectedType.id === 'request'
+            {editing
+              ? 'Tus cambios quedaron guardados'
+              : selectedType.id === 'request'
               ? 'Tus vecinos ya recibieron tu pedido'
               : selectedType.id === 'alert'
               ? 'Tu alerta ya llegó a tus vecinos'
+              : selectedType.id === 'event'
+              ? 'Tu evento ya está visible para el barrio'
               : 'Tus vecinos ya lo pueden ver'}
           </div>
         </div>
@@ -861,6 +975,8 @@ function CreatePost({ onClose, onPublished, startWith }) {
     : t === 'gift' ? 'Gratis'
     : t === 'trade' ? 'Trueque'
     : t === 'request' ? (budgetOpen ? 'A convenir' : budget ? plata(toNumber(budget)) : 'A convenir')
+    : t === 'service' ? (price ? `Desde ${plata(toNumber(price))}` : 'A convenir')
+    : t === 'event' ? (eventStartsAt ? new Date(eventStartsAt).toLocaleDateString('es-CL', { day: 'numeric', month: 'short' }) : 'Fecha por definir')
     : ''
   // Para alertas, la "categoría" del preview es la categoría de la alerta
   // (Seguridad / Infra / Mascotas / Otro), no la categoría de marketplace.
@@ -872,13 +988,13 @@ function CreatePost({ onClose, onPublished, startWith }) {
       <div style={s.header}>
         <button
           style={s.iconBtn}
-          onClick={() => (startWith ? onClose?.() : setStep('type'))}
+          onClick={() => (startWith || editing ? onClose?.() : setStep('type'))}
         >
-          {startWith ? <IcoCerrar /> : <IcoVolver />}
+          {startWith || editing ? <IcoCerrar /> : <IcoVolver />}
         </button>
         <div style={s.headerTitleRow}>
           <span style={{ fontSize: 16 }}>{selectedType.emoji}</span>
-          <span style={s.headerTitle}>{selectedType.label}</span>
+          <span style={s.headerTitle}>{t === 'event' ? 'Publicar evento' : selectedType.label}</span>
         </div>
         <div style={{ width: 40 }} />
       </div>
@@ -886,7 +1002,7 @@ function CreatePost({ onClose, onPublished, startWith }) {
       <div style={s.formScroll}>
 
         {/* ---- PREVIEW EN VIVO ---- */}
-        <PreviewCard
+        {t !== 'event' && <PreviewCard
           emoji={previewEmoji}
           title={previewTitle}
           price={previewPrice}
@@ -897,7 +1013,7 @@ function CreatePost({ onClose, onPublished, startWith }) {
           imgPreview={previews[0]}
           category={previewCategory}
           lookingFor={t === 'trade' && lookingFor ? lookingFor : null}
-        />
+        />}
 
         {/* ---------- ALERTA VECINAL ---------- */}
         {t === 'alert' && (
@@ -1209,6 +1325,229 @@ function CreatePost({ onClose, onPublished, startWith }) {
           </div>
         )}
 
+        {/* ---------- CREAR EVENTO ---------- */}
+        {t === 'event' && (
+          <div style={s.form}>
+            <Fotos
+              images={images} previews={previews}
+              onUpload={handleImageUpload} onRemove={removeImage}
+              first variant="banner" label="Imagen principal del evento"
+              hint="Una imagen clara ayuda a que más vecinos entiendan la actividad."
+            />
+
+            <label style={s.label}>¿Cómo se llama el evento?</label>
+            <input
+              type="text"
+              placeholder="Ej: Feria de emprendedores del barrio"
+              value={title}
+              onChange={onTitleChange}
+              style={s.input}
+            />
+            <CharCounter value={title.length} max={TITLE_MAX} />
+
+            <label style={s.label}>¿Cuándo será?</label>
+            <input
+              type="datetime-local"
+              value={eventStartsAt}
+              min={new Date().toISOString().slice(0, 16)}
+              onChange={(e) => setEventStartsAt(e.target.value)}
+              style={s.input}
+            />
+
+            <label style={s.label}>¿Dónde será?</label>
+            <div style={s.eventAddressRow}>
+              <input
+                type="text"
+                placeholder="Ej: Las Encinas 120, Las Condes"
+                value={alertLocation}
+                onChange={(e) => setAlertLocation(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault()
+                    buscarDireccionEvento()
+                  }
+                }}
+                style={{ ...s.input, flex: 1 }}
+              />
+              <button
+                type="button"
+                onClick={buscarDireccionEvento}
+                disabled={!alertLocation.trim() || loadingAddr}
+                style={{ ...s.eventAddressSearch, opacity: !alertLocation.trim() || loadingAddr ? 0.55 : 1 }}
+              >
+                {loadingAddr ? 'Buscando…' : 'Buscar'}
+              </button>
+            </div>
+
+            <div style={s.eventMapCard}>
+              <MiniMap
+                editable
+                lat={pinCoords?.lat}
+                lng={pinCoords?.lng}
+                centerLat={pinCoords?.lat || userCoords?.lat || barrioCoords?.lat || -33.4489}
+                centerLng={pinCoords?.lng || userCoords?.lng || barrioCoords?.lng || -70.6693}
+                height={165}
+                zoom={15}
+                onPick={(lat, lng) => setPinCoords({ lat, lng })}
+              />
+              <div style={s.eventMapFooter}>
+                <span style={s.eventMapHint}>
+                  <IcoUbicacion size={13} />
+                  {pinCoords ? 'Ubicación confirmada · toca para moverla' : 'Toca el mapa para marcar el lugar'}
+                </span>
+                <button
+                  type="button"
+                  style={s.eventGpsButton}
+                  onClick={() => {
+                    if (!navigator.geolocation) return setError('Tu dispositivo no permite obtener la ubicación')
+                    navigator.geolocation.getCurrentPosition(
+                      (pos) => {
+                        const coords = { lat: pos.coords.latitude, lng: pos.coords.longitude }
+                        setUserCoords(coords)
+                        setPinCoords(coords)
+                      },
+                      () => setError('No pudimos obtener tu ubicación. Puedes marcarla en el mapa.'),
+                      { enableHighAccuracy: true, timeout: 8000, maximumAge: 60000 }
+                    )
+                  }}
+                >
+                  Usar mi ubicación
+                </button>
+              </div>
+            </div>
+
+            <label style={s.label}>Cuéntales a los vecinos <span style={s.req}>*</span></label>
+            <textarea
+              placeholder="Qué se hará, quiénes pueden participar y qué deben llevar..."
+              value={content}
+              onChange={onContentChange}
+              style={{ ...s.input, minHeight: 95, resize: 'vertical' }}
+            />
+            <CharCounter value={content.length} max={CONTENT_MAX} />
+
+            <label style={s.label}>¿Qué tipo de actividad es?</label>
+            <div style={s.eventTypeRow}>
+              {EVENT_TYPES.map((item) => (
+                <button
+                  key={item.key}
+                  type="button"
+                  onClick={() => setEventType(item.key)}
+                  style={{
+                    ...s.eventTypeChip,
+                    background: eventType === item.key ? C.verde : C.card,
+                    color: eventType === item.key ? '#fff' : C.texto,
+                    borderColor: eventType === item.key ? C.verde : C.borde,
+                  }}
+                >
+                  <span>{item.emoji}</span>{item.label}
+                </button>
+              ))}
+            </div>
+
+            <label style={s.label}>Entrada</label>
+            <div style={s.eventChoiceGrid}>
+              <button type="button" onClick={() => setEventEntryType('free')} style={{ ...s.eventChoice, ...(eventEntryType === 'free' ? s.eventChoiceOn : {}) }}>✓ Gratuita</button>
+              <button type="button" onClick={() => setEventEntryType('paid')} style={{ ...s.eventChoice, ...(eventEntryType === 'paid' ? s.eventChoiceOn : {}) }}>🎟️ Pagada</button>
+            </div>
+            {eventEntryType === 'paid' && (
+              <div style={{ ...s.priceBox, marginTop: 8 }}>
+                <span style={s.pricePrefix}>$</span>
+                <input type="text" inputMode="numeric" placeholder="Valor por persona" value={eventPrice} onChange={(e) => setEventPrice(formatPrice(e.target.value))} style={s.priceInput} />
+              </div>
+            )}
+
+            <label style={s.label}>Características</label>
+            <div style={s.eventOptionsGrid}>
+              {[
+                ['🐾', 'Pet friendly', eventPetFriendly, setEventPetFriendly],
+                ['♿', 'Accesible', eventAccessible, setEventAccessible],
+                ['👨‍👩‍👧', 'Familiar', eventFamilyFriendly, setEventFamilyFriendly],
+                ['📝', 'Con inscripción', eventRequiresRegistration, setEventRequiresRegistration],
+              ].map(([emoji, label, active, setter]) => (
+                <button key={label} type="button" onClick={() => setter(!active)} style={{ ...s.eventOption, ...(active ? s.eventOptionOn : {}) }}>
+                  <span>{emoji}</span><span>{label}</span>{active && <b>✓</b>}
+                </button>
+              ))}
+            </div>
+
+            <label style={s.label}>Cupos <span style={s.opt}>(opcional)</span></label>
+            <input type="number" inputMode="numeric" min="1" placeholder="Ej: 80 personas" value={eventCapacity} onChange={(e) => setEventCapacity(e.target.value)} style={s.input} />
+
+            {eventRequiresRegistration && (
+              <>
+                <label style={s.label}>Enlace de inscripción <span style={s.opt}>(opcional)</span></label>
+                <input type="url" placeholder="https://..." value={eventRegistrationUrl} onChange={(e) => setEventRegistrationUrl(e.target.value)} style={s.input} />
+              </>
+            )}
+
+            <div style={s.eventAudienceNote}>
+              📣 Este evento se publicará para los vecinos de tu barrio.
+            </div>
+          </div>
+        )}
+
+        {/* ---------- OFRECER SERVICIO ---------- */}
+        {t === 'service' && (
+          <div style={s.form}>
+            <div style={s.hintBox}>
+              Tu servicio será visible para vecinos cercanos. Describe con claridad qué haces y cómo trabajas.
+            </div>
+
+            <label style={s.labelFirst}>¿Qué servicio ofreces?</label>
+            <input
+              type="text"
+              placeholder="Ej: Gasfitería y reparaciones a domicilio"
+              value={title}
+              onChange={onTitleChange}
+              style={s.input}
+            />
+            <CharCounter value={title.length} max={TITLE_MAX} />
+
+            <label style={s.label}>Rubro</label>
+            <div style={s.chipGrid2}>
+              {RUBROS.map((r) => (
+                <button
+                  key={r.key}
+                  type="button"
+                  onClick={() => setRubro(r.key)}
+                  style={{
+                    ...s.chip,
+                    background: rubro === r.key ? C.verde : C.card,
+                    color: rubro === r.key ? '#fff' : C.texto,
+                    borderColor: rubro === r.key ? C.verde : C.borde,
+                  }}
+                >
+                  <span style={{ marginRight: 5 }}>{r.emoji}</span>{r.label}
+                </button>
+              ))}
+            </div>
+
+            <label style={s.label}>Descripción <span style={s.req}>*</span></label>
+            <textarea
+              placeholder="Experiencia, qué incluye, horarios y zonas donde trabajas..."
+              value={content}
+              onChange={onContentChange}
+              style={{ ...s.input, minHeight: 95, resize: 'vertical' }}
+            />
+            <CharCounter value={content.length} max={CONTENT_MAX} />
+
+            <label style={s.label}>Precio referencial <span style={s.optional}>(opcional)</span></label>
+            <div style={s.priceBox}>
+              <span style={s.pricePrefix}>$</span>
+              <input
+                type="text"
+                inputMode="numeric"
+                placeholder="A convenir"
+                value={price}
+                onChange={onPriceChange}
+                style={s.priceInput}
+              />
+            </div>
+
+            <Fotos images={images} previews={previews} onUpload={handleImageUpload} onRemove={removeImage} />
+          </div>
+        )}
+
         {/* ---------- VENDER ---------- */}
         {t === 'sell' && (
           <div style={s.form}>
@@ -1406,7 +1745,7 @@ function CreatePost({ onClose, onPublished, startWith }) {
             se menciona "lo que buscás" en vez de precio.
             NOTA: Las alertas NO usan IA (no tienen botón AiButton, no tienen
             título ni precio), así que el disclaimer no aplica y se oculta. */}
-        {t !== 'alert' && (
+        {['sell', 'gift', 'trade'].includes(t) && (
           <div style={s.disclaimerBox}>
             <span style={s.disclaimerIcon}>⚠️</span>
             <p style={s.disclaimerText}>
@@ -1429,10 +1768,13 @@ function CreatePost({ onClose, onPublished, startWith }) {
 
       <div style={s.footer}>
         <button onClick={handlePublish} style={s.publishBtn}>
-          {t === 'alert' ? 'Enviar alerta al barrio' :
+          {editing ? 'Guardar cambios' :
+           t === 'alert' ? 'Enviar alerta al barrio' :
            t === 'request' ? 'Enviar pedido al barrio' :
            t === 'sell' ? 'Publicar venta' :
            t === 'gift' ? 'Publicar regalo' :
+           t === 'service' ? 'Publicar servicio' :
+           t === 'event' ? 'Publicar evento' :
            'Publicar intercambio'}
         </button>
       </div>
@@ -1492,11 +1834,36 @@ function CharCounter({ value, max }) {
 /* ============================================================
    SUBCOMPONENTE: FOTOS
    ============================================================ */
-function Fotos({ images, previews, onUpload, onRemove, required, first, hint }) {
+function Fotos({ images, previews, onUpload, onRemove, required, first, hint, variant, label = 'Fotos' }) {
+  if (variant === 'banner') {
+    const preview = previews[0]
+    return (
+      <div>
+        <label style={s.labelFirst}>{label} <span style={s.opt}>(opcional)</span></label>
+        <label htmlFor="upload-event-banner" style={s.eventBannerUpload}>
+          {preview ? (
+            <>
+              <img src={preview} alt="" style={s.eventBannerImg} />
+              <span style={s.eventBannerChange}>Cambiar imagen</span>
+            </>
+          ) : (
+            <>
+              <span style={s.eventBannerCamera}><IcoCamara size={28} /></span>
+              <strong>Subir imagen</strong>
+              <small>JPG o PNG · máximo 5 MB</small>
+            </>
+          )}
+          <input id="upload-event-banner" type="file" accept="image/*" onChange={onUpload} style={{ display: 'none' }} />
+        </label>
+        {preview && <button type="button" onClick={() => onRemove(0)} style={s.eventBannerRemove}>Quitar imagen</button>}
+        {hint && <div style={{ ...s.photoHint, marginTop: 8 }}>{hint}</div>}
+      </div>
+    )
+  }
   return (
     <div style={{ marginTop: first ? 0 : 18 }}>
       <label style={first ? s.labelFirst : s.label}>
-        Fotos {required && <span style={{ color: C.rojo }}>*</span>}
+        {label} {required && <span style={{ color: C.rojo }}>*</span>}
         <span style={s.opt}> ({images.length}/4)</span>
       </label>
       {hint && <div style={s.photoHint}>{hint}</div>}
@@ -1768,6 +2135,58 @@ const s = {
   chipGrid2: { display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8 },
   chipGrid3: { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 },
   chipGrid4: { display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8 },
+  eventTypeRow: {
+    display: 'flex', gap: 7, overflowX: 'auto', paddingBottom: 3,
+    WebkitOverflowScrolling: 'touch', scrollbarWidth: 'none',
+  },
+  eventTypeChip: {
+    flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: 5,
+    padding: '8px 11px', borderRadius: 999, border: `1.5px solid ${C.borde}`,
+    fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit',
+  },
+  eventChoiceGrid: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 },
+  eventChoice: {
+    padding: '11px 10px', borderRadius: 12, border: `1.5px solid ${C.borde}`,
+    background: C.card, color: C.textoSuave, fontSize: 12.5, fontWeight: 600,
+    fontFamily: 'inherit', cursor: 'pointer',
+  },
+  eventChoiceOn: { borderColor: C.verde, background: C.verdeSuave, color: C.verdeOsc },
+  eventOptionsGrid: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 },
+  eventOption: {
+    minHeight: 44, padding: '9px 10px', borderRadius: 12, border: `1px solid ${C.borde}`,
+    background: C.card, color: C.textoSuave, display: 'flex', alignItems: 'center', gap: 6,
+    textAlign: 'left', fontSize: 11.5, fontWeight: 600, fontFamily: 'inherit', cursor: 'pointer',
+  },
+  eventOptionOn: { borderColor: C.verde, background: C.verdeSuave, color: C.verdeOsc },
+  eventAudienceNote: {
+    marginTop: 18, padding: '11px 13px', borderRadius: 12,
+    background: C.verdeSuave, color: C.verdeOsc,
+    fontSize: 12.5, fontWeight: 500, lineHeight: 1.4,
+  },
+  eventMapCard: {
+    marginTop: 10, borderRadius: 14, overflow: 'hidden',
+    border: `1px solid ${C.borde}`, background: C.card,
+  },
+  eventAddressRow: { display: 'flex', alignItems: 'stretch', gap: 7 },
+  eventAddressSearch: {
+    flexShrink: 0, padding: '0 12px', borderRadius: 12,
+    border: `1px solid ${C.verde}`, background: C.verdeSuave,
+    color: C.verdeOsc, fontSize: 12, fontWeight: 600,
+    fontFamily: 'inherit', cursor: 'pointer',
+  },
+  eventMapFooter: {
+    padding: '9px 10px', display: 'flex', alignItems: 'center', gap: 8,
+  },
+  eventMapHint: {
+    flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 5,
+    fontSize: 10.5, color: C.textoSuave, lineHeight: 1.3,
+  },
+  eventGpsButton: {
+    flexShrink: 0, padding: '7px 9px', borderRadius: 999,
+    border: `1px solid ${C.verdeSuave}`, background: C.verdeSuave,
+    color: C.verdeOsc, fontSize: 10.5, fontWeight: 600,
+    fontFamily: 'inherit', cursor: 'pointer',
+  },
   chip: {
     padding: '11px 8px', borderRadius: 12,
     fontSize: 12.5, fontWeight: 600,
@@ -1857,6 +2276,28 @@ const s = {
     cursor: 'pointer',
   },
   photoAddText: { fontSize: 10.5, fontWeight: 600, color: C.textoTenue },
+  eventBannerUpload: {
+    width: '100%', minHeight: 165, borderRadius: 16,
+    border: `2px dashed ${C.verdeSuave}`, background: C.verdeBg,
+    display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+    gap: 6, color: C.verdeOsc, cursor: 'pointer', overflow: 'hidden',
+    position: 'relative', boxSizing: 'border-box', fontSize: 14,
+  },
+  eventBannerCamera: {
+    width: 48, height: 48, borderRadius: '50%', background: C.card,
+    display: 'flex', alignItems: 'center', justifyContent: 'center', color: C.verde,
+    boxShadow: '0 3px 10px rgba(22,163,74,0.12)',
+  },
+  eventBannerImg: { position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' },
+  eventBannerChange: {
+    position: 'absolute', bottom: 10, left: '50%', transform: 'translateX(-50%)',
+    padding: '6px 10px', borderRadius: 999, background: 'rgba(0,0,0,0.62)',
+    color: '#fff', fontSize: 11.5, fontWeight: 600, whiteSpace: 'nowrap',
+  },
+  eventBannerRemove: {
+    marginTop: 7, padding: 0, border: 'none', background: 'none', color: C.rojo,
+    fontSize: 11.5, fontWeight: 600, cursor: 'pointer',
+  },
 
   /* --- IA: botón de autocompletar desde la foto --- */
   aiButton: {

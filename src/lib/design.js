@@ -66,7 +66,7 @@ export const C = {
 // TIPOGRAFÍA — nada baja de 13px
 // ─────────────────────────────────────────────
 export const T = {
-  font: 'system-ui, -apple-system, "Segoe UI", sans-serif',
+  font: '"Plus Jakarta Sans", system-ui, -apple-system, sans-serif',
 
   saludo:   { fontSize: 22, fontWeight: 800, color: C.texto, letterSpacing: '-0.3px' },
   titulo:   { fontSize: 18, fontWeight: 800, color: C.texto, letterSpacing: '-0.2px' },

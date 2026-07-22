@@ -284,7 +284,7 @@ const s = {
     width: '100%',
     height: '100%',
     backgroundColor: '#f4f7f4',
-    fontFamily: 'system-ui, -apple-system, sans-serif',
+    fontFamily: '"Plus Jakarta Sans", system-ui, -apple-system, sans-serif',
     display: 'flex',
     flexDirection: 'column',
     overflow: 'hidden',

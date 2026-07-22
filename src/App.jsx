@@ -27,6 +27,7 @@ import CommerceForm from './components/CommerceForm'
 /* ── TASK 59: pantallas nuevas (Services, Events, Notifications, AlertaDetail) ── */
 import Services from './screens/Services'
 import Events from './screens/Events'
+import EventDetail from './screens/EventDetail'
 import Notifications from './screens/Notifications'
 import AlertaDetail from './screens/AlertaDetail'
 
@@ -40,6 +41,7 @@ import AdminFarmacias from './screens/AdminFarmacias'
 import AdminComercios from './screens/AdminComercios'
 import AdminUsuarios from './screens/AdminUsuarios'
 import AdminIncidentes from './screens/AdminIncidentes'
+import { AboutUs, Terms, ProhibitedProducts, InviteNeighbors, ContactUs, SettingsHub } from './screens/CommunityPagesV2'
 
 function Placeholder({ titulo, onBack, mensaje }) {
   return (
@@ -72,6 +74,8 @@ export default function App() {
   const [params, setParams] = useState({})
   const [createOpen, setCreateOpen] = useState(false)
   const [createType, setCreateType] = useState(null)
+  const [editingPost, setEditingPost] = useState(null)
+  const [eventsRevision, setEventsRevision] = useState(0)
   const [noLeidos, setNoLeidos] = useState(0)
   const historyRef = useRef([])
   // Track del tab previo para que el back desde tabs con flecha (ej: perfil) funcione.
@@ -214,7 +218,7 @@ export default function App() {
       return
     }
 
-    const subScreens = ['post', 'productdetail', 'chatconversation', 'dealdone', 'alerta', 'notificaciones', 'sellerprofile', 'noticias', 'admin', 'adminfarmacias', 'admincomercios', 'adminusuarios', 'adminincidentes']
+    const subScreens = ['post', 'productdetail', 'eventdetail', 'chatconversation', 'dealdone', 'alerta', 'notificaciones', 'sellerprofile', 'noticias', 'admin', 'adminfarmacias', 'admincomercios', 'adminusuarios', 'adminincidentes', 'settings', 'about', 'terms', 'prohibited', 'invite', 'contact']
     if (subScreens.includes(lower)) {
       historyRef.current.push({ screen: currentScreen, params })
     }
@@ -229,6 +233,8 @@ export default function App() {
 
     if (lower === 'post' || lower === 'productdetail') {
       setCurrentScreen('productDetail')
+    } else if (lower === 'eventdetail') {
+      setCurrentScreen('eventDetail')
     } else if (lower === 'chatconversation') {
       setCurrentScreen('chatConversation')
     } else if (lower === 'dealdone') {
@@ -251,6 +257,18 @@ export default function App() {
       setCurrentScreen('adminUsuarios')
     } else if (lower === 'adminincidentes') {
       setCurrentScreen('adminIncidentes')
+    } else if (lower === 'settings') {
+      setCurrentScreen('settings')
+    } else if (lower === 'about' || lower === 'nosotros') {
+      setCurrentScreen('about')
+    } else if (lower === 'terms' || lower === 'terminos') {
+      setCurrentScreen('terms')
+    } else if (lower === 'prohibited' || lower === 'productosprohibidos') {
+      setCurrentScreen('prohibited')
+    } else if (lower === 'invite' || lower === 'invitar') {
+      setCurrentScreen('invite')
+    } else if (lower === 'contact' || lower === 'contactanos') {
+      setCurrentScreen('contact')
     } else if (lower === 'chat' || lower === 'chatlist') {
       if (activeTabRef.current !== 'chat') prevTabRef.current = activeTabRef.current
       setActiveTab('chat')
@@ -271,13 +289,21 @@ export default function App() {
 
   /* ── CREAR (post / commerce) ── */
   const onCrear = useCallback((type = null) => {
+    setEditingPost(null)
     setCreateType(type)
+    setCreateOpen(true)
+  }, [])
+
+  const onEditarPost = useCallback((post) => {
+    setEditingPost(post)
+    setCreateType(post?.type || null)
     setCreateOpen(true)
   }, [])
 
   const onCerrarCrear = useCallback(() => {
     setCreateOpen(false)
     setCreateType(null)
+    setEditingPost(null)
   }, [])
 
   const onPublicadoComercio = useCallback(() => {
@@ -287,11 +313,24 @@ export default function App() {
     setActiveTab('comercios')
   }, [])
 
-  const onPublicado = useCallback(() => {
+  const onPublicado = useCallback((publishedType) => {
     setCreateOpen(false)
     setCreateType(null)
+    setEditingPost(null)
     setCurrentScreen('main')
-    setActiveTab('inicio')
+    if (publishedType === 'event') {
+      setEventsRevision(value => value + 1)
+      setActiveTab('eventos')
+    }
+    else if (publishedType === 'service') setActiveTab('servicios')
+    else if (['sell', 'gift', 'trade'].includes(publishedType)) setActiveTab('mercado')
+    else setActiveTab('inicio')
+  }, [])
+
+  const onActualizado = useCallback(() => {
+    setCreateOpen(false)
+    setCreateType(null)
+    setEditingPost(null)
   }, [])
 
   const onChangeTab = useCallback((tabId) => {
@@ -308,8 +347,9 @@ export default function App() {
 
   /* ── SCREEN RENDER ── */
   const flowScreens = ['splash', 'onboarding', 'register', 'profile', 'verification', 'complete']
-  const modalScreens = ['productDetail', 'chatConversation', 'dealDone', 'alertaDetail', 'notificaciones', 'sellerProfile', 'noticiasScreen', 'admin', 'adminFarmacias', 'adminComercios', 'adminUsuarios', 'adminIncidentes']
+  const modalScreens = ['productDetail', 'chatConversation', 'dealDone', 'alertaDetail', 'notificaciones', 'sellerProfile', 'noticiasScreen', 'admin', 'adminFarmacias', 'adminComercios', 'adminUsuarios', 'adminIncidentes', 'settings', 'about', 'terms', 'prohibited', 'invite', 'contact']
   const isModalScreen = modalScreens.includes(currentScreen)
+  const isCommunityScreen = ['settings', 'about', 'terms', 'prohibited', 'invite', 'contact'].includes(currentScreen)
   const isMainApp = !flowScreens.includes(currentScreen) && !isModalScreen
 
   const renderScreen = () => {
@@ -374,20 +414,24 @@ export default function App() {
 
     /* ── SUB-SCREENS DEL MERCADO ── */
     if (currentScreen === 'productDetail') {
-      return <ProductDetail postId={params?.postId} currentUser={user} onNavigate={onNavigate} />
+      return <ProductDetail postId={params?.postId} currentUser={user} onNavigate={onNavigate} onEdit={onEditarPost} />
+    }
+    if (currentScreen === 'eventDetail') {
+      return <EventDetail postId={params?.postId} currentUser={user} onNavigate={onNavigate} />
     }
     if (currentScreen === 'chatConversation') {
       return (
         <ChatConversation
           postId={params?.postId}
           sellerId={params?.sellerId || params?.otherUserId}
-          currentUser={user}
+          currentUser={{ ...user, profileId: profile?.id }}
+          previewMode={params?.preview === true}
           onNavigate={onNavigate}
         />
       )
     }
     if (currentScreen === 'dealDone') {
-      return <DealDone postId={params?.postId} sellerId={params?.sellerId} currentUser={user} onNavigate={onNavigate} />
+      return <DealDone postId={params?.postId} sellerId={params?.sellerId} currentUser={{ ...user, profileId: profile?.id }} onNavigate={onNavigate} />
     }
 
     /* ── TASK 59: SUB-SCREENS NUEVAS (AlertaDetail, Notifications) ── */
@@ -432,6 +476,12 @@ export default function App() {
     if (currentScreen === 'adminIncidentes') {
       return <AdminIncidentes currentUser={user} profile={profile} onNavigate={onNavigate} />
     }
+    if (currentScreen === 'settings') return <SettingsHub onNavigate={onNavigate} />
+    if (currentScreen === 'about') return <AboutUs onNavigate={onNavigate} />
+    if (currentScreen === 'terms') return <Terms onNavigate={onNavigate} />
+    if (currentScreen === 'prohibited') return <ProhibitedProducts onNavigate={onNavigate} />
+    if (currentScreen === 'invite') return <InviteNeighbors onNavigate={onNavigate} />
+    if (currentScreen === 'contact') return <ContactUs onNavigate={onNavigate} />
 
     /* ── No hay user → Register ── */
     if (!user) {
@@ -440,10 +490,10 @@ export default function App() {
 
     /* ── MAIN APP (TABS) ── */
     if (activeTab === 'inicio') return <Home currentUser={user} onNavigate={onNavigate} onCrear={onCrear} />
-    if (activeTab === 'mercado') return <Marketplace currentUser={user} onNavigate={onNavigate} />
-    if (activeTab === 'servicios') return <Services currentUser={user} onNavigate={onNavigate} />
-    if (activeTab === 'eventos') return <Events currentUser={user} onNavigate={onNavigate} />
-    if (activeTab === 'chat') return <ChatList currentUser={user} onNavigate={onNavigate} />
+    if (activeTab === 'mercado') return <Marketplace currentUser={user} onNavigate={onNavigate} onCrear={onCrear} />
+    if (activeTab === 'servicios') return <Services currentUser={user} onNavigate={onNavigate} onCrear={onCrear} />
+    if (activeTab === 'eventos') return <Events key={`events-${eventsRevision}`} currentUser={user} onNavigate={onNavigate} onCrear={onCrear} />
+    if (activeTab === 'chat') return <ChatList currentUser={{ ...user, profileId: profile?.id }} onNavigate={onNavigate} />
     if (activeTab === 'comercios') return <Comercios currentUser={user} onNavigate={onNavigate} onCrear={onCrear} />
     if (activeTab === 'alertas') return <Alertas currentUser={user} onNavigate={onNavigate} onCrear={onCrear} />
     if (activeTab === 'perfil') return <MyProfile currentUser={user} onNavigate={onNavigate} onLogout={handleLogout} />
@@ -454,7 +504,7 @@ export default function App() {
   return (
     <div className="phone-frame">
       <div className="phone-notch" />
-      <div className="phone-content" style={isModalScreen ? s.contentPadModal : s.contentPad}>
+      <div className="phone-content" style={isCommunityScreen ? s.contentPad : (isModalScreen ? s.contentPadModal : s.contentPad)}>
         <div style={s.root}>
           <div id="elbarrio-scroll" style={s.screenArea}>
             {renderScreen()}
@@ -466,6 +516,7 @@ export default function App() {
               onChangeTab={onChangeTab}
               onCrear={onCrear}
               noLeidos={noLeidos}
+              showCreateButton={activeTab !== 'comercios'}
             />
           )}
 
@@ -483,8 +534,9 @@ export default function App() {
             <div style={s.createOverlay}>
               <CreatePost
                 startWith={createType}
+                existingPost={editingPost}
                 onClose={onCerrarCrear}
-                onPublished={onPublicado}
+                onPublished={editingPost ? onActualizado : onPublicado}
               />
             </div>
           )}

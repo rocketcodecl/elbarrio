@@ -25,6 +25,11 @@ import { C, T, S, CATEGORIAS, iniciales, hace, plata, distancia } from '../lib/d
 
 // ---- Iconos SVG (mismo estilo que Search/Alertas) ----
 const Icon = {
+  Back: ({ size = 20, color = C.verdeOsc }) => (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="m15 18-6-6 6-6" />
+    </svg>
+  ),
   Tag: ({ size = 14, color = '#fff' }) => (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
       <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/>
@@ -137,9 +142,8 @@ const esTrueque = (t) => ['intercambio','intercambiar','trueque','swap','trade']
 // ---- Pills de filtro (con emoji, "Todos" al final a la derecha) ----
 const PILLS = [
   { id: 'venta',    label: 'Venta',   emoji: '🏷️', alts: ['venta','vender','vende','sell','sale'] },
+  { id: 'regalo',   label: 'Regalos', emoji: '🎁', alts: ['regalo','regalar','regala','gift','free'] },
   { id: 'trueque',  label: 'Trueque', emoji: '🔄', alts: ['intercambio','intercambiar','trueque','swap','trade'] },
-  { id: 'regalo',   label: 'Gratis',  emoji: '🎁', alts: ['regalo','regalar','regala','gift','free'] },
-  { id: 'todos',    label: 'Todos',   emoji: '✨', alts: ALL_ALTS },
 ]
 
 // ---- Helper: emoji por categoría (para placeholder cuando no hay imagen) ----
@@ -233,8 +237,13 @@ const precioInfo = (post) => {
 // ============================================================
 // COMPONENTE PRINCIPAL
 // ============================================================
-export default function Marketplace({ currentUser, onNavigate }) {
+export default function Marketplace({ currentUser, onNavigate, onCrear }) {
+  // Al entrar mostramos una mezcla de todos los tipos. Las pills sirven para
+  // acotar el feed y se pueden tocar nuevamente para volver a la mezcla.
   const [activeTab, setActiveTab] = useState('todos')
+  const [categoriaActiva, setCategoriaActiva] = useState('todas')
+  const [busqueda, setBusqueda] = useState('')
+  const [searchOpen, setSearchOpen] = useState(false)
   const [posts, setPosts] = useState([])
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
@@ -250,9 +259,6 @@ export default function Marketplace({ currentUser, onNavigate }) {
 
   // GPS real del usuario actual (para distancia real vendedor ↔ comprador)
   const [myCoords, setMyCoords] = useState(null)
-
-  // Perfil del usuario actual (para el avatar del header)
-  const [profile, setProfile] = useState(null)
 
   const nav = onNavigate || (() => {})
 
@@ -294,7 +300,7 @@ export default function Marketplace({ currentUser, onNavigate }) {
     if (currentUser?.id) {
       supabase
         .from('profiles')
-        .select('lat, lng, full_name, avatar_url')
+        .select('lat, lng')
         .eq('user_id', currentUser.id)
         .maybeSingle()
         .then(({ data }) => {
@@ -302,7 +308,6 @@ export default function Marketplace({ currentUser, onNavigate }) {
           if (data.lat != null && data.lng != null) {
             setMyCoords(prev => prev || { lat: data.lat, lng: data.lng })
           }
-          setProfile(data)
         })
     }
 
@@ -399,11 +404,26 @@ export default function Marketplace({ currentUser, onNavigate }) {
   }
 
   // ---- Render ----
-  // Derivar secciones desde posts (un único fetch, separación en cliente)
-  const feedPosts    = posts.slice(0, 6)
-  const ventaPosts   = posts.filter(p => esVenta(p.type))
-  const regaloPosts  = posts.filter(p => esRegalo(p.type))
-  const truequePosts = posts.filter(p => esTrueque(p.type))
+  // Un solo listado, filtrado por texto y por tipo. Así evitamos mostrar
+  // el mismo producto en "Nuevos" y nuevamente en otra sección.
+  const termino = busqueda.trim().toLowerCase()
+  const postsBuscados = termino
+    ? posts.filter((p) => [p.title, p.content, p.category, p.author?.full_name]
+      .filter(Boolean)
+      .some((valor) => String(valor).toLowerCase().includes(termino)))
+    : posts
+  const postsVisibles = postsBuscados.filter((p) => {
+    const coincideTipo = activeTab === 'todos'
+      ? (esVenta(p.type) || esRegalo(p.type) || esTrueque(p.type))
+      : activeTab === 'venta'
+      ? esVenta(p.type)
+      : activeTab === 'regalo'
+        ? esRegalo(p.type)
+        : esTrueque(p.type)
+    const coincideCategoria = categoriaActiva === 'todas' ||
+      (p.category || '').toLowerCase() === categoriaActiva.toLowerCase()
+    return coincideTipo && coincideCategoria
+  })
 
   const userWithCoords = { ...currentUser, ...myCoords }
   const irA = (postId) => nav('productdetail', { postId })
@@ -412,51 +432,64 @@ export default function Marketplace({ currentUser, onNavigate }) {
     <div style={s.wrap}>
       {/* ===== STICKY TOP: header + buscador + CTA + pills ===== */}
       <div style={s.stickyTop}>
-        {/* Fila 0: Header compacto (título + avatar) — consistente con Home/Comercios */}
-        <div style={s.headerRow}>
-          <div style={s.headerTit}>
-            <Icon.Bag size={20} color={C.verde} />
-            <span style={s.headerTitleText}>
-              Mercado de <span style={{ color: C.verde }}>el barrio</span>
-            </span>
-          </div>
-          <button style={s.headerAvatar} onClick={() => nav('perfil')} aria-label="Mi perfil">
-            {profile?.avatar_url ? (
-              <img src={profile.avatar_url} alt="" style={s.headerAvatarImg} />
-            ) : (
-              <span style={s.headerAvatarFallback}>{iniciales(profile?.full_name)}</span>
-            )}
+        <div className="market-feed-header" style={s.headerRow}>
+          <button type="button" style={s.headerBackBtn} onClick={() => nav('back')} aria-label="Volver">
+            <Icon.Back size={22} />
+          </button>
+          <strong style={s.headerTitleText}>
+            Mercado de <span style={s.headerBrand}>el barrio</span>
+          </strong>
+          <button
+            style={{ ...s.headerSearchBtn, ...s.headerSearchPosition, ...(searchOpen ? s.headerSearchBtnActive : {}) }}
+            onClick={() => {
+              setSearchOpen(open => {
+                if (open) setBusqueda('')
+                return !open
+              })
+            }}
+            aria-label={searchOpen ? 'Cerrar búsqueda' : 'Buscar en Mercado'}
+          >
+            {searchOpen ? <span style={s.headerSearchClose}>×</span> : <Icon.Search size={18} color={C.verdeOsc} />}
           </button>
         </div>
 
-        {/* Fila 1: Buscador full-width (click → Search screen) */}
-        <div style={s.searchBar}>
-          <button style={s.searchInner} onClick={() => nav('search')}>
-            <Icon.Search size={16} color={C.textoTenue} />
-            <span style={s.searchPlaceholder}>Buscar en el mercado…</span>
-          </button>
-        </div>
+        {/* El buscador se despliega solo cuando el vecino lo necesita. */}
+        {searchOpen && (
+          <div style={s.searchBar}>
+            <label style={s.searchInner}>
+              <Icon.Search size={16} color={C.textoTenue} />
+              <input
+                value={busqueda}
+                onChange={(e) => setBusqueda(e.target.value)}
+                placeholder="Buscar productos…"
+                style={s.searchInput}
+                autoFocus
+              />
+              {busqueda && (
+                <button style={s.searchClear} onClick={() => setBusqueda('')} aria-label="Limpiar búsqueda">
+                  ×
+                </button>
+              )}
+            </label>
+          </div>
+        )}
 
         {/* Fila 2: CTA "¿Quieres vender?" (encima de los cuadrados) */}
         <div style={s.publishCtaWrap}>
           <button
+            className="mp-publish-cta"
             style={s.publishCta}
-            onClick={() => nav('createpost', { type: tipoParaCrear() })}
+            onClick={() => onCrear?.(tipoParaCrear())}
           >
-            <span style={s.publishCtaEmojis} aria-hidden>
-              <span style={{ ...s.emojiCell, animation: 'mpEmojiFade 6s ease-in-out infinite', animationDelay: '0s' }}>📷</span>
-              <span style={{ ...s.emojiCell, animation: 'mpEmojiFade 6s ease-in-out infinite', animationDelay: '-1s' }}>🚲</span>
-              <span style={{ ...s.emojiCell, animation: 'mpEmojiFade 6s ease-in-out infinite', animationDelay: '-2s' }}>🌱</span>
-              <span style={{ ...s.emojiCell, animation: 'mpEmojiFade 6s ease-in-out infinite', animationDelay: '-3s' }}>👖</span>
-              <span style={{ ...s.emojiCell, animation: 'mpEmojiFade 6s ease-in-out infinite', animationDelay: '-4s' }}>🚗</span>
-              <span style={{ ...s.emojiCell, animation: 'mpEmojiFade 6s ease-in-out infinite', animationDelay: '-5s' }}>🏍️</span>
-            </span>
+            <span className="mp-publish-pattern" aria-hidden />
+            <span style={s.publishCtaIcon} aria-hidden>♻️</span>
             <span style={s.publishCtaText}>
-              <span style={s.publishCtaQuestion}>¿Quieres vender, regalar o cambiar?</span>
-              <span style={s.publishCtaAction}>PUBLICA AQUÍ</span>
+              <span style={s.publishCtaEyebrow}>MERCADO DEL BARRIO</span>
+              <span style={s.publishCtaQuestion}>¿Algo que ya no usas?</span>
             </span>
-            <span style={s.publishCtaArrow}>
-              <Icon.ArrowRight size={16} color={C.verde} />
+            <span className="mp-publish-action" style={s.publishCtaAction}>
+              ¡Publícalo!
+              <Icon.ArrowRight size={13} color="#fff" />
             </span>
           </button>
         </div>
@@ -469,17 +502,37 @@ export default function Marketplace({ currentUser, onNavigate }) {
             return (
               <button
                 key={pill.id}
-                onClick={() => setActiveTab(pill.id)}
+                onClick={() => setActiveTab(current => current === pill.id ? 'todos' : pill.id)}
                 style={{
                   ...s.pill,
                   borderColor: active ? C.verde : C.borde,
+                  background: active ? C.verde : C.card,
                 }}
               >
                 <span style={{ ...s.pillEmoji, color: col }}>{pill.emoji}</span>
-                <span style={{ ...s.pillLabel, color: col }}>{pill.label}</span>
+                <span style={{ ...s.pillLabel, color: active ? '#fff' : col }}>{pill.label}</span>
               </button>
             )
           })}
+        </div>
+
+        <div className="mp-hscroll" style={s.categoriesRow}>
+          <button
+            style={{ ...s.categoryPill, ...(categoriaActiva === 'todas' ? s.categoryPillActive : {}) }}
+            onClick={() => setCategoriaActiva('todas')}
+          >
+            Todo
+          </button>
+          {CATEGORIAS.map((categoria) => (
+            <button
+              key={categoria.key}
+              style={{ ...s.categoryPill, ...(categoriaActiva === categoria.key ? s.categoryPillActive : {}) }}
+              onClick={() => setCategoriaActiva(categoria.key)}
+            >
+              <span>{categoria.emoji}</span>
+              {categoria.key}
+            </button>
+          ))}
         </div>
       </div>
 
@@ -526,50 +579,32 @@ export default function Marketplace({ currentUser, onNavigate }) {
           ) : posts.length === 0 ? (
             <EmptyState
               pillId={activeTab}
-              onCrear={() => nav('createpost', { type: tipoParaCrear() })}
+              onCrear={() => onCrear?.(tipoParaCrear())}
             />
-          ) : activeTab === 'todos' ? (
-            <>
-              {/* Sección 1: Feed de 6 nuevos (tarjetas grandes horizontales) */}
-              {feedPosts.length > 0 && (
-                <div style={s.section}>
-                  <div style={s.sectionRow}>
-                    <h2 style={s.sectionTitle}>Nuevos en el barrio</h2>
-                  </div>
-                  <div className="mp-hscroll" style={s.hScroll}>
-                    {feedPosts.map(post => (
-                      <HFeedCard key={post.id} post={post} currentUser={userWithCoords} onClick={() => irA(post.id)} />
-                    ))}
-                  </div>
+          ) : (
+            <div style={s.marketList}>
+              <div style={s.sectionRow}>
+                <h2 style={s.sectionTitle}>Publicaciones recientes</h2>
+              </div>
+              {postsVisibles.length > 0 ? (
+                <div style={s.grid}>
+                  {postsVisibles.map((post) => (
+                    <MarketCard
+                      key={post.id}
+                      post={post}
+                      currentUser={userWithCoords}
+                      onClick={() => irA(post.id)}
+                    />
+                  ))}
+                </div>
+              ) : (
+                <div style={s.noResults}>
+                  <span style={s.noResultsEmoji}>🔎</span>
+                  <strong>No encontramos publicaciones</strong>
+                  <span>Prueba con otra palabra o cambia el filtro.</span>
                 </div>
               )}
-
-              {/* Sección 2: En venta (cuadrados pequeños, 3 por vista) */}
-              <MiniSection title="En venta" emoji="🏷️" posts={ventaPosts} currentUser={userWithCoords} onVerTodos={() => setActiveTab('venta')} onClick={irA} />
-
-              {/* Sección 3: Regalos */}
-              <MiniSection title="Regalos" emoji="🎁" posts={regaloPosts} currentUser={userWithCoords} onVerTodos={() => setActiveTab('regalo')} onClick={irA} />
-
-              {/* Sección 4: Trueques */}
-              <MiniSection title="Trueques" emoji="🔄" posts={truequePosts} currentUser={userWithCoords} onVerTodos={() => setActiveTab('trueque')} onClick={irA} />
-
-              {/* Fin del feed */}
-              <div style={s.endOfFeed}>
-                <span style={s.endOfFeedEmoji}>🌱</span>
-                <span style={s.endOfFeedText}>Viste todo lo del barrio</span>
-                <span style={s.endOfFeedHint}>Vuelve mañana o desliza para actualizar</span>
-              </div>
-            </>
-          ) : (
-            // Pill específica → solo esa sección, con todos sus posts
-            <MiniSection
-              title={activeTab === 'venta' ? 'En venta' : activeTab === 'regalo' ? 'Regalos' : 'Trueques'}
-              emoji={activeTab === 'venta' ? '🏷️' : activeTab === 'regalo' ? '🎁' : '🔄'}
-              posts={activeTab === 'venta' ? ventaPosts : activeTab === 'regalo' ? regaloPosts : truequePosts}
-              currentUser={userWithCoords}
-              onClick={irA}
-              expanded
-            />
+            </div>
           )}
         </div>
       </div>
@@ -583,6 +618,10 @@ export default function Marketplace({ currentUser, onNavigate }) {
         @keyframes mpSpin {
           from { transform: rotate(0deg); }
           to { transform: rotate(360deg); }
+        }
+        @keyframes marketHeaderDrift {
+          from { background-position: 0 0; }
+          to { background-position: -112px 68px; }
         }
         @keyframes mpCardIn {
           from { opacity: 0; transform: translateY(8px); }
@@ -599,8 +638,99 @@ export default function Marketplace({ currentUser, onNavigate }) {
         /* Ocultar scrollbar en los scrollers horizontales (feed + mini sections) */
         .mp-hscroll::-webkit-scrollbar { display: none; }
         .mp-hscroll { -ms-overflow-style: none; scrollbar-width: none; }
+        .mp-publish-cta,
+        .mp-publish-action { transition: transform 0.18s ease, box-shadow 0.18s ease; }
+        .mp-publish-cta { isolation: isolate; }
+        .mp-publish-cta::after {
+          content: '';
+          position: absolute;
+          z-index: 0;
+          top: -45%;
+          left: -42%;
+          width: 28%;
+          height: 190%;
+          background: linear-gradient(90deg, transparent, rgba(255,255,255,0.24), transparent);
+          transform: skewX(-18deg);
+          animation: mpPublishShine 4.2s ease-in-out infinite;
+          pointer-events: none;
+        }
+        .mp-publish-pattern {
+          position: absolute;
+          inset: 0;
+          z-index: 0;
+          opacity: 0.17;
+          background-image: radial-gradient(rgba(255,255,255,0.85) 0.8px, transparent 0.8px);
+          background-size: 12px 12px;
+          mask-image: linear-gradient(90deg, #000, transparent 72%);
+          pointer-events: none;
+        }
+        @keyframes mpPublishShine {
+          0%, 56% { left: -42%; opacity: 0; }
+          62% { opacity: 1; }
+          82% { left: 118%; opacity: 1; }
+          83%, 100% { left: 118%; opacity: 0; }
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .mp-publish-cta::after { animation: none; }
+          .market-feed-header { animation: none !important; }
+        }
+        .mp-publish-cta:hover .mp-publish-action {
+          transform: translateX(2px);
+          box-shadow: 0 5px 12px rgba(22,163,74,0.28);
+        }
+        .mp-publish-cta:active { transform: scale(0.99); }
+        .mp-publish-cta:active .mp-publish-action { transform: scale(0.97); }
       `}</style>
     </div>
+  )
+}
+
+// ============================================================
+// MARKET CARD — tarjeta única para la cuadrícula de Mercado
+// ============================================================
+function MarketCard({ post, currentUser, onClick }) {
+  const precio = precioInfo(post)
+  const tieneImg = post.images && post.images.length > 0
+  const [imgError, setImgError] = useState(false)
+  const demoUrl = !tieneImg ? demoImgUrl(post) : null
+  const imgSrc = tieneImg ? post.images[0] : (!imgError ? demoUrl : null)
+  const distM = computeDist(post, currentUser)
+  const dist = distM != null && distM >= 20 ? distancia(distM) : null
+
+  return (
+    <button style={s.card} onClick={onClick}>
+      <div style={s.imgBox}>
+        {imgSrc ? (
+          <img src={imgSrc} alt={post.title || ''} style={s.img} onError={() => setImgError(true)} />
+        ) : (
+          <div style={s.noImg}>
+            <span style={{ fontSize: 34 }}>{catEmoji(post.category)}</span>
+          </div>
+        )}
+        {esVenta(post.type) && post.is_negotiable === true && (
+          <span style={s.negotiableBadge}>Conversable</span>
+        )}
+        <span style={{ ...s.marketPriceBadge, color: precio.color }}>{precio.label}</span>
+      </div>
+      <div style={s.cardBody}>
+        <div style={s.postTitle}>{post.title || 'Sin título'}</div>
+        <div style={s.marketAuthor}>
+          {post.author?.avatar_url ? (
+            <img src={post.author.avatar_url} alt="" style={s.marketAuthorAvatar} />
+          ) : (
+            <span style={s.marketAuthorFallback}>{iniciales(post.author?.full_name)}</span>
+          )}
+          <span style={s.marketAuthorName}>
+            {post.author?.full_name?.split(' ')[0] || 'Vecino'}
+          </span>
+          <span style={s.marketTime}>
+            {dist ? (
+              <><Icon.Pin size={8} color={C.rojo} /> {dist}</>
+            ) : hace(post.created_at)}
+          </span>
+        </div>
+      </div>
+    </button>
   )
 }
 
@@ -852,56 +982,56 @@ const s = {
     position: 'relative',
   },
 
-  // ---- Fila 0: Header compacto (título + avatar) ----
+  // ---- Header de sección ----
   headerRow: {
     display: 'flex',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: '14px 16px 4px',
+    justifyContent: 'center',
+    minHeight: 72,
+    padding: 'calc(env(safe-area-inset-top, 0px) + 22px) 58px 16px',
     boxSizing: 'border-box',
+    position: 'relative',
+    backgroundColor: C.card,
+    backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='72' height='64' viewBox='0 0 72 64'%3E%3Cg fill='none' stroke='%2316a34a' stroke-opacity='.22' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M14 13h25l20 20-25 25-20-20V13Z'/%3E%3Ccircle cx='25' cy='24' r='3'/%3E%3C/g%3E%3C/svg%3E")`,
+    backgroundSize: '72px 64px',
+    backgroundPosition: 'calc(50% - 86px) center',
+    backgroundRepeat: 'no-repeat',
+    borderBottom: `2px solid ${C.verde}`,
   },
-  headerTit: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: 8,
-    minWidth: 0,
+  headerBackBtn: {
+    position: 'absolute', left: 16, bottom: 10,
+    width: 38, height: 38, padding: 0, border: `1px solid ${C.borde}`,
+    borderRadius: '50%', background: 'rgba(255,255,255,0.88)',
+    display: 'grid', placeItems: 'center', cursor: 'pointer',
   },
   headerTitleText: {
-    fontSize: 19,
+    minWidth: 0,
+    textAlign: 'center',
+    fontSize: 16,
     fontWeight: 600,
-    color: C.texto,
+    color: '#26302b',
     fontFamily: T.font,
-    letterSpacing: '-0.3px',
+    lineHeight: 1.2,
     whiteSpace: 'nowrap',
     overflow: 'hidden',
     textOverflow: 'ellipsis',
+    padding: '5px 10px',
+    background: 'transparent', border: 'none', boxShadow: 'none',
   },
-  headerAvatar: {
-    width: 38,
-    height: 38,
-    borderRadius: '50%',
-    border: `2px solid ${C.verde}`,
-    background: C.verdeSuave,
-    padding: 0,
-    overflow: 'hidden',
-    cursor: 'pointer',
-    flexShrink: 0,
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
+  headerBrand: { color: C.verde, fontWeight: 700 },
+  headerSearchBtn: {
+    width: 36, height: 36, borderRadius: '50%',
+    border: `1px solid ${C.borde}`, background: 'rgba(255,255,255,0.88)',
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    padding: 0, cursor: 'pointer', flexShrink: 0,
   },
-  headerAvatarImg: {
-    width: '100%',
-    height: '100%',
-    objectFit: 'cover',
+  headerSearchPosition: { position: 'absolute', right: 16, bottom: 11 },
+  headerSearchBtnActive: {
+    borderColor: C.verde, background: C.verdeSuave,
   },
-  headerAvatarFallback: {
-    fontSize: 13,
-    fontWeight: 600,
-    color: C.verde,
-    fontFamily: T.font,
+  headerSearchClose: {
+    color: C.verde, fontSize: 22, fontWeight: 400, lineHeight: 1,
   },
-
   // ---- Fila 1: Buscador ----
   searchBar: {
     display: 'flex',
@@ -921,8 +1051,19 @@ const s = {
     background: C.fondo,
     borderRadius: 12,
     border: `1px solid ${C.borde}`,
-    cursor: 'pointer',
     fontFamily: T.font,
+  },
+  searchInput: {
+    flex: 1, minWidth: 0,
+    border: 'none', outline: 'none', background: 'transparent',
+    color: C.texto, fontSize: 14, fontWeight: 500,
+    fontFamily: T.font,
+  },
+  searchClear: {
+    width: 26, height: 26, borderRadius: '50%',
+    border: 'none', background: C.bordeSuave,
+    color: C.textoSuave, fontSize: 18, lineHeight: 1,
+    cursor: 'pointer', fontFamily: T.font,
   },
   searchPlaceholder: {
     fontSize: 14,
@@ -934,20 +1075,19 @@ const s = {
   // ---- Fila 3: Pills (cuadrados) ----
   pillsRow: {
     display: 'flex',
-    gap: 8,
-    padding: '4px 16px 12px',
-    borderBottom: `1px solid ${C.bordeSuave}`,
+    gap: 6,
+    padding: '3px 16px 8px',
     boxSizing: 'border-box',
   },
   pill: {
     flex: 1,
     display: 'flex',
-    flexDirection: 'column',
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 4,
-    padding: '8px 4px 7px',
-    borderRadius: 14,
+    gap: 5,
+    padding: '8px 5px',
+    borderRadius: 11,
     background: 'transparent',
     border: `1px solid ${C.borde}`,
     cursor: 'pointer',
@@ -955,8 +1095,25 @@ const s = {
     transition: 'all 0.15s',
     whiteSpace: 'nowrap',
   },
-  pillEmoji: { fontSize: 18, lineHeight: 1 },
-  pillLabel: { fontSize: 12, fontWeight: 700, fontFamily: T.font },
+  pillEmoji: { fontSize: 14, lineHeight: 1 },
+  pillLabel: { fontSize: 11.5, fontWeight: 600, fontFamily: T.font },
+  categoriesRow: {
+    display: 'flex', gap: 7, overflowX: 'auto',
+    padding: '1px 16px 10px',
+    borderBottom: `1px solid ${C.bordeSuave}`,
+    WebkitOverflowScrolling: 'touch',
+  },
+  categoryPill: {
+    flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: 5,
+    padding: '6px 10px', borderRadius: 999,
+    background: C.card, border: `1px solid ${C.borde}`,
+    color: C.textoSuave, fontSize: 10.5, fontWeight: 500,
+    cursor: 'pointer', fontFamily: T.font, whiteSpace: 'nowrap',
+  },
+  categoryPillActive: {
+    background: C.verdeSuave, borderColor: C.verde,
+    color: C.verde, fontWeight: 600,
+  },
 
   // ---- Section wrapper (cada bloque del layout sectional) ----
   section: {
@@ -1118,11 +1275,11 @@ const s = {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: '2px 16px 10px',
+    padding: '2px 0 10px',
     boxSizing: 'border-box',
   },
   sectionTitle: {
-    fontSize: 17,
+    fontSize: 16,
     fontWeight: 600,
     color: C.texto,
     fontFamily: T.font,
@@ -1174,8 +1331,24 @@ const s = {
 
   // ---- Content ----
   content: {
-    padding: '14px 12px 120px',
+    padding: '16px 16px 120px',
   },
+  marketList: { width: '100%' },
+  resultsCount: {
+    minWidth: 24, height: 24, padding: '0 7px',
+    borderRadius: 999, background: C.verdeSuave,
+    color: C.verde, fontSize: 11, fontWeight: 600,
+    display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+  },
+  noResults: {
+    minHeight: 180, padding: '24px 20px',
+    borderRadius: 16, border: `1px dashed ${C.borde}`,
+    background: C.card, color: C.textoSuave,
+    display: 'flex', flexDirection: 'column',
+    alignItems: 'center', justifyContent: 'center', gap: 7,
+    textAlign: 'center', fontSize: 13,
+  },
+  noResultsEmoji: { fontSize: 30, marginBottom: 2 },
 
   // ---- Section header (sin uso actualmente, se mantiene por compatibilidad) ----
   sectionHeader: {
@@ -1199,7 +1372,7 @@ const s = {
   grid: {
     display: 'grid',
     gridTemplateColumns: '1fr 1fr',
-    gap: 12,
+    gap: 9,
   },
 
   // ---- Normal card ----
@@ -1231,6 +1404,24 @@ const s = {
     width: '100%', height: '100%',
     display: 'flex', alignItems: 'center', justifyContent: 'center',
     background: `linear-gradient(135deg, ${C.bordeSuave} 0%, ${C.fondo} 100%)`,
+  },
+  marketPriceBadge: {
+    position: 'absolute', left: 8, bottom: 8,
+    maxWidth: 'calc(100% - 16px)',
+    padding: '5px 8px', borderRadius: 7,
+    background: 'rgba(255,255,255,0.94)',
+    boxShadow: '0 2px 8px rgba(0,0,0,0.10)',
+    fontSize: 11.5, fontWeight: 700,
+    whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+  },
+  negotiableBadge: {
+    position: 'absolute', top: 8, right: 8,
+    padding: '4px 7px', borderRadius: 999,
+    background: C.verde,
+    border: '1px solid rgba(255,255,255,0.9)',
+    color: '#fff', fontSize: 9.5, fontWeight: 600,
+    boxShadow: '0 2px 8px rgba(0,0,0,0.12)',
+    whiteSpace: 'nowrap',
   },
   badgeNuevoSm: {
     position: 'absolute',
@@ -1273,23 +1464,35 @@ const s = {
 
   // ---- CTA "Publica aquí" (botón largo, encima de los cuadrados) ----
   publishCtaWrap: {
-    padding: '4px 16px 10px',
+    padding: '11px 16px 10px',
     boxSizing: 'border-box',
   },
   publishCta: {
     display: 'flex',
     alignItems: 'center',
-    gap: 12,
+    gap: 10,
     width: '100%',
-    padding: '11px 12px',
-    borderRadius: 16,
-    background: 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)',
+    minHeight: 54,
+    padding: '10px 11px',
+    borderRadius: 13,
+    background: 'linear-gradient(120deg, #18ad57 0%, #08743b 100%)',
     border: 'none',
     cursor: 'pointer',
     textAlign: 'left',
     fontFamily: T.font,
-    boxShadow: '0 6px 18px rgba(22,163,74,0.30)',
+    boxShadow: '0 5px 14px rgba(12,126,64,0.18)',
     boxSizing: 'border-box',
+    justifyContent: 'flex-start',
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  publishCtaIcon: {
+    width: 'auto', height: 'auto',
+    background: 'transparent', fontSize: 22,
+    border: 'none',
+    position: 'relative', zIndex: 1,
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    flexShrink: 0,
   },
   publishCtaEmojis: {
     width: 40,
@@ -1314,20 +1517,29 @@ const s = {
     display: 'flex',
     flexDirection: 'column',
     minWidth: 0,
+    position: 'relative', zIndex: 1,
   },
   publishCtaQuestion: {
-    fontSize: 12.5,
-    fontWeight: 600,
-    color: 'rgba(255,255,255,0.92)',
-    lineHeight: 1.3,
-  },
-  publishCtaAction: {
-    fontSize: 16,
+    fontSize: 13.5,
     fontWeight: 600,
     color: '#fff',
-    letterSpacing: '0.5px',
-    lineHeight: 1.2,
-    marginTop: 1,
+    lineHeight: 1.3,
+  },
+  publishCtaEyebrow: {
+    fontSize: 9.5, fontWeight: 700, color: 'rgba(255,255,255,0.72)',
+    letterSpacing: '0.9px', lineHeight: 1.2, marginBottom: 2,
+  },
+  publishCtaAction: {
+    fontSize: 12,
+    fontWeight: 700,
+    color: '#fff', background: 'rgba(255,255,255,0.14)',
+    padding: '7px 9px', borderRadius: 999,
+    border: '1px solid rgba(255,255,255,0.26)',
+    letterSpacing: 0, lineHeight: 1,
+    flexShrink: 0,
+    display: 'inline-flex', alignItems: 'center', gap: 5,
+    position: 'relative', zIndex: 1,
+    boxShadow: '0 3px 8px rgba(22,163,74,0.20)',
   },
   publishCtaArrow: {
     width: 30,
@@ -1341,14 +1553,15 @@ const s = {
     boxShadow: '0 2px 6px rgba(0,0,0,0.15)',
   },
   cardBody: {
-    padding: '8px 12px 10px',
+    padding: '9px 10px 10px',
   },
   postTitle: {
-    fontSize: 13.5,
-    fontWeight: 700,
+    fontSize: 12.5,
+    fontWeight: 600,
     color: C.texto,
-    marginBottom: 1,
-    lineHeight: '16px',
+    marginTop: 0,
+    marginBottom: 9,
+    lineHeight: '15px',
     overflow: 'hidden',
     display: '-webkit-box',
     WebkitLineClamp: 2,
@@ -1359,9 +1572,33 @@ const s = {
     marginBottom: 2,
   },
   priceSm: {
-    fontSize: 15,
+    fontSize: 14.5,
     fontWeight: 600,
     fontFamily: T.font,
+  },
+  marketAuthor: {
+    display: 'flex', alignItems: 'center', gap: 4,
+    minWidth: 0,
+  },
+  marketAuthorAvatar: {
+    width: 18, height: 18, borderRadius: '50%',
+    objectFit: 'cover', flexShrink: 0,
+  },
+  marketAuthorFallback: {
+    width: 18, height: 18, borderRadius: '50%',
+    background: C.verdeSuave, color: C.verde,
+    fontSize: 7, fontWeight: 700,
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    flexShrink: 0,
+  },
+  marketAuthorName: {
+    minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+    fontSize: 10.5, fontWeight: 600, color: C.textoSuave,
+  },
+  marketTime: {
+    marginLeft: 'auto', flexShrink: 0,
+    fontSize: 9.5, color: C.textoTenue,
+    display: 'inline-flex', alignItems: 'center', gap: 2,
   },
   dividerSm: {
     height: 1,

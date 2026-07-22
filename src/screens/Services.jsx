@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { supabase } from '../lib/supabase'
-import { C, T, distancia, iniciales } from '../lib/design'
+import { C, T, distancia, iniciales, RUBROS } from '../lib/design'
 
 /* ============================================================
    Services.jsx — Tab "servicios" de El Barrio.
@@ -23,8 +23,15 @@ const SVC_CSS = `
 @keyframes services-spin {
   to { transform: rotate(360deg); }
 }
+@keyframes services-header-drift {
+  from { background-position: 0 0; }
+  to { background-position: 112px 68px; }
+}
 .services-spin {
   animation: services-spin 0.8s linear infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .services-feed-header { animation: none !important; }
 }
 `
 
@@ -39,6 +46,9 @@ const Ico = ({ size = 18, children, stroke = 1.9, fill = 'none' }) => (
 
 const IcoSearch = (p) => (
   <Ico {...p}><circle cx="11" cy="11" r="7" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></Ico>
+)
+const IcoBack = (p) => (
+  <Ico {...p}><path d="m15 18-6-6 6-6" /></Ico>
 )
 const IcoFilter = (p) => (
   <Ico {...p}><line x1="4" y1="6" x2="20" y2="6" /><line x1="7" y1="12" x2="17" y2="12" /><line x1="10" y1="18" x2="14" y2="18" /></Ico>
@@ -84,54 +94,28 @@ const IcoStar = ({ size = 12, color = '#f59e0b' }) => (
 )
 
 /* ─── CATEGORÍAS (chips horizontales scrollables) ─── */
-const CATS = [
-  { key: 'Todos',      emoji: '🛠️' },
-  { key: 'Hogar',      emoji: '🏠' },
-  { key: 'Clases',     emoji: '📚' },
-  { key: 'Salud',      emoji: '🩺' },
-  { key: 'Tecnología', emoji: '📱' },
-  { key: 'Transporte', emoji: '🚚' },
-  { key: 'Otros',      emoji: '✨' },
-]
+const CATS = [{ key: 'Todos', emoji: '🛠️', label: 'Todos' }, ...RUBROS]
 
 /* Emoji para el badge de cada card según la categoría del post. */
-const CAT_EMOJI = {
-  'Hogar': '🏠',
-  'Clases': '📚',
-  'Salud': '🩺',
-  'Tecnología': '📱',
-  'Transporte': '🚚',
-  'Otros': '✨',
-}
+const CAT_EMOJI = Object.fromEntries(RUBROS.map(r => [r.key, r.emoji]))
 
 /* ─── Helpers ─── */
-// Seed determinista por id (para que los mocks no cambien entre renders).
-const seedOf = (s) =>
-  String(s || '').split('').reduce((a, c) => a + c.charCodeAt(0), 0)
-
-// Distancia: si el post tiene distance_meters usamos distancia() de design.js.
-// Si no, mock determinista por id: "A X cuadras".
 const getDistanceLabel = (post) => {
   const m = post?.distance_meters
   if (m !== null && m !== undefined && m !== '' && !Number.isNaN(Number(m))) {
     const d = distancia(Number(m))
     if (d) return d
   }
-  const cuadras = (seedOf(post?.id) % 18) + 2 // 2..19 cuadras
-  return `A ${cuadras} cuadras`
+  return null
 }
 
-// Rating: si el post trae rating, lo usamos. Si no, mock determinista.
 const getRating = (post) => {
-  const r = post?.rating
+  const r = post?.rating ?? post?.author?.reputation_score
   if (r !== null && r !== undefined && r !== '' && !Number.isNaN(Number(r))) {
     const count = Number(post?.rating_count) || 0
     return { value: Number(r).toFixed(1), count }
   }
-  const seed = seedOf(post?.id)
-  const value = (4.5 + (seed % 5) * 0.1).toFixed(1) // 4.5..4.9
-  const count = (seed % 28) + 3 // 3..30
-  return { value, count }
+  return null
 }
 
 const formatPrice = (post) => {
@@ -143,12 +127,13 @@ const formatPrice = (post) => {
 /* ============================================================
    COMPONENTE
    ============================================================ */
-export default function Services({ currentUser, onNavigate }) {
+export default function Services({ currentUser, onNavigate, onCrear }) {
   const [services, setServices] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [category, setCategory] = useState('Todos')
   const [search, setSearch] = useState('')
+  const [searchOpen, setSearchOpen] = useState(false)
 
   // Pull-to-refresh
   const scrollRef = useRef(null)
@@ -165,10 +150,10 @@ export default function Services({ currentUser, onNavigate }) {
     try {
       let q = supabase
         .from('posts')
-        .select('*, profiles!posts_user_id_fkey(*)')
+        .select('*, author:profiles!author_id(full_name, avatar_url, reputation_score, badge_founder, badge_trusted_seller)')
         .eq('type', 'service')
         .eq('status', 'active')
-      if (category !== 'Todos') q = q.eq('category', category)
+      if (category !== 'Todos') q = q.eq('service_key', category)
       q = q.order('created_at', { ascending: false }).limit(40)
       const { data, error: e } = await q
       if (e) throw e
@@ -193,6 +178,16 @@ export default function Services({ currentUser, onNavigate }) {
     const d = (svc.description || svc.content || '').toLowerCase()
     return t.includes(q) || d.includes(q)
   })
+
+  // Preparado para la futura activación comercial. No inventamos destacados:
+  // solo entran publicaciones marcadas y con una vigencia válida.
+  const isFeaturedActive = (svc) => {
+    if (!(svc.is_featured === true || svc.is_promoted === true || svc.sponsored === true)) return false
+    const until = svc.featured_until || svc.promoted_until
+    return !until || new Date(until).getTime() > Date.now()
+  }
+  const featured = filtered.filter(isFeaturedActive)
+  const regular = filtered.filter((svc) => !isFeaturedActive(svc))
 
   /* ── Pull-to-refresh visual ── */
   const onTouchStart = (e) => {
@@ -249,7 +244,7 @@ export default function Services({ currentUser, onNavigate }) {
       </svg>
       <div style={s.emptyTitle}>Todavía no hay servicios en tu barrio</div>
       <div style={s.emptySub}>¡Publicá el primero y ayudá a tus vecinos!</div>
-      <button style={s.emptyBtn} onClick={() => nav('createpost', { type: 'service' })}>
+      <button style={s.emptyBtn} onClick={() => onCrear?.('service')}>
         <IcoPlus size={16} /> <span>Publicar servicio</span>
       </button>
     </div>
@@ -286,13 +281,15 @@ export default function Services({ currentUser, onNavigate }) {
   )
 
   const renderCard = (svc) => {
-    const author = svc.profiles || svc.profile
+    const author = svc.author
     const name = author?.full_name || 'Vecino del barrio'
     const initials = iniciales(name)
     const rating = getRating(svc)
     const distLabel = getDistanceLabel(svc)
     const price = formatPrice(svc)
-    const catEmoji = CAT_EMOJI[svc.category] || '✨'
+    const serviceKey = svc.service_key || svc.category
+    const rubro = RUBROS.find(r => r.key === serviceKey)
+    const catEmoji = CAT_EMOJI[serviceKey] || '🛠️'
     const desc = svc.description || svc.content || ''
     const verified = author?.badge_trusted_seller || author?.badge_founder
 
@@ -319,23 +316,23 @@ export default function Services({ currentUser, onNavigate }) {
               <div style={s.authorMeta}>Vecino del barrio</div>
             </div>
           </div>
-          <div style={s.ratingBlock}>
+          {rating && <div style={s.ratingBlock}>
             <IcoStar size={12} />
             <span style={s.ratingText}>{rating.value}</span>
-            <span style={s.ratingCount}>({rating.count})</span>
-          </div>
+            {rating.count > 0 && <span style={s.ratingCount}>({rating.count})</span>}
+          </div>}
         </div>
 
         {/* Tags: categoría + distancia */}
         <div style={s.tagsRow}>
           <span style={s.catBadge}>
             <span style={s.catEmoji}>{catEmoji}</span>
-            <span>{svc.category || 'Otros'}</span>
+            <span>{rubro?.label || svc.category || 'Servicio'}</span>
           </span>
-          <span style={s.distTag}>
+          {distLabel && <span style={s.distTag}>
             <IcoPin size={11} />
             <span>{distLabel}</span>
-          </span>
+          </span>}
         </div>
 
         {/* Título */}
@@ -355,25 +352,62 @@ export default function Services({ currentUser, onNavigate }) {
     )
   }
 
+  const renderFeaturedCard = (svc) => {
+    const author = svc.author
+    const serviceKey = svc.service_key || svc.category
+    const rubro = RUBROS.find(r => r.key === serviceKey)
+    const price = formatPrice(svc)
+    return (
+      <button key={svc.id} style={s.featuredCard} onClick={() => nav('productdetail', { postId: svc.id })}>
+        <div style={s.sponsoredLabel}>PATROCINADO</div>
+        <div style={s.featuredTop}>
+          {author?.avatar_url
+            ? <img src={author.avatar_url} alt="" style={s.featuredAvatar} />
+            : <span style={s.featuredAvatarFallback}>{iniciales(author?.full_name)}</span>}
+          <span style={s.featuredEmoji}>{rubro?.emoji || '🛠️'}</span>
+        </div>
+        <strong style={s.featuredTitle}>{svc.title || 'Servicio disponible'}</strong>
+        <span style={s.featuredProvider}>{author?.full_name || 'Prestador del barrio'}</span>
+        <span style={s.featuredBottom}>{price ? `Desde ${price}` : 'Consultar'} <IcoChevronRight size={13} /></span>
+      </button>
+    )
+  }
+
   return (
     <div style={s.wrap}>
       <style dangerouslySetInnerHTML={{ __html: SVC_CSS }} />
 
       {/* ── HEADER FIJO ── */}
       <div style={s.header}>
-        <div style={s.headerTit}>Servicios</div>
-        <div style={s.headerSub}>Lo que tus vecinos saben hacer</div>
+        <div className="services-feed-header" style={s.headerTopSection}>
+          <button type="button" style={s.headerBackBtn} onClick={() => nav('back')} aria-label="Volver">
+            <IcoBack size={22} />
+          </button>
+          <strong style={s.headerTit}>
+            Servicios de <span style={s.headerBrand}>el barrio</span>
+          </strong>
+          <button style={s.searchToggle} onClick={() => { setSearchOpen(v => !v); if (searchOpen) setSearch('') }} aria-label="Buscar servicios">
+            <IcoSearch size={18} />
+          </button>
+        </div>
 
         {/* Buscador */}
-        <div style={s.searchWrap}>
+        {searchOpen && <div style={s.searchWrap}>
           <div style={s.searchIcon}><IcoSearch size={18} /></div>
           <input
             style={s.searchInput}
             placeholder="Buscar plomería, clases, peluquería..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
+            autoFocus
           />
-        </div>
+        </div>}
+
+        <button style={s.offerBanner} onClick={() => onCrear?.('service')}>
+          <span style={s.offerIcon}>🧰</span>
+          <span style={s.offerText}><strong>¿Ofreces un servicio?</strong><small>Hazte visible en el barrio.<br />¡Es gratis!</small></span>
+          <span style={s.offerAction}>Publícate →</span>
+        </button>
 
         {/* Chips de categoría */}
         <div style={s.catsScroll}>
@@ -391,7 +425,7 @@ export default function Services({ currentUser, onNavigate }) {
                 onClick={() => setCategory(cat.key)}
               >
                 <span style={s.catChipEmoji}>{cat.emoji}</span>
-                <span>{cat.key}</span>
+                <span>{cat.label || cat.key}</span>
               </button>
             )
           })}
@@ -429,6 +463,33 @@ export default function Services({ currentUser, onNavigate }) {
             padding: '0 16px 100px',
           }}
         >
+          {!loading && !error && featured.length > 0 && (
+            <section style={s.featuredSection}>
+              <div style={s.sectionHeading}>
+                <div style={s.sectionHeadingCopy}>
+                  <strong>Destacados cerca de ti</strong>
+                  <small>Promociones pagadas</small>
+                </div>
+              </div>
+              <div style={s.featuredScroll}>{featured.map(renderFeaturedCard)}</div>
+            </section>
+          )}
+
+          {!loading && !error && featured.length === 0 && category === 'Todos' && !search && (
+            <div style={s.monetizationCard}>
+              <span style={s.monetizationStar}>✦</span>
+              <span style={s.monetizationCopy}>
+                <strong>Destaca tu servicio</strong>
+                <small>Más visibilidad entre vecinos de tu barrio.</small>
+              </span>
+              <span style={s.comingSoon}>Próximamente</span>
+            </div>
+          )}
+
+          {!loading && !error && regular.length > 0 && (
+            <div style={s.regularHeading}>Servicios del barrio</div>
+          )}
+
           {loading ? (
             renderSkeletons()
           ) : error ? (
@@ -437,20 +498,12 @@ export default function Services({ currentUser, onNavigate }) {
             renderEmpty()
           ) : (
             <div style={s.list}>
-              {filtered.map(renderCard)}
+              {regular.map(renderCard)}
             </div>
           )}
         </div>
       </div>
 
-      {/* ── FAB ── */}
-      <button
-        style={s.fab}
-        onClick={() => nav('createpost', { type: 'service' })}
-      >
-        <IcoPlus size={20} />
-        <span style={s.fabText}>Publicar servicio</span>
-      </button>
     </div>
   )
 }
@@ -475,29 +528,69 @@ const s = {
   header: {
     flexShrink: 0,
     background: C.card,
-    padding: '28px 16px 12px',
-    borderBottom: `1px solid ${C.borde}`,
+    padding: '0 16px 10px',
     boxShadow: '0 2px 8px rgba(0,0,0,0.03)',
   },
-  headerTit: {
-    fontSize: 26,
-    fontWeight: 800,
-    color: C.verdeOsc,
-    letterSpacing: '-0.5px',
-    lineHeight: 1.1,
+  headerTopSection: {
+    minHeight: 72,
+    padding: 'calc(env(safe-area-inset-top, 0px) + 22px) 58px 16px',
+    backgroundColor: C.card,
+    backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='72' height='64' viewBox='0 0 72 64'%3E%3Cg fill='none' stroke='%2316a34a' stroke-opacity='.22' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M46 9a14 14 0 0 0-18 18L10 45l10 10 18-18A14 14 0 0 0 56 19L46 29 36 19 46 9Z'/%3E%3C/g%3E%3C/svg%3E")`,
+    backgroundSize: '72px 64px',
+    backgroundPosition: 'calc(50% - 86px) center',
+    backgroundRepeat: 'no-repeat',
+    borderBottom: `2px solid ${C.verde}`,
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    position: 'relative', boxSizing: 'border-box', margin: '0 -16px',
   },
-  headerSub: {
-    fontSize: 14,
-    color: C.textoSuave,
-    marginTop: 4,
-    marginBottom: 14,
-    fontWeight: 500,
+  headerBackBtn: {
+    position: 'absolute', left: 16, bottom: 10,
+    width: 38, height: 38, padding: 0, border: `1px solid ${C.borde}`,
+    borderRadius: '50%', background: 'rgba(255,255,255,0.88)',
+    color: C.verdeOsc, display: 'grid', placeItems: 'center', cursor: 'pointer',
+  },
+  headerTit: {
+    minWidth: 0, textAlign: 'center', fontSize: 16, fontWeight: 600,
+    color: '#26302b', lineHeight: 1.2, whiteSpace: 'nowrap',
+    overflow: 'hidden', textOverflow: 'ellipsis', padding: '5px 10px',
+    background: 'transparent', border: 'none', boxShadow: 'none',
+  },
+  headerBrand: { color: C.verde, fontWeight: 700 },
+  searchToggle: {
+    position: 'absolute', right: 16, bottom: 11,
+    width: 36, height: 36, borderRadius: '50%',
+    border: `1px solid ${C.borde}`, background: 'rgba(255,255,255,0.88)',
+    color: C.verdeOsc, display: 'flex', alignItems: 'center', justifyContent: 'center',
+    padding: 0, cursor: 'pointer', flexShrink: 0,
   },
 
   /* ── BUSCADOR ── */
   searchWrap: {
     position: 'relative',
-    marginBottom: 12,
+    marginTop: 10,
+    marginBottom: 8,
+  },
+  offerBanner: {
+    width: '100%', marginTop: 20, marginBottom: 10, padding: '10px 11px',
+    border: 'none', borderRadius: 13,
+    background: 'linear-gradient(120deg, #18ad57 0%, #08743b 100%)',
+    color: '#fff', display: 'flex', alignItems: 'center', gap: 10,
+    cursor: 'pointer', fontFamily: T.font, textAlign: 'left',
+    boxShadow: '0 5px 14px rgba(12,126,64,0.18)',
+  },
+  offerIcon: {
+    width: 'auto', height: 'auto', flexShrink: 0,
+    border: 'none', background: 'transparent',
+    display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22,
+  },
+  offerText: {
+    flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 1,
+    fontSize: 12.5,
+  },
+  offerAction: {
+    flexShrink: 0, fontSize: 12, fontWeight: 700,
+    padding: '7px 9px', borderRadius: 999, background: 'rgba(255,255,255,0.15)',
+    border: '1px solid rgba(255,255,255,0.24)',
   },
   searchIcon: {
     position: 'absolute',
@@ -524,28 +617,30 @@ const s = {
   /* ── CHIPS DE CATEGORÍA ── */
   catsScroll: {
     display: 'flex',
-    gap: 8,
+    gap: 6,
     overflowX: 'auto',
-    padding: '2px 0 4px',
+    padding: '2px 22px 5px 0',
     scrollbarWidth: 'none',
     WebkitOverflowScrolling: 'touch',
     msOverflowStyle: 'none',
+    WebkitMaskImage: 'linear-gradient(90deg, #000 0%, #000 91%, transparent 100%)',
+    maskImage: 'linear-gradient(90deg, #000 0%, #000 91%, transparent 100%)',
   },
   catChip: {
     display: 'flex',
     alignItems: 'center',
-    gap: 5,
-    padding: '8px 14px',
+    gap: 4,
+    padding: '6px 10px',
     borderRadius: 24,
-    fontSize: 13,
-    fontWeight: 700,
+    fontSize: 11.5,
+    fontWeight: 600,
     cursor: 'pointer',
     fontFamily: 'inherit',
     whiteSpace: 'nowrap',
     flexShrink: 0,
     boxSizing: 'border-box',
   },
-  catChipEmoji: { fontSize: 14, lineHeight: 1 },
+  catChipEmoji: { fontSize: 12.5, lineHeight: 1 },
 
   /* ── ÁREA DE SCROLL ── */
   scrollArea: {
@@ -580,6 +675,57 @@ const s = {
     gap: 12,
     paddingTop: 12,
   },
+  featuredSection: { paddingTop: 14, margin: '0 -16px' },
+  sectionHeading: {
+    padding: '0 16px 9px', color: C.texto,
+  },
+  sectionHeadingCopy: {
+    display: 'flex', flexDirection: 'column', gap: 2, fontSize: 15,
+  },
+  featuredScroll: {
+    display: 'flex', gap: 10, overflowX: 'auto', padding: '0 16px 4px',
+    scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch',
+  },
+  featuredCard: {
+    width: 220, minWidth: 220, padding: 12, borderRadius: 16,
+    border: '1px solid #f0d690', background: 'linear-gradient(145deg, #fffdf6, #fff)',
+    boxShadow: '0 4px 14px rgba(146,105,22,0.10)', textAlign: 'left',
+    cursor: 'pointer', fontFamily: T.font, color: C.texto,
+  },
+  sponsoredLabel: {
+    fontSize: 8.5, fontWeight: 700, letterSpacing: '0.8px', color: '#9a6b10', marginBottom: 8,
+  },
+  featuredTop: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 9 },
+  featuredAvatar: { width: 32, height: 32, borderRadius: '50%', objectFit: 'cover' },
+  featuredAvatarFallback: {
+    width: 32, height: 32, borderRadius: '50%', background: C.verde, color: '#fff',
+    display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 700,
+  },
+  featuredEmoji: { fontSize: 22 },
+  featuredTitle: { display: 'block', fontSize: 14, lineHeight: 1.25, marginBottom: 4 },
+  featuredProvider: { display: 'block', fontSize: 11, color: C.textoSuave, marginBottom: 12 },
+  featuredBottom: {
+    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+    color: C.verde, fontSize: 12, fontWeight: 600,
+  },
+  monetizationCard: {
+    marginTop: 14, padding: '11px 12px', borderRadius: 14,
+    border: '1px dashed #d7bb73', background: '#fffdf6',
+    display: 'flex', alignItems: 'center', gap: 9,
+  },
+  monetizationStar: {
+    width: 30, height: 30, borderRadius: '50%', background: '#fef3c7', color: '#b7791f',
+    display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+  },
+  monetizationCopy: {
+    flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 1,
+    fontSize: 12.5, color: C.texto,
+  },
+  comingSoon: {
+    padding: '5px 7px', borderRadius: 999, background: '#fef3c7', color: '#8a6014',
+    fontSize: 9.5, fontWeight: 600, flexShrink: 0,
+  },
+  regularHeading: { paddingTop: 16, fontSize: 15, fontWeight: 600, color: C.texto },
 
   /* ── CARD ── */
   card: {

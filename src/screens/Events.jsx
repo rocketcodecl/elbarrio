@@ -3,7 +3,6 @@ import { supabase } from '../lib/supabase'
 import {
   C, T, S, iniciales,
 } from '../lib/design'
-import MiniMap from '../components/MiniMap'
 
 /*
   EVENTS — Pantalla de Eventos de El Barrio (tab "eventos" del App.jsx).
@@ -131,6 +130,14 @@ const FILTROS = [
   { key: 'otros',      label: 'Otros',      emoji: '📌' },
 ]
 
+const CAT_UI = {
+  asambleas: { label: 'Comunidad', emoji: '🏛️', color: '#0f7a3f', bg: '#dcfce7' },
+  ferias: { label: 'Feria', emoji: '🥬', color: '#a35412', bg: '#ffedd5' },
+  talleres: { label: 'Taller', emoji: '🎨', color: '#7c3aed', bg: '#f3e8ff' },
+  deportes: { label: 'Deporte', emoji: '⚽', color: '#087ca7', bg: '#e0f2fe' },
+  otros: { label: 'Actividad', emoji: '📌', color: '#475569', bg: '#f1f5f9' },
+}
+
 const catDePost = (p) => {
   const cat = String(p?.category || p?.event_type || '').toLowerCase()
   const tit = String(p?.title || '').toLowerCase()
@@ -208,7 +215,7 @@ const diaSemLargo = (fecha) => DIAS_SEM_LARGOS[new Date(fecha).getDay()]
 
 const fechaCorta = (fecha) => {
   if (esHoy(fecha)) return 'Hoy'
-  if (esManana(fecha)) return 'Manana'
+  if (esManana(fecha)) return 'Mañana'
   const d = new Date(fecha)
   return `${DIAS_SEM[d.getDay()]} ${d.getDate()} ${MESES_CORTOS[d.getMonth()]}`
 }
@@ -221,7 +228,7 @@ const fechaLarga = (fecha) => {
 // ════════════════════════════════════════════════
 // COMPONENTE PRINCIPAL
 // ════════════════════════════════════════════════
-function Events({ currentUser, onNavigate }) {
+function Events({ currentUser, onNavigate, onCrear }) {
   const [profile, setProfile] = useState(null)
   const [eventos, setEventos] = useState([])
   const [filtro, setFiltro] = useState('todos')
@@ -240,6 +247,7 @@ function Events({ currentUser, onNavigate }) {
   const [pullDist, setPullDist] = useState(0)
 
   const nav = onNavigate || (() => {})
+  const canPublish = profile?.role === 'admin' || profile?.can_publish_events === true
 
   // ═══════ Cargar perfil del usuario (para neighborhood_id) ═══════
   useEffect(() => {
@@ -264,7 +272,7 @@ function Events({ currentUser, onNavigate }) {
       // futuros, ordenados por starts_at asc, con join a profiles.
       let q = supabase
         .from('posts')
-        .select('*, profiles!posts_user_id_fkey(*)')
+        .select('*, author:profiles!author_id(full_name, avatar_url, badge_founder)')
         .eq('type', 'event')
         .eq('status', 'active')
         .gte('starts_at', new Date().toISOString())
@@ -415,6 +423,9 @@ function Events({ currentUser, onNavigate }) {
     : eventos.filter((e) => catDePost(e) === filtro)
 
   const estaSemana = eventos.filter((e) => esDentroDe7Dias(e.starts_at)).slice(0, 12)
+  const destacados = [...eventosFiltrados]
+    .sort((a, b) => Number(!!b.images?.[0]) - Number(!!a.images?.[0]))
+    .slice(0, 6)
 
   const conteos = eventos.reduce((acc, e) => {
     const k = catDePost(e)
@@ -427,12 +438,13 @@ function Events({ currentUser, onNavigate }) {
   return (
     <div style={s.wrap}>
       {/* ══════ HEADER ══════ */}
-      <div style={s.header}>
-        <button style={s.backBtn} onClick={() => nav('inicio')} aria-label="Volver">
-          <IcoVolver />
+      <div className="events-feed-header" style={s.header}>
+        <button type="button" style={s.backBtn} onClick={() => nav('back')} aria-label="Volver">
+          <IcoVolver size={22} />
         </button>
-        <div style={s.headerTit}>Eventos</div>
-        <div style={{ width: 40 }} />
+        <strong style={s.headerTit}>
+          Eventos de <span style={s.headerBrand}>el barrio</span>
+        </strong>
       </div>
 
       {/* ══════ SCROLL AREA ══════ */}
@@ -462,15 +474,6 @@ function Events({ currentUser, onNavigate }) {
             <span>Actualizando...</span>
           </div>
         )}
-
-        {/* ══════ RESUMEN ══════ */}
-        <div style={s.resumen}>
-          <span style={s.resumenNum}>{eventos.length}</span>
-          <span style={s.resumenTxt}>
-            evento{eventos.length === 1 ? '' : 's'} proximo{eventos.length === 1 ? '' : 's'} en{' '}
-            <span style={s.marca}>el barrio</span>
-          </span>
-        </div>
 
         {error && <div style={s.errorBox}>{error}</div>}
 
@@ -511,40 +514,26 @@ function Events({ currentUser, onNavigate }) {
         {cargando ? (
           <SkeletonLista />
         ) : eventosFiltrados.length === 0 ? (
-          <EstadoVacio onCrear={() => nav('createpost', { type: 'event' })} />
+          <EstadoVacio canPublish={canPublish} onCrear={() => onCrear?.('event')} />
         ) : (
           <>
-            {/* ══════ ESTA SEMANA ══════ */}
-            {estaSemana.length > 0 && filtro === 'todos' && (
-              <div style={s.seccion}>
-                <div style={s.seccionTit}>
-                  <IcoCalendario size={14} color={C.verde} />
-                  <span>Esta semana</span>
+            {destacados.length > 0 && (
+              <div style={s.heroSection}>
+                <div style={s.heroHeading}>
+                  <span>{filtro === 'todos' ? 'Para esta semana' : 'Eventos encontrados'}</span>
+                  <small>{destacados.length} próximos</small>
                 </div>
-                <div style={s.chipsScroll}>
-                  {estaSemana.map((ev) => {
-                    const label = esHoy(ev.starts_at)
-                      ? 'Hoy'
-                      : esManana(ev.starts_at)
-                        ? 'Manana'
-                        : `${DIAS_SEM[new Date(ev.starts_at).getDay()]} ${new Date(ev.starts_at).getDate()}`
-                    const hora = hhmm(ev.starts_at)
-                    return (
-                      <button
-                        key={ev.id}
-                        style={s.chipSemana}
-                        onClick={() => nav('productdetail', { postId: ev.id })}
-                      >
-                        <div style={s.chipSemanaFecha}>
-                          <span style={s.chipSemanaDia}>{label}</span>
-                          <span style={s.chipSemanaHora}>{hora}</span>
-                        </div>
-                        <span style={s.chipSemanaTitulo}>
-                          {ev.title || (ev.content || '').slice(0, 40) || 'Evento'}
-                        </span>
-                      </button>
-                    )
-                  })}
+                <div style={s.heroScroll}>
+                  {destacados.map((ev) => (
+                    <HeroEventCard
+                      key={ev.id}
+                      evento={ev}
+                      asistiendo={!!asistiendo[ev.id]}
+                      count={asistenciasCount[ev.id] || 0}
+                      onToggle={() => toggleAsistir(ev.id)}
+                      onClick={() => nav('eventdetail', { postId: ev.id })}
+                    />
+                  ))}
                 </div>
               </div>
             )}
@@ -552,8 +541,7 @@ function Events({ currentUser, onNavigate }) {
             {/* ══════ PROXIMOS EVENTOS ══════ */}
             <div style={s.seccion}>
               <div style={s.seccionTit}>
-                <IcoCalendario size={14} color={C.verde} />
-                <span>Proximos eventos</span>
+                <span>Próximos eventos</span>
                 <span style={s.seccionCount}>{eventosFiltrados.length}</span>
               </div>
 
@@ -566,7 +554,7 @@ function Events({ currentUser, onNavigate }) {
                     count={asistenciasCount[ev.id] || 0}
                     pulso={pulso === ev.id}
                     onToggle={() => toggleAsistir(ev.id)}
-                    onClick={() => nav('productdetail', { postId: ev.id })}
+                    onClick={() => nav('eventdetail', { postId: ev.id })}
                   />
                 ))}
               </div>
@@ -586,14 +574,14 @@ function Events({ currentUser, onNavigate }) {
       </div>
 
       {/* ══════ FAB ══════ */}
-      <button
+      {canPublish && <button
         style={s.fab}
-        onClick={() => nav('createpost', { type: 'event' })}
+        onClick={() => onCrear?.('event')}
         aria-label="Crear evento"
       >
         <IcoPlus size={18} color="#fff" />
         <span style={s.fabText}>Crear evento</span>
-      </button>
+      </button>}
 
       {/* ══════ TOAST ══════ */}
       {toast && (
@@ -609,123 +597,68 @@ function Events({ currentUser, onNavigate }) {
 // ════════════════════════════════════════════════
 // TARJETA DE EVENTO (card grande)
 // ════════════════════════════════════════════════
+function HeroEventCard({ evento, asistiendo, count, onToggle, onClick }) {
+  const category = CAT_UI[catDePost(evento)] || CAT_UI.otros
+  const image = evento.images?.[0]
+  const place = evento.location_text || 'Lugar por confirmar'
+  return (
+    <div style={s.heroCard} onClick={onClick} role="button" tabIndex={0}>
+      {image ? (
+        <img src={image} alt="" style={s.heroImage} />
+      ) : (
+        <div style={{ ...s.heroFallback, background: `linear-gradient(140deg, ${category.bg}, #d7f5df)` }}>
+          <span>{category.emoji}</span>
+        </div>
+      )}
+      <div style={s.heroShade} />
+      <span style={s.heroCategory}>{category.label.toUpperCase()}</span>
+      <div style={s.heroContent}>
+        <strong style={s.heroTitle}>{evento.title || 'Evento del barrio'}</strong>
+        <span style={s.heroMeta}>
+          <IcoCalendario size={12} /> {fechaCorta(evento.starts_at)} · {hhmm(evento.starts_at)}
+        </span>
+        <span style={s.heroMeta}><IcoPin size={12} /> {place}</span>
+        <div style={s.heroBottom}>
+          <span style={s.heroCount}><IcoPersonas size={13} /> {count > 0 ? `${count} asistirán` : 'Sé el primero'}</span>
+          <span
+            role="button"
+            style={{ ...s.heroAttend, ...(asistiendo ? s.heroAttendOn : {}) }}
+            onClick={(e) => { e.stopPropagation(); onToggle() }}
+          >
+            {asistiendo ? '✓ Asistiré' : 'Asistiré'}
+          </span>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function EventCard({ evento, asistiendo, count, pulso, onToggle, onClick }) {
   const f = evento.starts_at
   const { mes, dia } = diaMesCorto(f)
-  const hoy = esHoy(f)
-  const manana = esManana(f)
-  const org = evento.profiles || {}
-  const tieneCoords = evento.latitude != null && evento.longitude != null
-  const lugar = evento.location_text || (tieneCoords ? null : 'Plaza de Armas')
-  const desc = (evento.content || evento.description || '').slice(0, 140)
+  const category = CAT_UI[catDePost(evento)] || CAT_UI.otros
+  const image = evento.images?.[0]
+  const lugar = evento.location_text || 'Lugar por confirmar'
 
   return (
     <div style={s.card} onClick={onClick}>
-      {/* Badge HOY / MAÑANA */}
-      {(hoy || manana) && (
-        <div style={{
-          ...s.fechaBadge,
-          background: hoy ? C.verde : C.dorado,
-        }}>
-          {hoy ? 'HOY' : 'MAÑANA'}
-        </div>
-      )}
-
-      {/* Fila superior: bloque de fecha + titulo */}
-      <div style={s.cardTop}>
-        <div style={s.fechaBloque}>
-          <span style={s.fechaMes}>{mes}</span>
-          <span style={s.fechaDia}>{dia}</span>
-        </div>
-
-        <div style={s.cardTitWrap}>
-          <div style={s.cardTit}>
-            {evento.title || 'Evento del barrio'}
-          </div>
-          <div style={s.cardFechaLarga}>
-            {fechaLarga(f)} · {hhmm(f)} hrs
-          </div>
-        </div>
+      <div style={{ ...s.listVisual, background: category.bg }}>
+        {image ? <img src={image} alt="" style={s.listImage} /> : <span style={s.listEmoji}>{category.emoji}</span>}
+        <span style={s.listDate}><b>{dia}</b>{mes}</span>
       </div>
-
-      {/* Descripcion */}
-      {desc && <div style={s.cardDesc}>{desc}</div>}
-
-      {/* Lugar: MiniMap si hay coords, si no texto */}
-      {tieneCoords ? (
-        <div style={s.miniMapWrap} onClick={(e) => e.stopPropagation()}>
-          <MiniMap
-            lat={evento.latitude}
-            lng={evento.longitude}
-            height={90}
-            zoom={15}
-          />
-          {lugar && (
-            <div style={s.miniMapLugar}>
-              <IcoPin size={11} color={C.verde} />
-              <span>{lugar}</span>
-            </div>
-          )}
+      <div style={s.listBody}>
+        <div style={s.listTitleRow}>
+          <strong style={s.listTitle}>{evento.title || 'Evento del barrio'}</strong>
+          <span style={{ ...s.listCategory, color: category.color }}>{category.label}</span>
         </div>
-      ) : lugar ? (
-        <div style={s.lugarRow}>
-          <IcoPin size={12} color={C.verde} />
-          <span style={s.lugarTxt}>{lugar}</span>
-        </div>
-      ) : null}
-
-      {/* Meta: hora */}
-      <div style={s.metaRow}>
-        <span style={s.metaItem}>
-          <IcoReloj size={12} color={C.textoTenue} />
-          <span>{hhmm(f)} hrs</span>
-        </span>
-        {evento.category && (
-          <span style={s.metaItem}>
-            <span style={s.catDot} />
-            <span>{String(evento.category).charAt(0).toUpperCase() + String(evento.category).slice(1)}</span>
-          </span>
-        )}
-      </div>
-
-      {/* Pie: organizador + asistencia */}
-      <div style={s.cardPie}>
-        <div style={s.orgBlock}>
-          {org.avatar_url ? (
-            <img src={org.avatar_url} alt="" style={s.orgAvatar} />
-          ) : (
-            <div style={s.orgAvatarFallback}>{iniciales(org.full_name)}</div>
-          )}
-          <div style={s.orgMeta}>
-            <span style={s.orgNombre}>
-              {(org.full_name || 'Vecino').split(' ')[0]}
-            </span>
-            <span style={s.orgRol}>organiza</span>
-          </div>
-        </div>
-
-        <div style={s.asistenciaBlock}>
-          <span style={s.asistCount}>
-            <IcoPersonas size={11} color={C.verde} />
-            <span>{count} van</span>
-          </span>
+        <span style={s.listMeta}>{fechaCorta(f)} · {hhmm(f)} · {lugar}</span>
+        <div style={s.listBottom}>
+          <span style={s.listCount}><IcoPersonas size={12} /> {count > 0 ? `${count} vecinos van` : 'Aún sin asistentes'}</span>
           <button
-            style={{
-              ...s.asistBtn,
-              ...(asistiendo ? s.asistBtnOn : {}),
-              ...(pulso ? s.asistBtnPulso : {}),
-            }}
+            style={{ ...s.listAttend, ...(asistiendo ? s.listAttendOn : {}), ...(pulso ? s.asistBtnPulso : {}) }}
             onClick={(e) => { e.stopPropagation(); onToggle() }}
-          >
-            {asistiendo ? (
-              <>
-                <IcoCheck size={12} color="#fff" />
-                <span>Asistiras</span>
-              </>
-            ) : (
-              <span>Asistare</span>
-            )}
-          </button>
+            aria-label={asistiendo ? 'Cancelar asistencia' : 'Asistir'}
+          >{asistiendo ? <IcoCheck size={15} /> : <IcoPlus size={17} />}</button>
         </div>
       </div>
     </div>
@@ -778,7 +711,7 @@ function SkeletonLista() {
 // ════════════════════════════════════════════════
 // ESTADO VACIO
 // ════════════════════════════════════════════════
-function EstadoVacio({ onCrear }) {
+function EstadoVacio({ onCrear, canPublish }) {
   return (
     <div style={s.vacio}>
       <IcoCalendarioVacio size={72} color={C.verde} />
@@ -787,10 +720,10 @@ function EstadoVacio({ onCrear }) {
         Si tenes algo planeado (una asamblea, una minga, una feria, un cumple,
         una venta de garaje, un partido), crealo y avisale a tus vecinos.
       </div>
-      <button style={s.vacioCta} onClick={onCrear}>
+      {canPublish ? <button style={s.vacioCta} onClick={onCrear}>
         <IcoPlus size={14} color="#fff" />
         <span>Organizá el primero</span>
-      </button>
+      </button> : <div style={s.vacioTxt}>Los eventos son publicados por administradores y organizaciones vecinales autorizadas.</div>}
     </div>
   )
 }
@@ -810,20 +743,38 @@ const s = {
 
   /* ── header ── */
   header: {
-    background: C.card,
-    padding: '28px 18px 12px',
-    borderBottom: `1px solid ${C.borde}`,
-    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-    flexShrink: 0,
+    minHeight: 72,
+    padding: 'calc(env(safe-area-inset-top, 0px) + 22px) 58px 16px',
+    backgroundColor: C.card,
+    backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='72' height='64' viewBox='0 0 72 64'%3E%3Cg fill='none' stroke='%2316a34a' stroke-opacity='.22' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='12' y='13' width='48' height='42' rx='6'/%3E%3Cpath d='M24 8v11M48 8v11M12 25h48M24 35h5M34 35h5M44 35h5M24 45h5M34 45h5'/%3E%3C/g%3E%3C/svg%3E")`,
+    backgroundSize: '72px 64px',
+    backgroundPosition: 'calc(50% - 86px) center',
+    backgroundRepeat: 'no-repeat',
+    borderBottom: `2px solid ${C.verde}`,
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    flexShrink: 0, position: 'relative', boxSizing: 'border-box',
   },
   backBtn: {
-    width: 40, height: 40, borderRadius: '50%',
-    background: C.fondo, border: `1px solid ${C.borde}`,
-    color: C.texto, cursor: 'pointer', padding: 0,
-    display: 'flex', alignItems: 'center', justifyContent: 'center',
-    fontFamily: 'inherit',
+    position: 'absolute', left: 16, bottom: 10,
+    width: 38, height: 38, borderRadius: '50%',
+    background: 'rgba(255,255,255,0.88)', border: `1px solid ${C.borde}`,
+    color: C.verdeOsc, cursor: 'pointer', padding: 0,
+    display: 'grid', placeItems: 'center', fontFamily: 'inherit',
   },
-  headerTit: { fontSize: 17, fontWeight: 700, color: C.texto },
+  headerTit: {
+    minWidth: 0, textAlign: 'center', fontSize: 16, lineHeight: 1.2,
+    color: '#26302b', fontWeight: 600, whiteSpace: 'nowrap',
+    overflow: 'hidden', textOverflow: 'ellipsis', padding: '5px 10px',
+    background: 'transparent', border: 'none', boxShadow: 'none',
+  },
+  headerBrand: { color: C.verde, fontWeight: 700 },
+  headerSub: { fontSize: 12, fontWeight: 500, color: C.textoSuave, marginTop: 2 },
+  headerAvatar: { width: 38, height: 38, borderRadius: '50%', objectFit: 'cover', border: `2px solid ${C.verde}` },
+  headerAvatarFallback: {
+    width: 38, height: 38, borderRadius: '50%', background: C.verdeSuave, color: C.verde,
+    border: `2px solid ${C.verde}`, display: 'flex', alignItems: 'center', justifyContent: 'center',
+    fontSize: 11, fontWeight: 700,
+  },
 
   scroll: {
     flex: 1, overflowY: 'auto',
@@ -867,7 +818,7 @@ const s = {
   /* ── filtros ── */
   filtros: {
     display: 'flex', gap: 7, overflowX: 'auto',
-    paddingBottom: 4, marginBottom: 14,
+    paddingBottom: 5, marginBottom: 16,
     margin: '0 -16px', paddingLeft: 16, paddingRight: 16,
     WebkitOverflowScrolling: 'touch',
     scrollbarWidth: 'none',
@@ -875,10 +826,10 @@ const s = {
   filtroChip: {
     display: 'flex', alignItems: 'center', gap: 5,
     flexShrink: 0,
-    padding: '7px 11px', borderRadius: 999,
+    padding: '7px 10px', borderRadius: 999,
     border: `1px solid ${C.borde}`,
     background: '#fff',
-    fontSize: 12, fontWeight: 700,
+    fontSize: 11.5, fontWeight: 600,
     cursor: 'pointer', fontFamily: 'inherit',
   },
   filtroCount: {
@@ -892,7 +843,7 @@ const s = {
   seccion: { marginBottom: 18 },
   seccionTit: {
     display: 'flex', alignItems: 'center', gap: 6,
-    fontSize: 14, fontWeight: 800, color: C.texto,
+    fontSize: 17, fontWeight: 600, color: C.texto,
     marginBottom: 10, letterSpacing: '-0.1px',
   },
   seccionCount: {
@@ -941,18 +892,87 @@ const s = {
   /* ── lista ── */
   lista: { display: 'flex', flexDirection: 'column', gap: 12 },
 
+  heroSection: { margin: '0 -16px 22px' },
+  heroHeading: {
+    padding: '0 16px 10px', display: 'flex', alignItems: 'baseline', justifyContent: 'space-between',
+    fontSize: 17, fontWeight: 600, color: C.texto,
+  },
+  heroScroll: {
+    display: 'flex', gap: 11, overflowX: 'auto', padding: '0 16px 4px',
+    WebkitOverflowScrolling: 'touch', scrollbarWidth: 'none',
+  },
+  heroCard: {
+    position: 'relative', flexShrink: 0, width: '84%', maxWidth: 330, height: 245,
+    padding: 0, border: 'none', borderRadius: 18, overflow: 'hidden',
+    background: '#dceee2', cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left',
+    boxShadow: '0 6px 18px rgba(15,60,36,0.14)', color: '#fff',
+  },
+  heroImage: { position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' },
+  heroFallback: {
+    position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
+    fontSize: 74,
+  },
+  heroShade: { position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(0,0,0,0.04) 25%, rgba(0,0,0,0.82) 100%)' },
+  heroCategory: {
+    position: 'absolute', top: 13, left: 13, padding: '5px 9px', borderRadius: 7,
+    background: 'rgba(7,117,56,0.94)', color: '#fff', fontSize: 9.5, fontWeight: 700,
+    letterSpacing: '0.5px',
+  },
+  heroContent: { position: 'absolute', left: 15, right: 15, bottom: 14, display: 'flex', flexDirection: 'column', gap: 5 },
+  heroTitle: { fontSize: 20, lineHeight: 1.2, fontWeight: 600, textShadow: '0 1px 4px rgba(0,0,0,0.35)' },
+  heroMeta: { display: 'flex', alignItems: 'center', gap: 5, fontSize: 11.5, fontWeight: 500 },
+  heroBottom: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginTop: 6 },
+  heroCount: { display: 'flex', alignItems: 'center', gap: 5, fontSize: 11 },
+  heroAttend: {
+    padding: '8px 13px', borderRadius: 999, background: '#fff', color: C.verdeOsc,
+    fontSize: 11.5, fontWeight: 600, whiteSpace: 'nowrap',
+  },
+  heroAttendOn: { background: C.verde, color: '#fff' },
+
   /* ── card grande ── */
   card: {
     position: 'relative',
     background: C.card,
     border: `1px solid ${C.borde}`,
-    borderRadius: 18,
-    padding: 14,
+    borderRadius: 16,
+    padding: 9,
     cursor: 'pointer',
     boxShadow: '0 2px 10px rgba(0,0,0,0.04)',
     transition: 'transform 0.14s ease, box-shadow 0.14s ease',
     fontFamily: 'inherit',
+    display: 'flex', gap: 11, minHeight: 116,
   },
+  listVisual: {
+    position: 'relative', width: 96, minHeight: 104, borderRadius: 12, overflow: 'hidden',
+    flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
+  },
+  listImage: { position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' },
+  listEmoji: { fontSize: 34 },
+  listDate: {
+    position: 'absolute', left: 6, bottom: 6, minWidth: 30, padding: '3px 5px',
+    borderRadius: 7, background: 'rgba(255,255,255,0.94)', color: C.texto,
+    display: 'flex', flexDirection: 'column', alignItems: 'center',
+    fontSize: 8, fontWeight: 700, lineHeight: 1.05,
+  },
+  listBody: { flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', padding: '3px 2px' },
+  listTitleRow: { display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 7 },
+  listTitle: {
+    minWidth: 0, fontSize: 14.5, lineHeight: 1.25, fontWeight: 600, color: C.texto,
+    display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden',
+  },
+  listCategory: { flexShrink: 0, fontSize: 9.5, fontWeight: 700, textTransform: 'uppercase' },
+  listMeta: {
+    marginTop: 5, fontSize: 11, lineHeight: 1.35, color: C.textoSuave,
+    display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden',
+  },
+  listBottom: { marginTop: 'auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 7 },
+  listCount: { display: 'flex', alignItems: 'center', gap: 4, color: C.textoTenue, fontSize: 10.5 },
+  listAttend: {
+    width: 30, height: 30, borderRadius: '50%', border: `1.5px solid ${C.verde}`,
+    background: C.card, color: C.verde, display: 'flex', alignItems: 'center', justifyContent: 'center',
+    padding: 0, cursor: 'pointer', flexShrink: 0,
+  },
+  listAttendOn: { background: C.verde, color: '#fff' },
   fechaBadge: {
     position: 'absolute', top: 12, right: 12,
     fontSize: 10, fontWeight: 800, color: '#fff',
@@ -1214,6 +1234,13 @@ if (typeof document !== 'undefined' && !document.getElementById('events-keyframe
       35%  { transform: scale(1.10); box-shadow: 0 0 0 6px rgba(22,163,74,0.18); }
       70%  { transform: scale(1.04); box-shadow: 0 0 0 10px rgba(22,163,74,0.08); }
       100% { transform: scale(1.06); box-shadow: 0 0 0 0 rgba(22,163,74,0); }
+    }
+    @keyframes events-header-drift {
+      from { background-position: 0 0; }
+      to { background-position: -112px -68px; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .events-feed-header { animation: none !important; }
     }
   `
   document.head.appendChild(style)

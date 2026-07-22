@@ -186,6 +186,7 @@ const resolverTipo = (post) => {
   if (t === 'alert')            return TIPOS.alert
   if (t === 'event')            return TIPOS.event
   if (t === 'request')          return TIPOS.request
+  if (t === 'service')          return { ...TIPOS.general, emoji: '🛠️', label: 'Servicio', corto: 'Servicio', color: C.verde, bg: C.verdeSuave }
   return TIPOS.general
 }
 
@@ -241,7 +242,7 @@ const getCoord = (obj) => {
 // ─────────────────────────────────────────────
 // COMPONENTE PRINCIPAL
 // ─────────────────────────────────────────────
-export default function ProductDetail({ postId, currentUser, onNavigate }) {
+export default function ProductDetail({ postId, currentUser, onNavigate, onEdit }) {
   const [post, setPost] = useState(null)
   const [loading, setLoading] = useState(true)
   const [currentImage, setCurrentImage] = useState(0)
@@ -270,6 +271,8 @@ export default function ProductDetail({ postId, currentUser, onNavigate }) {
   // Misc
   const [myCoords, setMyCoords] = useState(null)
   const [toast, setToast] = useState(null)
+  const [manageOpen, setManageOpen] = useState(false)
+  const [managing, setManaging] = useState(false)
 
   const viewBumpedRef = useRef(false)
   const nav = onNavigate || (() => {})
@@ -587,10 +590,13 @@ export default function ProductDetail({ postId, currentUser, onNavigate }) {
   // ───── Distancia real ─────
   const computeDist = () => {
     if (!post) return null
-    if (post.distance_meters != null) return distancia(post.distance_meters)
+    if (post.distance_meters != null) {
+      return post.distance_meters >= 20 ? distancia(post.distance_meters) : null
+    }
     const sellerCoord = getCoord(post.author)
     if (!myCoords || !sellerCoord) return null
-    return distancia(haversine(myCoords, sellerCoord))
+    const metros = haversine(myCoords, sellerCoord)
+    return metros >= 20 ? distancia(metros) : null
   }
 
   // ───── Loading ─────
@@ -614,15 +620,38 @@ export default function ProductDetail({ postId, currentUser, onNavigate }) {
   const images = (post.images && post.images.length > 0) ? post.images : []
   const dist = computeDist()
   const isOwn = currentUser?.id && post.author_id === currentUser.id
-  const ctaLabel = esRegalo(post.type) ? 'Reclamar' : esTrueque(post.type) ? 'Proponer trueque' : 'Mensaje al vendedor'
+  const ctaLabel = post.type === 'event' ? 'Contactar organización' : post.type === 'service' ? 'Contactar' : esRegalo(post.type) ? 'Reclamar' : esTrueque(post.type) ? 'Proponer trueque' : 'Mensaje al vendedor'
   const ctaIcon = esRegalo(post.type) ? <Icon.Gift /> : esTrueque(post.type) ? <Icon.Swap /> : <Icon.Message />
 
   const onCta = () => {
     if (isOwn) {
-      showToast('Es tu propia publicación')
+      setManageOpen(true)
       return
     }
     nav('ChatConversation', { postId: post.id, sellerId: post.author_id })
+  }
+
+  const cambiarEstado = async (status) => {
+    if (!isOwn || managing) return
+    setManaging(true)
+    const { error } = await supabase.from('posts').update({ status }).eq('id', post.id)
+    setManaging(false)
+    if (error) return showToast('No pudimos actualizar la publicación')
+    setPost((prev) => ({ ...prev, status }))
+    setManageOpen(false)
+    showToast(status === 'active' ? 'Publicación reactivada' : status === 'sold' ? 'Marcada como vendida' : 'Publicación pausada')
+  }
+
+  const eliminarPublicacion = async () => {
+    if (!isOwn || managing) return
+    const confirmado = window.confirm('Esta publicación se eliminará definitivamente. ¿Quieres continuar?')
+    if (!confirmado) return
+    setManaging(true)
+    const { error } = await supabase.from('posts').delete().eq('id', post.id)
+    setManaging(false)
+    if (error) return showToast('No pudimos eliminar la publicación')
+    setManageOpen(false)
+    nav('back')
   }
 
   return (
@@ -686,14 +715,13 @@ export default function ProductDetail({ postId, currentUser, onNavigate }) {
 
         {/* ───── Contenido ───── */}
         <div style={s.content}>
-          {/* Título + precio */}
-          <h1 style={s.title}>{post.title || 'Sin título'}</h1>
-
+          {/* Precio + título */}
           <div style={s.priceRow}>
             <span style={s.price}>{precioLabel(post)}</span>
             {post.price && esVenta(post.type) && <span style={s.currency}>CLP</span>}
             {post.is_negotiable && <span style={s.negotiable}>Negociable</span>}
           </div>
+          <h1 style={s.title}>{post.title || 'Sin título'}</h1>
 
           {/* Stats: vistas · likes · comentarios */}
           <div style={s.statsRow}>
@@ -761,17 +789,6 @@ export default function ProductDetail({ postId, currentUser, onNavigate }) {
             <Icon.ChevronRight />
           </div>
 
-          {/* Tarjeta de seguridad */}
-          <div style={s.shieldCard}>
-            <div style={s.shieldIconWrap}><Icon.Shield /></div>
-            <div style={{ flex: 1 }}>
-              <div style={s.shieldTitle}>Transacción protegida por la comunidad</div>
-              <div style={s.shieldText}>
-                Revisa nuestros consejos de seguridad antes de concretar. Nunca pagues por adelantado a desconocidos.
-              </div>
-            </div>
-          </div>
-
           {/* Descripción */}
           <section style={s.section}>
             <div style={s.sectionTitle}>Descripción</div>
@@ -780,20 +797,23 @@ export default function ProductDetail({ postId, currentUser, onNavigate }) {
             </div>
           </section>
 
-          {/* Ubicación aproximada */}
-          <section style={s.section}>
-            <div style={s.sectionTitle}>Ubicación aproximada</div>
-            <div style={s.mapBox}>
-              <div style={s.mapGrid} />
-              <div style={s.pulseWrap}>
-                <div style={{ ...s.pulse, animationDelay: '0s' }} />
-                <div style={{ ...s.pulse, animationDelay: '1s' }} />
-                <div style={{ ...s.pulse, animationDelay: '2s' }} />
-                <div style={s.pulseDot} />
-              </div>
-              <div style={s.mapCaption}>Se comparte solo al coordinar</div>
+          {/* Ubicación aproximada, sin mapa decorativo */}
+          <div style={s.locationStrip}>
+            <Icon.Pin size={15} color={C.verde} />
+            <div>
+              <div style={s.locationTitle}>Ubicación aproximada{dist ? ` · a ${dist}` : ''}</div>
+              <div style={s.locationText}>La ubicación exacta se comparte solo al coordinar.</div>
             </div>
-          </section>
+          </div>
+
+          {/* Seguridad compacta */}
+          <div style={s.shieldCard}>
+            <div style={s.shieldIconWrap}><Icon.Shield /></div>
+            <div style={{ flex: 1 }}>
+              <div style={s.shieldTitle}>Compra y coordina con seguridad</div>
+              <div style={s.shieldText}>No pagues por adelantado a desconocidos.</div>
+            </div>
+          </div>
 
           {/* Comentarios */}
           <section style={s.section}>
@@ -859,18 +879,58 @@ export default function ProductDetail({ postId, currentUser, onNavigate }) {
 
       {/* ───── Bottom bar ───── */}
       <div style={s.bottomBar}>
-        <button
-          style={{ ...s.heartBtn, borderColor: liked ? '#fecdd3' : C.borde }}
-          onClick={toggleLike}
-          aria-label={liked ? 'Quitar de favoritos' : 'Guardar en favoritos'}
-        >
-          <Icon.Heart filled={liked} color={liked ? '#e11d48' : C.textoSuave} />
-        </button>
+        {!isOwn && (
+          <button
+            style={{ ...s.heartBtn, borderColor: liked ? '#fecdd3' : C.borde }}
+            onClick={toggleLike}
+            aria-label={liked ? 'Quitar de favoritos' : 'Guardar en favoritos'}
+          >
+            <Icon.Heart filled={liked} color={liked ? '#e11d48' : C.textoSuave} />
+          </button>
+        )}
         <button style={s.contactBtn} onClick={onCta}>
-          {isOwn ? <Icon.Check /> : ctaIcon}
-          <span>{isOwn ? 'Es tu publicación' : ctaLabel}</span>
+          {isOwn ? <Icon.Tag color="#fff" /> : ctaIcon}
+          <span>{isOwn ? 'Administrar publicación' : ctaLabel}</span>
         </button>
       </div>
+
+      {manageOpen && (
+        <div style={s.manageOverlay} onClick={() => !managing && setManageOpen(false)}>
+          <div style={s.manageSheet} onClick={(e) => e.stopPropagation()}>
+            <div style={s.manageHandle} />
+            <div style={s.manageTitle}>Administrar publicación</div>
+            <button style={s.managePrimary} onClick={() => { setManageOpen(false); onEdit?.(post) }}>
+              ✏️ Editar publicación
+            </button>
+            <button
+              style={s.managePreview}
+              onClick={() => nav('ChatConversation', { postId: post.id, sellerId: post.author_id, preview: true })}
+            >
+              💬 Vista previa del chat
+            </button>
+            {post.status === 'active' ? (
+              <button style={s.manageOption} onClick={() => cambiarEstado('paused')} disabled={managing}>
+                ⏸️ Pausar publicación
+              </button>
+            ) : (
+              <button style={s.manageOption} onClick={() => cambiarEstado('active')} disabled={managing}>
+                ▶️ Reactivar publicación
+              </button>
+            )}
+            {esVenta(post.type) && post.status !== 'sold' && (
+              <button style={s.manageOption} onClick={() => cambiarEstado('sold')} disabled={managing}>
+                ✅ Marcar como vendida
+              </button>
+            )}
+            <button style={s.manageShare} onClick={handleShare}>
+              🔗 Compartir publicación
+            </button>
+            <button style={s.manageDanger} onClick={eliminarPublicacion} disabled={managing}>
+              🗑️ Eliminar publicación
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* ───── Lightbox ───── */}
       {lightboxOpen && images.length > 0 && (
@@ -924,30 +984,36 @@ function CommentItem({ c }) {
 }
 
 function SimilarCard({ p, myCoords, onClick }) {
-  const img = p.images?.[0] || demoImg(p.category, (p.id || '').length % 20)
+  const img = p.images?.[0] || null
+  const [imgError, setImgError] = useState(false)
   const tipo = resolverTipo(p)
   let distLabel = null
-  if (p.distance_meters != null) distLabel = distancia(p.distance_meters)
+  if (p.distance_meters != null && p.distance_meters >= 20) distLabel = distancia(p.distance_meters)
   else if (myCoords && p.author) {
     const sc = getCoord(p.author)
-    if (sc) distLabel = distancia(haversine(myCoords, sc))
+    if (sc) {
+      const metros = haversine(myCoords, sc)
+      if (metros >= 20) distLabel = distancia(metros)
+    }
   }
 
   return (
     <div style={s.similarCard} onClick={onClick}>
       <div style={s.similarImgBox}>
-        <img src={img} alt={p.title || ''} style={s.similarImg} onError={(e) => {
-          e.target.style.display = 'none'
-          e.target.parentElement.style.background = C.verdeBg
-          e.target.parentElement.setAttribute('data-fallback', catEmoji(p.category))
-        }} />
-        <div style={{ ...s.similarTipo, background: tipo.bg, color: tipo.color }}>{tipo.emoji}</div>
-        {distLabel && <div style={s.similarDist}><Icon.Pin size={9} color="#fff" />{distLabel}</div>}
+        {img && !imgError ? (
+          <img src={img} alt={p.title || ''} style={s.similarImg} onError={() => setImgError(true)} />
+        ) : (
+          <div style={s.similarFallback}>{catEmoji(p.category)}</div>
+        )}
+        <div style={{ ...s.similarPriceBadge, color: tipo.color }}>
+          {esRegalo(p.type) ? 'Gratis' : esTrueque(p.type) ? 'Trueque' : p.price ? plata(p.price) : 'Consultar'}
+        </div>
       </div>
       <div style={s.similarBody}>
         <div style={s.similarTitle}>{p.title || 'Sin título'}</div>
-        <div style={{ ...s.similarPrice, color: tipo.color }}>
-          {esRegalo(p.type) ? 'Gratis' : esTrueque(p.type) ? 'Trueque' : p.price ? plata(p.price) : 'Consultar'}
+        <div style={s.similarMeta}>
+          <span>{p.author?.full_name?.split(' ')[0] || 'Vecino'}</span>
+          {distLabel && <span><Icon.Pin size={8} color={C.textoTenue} /> {distLabel}</span>}
         </div>
       </div>
     </div>
@@ -959,7 +1025,7 @@ function SkeletonView() {
     <div style={s.wrap}>
       <style dangerouslySetInnerHTML={{ __html: INJECT_STYLE }} />
       <div style={s.scrollArea}>
-        <div className="pd-shimmer" style={{ width: '100%', aspectRatio: '1/1' }} />
+        <div className="pd-shimmer" style={{ width: '100%', aspectRatio: '4/3' }} />
         <div style={s.content}>
           <div className="pd-shimmer" style={{ height: 24, width: '70%', borderRadius: 8, marginBottom: 12 }} />
           <div className="pd-shimmer" style={{ height: 20, width: '40%', borderRadius: 8, marginBottom: 18 }} />
@@ -1059,7 +1125,7 @@ const s = {
   galleryWrap: {
     position: 'relative',
     width: '100%',
-    aspectRatio: '1/1',
+    aspectRatio: '4/3',
     backgroundColor: '#e8e8e8',
   },
   mainImg: { width: '100%', height: '100%', objectFit: 'cover', display: 'block', cursor: 'zoom-in' },
@@ -1077,15 +1143,15 @@ const s = {
   },
   dot: { height: 7, borderRadius: 4, cursor: 'pointer', transition: 'all 0.2s' },
   imgCounter: {
-    position: 'absolute', top: 70, right: 14,
+    position: 'absolute', top: 58, right: 12,
     backgroundColor: 'rgba(0,0,0,0.55)',
     color: '#fff', fontSize: 11, fontWeight: 600,
     padding: '4px 9px', borderRadius: 10,
     backdropFilter: 'blur(4px)',
   },
   floatBtn: {
-    position: 'absolute', top: 50,
-    width: 38, height: 38, borderRadius: '50%',
+    position: 'absolute', top: 16,
+    width: 36, height: 36, borderRadius: '50%',
     backgroundColor: 'rgba(255,255,255,0.95)',
     border: 'none', cursor: 'pointer',
     display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -1093,7 +1159,7 @@ const s = {
     backdropFilter: 'blur(4px)',
   },
   tipoBadge: {
-    position: 'absolute', top: 50, left: 60,
+    position: 'absolute', top: 18, left: 58,
     display: 'flex', alignItems: 'center', gap: 5,
     padding: '5px 10px',
     borderRadius: 20,
@@ -1103,20 +1169,20 @@ const s = {
   },
 
   // ── Contenido ──
-  content: { padding: '18px 16px 20px' },
+  content: { padding: '16px 16px 20px' },
 
   title: {
-    fontSize: 21,
+    fontSize: 20,
     fontWeight: 600,
     color: C.texto,
     margin: 0,
     lineHeight: 1.3,
     letterSpacing: '-0.2px',
-    marginBottom: 10,
+    marginBottom: 12,
   },
 
   priceRow: {
-    display: 'flex', alignItems: 'baseline', gap: 6, marginBottom: 14,
+    display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6,
   },
   price: { fontSize: 22, fontWeight: 600, color: C.verde, letterSpacing: '-0.3px' },
   currency: { fontSize: 12, fontWeight: 600, color: C.textoTenue },
@@ -1129,11 +1195,9 @@ const s = {
   // ── Stats ──
   statsRow: {
     display: 'flex', alignItems: 'center', gap: 12,
-    padding: '10px 14px',
-    backgroundColor: C.card,
-    borderRadius: 12,
-    marginBottom: 12,
-    border: `1px solid ${C.bordeSuave}`,
+    padding: '2px 0 9px',
+    backgroundColor: 'transparent',
+    marginBottom: 4,
   },
   statItem: { display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, color: C.textoSuave, fontWeight: 600 },
   statDivider: { width: 1, height: 14, backgroundColor: C.borde },
@@ -1186,15 +1250,15 @@ const s = {
   // ── Shield ──
   shieldCard: {
     display: 'flex', gap: 10,
-    padding: '12px 14px',
+    padding: '10px 12px',
     backgroundColor: C.verdeBg,
     borderRadius: 14,
-    marginBottom: 18,
+    marginBottom: 20,
     border: `1px solid ${C.verdeSuave}`,
   },
   shieldIconWrap: { paddingTop: 2 },
-  shieldTitle: { fontSize: 12.5, fontWeight: 600, color: C.verdeOsc, marginBottom: 3 },
-  shieldText: { fontSize: 11.5, color: '#047857', lineHeight: 1.5 },
+  shieldTitle: { fontSize: 12, fontWeight: 600, color: C.verdeOsc, marginBottom: 2 },
+  shieldText: { fontSize: 11, color: '#047857', lineHeight: 1.4 },
 
   // ── Secciones ──
   section: { marginBottom: 22 },
@@ -1213,6 +1277,15 @@ const s = {
     border: `1px solid ${C.bordeSuave}`,
   },
   description: { fontSize: 14, color: C.texto, lineHeight: 1.6, whiteSpace: 'pre-wrap' },
+
+  locationStrip: {
+    display: 'flex', alignItems: 'flex-start', gap: 9,
+    padding: '11px 12px', marginBottom: 12,
+    backgroundColor: C.card, borderRadius: 13,
+    border: `1px solid ${C.bordeSuave}`,
+  },
+  locationTitle: { fontSize: 12.5, fontWeight: 600, color: C.texto, marginBottom: 2 },
+  locationText: { fontSize: 11, color: C.textoTenue, lineHeight: 1.4 },
 
   // ── Mapa ──
   mapBox: {
@@ -1302,13 +1375,26 @@ const s = {
   // ── Similares ──
   similarScroll: { display: 'flex', gap: 10, overflowX: 'auto', paddingBottom: 4 },
   similarCard: {
-    flexShrink: 0, width: 130, cursor: 'pointer',
+    flexShrink: 0, width: 142, cursor: 'pointer',
   },
   similarImgBox: {
-    position: 'relative', width: '100%', aspectRatio: '1/1',
+    position: 'relative', width: '100%', aspectRatio: '4/3',
     borderRadius: 12, overflow: 'hidden', backgroundColor: C.bordeSuave,
   },
   similarImg: { width: '100%', height: '100%', objectFit: 'cover', display: 'block' },
+  similarFallback: {
+    width: '100%', height: '100%',
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    background: `linear-gradient(135deg, ${C.verdeBg}, ${C.verdeSuave})`,
+    fontSize: 34,
+  },
+  similarPriceBadge: {
+    position: 'absolute', left: 7, bottom: 7,
+    padding: '4px 7px', borderRadius: 7,
+    background: 'rgba(255,255,255,0.94)',
+    boxShadow: '0 2px 8px rgba(0,0,0,0.10)',
+    fontSize: 10.5, fontWeight: 700,
+  },
   similarTipo: {
     position: 'absolute', top: 6, left: 6,
     width: 22, height: 22, borderRadius: '50%',
@@ -1324,11 +1410,14 @@ const s = {
   },
   similarBody: { padding: '8px 4px 0' },
   similarTitle: {
-    fontSize: 12, fontWeight: 500, color: C.texto,
+    fontSize: 12, fontWeight: 600, color: C.texto,
     overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
     marginBottom: 3,
   },
-  similarPrice: { fontSize: 12.5, fontWeight: 600 },
+  similarMeta: {
+    marginTop: 5, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 5,
+    fontSize: 9.5, color: C.textoTenue,
+  },
   similarEmpty: { fontSize: 12.5, color: C.textoTenue, padding: '14px 0' },
 
   // ── Bottom bar ──
@@ -1358,6 +1447,60 @@ const s = {
     cursor: 'pointer',
     display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
     transition: 'background 0.15s',
+  },
+
+  // ── Administrar publicación propia ──
+  manageOverlay: {
+    position: 'absolute', inset: 0, zIndex: 900,
+    background: 'rgba(15,23,20,0.38)',
+    display: 'flex', alignItems: 'flex-end',
+  },
+  manageSheet: {
+    width: '100%', padding: '10px 16px 20px',
+    background: C.card, borderRadius: '22px 22px 0 0',
+    boxShadow: '0 -10px 30px rgba(0,0,0,0.14)',
+  },
+  manageHandle: {
+    width: 38, height: 4, borderRadius: 999,
+    background: C.borde, margin: '0 auto 14px',
+  },
+  manageTitle: {
+    fontSize: 17, fontWeight: 600, color: C.texto,
+    marginBottom: 12, textAlign: 'center',
+  },
+  managePrimary: {
+    width: '100%', padding: '12px 14px', marginBottom: 8,
+    borderRadius: 12, border: 'none', background: C.verde,
+    color: '#fff', fontSize: 14, fontWeight: 600,
+    cursor: 'pointer', fontFamily: T.font,
+  },
+  manageOption: {
+    width: '100%', padding: '11px 14px', marginBottom: 7,
+    borderRadius: 12, border: `1px solid ${C.borde}`,
+    background: C.fondo, color: C.texto,
+    fontSize: 13.5, fontWeight: 500, textAlign: 'left',
+    cursor: 'pointer', fontFamily: T.font,
+  },
+  managePreview: {
+    width: '100%', padding: '11px 14px', marginBottom: 7,
+    borderRadius: 12, border: `1px solid ${C.verde}`,
+    background: '#ecfdf3', color: C.verde,
+    fontSize: 13.5, fontWeight: 600, textAlign: 'left',
+    cursor: 'pointer', fontFamily: T.font,
+  },
+  manageShare: {
+    width: '100%', padding: '11px 14px', marginBottom: 7,
+    borderRadius: 12, border: `1px solid ${C.borde}`,
+    background: C.card, color: C.verde,
+    fontSize: 13.5, fontWeight: 600, textAlign: 'left',
+    cursor: 'pointer', fontFamily: T.font,
+  },
+  manageDanger: {
+    width: '100%', padding: '11px 14px',
+    borderRadius: 12, border: '1px solid #fecaca',
+    background: '#fff7f7', color: '#dc2626',
+    fontSize: 13.5, fontWeight: 600, textAlign: 'left',
+    cursor: 'pointer', fontFamily: T.font,
   },
 
   // ── Lightbox ──

@@ -4,10 +4,22 @@ import { supabase } from '../lib/supabase'
 // keyframes del spinner. Se inyectan una sola vez.
 const SPIN_STYLE = `
 @keyframes clSpin { to { transform: rotate(360deg); } }
+@keyframes chat-header-drift {
+  from { background-position: 0 0; }
+  to { background-position: 112px -68px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .chat-feed-header { animation: none !important; }
+}
 `
 
 // ===== ICONOS SVG =====
 const Icon = {
+  Back: ({ size = 20, color = '#166534' }) => (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="m15 18-6-6 6-6" />
+    </svg>
+  ),
   Search: ({ size = 18, color = '#888' }) => (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
@@ -79,8 +91,11 @@ function ChatList({ currentUser, onNavigate }) {
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
 
+  const myProfileId = currentUser?.profileId || currentUser?.id
+  const myIds = [...new Set([myProfileId, currentUser?.id].filter(Boolean))]
+
   useEffect(() => {
-    if (currentUser?.id) {
+    if (myProfileId) {
       loadConversations()
       
       // Suscripción realtime inteligente: en vez de recargar TODA la lista
@@ -92,13 +107,14 @@ function ChatList({ currentUser, onNavigate }) {
           { event: 'INSERT', schema: 'public', table: 'messages' }, 
           (payload) => {
             const msg = payload.new
-            const mine = msg.sender_id === currentUser.id
+            if (!myIds.includes(msg.sender_id) && !myIds.includes(msg.receiver_id)) return
+            const mine = myIds.includes(msg.sender_id)
             const otherUserId = mine ? msg.receiver_id : msg.sender_id
             const groupKey = `${otherUserId}_${msg.post_id || 'general'}`
             
             // Si yo soy el receptor y no estoy en esa conversación,
             // el mensaje no está leído → suma al badge.
-            const unreadInc = (!mine && msg.receiver_id === currentUser.id && !msg.read) ? 1 : 0
+            const unreadInc = (!mine && myIds.includes(msg.receiver_id) && !msg.read) ? 1 : 0
             
             setConversations(prev => {
               const idx = prev.findIndex(c => 
@@ -129,7 +145,8 @@ function ChatList({ currentUser, onNavigate }) {
             // (el receptor abrió el chat), actualizamos el badge.
             if (payload.new.read && !payload.old?.read) {
               const msg = payload.new
-              const otherUserId = msg.sender_id === currentUser.id ? msg.receiver_id : msg.sender_id
+              if (!myIds.includes(msg.sender_id) && !myIds.includes(msg.receiver_id)) return
+              const otherUserId = myIds.includes(msg.sender_id) ? msg.receiver_id : msg.sender_id
               const groupKey = `${otherUserId}_${msg.post_id || 'general'}`
               setConversations(prev => prev.map(c => {
                 if (`${c.otherUserId}_${c.postId || 'general'}` !== groupKey) return c
@@ -144,17 +161,15 @@ function ChatList({ currentUser, onNavigate }) {
         supabase.removeChannel(subscription)
       }
     }
-  }, [currentUser?.id])
+  }, [myProfileId])
 
   const loadConversations = async () => {
     try {
-      const myId = currentUser.id
-
       // 1. Obtener todos los mensajes donde soy emisor o receptor
       const { data: messages, error } = await supabase
         .from('messages')
         .select('*')
-        .or(`sender_id.eq.${myId},receiver_id.eq.${myId}`)
+        .or(myIds.flatMap(id => [`sender_id.eq.${id}`, `receiver_id.eq.${id}`]).join(','))
         .order('created_at', { ascending: false })
 
       if (error) throw error
@@ -169,7 +184,7 @@ function ChatList({ currentUser, onNavigate }) {
       const groups = {}
 
       for (const msg of messages) {
-        const otherUserId = msg.sender_id === myId ? msg.receiver_id : msg.sender_id
+        const otherUserId = myIds.includes(msg.sender_id) ? msg.receiver_id : msg.sender_id
         const groupKey = `${otherUserId}_${msg.post_id || 'general'}`
 
         if (!groups[groupKey]) {
@@ -182,7 +197,7 @@ function ChatList({ currentUser, onNavigate }) {
         }
 
         // Si yo soy el receptor y el mensaje está marcado como read = false, sumar al contador
-        if (msg.receiver_id === myId && msg.read === false) {
+        if (myIds.includes(msg.receiver_id) && msg.read === false) {
           groups[groupKey].unreadCount += 1
         }
       }
@@ -271,11 +286,13 @@ function ChatList({ currentUser, onNavigate }) {
       <style dangerouslySetInnerHTML={{ __html: SPIN_STYLE }} />
 
       {/* HEADER PRINCIPAL */}
-      <div style={s.header}>
-        <div style={s.titleRow}>
-          <span style={s.title}>Mensajes</span>
-          <span style={s.subTitle}>Vecinos de Barrio Italia</span>
-        </div>
+      <div className="chat-feed-header" style={s.header}>
+        <button type="button" style={s.headerBackBtn} onClick={() => onNavigate?.('back')} aria-label="Volver">
+          <Icon.Back size={22} />
+        </button>
+        <strong style={s.title}>
+          Chat de <span style={s.titleBrand}>el barrio</span>
+        </strong>
       </div>
 
       {/* BUSCADOR */}
@@ -403,7 +420,7 @@ const s = {
     width: '100%',
     height: '100%',
     backgroundColor: '#fff',
-    fontFamily: 'system-ui, -apple-system, sans-serif',
+    fontFamily: '"Plus Jakarta Sans", system-ui, -apple-system, sans-serif',
     display: 'flex',
     flexDirection: 'column',
     overflow: 'hidden'
@@ -416,26 +433,31 @@ const s = {
   },
 
   header: {
+    minHeight: 72,
     flexShrink: 0,
     backgroundColor: '#fff',
-    padding: '52px 18px 12px',
-    borderBottom: '1px solid #f3f4f6'
+    backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='72' height='64' viewBox='0 0 72 64'%3E%3Cg fill='none' stroke='%2316a34a' stroke-opacity='.22' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M58 39a7 7 0 0 1-7 7H29L15 57V17a7 7 0 0 1 7-7h29a7 7 0 0 1 7 7v22Z'/%3E%3Cpath d='M27 24h20M27 33h13'/%3E%3C/g%3E%3C/svg%3E")`,
+    backgroundSize: '72px 64px',
+    backgroundPosition: 'calc(50% - 86px) center',
+    backgroundRepeat: 'no-repeat',
+    padding: 'calc(env(safe-area-inset-top, 0px) + 22px) 58px 16px',
+    borderBottom: '2px solid #16a34a',
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    position: 'relative', boxSizing: 'border-box',
   },
-  titleRow: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: 3
+  headerBackBtn: {
+    position: 'absolute', left: 16, bottom: 10,
+    width: 38, height: 38, padding: 0, borderRadius: '50%',
+    border: '1px solid #dfe7e1', background: 'rgba(255,255,255,0.88)',
+    display: 'grid', placeItems: 'center', cursor: 'pointer',
   },
   title: {
-    fontSize: 22,
-    fontWeight: 800,
-    color: '#111'
+    minWidth: 0, textAlign: 'center', fontSize: 16, lineHeight: 1.2,
+    color: '#26302b', fontWeight: 600, whiteSpace: 'nowrap',
+    overflow: 'hidden', textOverflow: 'ellipsis', padding: '5px 10px',
+    background: 'transparent', border: 'none', boxShadow: 'none',
   },
-  subTitle: {
-    fontSize: 12,
-    color: '#888',
-    fontWeight: 500
-  },
+  titleBrand: { color: '#16a34a', fontWeight: 700 },
 
   searchBoxRow: {
     padding: '12px 18px',

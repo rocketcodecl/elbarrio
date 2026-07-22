@@ -75,7 +75,7 @@ const CREAR = [
   { id: 'general', ...TIPOS.general },
 ]
 
-function TabBar({ activeTab, onChangeTab, onCrear, noLeidos = 0 }) {
+function TabBar({ activeTab, onChangeTab, onCrear, noLeidos = 0, showCreateButton = true }) {
   const [abierto, setAbierto] = useState(false)
 
   const elegir = (id) => {
@@ -86,7 +86,7 @@ function TabBar({ activeTab, onChangeTab, onCrear, noLeidos = 0 }) {
   return (
     <>
       {/* ═══ MENÚ DEL "+" ═══ */}
-      {abierto && (
+      {showCreateButton && abierto && (
         <div style={s.overlay} onClick={() => setAbierto(false)}>
           <div style={s.menu} onClick={(e) => e.stopPropagation()}>
             {CREAR.map((c) => (
@@ -100,17 +100,19 @@ function TabBar({ activeTab, onChangeTab, onCrear, noLeidos = 0 }) {
       )}
 
       {/* ═══ BOTÓN "+" (squircle, no círculo) ═══ */}
-      <button
-        style={{
-          ...s.fab,
-          transform: abierto ? 'rotate(45deg)' : 'rotate(0deg)',
-          background: abierto ? C.texto : C.verde,
-        }}
-        onClick={() => setAbierto(!abierto)}
-        aria-label="Crear"
-      >
-        +
-      </button>
+      {showCreateButton && (
+        <button
+          style={{
+            ...s.fab,
+            transform: abierto ? 'rotate(45deg)' : 'rotate(0deg)',
+            background: abierto ? C.texto : C.verde,
+          }}
+          onClick={() => setAbierto(!abierto)}
+          aria-label="Crear"
+        >
+          +
+        </button>
+      )}
 
       {/* ═══ BARRA ═══ */}
       <div style={s.barra}>

@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import { createPortal } from 'react-dom'
 import { supabase } from '../lib/supabase'
 import {
   C, T, COMERCIOS, COMERCIOS_CATS, iniciales, distancia,
@@ -142,11 +143,10 @@ const Ico = {
       <path d="m15 18-6-6 6-6" />
     </svg>
   ),
-  search: ({ size = 16, color = C.textoTenue }) => (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
-      stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <circle cx="11" cy="11" r="8" />
-      <path d="m21 21-4.3-4.3" />
+  search: ({ size = 18, color = C.textoSuave }) => (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="11" cy="11" r="7" />
+      <path d="m20 20-4-4" />
     </svg>
   ),
   pin: ({ size = 11, color = C.verde }) => (
@@ -279,6 +279,28 @@ const Ico = {
       <path d="m9 14 3 3 3-3" />
     </svg>
   ),
+  share: ({ size = 18, color = C.texto }) => (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/>
+      <path d="m8.6 10.5 6.8-4M8.6 13.5l6.8 4"/>
+    </svg>
+  ),
+  heart: ({ size = 18, color = C.texto, filled = false }) => (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill={filled ? color : 'none'} stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78L12 21.23l7.78-7.78a5.5 5.5 0 0 0 0-7.78Z" />
+    </svg>
+  ),
+  message: ({ size = 18, color = C.verde }) => (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2Z" />
+    </svg>
+  ),
+  copy: ({ size = 18, color = C.verde }) => (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="9" y="9" width="13" height="13" rx="2" />
+      <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+    </svg>
+  ),
 }
 
 /* ── Normaliza teléfono ── */
@@ -330,59 +352,30 @@ function CardGrande({ c, userCoords, onAbrir }) {
 
   return (
     <div style={s.cardGrande} onClick={() => onAbrir(c)}>
-      {/* Tira dorada superior — identidad premium inmediata */}
-      <div style={s.premiumStrip} />
-
-      {/* Cover más alto + ribbon + gradiente + logo superpuesto */}
       <div style={s.coverBox}>
         {c.cover_url
           ? <img src={c.cover_url} alt="" style={s.coverImg} />
           : <div style={{ ...s.coverEmpty, background: catInfo.bg }}>
               <span style={{ fontSize: 44 }}>{catInfo.emoji}</span>
             </div>}
-        {/* Gradiente inferior más fuerte → anclaje visual + legibilidad logo */}
-        <div style={s.coverGradient} />
-        {/* Ribbon destacado (gradiente dorado, más grande) */}
         <div style={s.ribbonDestacado}>
-          <Ico.star size={10} color="#fff" /> <span>Destacado</span>
-        </div>
-        {/* Distancia flotante (top-right) → info rápida sin ocupar body */}
-        {dist && (
-          <div style={s.coverDistBadge}>
-            <Ico.pin size={9} color="#fff" /> a {dist}
-          </div>
-        )}
-        {/* LOGO superpuesto bottom-right → marca visible en el feed */}
-        <div style={s.coverLogoBadge}>
-          {c.logo_url
-            ? <img src={c.logo_url} alt="" style={s.coverLogoBadgeImg} />
-            : <div style={s.coverLogoBadgeFallback}>{iniciales(c.name)}</div>}
+          <span>Destacado</span>
         </div>
       </div>
 
       <div style={s.cardGrandeBody}>
-        <div style={s.nombreGrande}>{c.name}</div>
-
-        <div style={s.horarioRowFeed}>
-          <HorarioBloque horario={horario} />
+        <div style={s.featuredIdentity}>
+          <div style={{ ...s.featuredCategoryIcon, background: catInfo.bg }}>
+            {c.logo_url
+              ? <img src={c.logo_url} alt="" style={s.featuredCategoryImg} />
+              : <span>{catInfo.emoji}</span>}
+          </div>
+          <div style={s.nombreGrande}>{c.name}</div>
         </div>
-
-        {c.description && <div style={s.descGrande}>{c.description}</div>}
-
-        {c.discount_text && (
-          <div style={s.beneficioPill}>
-            <Ico.gift size={13} color={C.verde} />
-            <span>{c.discount_text}</span>
-          </div>
-        )}
-
-        {c.address && (
-          <div style={s.ubicacionRow}>
-            <span style={s.ubicacionTxt}>
-              <Ico.pin size={11} color={C.verde} /> {c.address}
-            </span>
-          </div>
-        )}
+        <div style={s.featuredMeta}>
+          <span><Ico.star size={10} color="#687069" /> {Number(c.rating) > 0 ? Number(c.rating).toFixed(1) : 'Nuevo'}{dist ? ` · ${dist}` : ''}</span>
+          <span style={{ color: horario?.abierto ? C.verdeOsc : C.textoTenue }}>{horario?.abierto ? 'Abierto' : 'Cerrado'}</span>
+        </div>
       </div>
     </div>
   )
@@ -391,96 +384,44 @@ function CardGrande({ c, userCoords, onAbrir }) {
 /* ════════════════════════════════════════════════════════════
    CARD COMPACTA (no premium) — feed
    ════════════════════════════════════════════════════════════ */
-function CardCompacta({ c, userCoords, expanded, onToggle }) {
+function CardCompacta({ c, userCoords, onToggle }) {
   const cats = c.categories?.length ? c.categories : (c.category ? [c.category] : [])
   const horario = horarioFeed(c.opening_hours)
   const metros = haversine(userCoords?.lat, userCoords?.lng, c.lat, c.lng)
   const dist = distancia(metros)
   const catInfo = COMERCIOS[cats[0]] || COMERCIOS['Otro']
-  const wa = waLink(c.phone)
-  const telLink = c.phone ? `tel:${c.phone.replace(/[^\d+]/g, '')}` : null
+  const resumen = c.description || cats[0] || 'Comercio del barrio'
 
   return (
-    <div
-      style={{ ...s.cardCompacta, ...(expanded ? s.cardCompactaExpanded : null) }}
-      onClick={() => onToggle(c.id)}
-    >
-      <div style={s.cardCompactaTopRow}>
-        <div style={s.logoCuadrado}>
-          {c.logo_url || c.cover_url
-            ? <img src={c.logo_url || c.cover_url} alt="" style={s.logoCuadradoImg} />
-            : <div style={{ ...s.logoCuadradoFallback, background: catInfo.bg }}>
-                <span style={{ fontSize: 22 }}>{catInfo.emoji}</span>
-              </div>}
-        </div>
+    <div style={s.cardCompacta} onClick={() => onToggle(c.id)}>
+      <div style={s.logoCuadrado}>
+        {c.cover_url || c.logo_url
+          ? <img src={c.cover_url || c.logo_url} alt="" style={s.logoCuadradoImg} />
+          : <div style={{ ...s.logoCuadradoFallback, background: catInfo.bg }}>
+              <span style={{ fontSize: 22 }}>{catInfo.emoji}</span>
+            </div>}
+      </div>
 
-        <div style={s.cardCompactaBody}>
+      <div style={s.cardCompactaBody}>
+        <div style={s.compactTitleRow}>
           <div style={s.nombreCompacto}>{c.name}</div>
-
-          <div style={s.horarioRowFeedSm}>
-            <HorarioBloque horario={horario} size="sm" />
-          </div>
-
-          {c.discount_text && (
-            <div style={s.beneficioSm}>
-              <Ico.gift size={10} color={C.verde} /> {c.discount_text}
-            </div>
-          )}
-
-          <div style={s.ubicacionRowSm}>
-            {c.address && (
-              <span style={s.ubicacionTxtSm}>
-                <Ico.pin size={10} color={C.verde} /> {c.address}
-                {dist && <span style={s.distTxtSm}> · a {dist}</span>}
-              </span>
-            )}
-          </div>
-        </div>
-
-        <div style={s.cardCompactaRight}>
           <span style={{
-            ...s.cardCompactaChev,
-            transform: expanded ? 'rotate(90deg)' : 'none',
-          }}>
-            <Ico.chevron size={16} color={expanded ? C.verde : C.textoTenue} />
-          </span>
+            ...s.estadoBadge,
+            background: horario?.abierto ? '#86efac' : '#dbe3ef',
+            color: horario?.abierto ? '#075b2c' : '#46515e',
+          }}>{horario?.abierto ? 'ABIERTO' : 'CERRADO'}</span>
+        </div>
+        <div style={s.compactDescription}>{resumen}</div>
+        <div style={s.compactMeta}>
+          <Ico.star size={10} color={C.verdeOsc} />
+          <strong>{Number(c.rating) > 0 ? Number(c.rating).toFixed(1) : 'Nuevo'}</strong>
+          {dist && <><span>·</span><span>{dist}</span></>}
         </div>
       </div>
 
-      {/* ── Sección expandible inline (sin modal) ── */}
-      {expanded && (
-        <div style={s.cardCompactaExpand}>
-          {/* Teléfono */}
-          {c.phone && (
-            <div style={s.expandInfoRow}>
-              <span style={s.expandInfoIcon}><Ico.phone size={13} color={C.verde} /></span>
-              <a href={telLink} style={s.expandInfoLink} onClick={(e) => e.stopPropagation()}>
-                {c.phone}
-              </a>
-            </div>
-          )}
-          {/* Dirección completa (puede cortarse en el resumen) */}
-          {c.address && (
-            <div style={s.expandInfoRow}>
-              <span style={s.expandInfoIcon}><Ico.pin size={13} color={C.verde} /></span>
-              <span style={s.expandInfoText}>{c.address}</span>
-            </div>
-          )}
-          {/* Botón WhatsApp full-width */}
-          {wa && (
-            <a
-              href={wa}
-              target="_blank"
-              rel="noreferrer"
-              style={s.expandWaBtn}
-              onClick={(e) => e.stopPropagation()}
-            >
-              <Ico.whatsapp size={16} color="#fff" />
-              <span>Contactar por WhatsApp</span>
-            </a>
-          )}
-        </div>
-      )}
+      <span style={s.cardCompactaChev}>
+        <Ico.chevron size={22} color={C.verdeOsc} />
+      </span>
     </div>
   )
 }
@@ -496,9 +437,27 @@ function ComercioDetalle({ c, userCoords, onClose, onEditar, esAdmin }) {
   const [mapaOpen, setMapaOpen] = useState(false)
   const [fotoIdx, setFotoIdx] = useState(0)
   const [lightbox, setLightbox] = useState(null)
+  const [favorito, setFavorito] = useState(false)
+  const [shareOpen, setShareOpen] = useState(false)
+  const [copiado, setCopiado] = useState(false)
+  const [promos, setPromos] = useState([])
+  const [reviews, setReviews] = useState([])
   const mapaRef = useRef(null)
   const galeriaRef = useRef(null)
   const galeriaPausaRef = useRef(false)
+
+  useEffect(() => {
+    let active = true
+    Promise.all([
+      supabase.from('commerce_promos').select('*').eq('commerce_id', c.id).eq('is_active', true).order('created_at', { ascending: false }).limit(8),
+      supabase.from('commerce_reviews').select('*').eq('commerce_id', c.id).order('created_at', { ascending: false }).limit(6),
+    ]).then(([promoResult, reviewResult]) => {
+      if (!active) return
+      setPromos(promoResult.data || [])
+      setReviews(reviewResult.data || [])
+    })
+    return () => { active = false }
+  }, [c.id])
 
   // Scroll automático al mapa cuando se abre el dropdown
   useEffect(() => {
@@ -542,24 +501,33 @@ function ComercioDetalle({ c, userCoords, onClose, onEditar, esAdmin }) {
   const catInfo = COMERCIOS[cats[0]] || COMERCIOS['Otro']
   const isPremium = !!c.is_premium
 
-  /* Galería de fotos (premium): array puro de gallery (sin cover).
-     El cover_url va aparte como foto principal del hero.
-     DEMO: si el comercio es premium y tiene al menos 1 foto propia, se le
-     agregan 3 imágenes demo (de Unsplash) para que el carrusel se vea más
-     lleno durante las pruebas. En producción esto se reemplaza por fotos
-     reales subidas por el comercio. */
-  const galleryRaw = isPremium ? (Array.isArray(c.gallery) ? c.gallery.filter(Boolean) : []) : []
-  const DEMO_GALLERY = [
-    'https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=600&h=600&fit=crop&q=80',
-    'https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?w=600&h=600&fit=crop&q=80',
-    'https://images.unsplash.com/photo-1567521464027-f127ff144326?w=600&h=600&fit=crop&q=80',
+  const shareText = [
+    `${c.name} en El Barrio`,
+    c.description,
+    c.address ? `📍 ${c.address}` : null,
+    c.phone ? `📞 ${c.phone}` : null,
+  ].filter(Boolean).join('\n')
+  const compartir = () => setShareOpen(true)
+  const copiarInformacion = async () => {
+    await navigator.clipboard.writeText(shareText)
+    setCopiado(true)
+    setTimeout(() => setCopiado(false), 1800)
+  }
+
+  /* Galería real del comercio. El cover_url se usa aparte como hero. */
+  const galleryRaw = Array.isArray(c.gallery) ? c.gallery.filter(Boolean) : []
+  const gallery = [
+    c.cover_url ? { url: c.cover_url, label: null } : null,
+    ...galleryRaw.map((item) => typeof item === 'string'
+      ? { url: item, label: null }
+      : { url: item?.url || item?.image_url, label: item?.label || item?.title || null }),
   ]
-  const gallery = galleryRaw.length > 0 ? [...galleryRaw, ...DEMO_GALLERY] : []
+    .filter(item => item?.url)
+    .filter((item, index, all) => all.findIndex(candidate => candidate.url === item.url) === index)
   /* Foto principal del hero: cover_url, o primera de gallery si no hay cover. */
-  const fotoPrincipal = c.cover_url || gallery[0] || null
+  const fotoPrincipal = c.cover_url || gallery[0]?.url || null
 
   /* CTAs premium: WhatsApp, Llamar, Instagram */
-  const telLink = c.phone ? `tel:${c.phone.replace(/[^\d+]/g, '')}` : null
   const igUrl = c.instagram
     ? (c.instagram.startsWith('http') ? c.instagram : `https://instagram.com/${c.instagram.replace(/^@/, '')}`)
     : null
@@ -567,6 +535,7 @@ function ComercioDetalle({ c, userCoords, onClose, onEditar, esAdmin }) {
   return (
     <div style={s.detalleBackdrop} onClick={onClose}>
       <div style={s.detalleSheet} onClick={(e) => e.stopPropagation()}>
+        <div style={s.detalleScroll}>
 
         {/* ── Keyframes globales del modal (shimmer del banner de descuento) ── */}
         <style>{`
@@ -578,34 +547,21 @@ function ComercioDetalle({ c, userCoords, onClose, onEditar, esAdmin }) {
             100% { transform: translateX(130%) skewX(-18deg); opacity: 0; }
           }
           @keyframes benShineText {
-            0%, 100% { text-shadow: 0 0 0 rgba(255,255,255,0); }
-            50%      { text-shadow: 0 0 14px rgba(255,255,255,0.45); }
+            0%, 100% { text-shadow: 0 1px 3px rgba(0,0,0,0.38), 0 0 0 rgba(255,255,255,0); }
+            50%      { text-shadow: 0 1px 3px rgba(0,0,0,0.38), 0 0 14px rgba(255,255,255,0.45); }
           }
         `}</style>
 
         {/* ── COVER / HEADER ── */}
         <div style={s.detalleCoverWrap}>
-          {isPremium ? (
-            /* PREMIUM: hero con foto principal fija (sin carrusel aquí — la galería va abajo) */
+          {fotoPrincipal ? (
             <div style={s.detalleCoverBox}>
-              {fotoPrincipal ? (
-                <>
-                  <img src={fotoPrincipal} alt="" style={s.detalleCoverImg} />
-                  <div style={s.detalleCoverGradient} />
-                </>
-              ) : (
-                <div style={{ ...s.detalleCoverEmpty, background: catInfo.bg }}>
-                  <span style={{ fontSize: 64 }}>{catInfo.emoji}</span>
-                </div>
-              )}
-              {/* Ribbon destacado — bottom-left (NO choca con el botón cerrar top-left) */}
-              <div style={s.ribbonDestacadoModal}>
-                <Ico.star size={10} color="#fff" /> <span>Destacado</span>
-              </div>
+              <img src={fotoPrincipal} alt="" style={s.detalleCoverImg} />
+              <div style={s.detalleCoverGradient} />
             </div>
           ) : (
-            /* NORMAL: cabecera sólida minimal (sin emoji gigante — solo color de categoría) */
             <div style={{ ...s.detalleCoverBox, ...s.detalleCoverSolid, background: catInfo.bg }}>
+              <span style={{ fontSize: 54 }}>{catInfo.emoji}</span>
               <div style={s.detalleCoverSolidGrad} />
             </div>
           )}
@@ -613,9 +569,10 @@ function ComercioDetalle({ c, userCoords, onClose, onEditar, esAdmin }) {
           {/* HEADER flotante (botones) encima del cover */}
           <div style={s.detalleHeaderFloat}>
             <button style={s.detalleClose} onClick={onClose} aria-label="Cerrar">
-              <Ico.close size={18} color="#fff" />
+              <Ico.back size={19} color="#26312c" />
             </button>
-            {esAdmin && (
+            <div style={s.detalleHeaderActions}>
+              {esAdmin && (
               <button
                 style={s.detalleEditFloat}
                 onClick={() => onEditar(c)}
@@ -623,72 +580,51 @@ function ComercioDetalle({ c, userCoords, onClose, onEditar, esAdmin }) {
               >
                 <Ico.edit size={13} color="#fff" /> Editar
               </button>
-            )}
-          </div>
-        </div>
-
-        {/* ── LOGO grande + sello verificado (premium) ── */}
-        <div style={{ ...s.detalleLogoWrap, marginTop: isPremium ? -42 : -38 }}>
-          <div style={s.detalleLogoBox}>
-            {c.logo_url
-              ? <img src={c.logo_url} alt="" style={s.detalleLogoImg} />
-              : <div style={s.detalleLogoFallback}>{iniciales(c.name)}</div>}
-          </div>
-          {isPremium && (
-            <div style={s.logoVerifiedBadge}>
-              <Ico.verified size={24} />
+              )}
             </div>
-          )}
+          </div>
+
+          <div style={s.detalleHeroIdentity}>
+            <div style={s.detalleHeroLogo}>
+              {c.logo_url
+                ? <img src={c.logo_url} alt="" style={s.detalleHeroLogoImg} />
+                : <span>{iniciales(c.name)}</span>}
+            </div>
+            {isPremium && <span style={s.detalleHeroFeatured}>Destacado</span>}
+          </div>
+
+          <div style={s.detalleHeroActions}>
+            <button style={s.detalleShareFloat} onClick={compartir} aria-label="Compartir comercio">
+              <Ico.share size={17} color="#fff" />
+            </button>
+            <button
+              style={{ ...s.detalleShareFloat, ...(favorito ? s.detalleFavoriteActive : {}) }}
+              onClick={() => setFavorito(v => !v)}
+              aria-label={favorito ? 'Quitar de favoritos' : 'Guardar como favorito'}
+            >
+              <Ico.heart size={18} color={favorito ? '#fff' : '#fff'} filled={favorito} />
+            </button>
+          </div>
         </div>
 
-        {/* ── SCROLL CONTENT ── */}
-        <div style={s.detalleScroll}>
+        {/* ── CONTENIDO ── */}
           <div style={s.detalleBody}>
-            {/* Nombre centrado (sin status pill — el horario abajo ya indica el estado) */}
-            <h2 style={s.detalleNombre}>{c.name}</h2>
-
-            {/* Horario feed (fuente única de verdad del estado) */}
-            <div style={s.detalleHorarioRow}>
-              <HorarioBloque horario={horario} />
-            </div>
-
-            {/* ── GALERÍA de cuadrados con scroll horizontal (premium, si hay fotos) ── */}
-            {gallery.length > 0 && (
-              <div style={s.galeriaWrap}>
-                <div
-                  ref={galeriaRef}
-                  style={s.galeriaScroll}
-                  onMouseEnter={() => { galeriaPausaRef.current = true }}
-                  onMouseLeave={() => { galeriaPausaRef.current = false }}
-                >
-                  {/* Primero el cover como thumbnail si existe y no está repetido en gallery */}
-                  {c.cover_url && !gallery.includes(c.cover_url) && (
-                    <button
-                      style={s.galeriaItem}
-                      onClick={() => setLightbox(c.cover_url)}
-                      aria-label="Ver foto"
-                    >
-                      <img src={c.cover_url} alt="" style={s.galeriaImg} />
-                    </button>
-                  )}
-                  {gallery.map((url, i) => (
-                    <button
-                      key={i}
-                      style={s.galeriaItem}
-                      onClick={() => setLightbox(url)}
-                      aria-label={`Ver foto ${i + 1}`}
-                    >
-                      <img src={url} alt="" style={s.galeriaImg} />
-                    </button>
-                  ))}
-                </div>
+            <section style={s.commerceInfoCard}>
+              <div style={s.commerceTitleRow}>
+                <h2 style={s.commerceTitle}>{c.name}</h2>
+                {Number(c.rating) > 0 && <span style={s.commerceRating}>★ {Number(c.rating).toFixed(1)}</span>}
               </div>
-            )}
-
-            {/* Descripción */}
-            {c.description && (
-              <p style={s.detalleDesc}>{c.description}</p>
-            )}
+              <div style={s.commerceStatus}><HorarioBloque horario={horario} /></div>
+              {c.address && (
+                <div style={s.commerceAddressRow}>
+                  <Ico.pin size={17} color={C.textoSuave} />
+                  <span>{c.address}{dist ? ` · ${dist}` : ''}</span>
+                  {c.lat != null && c.lng != null && (
+                  <a href={`https://www.google.com/maps/search/?api=1&query=${c.lat},${c.lng}`} target="_blank" rel="noreferrer" style={s.commerceMapLink}>Ver en mapa</a>
+                  )}
+                </div>
+              )}
+            </section>
 
             {/* ── BANNER BENEFICIO RE-DISEÑADO (premium quality) ── */}
             {c.discount_text && (
@@ -712,24 +648,67 @@ function ComercioDetalle({ c, userCoords, onClose, onEditar, esAdmin }) {
               </div>
             )}
 
-            {/* Info rápida: dirección + teléfono (chips verticales) */}
-            <div style={s.detalleQuickInfo}>
-              {c.address && (
-                <div style={s.quickInfoChip}>
-                  <Ico.pin size={13} color={C.verde} />
-                  <div style={s.quickInfoAddrCol}>
-                    <span style={s.quickInfoAddr}>{c.address}</span>
-                    {dist && <span style={s.quickInfoDist}>a {dist}</span>}
-                  </div>
+            {c.description && (
+              <section style={s.commerceAbout}>
+                <h3 style={s.commerceAboutTitle}>Acerca del comercio</h3>
+                <p style={s.commerceAboutText}>{c.description}</p>
+              </section>
+            )}
+
+            {promos.length > 0 && (
+              <section style={s.promosSection}>
+                <div style={s.commerceSectionHeader}>
+                  <div style={s.commerceSectionTitles}><strong>Promociones destacadas</strong><small>Beneficios del comercio</small></div>
                 </div>
-              )}
-              {c.phone && (
-                <div style={s.quickInfoChip}>
-                  <Ico.phone size={13} color={C.textoTenue} />
-                  <span>{c.phone}</span>
+                <div style={s.promosScroll}>
+                  {promos.map(promo => (
+                    <article key={promo.id} style={s.promoCard}>
+                      {promo.image_url ? <img src={promo.image_url} alt="" style={s.promoImage} /> : <div style={s.promoFallback}><Ico.gift size={24} color={C.verde} /></div>}
+                      <div style={s.promoBody}>
+                        <strong>{promo.title || 'Promoción del comercio'}</strong>
+                        {promo.description && <span>{promo.description}</span>}
+                      </div>
+                    </article>
+                  ))}
                 </div>
+              </section>
+            )}
+
+            {gallery.length > 0 && (
+              <section style={s.commerceGallerySection}>
+                <div style={s.commerceSectionHeader}>
+                  <div style={s.commerceSectionTitles}><strong>Imágenes del comercio</strong><small>Conoce el lugar</small></div>
+                </div>
+                <div ref={galeriaRef} style={s.commerceGalleryScroll}>
+                  {gallery.map((item, index) => (
+                    <button key={item.url} type="button" style={s.commerceGalleryCard} onClick={() => setLightbox(item.url)} aria-label={`Ver imagen ${index + 1}`}>
+                      <img src={item.url} alt="" style={s.commerceGalleryImage} />
+                      {item.label && <span style={s.commerceGalleryCaption}>{item.label}</span>}
+                    </button>
+                  ))}
+                </div>
+              </section>
+            )}
+
+            <section style={s.commerceReviewsSection}>
+              <div style={s.commerceSectionHeader}>
+                <div style={s.commerceSectionTitles}><strong>Opiniones de vecinos</strong><small>{reviews.length ? `${reviews.length} opiniones` : 'La confianza se construye entre vecinos'}</small></div>
+              </div>
+              {reviews.length > 0 ? reviews.map((review) => {
+                const score = Math.max(0, Math.min(5, Number(review.rating) || 0))
+                return (
+                  <article key={review.id} style={s.commerceReviewCard}>
+                    <div style={s.commerceReviewTop}>
+                      <strong>{review.reviewer_name || review.author_name || 'Vecino del barrio'}</strong>
+                      <span style={s.commerceReviewStars}>{'★'.repeat(score)}{'☆'.repeat(5 - score)}</span>
+                    </div>
+                    {(review.comment || review.content || review.review) && <p style={s.commerceReviewText}>{review.comment || review.content || review.review}</p>}
+                  </article>
+                )
+              }) : (
+                <div style={s.commerceReviewsEmpty}>Este comercio aún no tiene opiniones.</div>
               )}
-            </div>
+            </section>
 
             {/* DROPDOWN: VER UBICACIÓN */}
             <button
@@ -740,7 +719,7 @@ function ComercioDetalle({ c, userCoords, onClose, onEditar, esAdmin }) {
                 <span style={s.dropdownIconBox}>
                   <Ico.pin size={14} color={C.verde} />
                 </span>
-                Ver ubicación
+                Ubicación
               </span>
               <span style={{
                 ...s.dropdownChev,
@@ -792,26 +771,29 @@ function ComercioDetalle({ c, userCoords, onClose, onEditar, esAdmin }) {
             )}
 
             <div style={{ height: 8 }} />
-          </div>
+        </div>
         </div>
 
         {/* ── FOOTER: CTAs ── */}
         {isPremium ? (
-          /* PREMIUM: fila de CTAs (WhatsApp + Llamar + Instagram) */
+          /* PREMIUM: fila de CTAs (WhatsApp + Ir + Instagram) */
           <div style={s.ctaRow}>
             {wa && (
               <a href={wa} target="_blank" rel="noreferrer" style={{ ...s.ctaBtn, ...s.ctaWhatsapp }} aria-label="WhatsApp">
-                <Ico.whatsapp size={22} color="#fff" />
+                <Ico.whatsapp size={20} color="#fff" />
+                <span>WhatsApp</span>
               </a>
             )}
-            {telLink && (
-              <a href={telLink} style={{ ...s.ctaBtn, ...s.ctaCall }} aria-label="Llamar">
-                <Ico.phoneFill size={20} color="#fff" />
+            {c.lat != null && c.lng != null && (
+              <a href={`https://www.google.com/maps/dir/?api=1&destination=${c.lat},${c.lng}`} target="_blank" rel="noreferrer" style={{ ...s.ctaBtn, ...s.ctaMaps }} aria-label="Cómo llegar">
+                <Ico.pin size={19} color="#fff" />
+                <span>Ir</span>
               </a>
             )}
             {igUrl && (
               <a href={igUrl} target="_blank" rel="noreferrer" style={{ ...s.ctaBtn, ...s.ctaInstagram }} aria-label="Instagram">
-                <Ico.instagram size={20} color="#fff" />
+                <Ico.instagram size={19} color="#fff" />
+                <span>Instagram</span>
               </a>
             )}
           </div>
@@ -854,6 +836,31 @@ function ComercioDetalle({ c, userCoords, onClose, onEditar, esAdmin }) {
           />
         </div>
       )}
+
+      {shareOpen && (
+        <div style={s.shareSheetBackdrop} onClick={() => setShareOpen(false)}>
+          <div style={s.shareSheet} onClick={(e) => e.stopPropagation()}>
+            <div style={s.shareSheetHandle} />
+            <strong style={s.shareSheetTitle}>Compartir comercio</strong>
+            <span style={s.shareSheetSubtitle}>Envía la información por tu canal preferido</span>
+            <div style={s.shareOptions}>
+              <a href={`https://wa.me/?text=${encodeURIComponent(shareText)}`} target="_blank" rel="noreferrer" style={s.shareOption}>
+                <span style={s.shareOptionIcon}><Ico.whatsapp size={20} color={C.verde} /></span>
+                WhatsApp
+              </a>
+              <a href={`sms:?body=${encodeURIComponent(shareText)}`} style={s.shareOption}>
+                <span style={s.shareOptionIcon}><Ico.message size={20} /></span>
+                Mensaje
+              </a>
+              <button type="button" style={s.shareOption} onClick={copiarInformacion}>
+                <span style={s.shareOptionIcon}><Ico.copy size={20} /></span>
+                {copiado ? 'Copiado' : 'Copiar info'}
+              </button>
+            </div>
+            <button type="button" style={s.shareCancel} onClick={() => setShareOpen(false)}>Cancelar</button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -865,14 +872,11 @@ function Comercios({ currentUser, onNavigate, onCrear, onEditar }) {
   const [profile, setProfile] = useState(null)
   const [comercios, setComercios] = useState([])
   const [cargando, setCargando] = useState(true)
-  const [busqueda, setBusqueda] = useState('')
   const [cat, setCat] = useState('Todas')
   const [userCoords, setUserCoords] = useState(null)
   const [seleccionado, setSeleccionado] = useState(null)
-  const [expandedId, setExpandedId] = useState(null)
-
-  // Toggle acordeón: si se clickea la misma card, se colapsa; si es otra, se expande.
-  const onToggleCompacta = (id) => setExpandedId((prev) => (prev === id ? null : id))
+  const [searchOpen, setSearchOpen] = useState(false)
+  const [busqueda, setBusqueda] = useState('')
 
   useEffect(() => { cargar() }, [currentUser?.id])
 
@@ -919,21 +923,20 @@ function Comercios({ currentUser, onNavigate, onCrear, onEditar }) {
     }
   }
 
-  const nav = onNavigate || (() => {})
-
   const filtrados = comercios.filter((c) => {
     const cats = c.categories?.length ? c.categories : (c.category ? [c.category] : [])
     if (cat !== 'Todas' && !cats.includes(cat)) return false
-    if (busqueda.trim()) {
-      const q = busqueda.toLowerCase()
-      const buscarEn = `${c.name || ''} ${c.description || ''} ${c.address || ''} ${cats.join(' ')}`.toLowerCase()
-      if (!buscarEn.includes(q)) return false
+    const termino = busqueda.trim().toLowerCase()
+    if (termino) {
+      const texto = [c.name, c.description, c.address, ...cats].filter(Boolean).join(' ').toLowerCase()
+      if (!texto.includes(termino)) return false
     }
     return true
   })
 
   const esAdmin = profile?.is_admin || profile?.role === 'admin' || profile?.is_operator
-
+  const destacados = filtrados.filter(c => c.is_premium)
+  const cercanos = filtrados.filter(c => !c.is_premium)
   const onAbrirComercio = (c) => setSeleccionado(c)
 
   const onEditarComercio = (c) => {
@@ -946,39 +949,58 @@ function Comercios({ currentUser, onNavigate, onCrear, onEditar }) {
     if (onCrear) onCrear('commerce')
     else if (onEditar) onEditar(null)
   }
+  const phonePortal = typeof document !== 'undefined'
+    ? document.querySelector('.phone-content')
+    : null
 
   return (
     <div style={s.wrap}>
-      {/* HEADER */}
-      <div style={s.header}>
-        <button style={s.backBtn} onClick={() => nav('inicio')} aria-label="Volver">
-          <Ico.back />
+      <style>{`
+        @keyframes commerceBagDrift {
+          from { background-position: 0 0; }
+          to { background-position: 112px -68px; }
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .commerce-feed-header { animation: none !important; }
+        }
+      `}</style>
+      <header className="commerce-feed-header" style={s.feedHeader}>
+        <button
+          type="button"
+          style={s.feedBackButton}
+          onClick={() => onNavigate?.('back')}
+          aria-label="Volver"
+        >
+          <Ico.back size={22} color={C.verdeOsc} />
         </button>
-        <div style={s.headerTit}>
-          <Ico.store size={20} color={C.verde} />
-          <span>
-            Comercios de <span style={{ color: C.verde }}>el barrio</span>
-          </span>
-        </div>
-        {esAdmin ? (
-          <button style={s.addBtn} onClick={onAgregar} aria-label="Agregar comercio">
-            <Ico.plus />
-          </button>
-        ) : (
-          <div style={{ width: 36 }} />
-        )}
-      </div>
+        <strong style={s.feedHeaderTitle}>
+          Comercios de <span style={s.feedHeaderBrand}>el barrio</span>
+        </strong>
+        <button
+          type="button"
+          style={{ ...s.feedSearchButton, ...(searchOpen ? s.feedSearchButtonActive : {}) }}
+          onClick={() => {
+            setSearchOpen(v => !v)
+            if (searchOpen) setBusqueda('')
+          }}
+          aria-label={searchOpen ? 'Cerrar búsqueda' : 'Buscar comercios'}
+        >
+          {searchOpen ? <span style={s.feedSearchClose}>×</span> : <Ico.search size={19} color={C.verdeOsc} />}
+        </button>
+      </header>
 
-      {/* BUSCADOR */}
-      <div style={s.searchRow}>
-        <div style={s.searchIcon}><Ico.search /></div>
-        <input
-          placeholder="Buscar por nombre, rubro o dirección..."
-          value={busqueda}
-          onChange={(e) => setBusqueda(e.target.value)}
-          style={s.searchInput}
-        />
-      </div>
+      {searchOpen && (
+        <div style={s.feedSearchWrap}>
+          <Ico.search size={17} color={C.textoTenue} />
+          <input
+            value={busqueda}
+            onChange={(e) => setBusqueda(e.target.value)}
+            placeholder="Buscar comercios…"
+            style={s.feedSearchInput}
+            autoFocus
+          />
+        </div>
+      )}
 
       {/* FILTROS POR RUBRO */}
       <div style={s.filtrosScroll}>
@@ -996,8 +1018,14 @@ function Comercios({ currentUser, onNavigate, onCrear, onEditar }) {
               }}
               onClick={() => setCat(c)}
             >
-              {ci && <span style={{ fontSize: 12 }}>{ci.emoji}</span>}
-              {c}
+              <span style={s.filterIcon}>{c === 'Todas' ? '🏪' : ci.emoji}</span>
+              {c === 'Todas' ? 'Todos' : ({
+                Almacén: 'Almacenes',
+                Panadería: 'Panaderías',
+                Farmacia: 'Farmacias',
+                Restaurante: 'Restaurantes',
+                Cafetería: 'Cafeterías',
+              }[c] || c)}
             </button>
           )
         })}
@@ -1013,16 +1041,16 @@ function Comercios({ currentUser, onNavigate, onCrear, onEditar }) {
           <div style={s.vacio}>
             <div style={s.vacioEmoji}>🏪</div>
             <div style={s.vacioTit}>
-              {busqueda || cat !== 'Todas'
+              {cat !== 'Todas'
                 ? 'No hay comercios con ese filtro'
                 : 'Todavía no hay comercios en el barrio'}
             </div>
             <div style={s.vacioTxt}>
-              {busqueda || cat !== 'Todas'
-                ? 'Probá con otro rubro o cambiá la búsqueda.'
+              {cat !== 'Todas'
+                ? 'Probá con otro rubro.'
                 : 'Si tenés un local o conocés uno, sumalo al directorio.'}
             </div>
-            {esAdmin && !busqueda && cat === 'Todas' && (
+            {esAdmin && cat === 'Todas' && (
               <button style={s.vacioBtn} onClick={onAgregar}>
                 <Ico.plus size={16} color="#fff" /> Agregar comercio
               </button>
@@ -1030,28 +1058,40 @@ function Comercios({ currentUser, onNavigate, onCrear, onEditar }) {
           </div>
         ) : (
           <div style={{ marginBottom: 120 }}>
-            {filtrados.map((c) => (
-              c.is_premium
-                ? <CardGrande
-                    key={c.id}
-                    c={c}
-                    userCoords={userCoords}
-                    onAbrir={onAbrirComercio}
-                  />
-                : <CardCompacta
-                    key={c.id}
-                    c={c}
-                    userCoords={userCoords}
-                    expanded={expandedId === c.id}
-                    onToggle={onToggleCompacta}
-                  />
-            ))}
+            {destacados.length > 0 && (
+              <section style={s.feedSection}>
+                <div style={s.feedHeading}>
+                  <span style={s.feedHeadingTitle}><span style={s.featuredSectionIcon}><Ico.star size={10} color="#fff" /></span>Comercios Destacados</span>
+                  <button style={s.seeAllBtn} onClick={() => setCat('Todas')}>Ver todos</button>
+                </div>
+                <div style={s.featuredScroll}>
+                  {destacados.map(c => <CardGrande key={c.id} c={c} userCoords={userCoords} onAbrir={onAbrirComercio} />)}
+                </div>
+              </section>
+            )}
+            {cercanos.length > 0 && (
+              <section style={s.feedSection}>
+                <div style={s.nearbyHeading}>Cerca de ti</div>
+                {cercanos.map(c => (
+                  <CardCompacta key={c.id} c={c} userCoords={userCoords} onToggle={() => onAbrirComercio(c)} />
+                ))}
+              </section>
+            )}
           </div>
         )}
       </div>
 
       {/* MODAL DE DETALLE */}
-      {seleccionado && (
+      {seleccionado && (phonePortal ? createPortal(
+        <ComercioDetalle
+          c={seleccionado}
+          userCoords={userCoords}
+          onClose={() => setSeleccionado(null)}
+          onEditar={onEditarComercio}
+          esAdmin={esAdmin}
+        />,
+        phonePortal,
+      ) : (
         <ComercioDetalle
           c={seleccionado}
           userCoords={userCoords}
@@ -1059,7 +1099,7 @@ function Comercios({ currentUser, onNavigate, onCrear, onEditar }) {
           onEditar={onEditarComercio}
           esAdmin={esAdmin}
         />
-      )}
+      ))}
     </div>
   )
 }
@@ -1071,6 +1111,51 @@ const s = {
     background: C.fondo, fontFamily: T.font,
     display: 'flex', flexDirection: 'column', overflow: 'hidden',
     position: 'relative',
+  },
+
+  feedHeader: {
+    minHeight: 72,
+    padding: 'calc(env(safe-area-inset-top, 0px) + 22px) 58px 16px',
+    flexShrink: 0,
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    backgroundColor: C.card,
+    backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='72' height='64' viewBox='0 0 72 64'%3E%3Cg fill='none' stroke='%2316a34a' stroke-opacity='.22' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M19 20h34l-3 35H22l-3-35Z'/%3E%3Cpath d='M27 20v-5a9 9 0 0 1 18 0v5'/%3E%3C/g%3E%3C/svg%3E")`,
+    backgroundSize: '72px 64px',
+    backgroundPosition: 'calc(50% - 86px) center',
+    backgroundRepeat: 'no-repeat',
+    borderBottom: `2px solid ${C.verde}`,
+    boxSizing: 'border-box', position: 'relative',
+  },
+  feedBackButton: {
+    position: 'absolute', left: 16, bottom: 10,
+    width: 38, height: 38, padding: 0, border: `1px solid ${C.borde}`, borderRadius: '50%',
+    background: 'rgba(255,255,255,0.88)', cursor: 'pointer',
+    display: 'grid', placeItems: 'center',
+  },
+  feedSearchButton: {
+    position: 'absolute', right: 16, bottom: 11,
+    width: 36, height: 36, padding: 0, border: `1px solid ${C.borde}`, borderRadius: '50%',
+    background: 'rgba(255,255,255,0.88)', cursor: 'pointer',
+    display: 'grid', placeItems: 'center',
+  },
+  feedSearchButtonActive: { borderColor: C.verde, background: C.verdeSuave },
+  feedSearchClose: { color: C.verde, fontSize: 22, fontWeight: 400, lineHeight: 1 },
+  feedHeaderTitle: {
+    minWidth: 0, textAlign: 'center', fontSize: 16, lineHeight: 1.2,
+    color: '#26302b', fontWeight: 600, whiteSpace: 'nowrap',
+    overflow: 'hidden', textOverflow: 'ellipsis',
+    padding: '5px 10px',
+    background: 'transparent', border: 'none', boxShadow: 'none',
+  },
+  feedHeaderBrand: { color: C.verde, fontWeight: 700 },
+  feedSearchWrap: {
+    minHeight: 42, margin: '12px 16px 0', padding: '0 12px', flexShrink: 0,
+    display: 'flex', alignItems: 'center', gap: 8,
+    background: C.card, border: `1px solid ${C.borde}`, borderRadius: 12,
+  },
+  feedSearchInput: {
+    flex: 1, minWidth: 0, border: 0, outline: 'none', background: 'transparent',
+    color: C.texto, fontSize: 13, fontFamily: 'inherit',
   },
 
   /* ── header ── */
@@ -1089,7 +1174,7 @@ const s = {
     boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
   },
   headerTit: {
-    fontSize: 17.5, fontWeight: 800, color: C.texto,
+    fontSize: 17.5, fontWeight: 600, color: C.texto,
     flex: 1,
     display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7,
     letterSpacing: '-0.2px',
@@ -1102,29 +1187,11 @@ const s = {
     boxShadow: '0 1px 3px rgba(22,163,74,0.15)',
   },
 
-  /* ── buscador ── */
-  searchRow: {
-    position: 'relative',
-    margin: '12px 16px 8px',
-    flexShrink: 0,
-  },
-  searchIcon: {
-    position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)',
-    display: 'flex', alignItems: 'center',
-  },
-  searchInput: {
-    width: '100%', padding: '12px 16px 12px 40px',
-    fontSize: 14, background: C.card,
-    border: `1.5px solid ${C.borde}`, borderRadius: 999,
-    outline: 'none', fontFamily: 'inherit', color: C.texto,
-    boxSizing: 'border-box',
-  },
-
   /* ── filtros ── */
   filtrosScroll: {
-    display: 'flex', gap: 7,
+    display: 'flex', gap: 10,
     overflowX: 'auto',
-    padding: '4px 16px 10px',
+    padding: '24px 16px 22px',
     flexShrink: 0,
     scrollbarWidth: 'none',
     msOverflowStyle: 'none',
@@ -1132,18 +1199,34 @@ const s = {
   },
   filtroChip: {
     flexShrink: 0,
-    padding: '8px 14px',
+    minHeight: 29, padding: '0 14px',
     borderRadius: 999,
-    fontSize: 12.5, fontWeight: 700,
+    fontSize: 10.5, fontWeight: 600,
     cursor: 'pointer', fontFamily: 'inherit',
     display: 'flex', alignItems: 'center', gap: 5,
     whiteSpace: 'nowrap',
   },
+  filterIcon: { fontSize: 14, lineHeight: 1 },
 
   /* ── scroll principal ── */
   scroll: {
     flex: 1, overflowY: 'auto',
-    padding: '6px 16px 0',
+    padding: '4px 16px 0',
+    WebkitOverflowScrolling: 'touch',
+  },
+  feedSection: { marginBottom: 36 },
+  feedHeading: {
+    display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8,
+    marginBottom: 12, color: C.texto,
+  },
+  feedHeadingTitle: { display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, fontWeight: 700 },
+  featuredSectionIcon: { width: 17, height: 17, borderRadius: '50%', background: C.verdeOsc, display: 'grid', placeItems: 'center' },
+  seeAllBtn: { padding: 0, border: 0, background: 'transparent', color: C.verdeOsc, fontSize: 10, fontWeight: 700, fontFamily: 'inherit', cursor: 'pointer' },
+  nearbyHeading: { marginBottom: 12, fontSize: 14.5, fontWeight: 700, color: C.texto },
+  featuredScroll: {
+    display: 'flex', gap: 10, overflowX: 'auto',
+    margin: '0 -16px', padding: '0 16px 4px',
+    WebkitOverflowScrolling: 'touch', scrollbarWidth: 'none',
   },
   cargando: {
     flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -1171,12 +1254,13 @@ const s = {
   cardGrande: {
     position: 'relative',
     background: C.card,
-    borderRadius: 18,
-    border: `1px solid ${C.borde}`,
+    borderRadius: 11,
+    border: '1px solid #c8d3c8',
     overflow: 'hidden',
-    marginBottom: 14,
+    marginBottom: 0,
     cursor: 'pointer',
-    boxShadow: '0 6px 20px rgba(217,119,6,0.08), 0 2px 6px rgba(0,0,0,0.04)',
+    boxShadow: '0 1px 3px rgba(15,23,42,.06)',
+    width: '66%', minWidth: '66%', flexShrink: 0,
   },
 
   /* Tira dorada superior — identidad premium inmediata */
@@ -1190,11 +1274,11 @@ const s = {
   coverBox: {
     position: 'relative',
     width: '100%',
-    height: 170,
+    height: 109,
     background: C.fondo,
     overflow: 'hidden',
   },
-  coverImg: { width: '100%', height: '100%', objectFit: 'cover' },
+  coverImg: { width: '100%', height: '100%', objectFit: 'cover', display: 'block' },
   coverEmpty: {
     width: '100%', height: '100%',
     display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -1209,15 +1293,13 @@ const s = {
   /* RIBBON "Destacado" — feed (más grande, gradiente dorado) */
   ribbonDestacado: {
     position: 'absolute',
-    top: 0, left: 0,
-    background: `linear-gradient(135deg, ${C.dorado}, ${C.doradoSuave})`,
-    color: '#fff',
-    padding: '7px 22px 7px 13px',
-    fontSize: 11, fontWeight: 800,
-    letterSpacing: '0.4px',
+    top: 7, right: 7,
+    background: C.verde,
+    color: C.verdeOsc,
+    padding: '4px 8px', borderRadius: 999,
+    fontSize: 8.5, fontWeight: 700,
     display: 'flex', alignItems: 'center', gap: 4,
-    boxShadow: '0 3px 10px rgba(217,119,6,0.4)',
-    clipPath: 'polygon(0 0, 100% 0, calc(100% - 10px) 50%, 100% 100%, 0 100%)',
+    boxShadow: 'none',
     zIndex: 2,
   },
 
@@ -1254,10 +1336,14 @@ const s = {
     display: 'flex', alignItems: 'center', justifyContent: 'center',
   },
 
-  cardGrandeBody: { padding: '14px 16px 14px' },
+  cardGrandeBody: { padding: '10px 12px 11px' },
+  featuredIdentity: { display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 },
+  featuredCategoryIcon: { width: 27, height: 27, borderRadius: '50%', display: 'grid', placeItems: 'center', flexShrink: 0, overflow: 'hidden', fontSize: 12 },
+  featuredCategoryImg: { width: '100%', height: '100%', objectFit: 'cover' },
+  featuredMeta: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginTop: 10, fontSize: 10.5, color: '#657068', fontWeight: 600 },
   nombreGrande: {
-    fontSize: 17.5, fontWeight: 800, color: C.texto,
-    lineHeight: 1.25, marginBottom: 4,
+    minWidth: 0, fontSize: 11.5, fontWeight: 700, color: C.texto,
+    lineHeight: 1.25, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
   },
 
   horarioRowFeed: { marginBottom: 8 },
@@ -1307,10 +1393,10 @@ const s = {
 
   /* ══════ CARD COMPACTA (no premium) ══════ */
   cardCompacta: {
-    display: 'flex', flexDirection: 'column',
-    background: C.card, borderRadius: 14, padding: 10,
-    border: `1px solid ${C.borde}`,
-    marginBottom: 8, cursor: 'pointer',
+    minHeight: 100, display: 'grid', gridTemplateColumns: '80px minmax(0, 1fr) 22px', alignItems: 'center', gap: 11,
+    background: C.card, borderRadius: 10, padding: 9,
+    border: '1px solid #c7d4c7',
+    marginBottom: 10, cursor: 'pointer',
     transition: 'border-color .15s ease, box-shadow .15s ease',
   },
   cardCompactaExpanded: {
@@ -1321,7 +1407,7 @@ const s = {
     display: 'flex', alignItems: 'center', gap: 12,
   },
   logoCuadrado: {
-    width: 54, height: 54, borderRadius: 12, flexShrink: 0,
+    width: 80, height: 80, borderRadius: 8, flexShrink: 0,
     overflow: 'hidden', background: C.fondo,
   },
   logoCuadradoImg: { width: '100%', height: '100%', objectFit: 'cover' },
@@ -1330,11 +1416,14 @@ const s = {
     display: 'flex', alignItems: 'center', justifyContent: 'center',
   },
   cardCompactaBody: { flex: 1, minWidth: 0 },
+  compactTitleRow: { display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 5 },
   nombreCompacto: {
-    fontSize: 14, fontWeight: 700, color: C.texto,
-    marginBottom: 3,
-    whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+    minWidth: 0, fontSize: 13.5, fontWeight: 700, color: C.texto,
+    lineHeight: 1.25, marginBottom: 3,
   },
+  estadoBadge: { flexShrink: 0, padding: '2px 5px', borderRadius: 5, fontSize: 7.5, lineHeight: 1.1, fontWeight: 800 },
+  compactDescription: { fontSize: 9.5, lineHeight: 1.35, color: C.textoSuave, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', marginBottom: 10 },
+  compactMeta: { display: 'flex', alignItems: 'center', gap: 5, color: C.textoSuave, fontSize: 10.5 },
   beneficioSm: {
     display: 'inline-flex', alignItems: 'center', gap: 4,
     color: C.verde, fontSize: 11, fontWeight: 600,
@@ -1359,7 +1448,7 @@ const s = {
     flexShrink: 0, display: 'flex', alignItems: 'center',
   },
   cardCompactaChev: {
-    display: 'inline-flex', transition: 'transform .2s ease',
+    display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
   },
 
   /* ── Sección expandible inline (acordeón, sin modal) ── */
@@ -1402,7 +1491,7 @@ const s = {
     position: 'absolute',
     top: 0, left: 0, right: 0, bottom: 0,
     background: 'rgba(17,24,39,0.6)',
-    zIndex: 600,
+    zIndex: 90,
     display: 'flex', alignItems: 'flex-end',
   },
   /* Sheet 100% → sin gap gris arriba, fullscreen limpio */
@@ -1425,12 +1514,12 @@ const s = {
   detalleCoverBox: {
     position: 'relative',
     width: '100%',
-    height: 200,
+    height: 220,
     background: C.fondo,
     overflow: 'hidden',
     borderTopLeftRadius: 0, borderTopRightRadius: 0,
   },
-  detalleCoverImg: { width: '100%', height: '100%', objectFit: 'cover' },
+  detalleCoverImg: { width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center top' },
   detalleCoverEmpty: {
     width: '100%', height: '100%',
     display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -1471,17 +1560,50 @@ const s = {
   /* Header flotante (X + Editar) sobre el cover */
   detalleHeaderFloat: {
     position: 'absolute',
-    top: 14, left: 14, right: 14,
+    top: 'calc(env(safe-area-inset-top, 0px) + 44px)', left: 14, right: 14,
     display: 'flex', alignItems: 'center', justifyContent: 'space-between',
     zIndex: 5,
   },
+  detalleHeaderActions: { display: 'flex', alignItems: 'center', gap: 7 },
+  detalleHeroIdentity: {
+    position: 'absolute', left: 16, bottom: 10, zIndex: 5,
+    display: 'flex', alignItems: 'center', gap: 8,
+  },
+  detalleHeroLogo: {
+    width: 58, height: 58, borderRadius: 12, overflow: 'hidden',
+    background: '#fff', border: '2px solid rgba(255,255,255,0.9)',
+    boxShadow: '0 3px 10px rgba(15,23,42,0.2)', color: C.verdeOsc,
+    display: 'grid', placeItems: 'center', fontSize: 13, fontWeight: 800,
+  },
+  detalleHeroLogoImg: { width: '100%', height: '100%', objectFit: 'contain', background: '#fff' },
+  detalleHeroFeatured: {
+    padding: '6px 11px', borderRadius: 999, background: C.verde,
+    color: '#fff', fontSize: 10.5, lineHeight: 1, fontWeight: 800,
+    boxShadow: '0 2px 7px rgba(0,0,0,0.18)',
+  },
+  detalleHeroActions: {
+    position: 'absolute', right: 12, bottom: 10, zIndex: 5,
+    display: 'flex', alignItems: 'center', gap: 7,
+  },
+  detalleShareFloat: {
+    width: 38, height: 38, borderRadius: '50%',
+    background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)',
+    border: '1px solid rgba(255,255,255,0.18)', color: '#fff',
+    display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', padding: 0,
+  },
+  detalleFavoriteActive: { background: C.verde },
+  promosSection: { marginTop: 0, marginBottom: 22 },
+  promosHeading: { fontSize: 15, fontWeight: 600, color: C.texto, marginBottom: 9 },
+  promosScroll: { display: 'flex', gap: 9, overflowX: 'auto', paddingBottom: 4, scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch' },
+  promoCard: { width: 165, minWidth: 165, borderRadius: 12, overflow: 'hidden', background: '#fff', border: `1px solid ${C.borde}`, boxShadow: '0 2px 7px rgba(15,23,42,0.05)' },
+  promoImage: { width: '100%', height: 105, objectFit: 'cover', display: 'block' },
+  promoFallback: { width: '100%', height: 105, background: C.verdeSuave, display: 'flex', alignItems: 'center', justifyContent: 'center' },
+  promoBody: { padding: 10, display: 'flex', flexDirection: 'column', gap: 3, fontSize: 11.5, lineHeight: 1.35, color: C.textoSuave },
   detalleClose: {
     width: 38, height: 38, borderRadius: '50%',
-    background: 'rgba(0,0,0,0.45)',
-    backdropFilter: 'blur(8px)',
-    WebkitBackdropFilter: 'blur(8px)',
-    border: '1px solid rgba(255,255,255,0.18)',
-    color: '#fff',
+    background: 'rgba(255,255,255,0.92)',
+    backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)',
+    border: '1px solid rgba(255,255,255,0.65)', color: C.texto,
     display: 'flex', alignItems: 'center', justifyContent: 'center',
     cursor: 'pointer', padding: 0,
   },
@@ -1536,8 +1658,68 @@ const s = {
 
   /* BODY del modal */
   detalleBody: {
-    padding: '14px 18px 16px',
+    padding: '0 16px 22px',
+    position: 'relative',
+    marginTop: -2,
   },
+  commerceInfoCard: {
+    position: 'relative', zIndex: 3, background: 'rgba(255,255,255,0.92)', borderRadius: 13,
+    padding: '14px 14px 13px', border: `1px solid ${C.borde}`,
+    boxShadow: '0 4px 12px rgba(15,23,42,0.07)',
+  },
+  commerceIdentityRow: { position: 'absolute', top: 0, left: 14, height: 0 },
+  commerceMiniLogo: {
+    width: 46, height: 46, marginTop: -39, borderRadius: 10,
+    background: `linear-gradient(135deg, ${C.verde}, ${C.verdeOsc})`,
+    border: '3px solid #fff', overflow: 'hidden', boxShadow: '0 3px 10px rgba(15,23,42,0.15)',
+    display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: 16, fontWeight: 800,
+  },
+  commerceMiniLogoImg: { width: '100%', height: '100%', objectFit: 'cover' },
+  commerceFeaturedPill: { padding: '4px 9px', borderRadius: 999, background: C.verdeSuave, color: C.verdeOsc, fontSize: 10.5, fontWeight: 700 },
+  commerceTitleRow: { display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10 },
+  commerceTitle: { margin: 0, color: C.texto, fontSize: 18.5, lineHeight: 1.2, fontWeight: 700, letterSpacing: '-0.3px' },
+  commerceRating: { flexShrink: 0, padding: '5px 8px', borderRadius: 9, background: '#f7f4ee', color: '#554b3d', fontSize: 12, fontWeight: 700 },
+  commerceStatus: { marginTop: 4, minHeight: 18 },
+  commerceAddressRow: {
+    display: 'grid', gridTemplateColumns: '18px 1fr auto', alignItems: 'center', gap: 7,
+    marginTop: 9, paddingTop: 9, borderTop: `1px solid ${C.borde}`, color: C.textoSuave, fontSize: 11.5, lineHeight: 1.3,
+  },
+  commerceMapLink: { color: C.verde, fontWeight: 700, textDecoration: 'none', whiteSpace: 'nowrap' },
+  commerceSectionHeader: { display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', marginBottom: 10 },
+  commerceSectionTitles: { display: 'flex', flexDirection: 'column', gap: 2, fontSize: 14, color: C.texto },
+  commerceGallerySection: {
+    marginTop: 14, marginBottom: 22, padding: 14,
+    background: 'rgba(255,255,255,0.78)', border: `1px solid ${C.borde}`, borderRadius: 13,
+    boxShadow: '0 2px 8px rgba(15,23,42,0.04)',
+  },
+  commerceGalleryScroll: { display: 'flex', gap: 9, overflowX: 'auto', paddingBottom: 3, scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch' },
+  commerceGalleryCard: {
+    width: 174, minWidth: 174, padding: 0, border: `1px solid ${C.borde}`,
+    borderRadius: 11, overflow: 'hidden', background: C.card, cursor: 'pointer',
+    textAlign: 'left', fontFamily: 'inherit',
+  },
+  commerceGalleryImage: { width: '100%', height: 104, objectFit: 'cover', display: 'block' },
+  commerceGalleryCaption: {
+    display: 'block', padding: '8px 9px', color: C.texto,
+    fontSize: 11.5, fontWeight: 600, lineHeight: 1.3,
+  },
+  commerceAbout: {
+    marginTop: 20, padding: 14, borderRadius: 13,
+    background: 'rgba(255,255,255,0.78)', border: `1px solid ${C.borde}`,
+    boxShadow: '0 2px 8px rgba(15,23,42,0.04)',
+  },
+  commerceAboutTitle: { margin: '0 0 8px', fontSize: 14, fontWeight: 700, color: C.texto },
+  commerceAboutText: { margin: 0, fontSize: 13.5, lineHeight: 1.55, color: C.textoSuave },
+  commerceReviewsSection: {
+    marginTop: 14, marginBottom: 22, padding: 14, borderRadius: 13,
+    background: 'rgba(255,255,255,0.78)', border: `1px solid ${C.borde}`,
+    boxShadow: '0 2px 8px rgba(15,23,42,0.04)',
+  },
+  commerceReviewCard: { background: '#f1f4ff', border: '1px solid #e2e8f7', borderRadius: 13, padding: 13, marginBottom: 9 },
+  commerceReviewTop: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, fontSize: 12.5, color: C.texto },
+  commerceReviewStars: { color: '#8a7658', fontSize: 12, letterSpacing: 1, whiteSpace: 'nowrap' },
+  commerceReviewText: { margin: '9px 0 0', color: C.textoSuave, fontSize: 12.5, lineHeight: 1.5, fontStyle: 'italic' },
+  commerceReviewsEmpty: { padding: '18px 14px', borderRadius: 13, background: '#f5f7fb', color: C.textoSuave, textAlign: 'center', fontSize: 12.5 },
 
   /* Nombre del comercio (centrado, sin status pill) */
   detalleNombre: {
@@ -1563,8 +1745,9 @@ const s = {
     position: 'relative',
     overflow: 'hidden',
     borderRadius: 16,
-    background: `linear-gradient(135deg, ${C.verde} 0%, ${C.verdeOsc} 100%)`,
-    padding: '14px 16px',
+    background: 'linear-gradient(135deg, rgba(22,163,74,0.82) 0%, rgba(8,116,59,0.78) 100%)',
+    padding: '10px 13px',
+    marginTop: 16,
     marginBottom: 14,
     boxShadow: '0 4px 14px rgba(22,163,74,0.28)',
   },
@@ -1583,7 +1766,7 @@ const s = {
   },
   /* Badge circular con icono */
   beneficioBadge: {
-    width: 44, height: 44, borderRadius: '50%',
+    width: 34, height: 34, borderRadius: '50%',
     background: 'rgba(255,255,255,0.18)',
     border: '1.5px solid rgba(255,255,255,0.35)',
     display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -1599,6 +1782,7 @@ const s = {
   beneficioLabel: {
     fontSize: 11, fontWeight: 800, color: 'rgba(255,255,255,0.92)',
     textTransform: 'uppercase', letterSpacing: '0.4px',
+    textShadow: '0 1px 3px rgba(0,0,0,0.38)',
   },
   beneficioSep: {
     fontSize: 13, fontWeight: 400, color: 'rgba(255,255,255,0.45)',
@@ -1608,12 +1792,14 @@ const s = {
     fontSize: 14.5, fontWeight: 800, color: '#fff',
     lineHeight: 1.3,
     letterSpacing: '-0.1px',
+    textShadow: '0 1px 3px rgba(0,0,0,0.38)',
   },
   /* Variante con shine animado (text-shadow pulsante tenue) */
   beneficioTextShine: {
     fontSize: 14.5, fontWeight: 800, color: '#fff',
     lineHeight: 1.3,
     letterSpacing: '-0.1px',
+    textShadow: '0 1px 3px rgba(0,0,0,0.38)',
     animation: 'benShineText 3.6s ease-in-out infinite',
   },
   /* Overlay shimmer — franja diagonal de luz que atraviesa el banner.
@@ -1781,19 +1967,20 @@ const s = {
   },
   ctaBtn: {
     flex: 1,
-    display: 'flex', alignItems: 'center', justifyContent: 'center',
-    padding: '16px 8px',
+    display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 4,
+    padding: '9px 6px calc(env(safe-area-inset-bottom, 0px) + 8px)',
     textDecoration: 'none',
     border: 'none',
     cursor: 'pointer',
     color: '#fff',
+    fontSize: 10, fontWeight: 700, fontFamily: 'inherit',
     transition: 'filter .15s ease',
   },
   ctaWhatsapp: {
     background: C.whatsapp,
   },
-  ctaCall: {
-    background: C.verde,
+  ctaMaps: {
+    background: '#4285F4',
   },
   ctaInstagram: {
     background: '#E1306C',
@@ -1851,6 +2038,38 @@ const s = {
   /* ════════════════════════════════════════════════
      LIGHTBOX — fullscreen al tocar una foto
      ════════════════════════════════════════════════ */
+  shareSheetBackdrop: {
+    position: 'absolute', inset: 0, zIndex: 820,
+    background: 'rgba(15,23,42,0.42)',
+    display: 'flex', alignItems: 'flex-end',
+  },
+  shareSheet: {
+    width: '100%', padding: '10px 16px calc(env(safe-area-inset-bottom, 0px) + 16px)',
+    borderRadius: '20px 20px 0 0', background: '#fff',
+    boxShadow: '0 -10px 30px rgba(15,23,42,0.18)', boxSizing: 'border-box',
+  },
+  shareSheetHandle: {
+    width: 38, height: 4, borderRadius: 999, background: '#d7ddd9', margin: '0 auto 15px',
+  },
+  shareSheetTitle: { display: 'block', textAlign: 'center', fontSize: 16, color: C.texto },
+  shareSheetSubtitle: { display: 'block', textAlign: 'center', marginTop: 4, fontSize: 11.5, color: C.textoSuave },
+  shareOptions: { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10, marginTop: 18 },
+  shareOption: {
+    minWidth: 0, padding: '12px 5px', borderRadius: 13, border: `1px solid ${C.borde}`,
+    background: '#f8faf9', color: C.texto, textDecoration: 'none', fontFamily: 'inherit',
+    fontSize: 10.5, fontWeight: 700, cursor: 'pointer',
+    display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8,
+  },
+  shareOptionIcon: {
+    width: 38, height: 38, borderRadius: '50%', background: C.verdeSuave,
+    display: 'grid', placeItems: 'center',
+  },
+  shareCancel: {
+    width: '100%', marginTop: 12, padding: '11px 14px', borderRadius: 12,
+    border: 0, background: '#edf1ee', color: C.texto, fontFamily: 'inherit',
+    fontSize: 13, fontWeight: 700, cursor: 'pointer',
+  },
+
   lightboxBackdrop: {
     position: 'fixed',
     top: 0, left: 0, right: 0, bottom: 0,

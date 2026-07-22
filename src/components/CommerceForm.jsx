@@ -455,7 +455,7 @@ const s = {
     background: '#f4f7f4',
     borderTopLeftRadius: 22, borderTopRightRadius: 22,
     display: 'flex', flexDirection: 'column',
-    fontFamily: 'system-ui, -apple-system, sans-serif',
+    fontFamily: '"Plus Jakarta Sans", system-ui, -apple-system, sans-serif',
     overflow: 'hidden',
   },
 
