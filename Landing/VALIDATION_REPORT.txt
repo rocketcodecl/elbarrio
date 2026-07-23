@@ -1,0 +1,27 @@
+EL BARRIO - REPORTE DE VALIDACIÓN
+======================================
+
+[OK] admin/content.php: No syntax errors detected in /mnt/data/ElBarrio-Landing/admin/content.php
+[OK] admin/index.php: No syntax errors detected in /mnt/data/ElBarrio-Landing/admin/index.php
+[OK] admin/login.php: No syntax errors detected in /mnt/data/ElBarrio-Landing/admin/login.php
+[OK] admin/logout.php: No syntax errors detected in /mnt/data/ElBarrio-Landing/admin/logout.php
+[OK] admin/media.php: No syntax errors detected in /mnt/data/ElBarrio-Landing/admin/media.php
+[OK] admin/messages.php: No syntax errors detected in /mnt/data/ElBarrio-Landing/admin/messages.php
+[OK] admin/pages.php: No syntax errors detected in /mnt/data/ElBarrio-Landing/admin/pages.php
+[OK] admin/settings.php: No syntax errors detected in /mnt/data/ElBarrio-Landing/admin/settings.php
+[OK] admin/subscribers.php: No syntax errors detected in /mnt/data/ElBarrio-Landing/admin/subscribers.php
+[OK] api/contact.php: No syntax errors detected in /mnt/data/ElBarrio-Landing/api/contact.php
+[OK] api/export-subscribers.php: No syntax errors detected in /mnt/data/ElBarrio-Landing/api/export-subscribers.php
+[OK] api/subscribe.php: No syntax errors detected in /mnt/data/ElBarrio-Landing/api/subscribe.php
+[OK] config/app.php: No syntax errors detected in /mnt/data/ElBarrio-Landing/config/app.php
+[OK] includes/admin-ui.php: No syntax errors detected in /mnt/data/ElBarrio-Landing/includes/admin-ui.php
+[OK] includes/auth.php: No syntax errors detected in /mnt/data/ElBarrio-Landing/includes/auth.php
+[OK] includes/bootstrap.php: No syntax errors detected in /mnt/data/ElBarrio-Landing/includes/bootstrap.php
+[OK] includes/database.php: No syntax errors detected in /mnt/data/ElBarrio-Landing/includes/database.php
+[OK] includes/footer.php: No syntax errors detected in /mnt/data/ElBarrio-Landing/includes/footer.php
+[OK] includes/functions.php: No syntax errors detected in /mnt/data/ElBarrio-Landing/includes/functions.php
+[OK] includes/header.php: No syntax errors detected in /mnt/data/ElBarrio-Landing/includes/header.php
+[OK] index.php: No syntax errors detected in /mnt/data/ElBarrio-Landing/index.php
+[OK] install.php: No syntax errors detected in /mnt/data/ElBarrio-Landing/install.php
+[OK] pages/home.php: No syntax errors detected in /mnt/data/ElBarrio-Landing/pages/home.php
+[OK] sitemap.php: No syntax errors detected in /mnt/data/ElBarrio-Landing/sitemap.php

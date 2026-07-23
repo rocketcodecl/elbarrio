@@ -1,0 +1,193 @@
+
+/*
+|--------------------------------------------------------------------------
+| El Barrio — pages.css
+|--------------------------------------------------------------------------
+| Estilos específicos de la Landing.
+*/
+
+/* Espaciado general */
+.hero,
+.problem,
+.ecosystem,
+.timeline,
+.marketplace,
+.impact,
+.cta {
+    position: relative;
+    padding-block: var(--section-space);
+}
+
+/* ---------------- Hero ---------------- */
+
+.hero {
+    display: grid;
+    align-items: center;
+    min-height: 100vh;
+    overflow: hidden;
+    background:
+        radial-gradient(circle at top right, rgba(220,91,55,.18), transparent 30%),
+        radial-gradient(circle at bottom left, rgba(46,106,80,.18), transparent 35%),
+        var(--color-paper);
+}
+
+.hero__inner{
+    display:grid;
+    grid-template-columns:1.1fr .9fr;
+    gap:min(6vw,5rem);
+    align-items:center;
+}
+
+.hero__content h1{
+    margin-bottom:1.5rem;
+    max-width:12ch;
+}
+
+.hero__content p{
+    max-width:38rem;
+    font-size:clamp(1.1rem,2vw,1.35rem);
+    color:var(--color-ink-soft);
+}
+
+.hero__actions{
+    display:flex;
+    gap:1rem;
+    flex-wrap:wrap;
+    margin-top:2rem;
+}
+
+.hero__scene{
+    aspect-ratio:1;
+    border-radius:50%;
+    background:
+        radial-gradient(circle,#fff 0%,#f5eee2 65%,#e8dece 100%);
+    box-shadow:var(--shadow-lg);
+    position:relative;
+}
+
+.hero__scene::before{
+    content:"";
+    position:absolute;
+    inset:15%;
+    border-radius:1.5rem;
+    background:
+        repeating-linear-gradient(90deg,
+            rgba(46,106,80,.08) 0 30px,
+            transparent 30px 60px),
+        repeating-linear-gradient(
+            rgba(220,91,55,.08) 0 30px,
+            transparent 30px 60px);
+    transform:rotate(45deg);
+}
+
+/* ---------------- Problema ---------------- */
+
+.problem__grid{
+    display:grid;
+    grid-template-columns:repeat(3,1fr);
+    gap:2rem;
+}
+
+/* ---------------- Ecosistema ---------------- */
+
+.ecosystem{
+    color:#fff;
+    background:var(--color-night);
+}
+
+.ecosystem__grid{
+    display:grid;
+    grid-template-columns:repeat(2,1fr);
+    gap:2rem;
+    align-items:center;
+}
+
+.ecosystem__canvas{
+    min-height:34rem;
+    position:relative;
+}
+
+/* ---------------- Timeline ---------------- */
+
+.timeline__list{
+    display:grid;
+    gap:2rem;
+}
+
+/* ---------------- Marketplace ---------------- */
+
+.marketplace__grid{
+    display:grid;
+    grid-template-columns:repeat(3,1fr);
+    gap:2rem;
+}
+
+/* ---------------- Impacto ---------------- */
+
+.impact{
+    background:linear-gradient(var(--color-paper),#fff);
+}
+
+.impact__stats{
+    display:grid;
+    grid-template-columns:repeat(4,1fr);
+}
+
+/* ---------------- CTA ---------------- */
+
+.cta{
+    color:#fff;
+    text-align:center;
+    background:linear-gradient(135deg,var(--color-green-dark),var(--color-night));
+}
+
+.cta h2{
+    color:#fff;
+}
+
+.cta p{
+    max-width:40rem;
+    margin-inline:auto;
+    color:rgba(255,255,255,.75);
+}
+
+/* ---------------- Responsive ---------------- */
+
+@media (max-width: 992px){
+
+.hero__inner,
+.ecosystem__grid{
+grid-template-columns:1fr;
+}
+
+.problem__grid,
+.marketplace__grid{
+grid-template-columns:1fr 1fr;
+}
+
+.impact__stats{
+grid-template-columns:1fr 1fr;
+}
+
+}
+
+@media (max-width:640px){
+
+.problem__grid,
+.marketplace__grid,
+.impact__stats{
+grid-template-columns:1fr;
+}
+
+.hero{
+min-height:auto;
+padding-top:8rem;
+}
+
+.hero__actions{
+flex-direction:column;
+}
+
+}
+
+.contact-form{padding:clamp(1.2rem,4vw,2.2rem)}.form-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1rem;margin-bottom:1rem}.form-grid label{display:grid;gap:.45rem;font-weight:700}.form-grid input,.form-grid textarea{width:100%;border:1px solid rgba(23,33,28,.16);border-radius:14px;padding:.9rem 1rem;font:inherit;background:#fff}.form-grid__wide{grid-column:1/-1}.hp-field{position:absolute!important;left:-9999px!important}.form-status{min-height:1.5em;margin:.8rem 0 0}@media(max-width:680px){.form-grid{grid-template-columns:1fr}.form-grid__wide{grid-column:auto}}

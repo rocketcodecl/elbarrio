@@ -1,0 +1,12 @@
+<?php
+declare(strict_types=1);
+require_once dirname(__DIR__).'/includes/bootstrap.php';require_once dirname(__DIR__).'/includes/auth.php';require_once dirname(__DIR__).'/includes/admin-ui.php';
+require_installation();auth_require_role(['administrator','editor']);$notice='';
+if(request_method()==='POST'&&auth_verify_csrf((string)($_POST['csrf_token']??''))){
+ $id=(int)($_POST['id']??0);$action=(string)($_POST['action']??'');
+ if($action==='status'&&in_array($_POST['status']??'',['active','pending','unsubscribed','blocked'],true)){db_execute('UPDATE subscribers SET status=:status,unsubscribed_at=IF(:status="unsubscribed",NOW(),unsubscribed_at),updated_at=NOW() WHERE id=:id',['status'=>$_POST['status'],'id'=>$id]);$notice='Suscriptor actualizado.';}
+ if($action==='delete'&&auth_has_role(['administrator'])){db_execute('DELETE FROM subscribers WHERE id=:id',['id'=>$id]);$notice='Suscriptor eliminado.';}
+}
+$rows=db_fetch_all('SELECT * FROM subscribers ORDER BY created_at DESC LIMIT 500');admin_top('Suscriptores','subscribers');?>
+<?php if($notice):?><div class="alert"><?=e($notice)?></div><?php endif?><div class="toolbar"><a class="btn primary" href="<?=e(relative_url('api/export-subscribers.php'))?>">Exportar CSV</a></div>
+<section class="panel"><table><thead><tr><th>Contacto</th><th>Estado</th><th>Origen</th><th>Fecha</th><th></th></tr></thead><tbody><?php foreach($rows as $r):?><tr><td><strong><?=e($r['name']?:'Sin nombre')?></strong><br><?=e($r['email'])?></td><td><form method="post"><input type="hidden" name="csrf_token" value="<?=e(auth_csrf_token())?>"><input type="hidden" name="action" value="status"><input type="hidden" name="id" value="<?=e($r['id'])?>"><select name="status" onchange="this.form.submit()"><?php foreach(['active','pending','unsubscribed','blocked'] as $s):?><option <?=$r['status']===$s?'selected':''?>><?=e($s)?></option><?php endforeach?></select></form></td><td><?=e($r['source'])?></td><td><?=e(date('d/m/Y H:i',strtotime($r['created_at'])))?></td><td><?php if(auth_has_role(['administrator'])):?><form method="post" onsubmit="return confirm('¿Eliminar?')"><input type="hidden" name="csrf_token" value="<?=e(auth_csrf_token())?>"><input type="hidden" name="action" value="delete"><input type="hidden" name="id" value="<?=e($r['id'])?>"><button class="btn danger">Eliminar</button></form><?php endif?></td></tr><?php endforeach?><?php if(!$rows):?><tr><td colspan="5" class="empty">No hay suscriptores.</td></tr><?php endif?></tbody></table></section><?php admin_bottom();?>

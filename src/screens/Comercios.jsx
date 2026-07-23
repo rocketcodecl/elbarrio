@@ -439,7 +439,7 @@ function CardCompacta({ c, userCoords, expanded, onToggle }) {
         aria-hidden={!expanded}
         style={{
           ...s.expandMotion,
-          maxHeight: expanded ? 420 : 0,
+          gridTemplateRows: expanded ? '1fr' : '0fr',
           opacity: expanded ? 1 : 0,
           transform: expanded ? 'translateY(0)' : 'translateY(-6px)',
           pointerEvents: expanded ? 'auto' : 'none',
@@ -1473,7 +1473,10 @@ function Comercios({ currentUser, onNavigate, onCrear, onEditar }) {
             {destacados.length > 0 && (
               <section style={s.feedSection}>
                 <div style={s.feedHeading}>
-                  <span style={s.feedHeadingTitle}><span style={s.featuredSectionIcon}><Ico.star size={10} color="#fff" /></span>Comercios Destacados</span>
+                  <span style={s.feedHeadingTitle}>
+                    <Ico.star size={16} color={C.verde} />
+                    Comercios Destacados
+                  </span>
                   <button style={s.seeAllBtn} onClick={() => setCat('Todas')}>Ver todos</button>
                 </div>
                 <div
@@ -1503,8 +1506,28 @@ function Comercios({ currentUser, onNavigate, onCrear, onEditar }) {
               </section>
             )}
             {cercanos.length > 0 && (
-              <section style={s.feedSection}>
-                <div style={s.nearbyHeading}>Cerca de ti</div>
+              <section style={{ ...s.feedSection, marginTop: -16 }}>
+                <div style={s.nearbyHeading}>
+                  <svg
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    xmlns="http://www.w3.org/2000/svg"
+                    aria-hidden="true"
+                    style={{ color: 'rgba(22, 163, 74, 1)' }}
+                  >
+                    <path
+                      d="M12 21s7-6.05 7-12a7 7 0 1 0-14 0c0 5.95 7 12 7 12Z"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                    <circle cx="12" cy="9" r="2.5" stroke="currentColor" strokeWidth="2" />
+                  </svg>
+                  <span>Cerca de ti</span>
+                </div>
                 {cercanos.map(c => (
                   <CardCompacta key={c.id} c={c} userCoords={userCoords} expanded={expandidoId === c.id} onToggle={onToggleComercio} />
                 ))}
@@ -1659,7 +1682,7 @@ const s = {
   feedHeadingTitle: { display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, fontWeight: 700 },
   featuredSectionIcon: { width: 17, height: 17, borderRadius: '50%', background: C.verdeOsc, display: 'grid', placeItems: 'center' },
   seeAllBtn: { padding: 0, border: 0, background: 'transparent', color: C.verdeOsc, fontSize: 10, fontWeight: 700, fontFamily: 'inherit', cursor: 'pointer' },
-  nearbyHeading: { marginBottom: 12, fontSize: 14.5, fontWeight: 700, color: C.texto },
+  nearbyHeading: { display: 'flex', alignItems: 'center', gap: 7, marginBottom: 12, fontSize: 14.5, fontWeight: 700, color: C.texto },
   featuredScroll: {
     display: 'flex', gap: 10, overflowX: 'auto',
     margin: '0 -16px', padding: '0 16px 4px',
@@ -1897,9 +1920,9 @@ const s = {
 
   /* ── Sección expandible inline (acordeón, sin modal) ── */
   expandMotion: {
-    display: 'block', overflow: 'hidden',
-    transition: 'max-height .38s cubic-bezier(.22,1,.36,1), opacity .28s ease, transform .38s cubic-bezier(.22,1,.36,1)',
-    willChange: 'max-height, opacity, transform',
+    display: 'grid', overflow: 'hidden',
+    transition: 'grid-template-rows .62s cubic-bezier(.16,1,.3,1), opacity .34s ease, transform .62s cubic-bezier(.16,1,.3,1)',
+    willChange: 'grid-template-rows, opacity, transform',
   },
   expandMotionInner: { minHeight: 0, overflow: 'hidden' },
   cardCompactaExpand: {
@@ -1907,7 +1930,7 @@ const s = {
     padding: '11px 3px 2px',
     borderTop: `1px dashed ${C.borde}`,
     display: 'flex', flexDirection: 'column', gap: 8,
-    transition: 'transform .26s cubic-bezier(.2,.8,.2,1)',
+    transition: 'transform .62s cubic-bezier(.16,1,.3,1)',
   },
   expandCategories: { display: 'flex', flexWrap: 'wrap', gap: 6 },
   expandCategoryChip: { padding: '4px 8px', borderRadius: 8, fontSize: 9.5, fontWeight: 700 },
