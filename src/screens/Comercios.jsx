@@ -1700,7 +1700,7 @@ const s = {
     marginBottom: 0,
     cursor: 'pointer',
     boxShadow: '0 1px 3px rgba(15,23,42,.06)',
-    width: 'calc(100% - 32px)', minWidth: 'calc(100% - 32px)', flexShrink: 0, scrollSnapAlign: 'start',
+    width: '100%', minWidth: '100%', flexShrink: 0, scrollSnapAlign: 'start',
   },
 
   /* Tira dorada superior — identidad premium inmediata */
