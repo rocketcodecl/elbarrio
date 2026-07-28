@@ -1188,7 +1188,7 @@ function Comercios({ currentUser, onNavigate, onCrear, onEditar }) {
     navigator.geolocation.getCurrentPosition(
       (pos) => setUserCoords({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
       () => {},
-      { enableHighAccuracy: false, timeout: 5000, maximumAge: 300000 }
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
     )
   }, [])
 
@@ -1208,6 +1208,12 @@ function Comercios({ currentUser, onNavigate, onCrear, onEditar }) {
         return
       }
       setProfile(p)
+      if (p.lat != null && p.lng != null) {
+        // Respaldo inmediato: la ubicación validada al registrarse evita que
+        // las distancias desaparezcan si el navegador demora o niega el GPS.
+        // Si el GPS responde, el efecto anterior la reemplaza por la actual.
+        setUserCoords(current => current || { lat: Number(p.lat), lng: Number(p.lng) })
+      }
 
       const { data, error } = await supabase
         .from('commerces')

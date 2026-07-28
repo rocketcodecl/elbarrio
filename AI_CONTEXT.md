@@ -130,6 +130,7 @@ El botón de creación abre `CreatePost.jsx`, salvo la creación de comercios, q
 - Las páginas comunitarias comparten la identidad visual vigente, el header simple con retorno y scroll independiente.
 - Los feeds de Mercado, Servicios, Eventos, Chat y Comercios usan un header interno común: botón volver, título centrado en gris carbón con `el barrio` en verde de marca, un ícono lineal grande y translúcido propio de la sección hacia el lado izquierdo, y una línea verde inferior. Inicio conserva su header propio.
 - Los CTA de publicación de Mercado y Servicios comparten proporciones compactas y muestran su emoji principal sin círculo; el CTA de Servicios usa la acción `Publícate` y comunica que publicar es gratis.
+- Las distancias del feed y detalle de Comercios se calculan desde el GPS del navegador; mientras este responde o si el permiso falla, usan como respaldo las coordenadas verificadas del perfil del vecino.
 
 ## Convenciones de código
 
