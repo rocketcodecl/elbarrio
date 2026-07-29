@@ -4,6 +4,7 @@ import AdminShell from './components/AdminShell.jsx'
 import AdminLogin from './screens/AdminLogin.jsx'
 import Dashboard from './screens/Dashboard.jsx'
 import CommerceManager from './screens/CommerceManager.jsx'
+import EventManager from './screens/EventManager.jsx'
 
 const ADMIN_ROLE = 'admin'
 
@@ -112,7 +113,8 @@ export default function App() {
     >
       {activeSection === 'dashboard' && <Dashboard profile={profile} onNavigate={setActiveSection} />}
       {activeSection === 'comercios' && <CommerceManager profile={profile} />}
-      {!['dashboard', 'comercios'].includes(activeSection) && (
+      {activeSection === 'eventos' && <EventManager profile={profile} />}
+      {!['dashboard', 'comercios', 'eventos'].includes(activeSection) && (
         <section className="placeholder-module"><span>🚧</span><h1>Módulo en preparación</h1><p>Lo construiremos en una siguiente fase.</p></section>
       )}
     </AdminShell>

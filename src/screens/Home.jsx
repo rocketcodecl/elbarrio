@@ -804,33 +804,22 @@ function Home({ currentUser, onNavigate, onCrear }) {
             Pin: lineal verde marca, sin fondo blanco.
             Texto: "Estás a xx m" (metros desde el user vía Haversine).
             Radial: clase .alerta-pulse anima un halo suave del color de la cat. */}
-        {!buscando && (
+        {!buscando && alertas.length > 0 && (
           <div style={{ ...s.seccion, marginBottom: 16 }}>
             <div style={{ ...s.seccionTit, marginBottom: 7 }}>
               <Ico.alerta />
               <span style={s.seccionTxt}>Alerta oficial</span>
-              {alertas.length > 0 && (
-                <button
-                  style={s.verTodasBtn}
-                  onClick={() => nav('alertas')}
-                >
-                  Ver todas
-                  <span style={s.verTodasFlecha}>→</span>
-                </button>
-              )}
+              <button
+                style={s.verTodasBtn}
+                onClick={() => nav('alertas')}
+              >
+                Ver todas
+                <span style={s.verTodasFlecha}>→</span>
+              </button>
             </div>
 
-            {alertas.length === 0 ? (
-              <button style={s.alertaVaciaStrip} onClick={() => nav('alertas')}>
-                <span style={{ fontSize: 18, lineHeight: 1 }}>🚨</span>
-                <span style={s.alertaVaciaTxt}>
-                  No hay alertas oficiales ahora.
-                  <span style={s.alertaVaciaCta}>Ver centro de alertas →</span>
-                </span>
-              </button>
-            ) : (
-              <div style={s.alertaLista}>
-                {alertas.slice(0, 1).map((a) => {
+            <div style={s.alertaLista}>
+              {alertas.slice(0, 1).map((a) => {
                   const cat = REPORTES[a.category] || REPORTES.seguridad
                   // Distancia: preferimos la calculada con Haversine desde
                   // el GPS del user hasta la lat/lng de la alerta. Si no hay
@@ -874,9 +863,8 @@ function Home({ currentUser, onNavigate, onCrear }) {
                       <span style={s.alertaRowFlecha}>›</span>
                     </button>
                   )
-                })}
-              </div>
-            )}
+              })}
+            </div>
           </div>
         )}
 

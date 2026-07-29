@@ -40,8 +40,13 @@ import { DIAS_SEMANA } from '../lib/horarios'
     · Footer WhatsApp full-width sticky (sin margen desperdiciado).
 */
 
-/* ── Días de la semana (claves de opening_hours) ── */
-const DIAS = ['dom', 'lun', 'mar', 'mie', 'jue', 'vie', 'sab']
+/* ── Días de la semana (claves oficiales de opening_hours) ──
+   El panel guarda las claves nativas de JavaScript: 0=domingo…6=sábado.
+   Mantenemos el respaldo abreviado para comercios creados antes del panel. */
+const DIAS = ['0', '1', '2', '3', '4', '5', '6']
+const DIAS_LEGACY = ['dom', 'lun', 'mar', 'mie', 'jue', 'vie', 'sab']
+const horarioDelDia = (hours, dayKey) => hours?.[dayKey] ?? hours?.[DIAS_LEGACY[Number(dayKey)]]
+const etiquetaDia = (dayKey) => DIAS_SEMANA.find(day => day.key === dayKey)?.corto || ''
 
 /* ── Helper: estado del horario para el FEED y el MODAL ── */
 const fmtCountdown = (mins) => {
@@ -58,9 +63,9 @@ const proximoDiaAbierto = (hours, startOffset = 1) => {
     const d = new Date(now)
     d.setDate(now.getDate() + i)
     const key = DIAS[d.getDay()]
-    const h = hours[key]
+    const h = horarioDelDia(hours, key)
     if (h && h.o && h.c) {
-      const etiqueta = i === 1 ? 'mañana' : key
+      const etiqueta = i === 1 ? 'mañana' : etiquetaDia(key)
       return { etiqueta, hora: h.o, dia: key }
     }
   }
@@ -71,7 +76,7 @@ const horarioFeed = (hours) => {
   if (!hours) return null
   const now = new Date()
   const dia = DIAS[now.getDay()]
-  const h = hours[dia]
+  const h = horarioDelDia(hours, dia)
   if (!h || !h.o || !h.c) {
     // Hoy no abre → buscar próximo día
     const prox = proximoDiaAbierto(hours, 1)
@@ -98,6 +103,7 @@ const horarioFeed = (hours) => {
     return {
       principal: `abierto de ${h.o} a ${h.c}`,
       secundario: cierraEn,
+      cierra: h.c,
       abierto: true,
     }
   }
@@ -378,7 +384,9 @@ function CardGrande({ c, userCoords, onAbrir }) {
             <span style={s.feedFavoriteMeta}>♥ {Number(c.favorites_count) || 0}</span>
             {dist && <span>· {dist}</span>}
           </span>
-          <span style={{ color: horario?.abierto ? C.verdeOsc : C.textoTenue }}>{horario?.abierto ? 'Abierto' : 'Cerrado'}</span>
+          <span style={{ color: horario?.abierto ? C.verdeOsc : C.textoTenue }}>
+            {horario?.abierto ? `Abierto · Cierra ${horario.cierra} hrs` : 'Cerrado'}
+          </span>
         </div>
       </div>
     </div>

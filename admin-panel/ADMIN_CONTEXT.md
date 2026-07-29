@@ -19,7 +19,7 @@
 
 - Resumen: implementado.
 - Comercios: implementado el directorio real, búsqueda, filtros, creación y edición completa.
-- Eventos: pendiente.
+- Eventos: implementado con listado, creación, edición y pausa/publicación desde el panel.
 - Farmacias: pendiente.
 - Incidentes: pendiente.
 - Usuarios: pendiente.
@@ -38,6 +38,10 @@
 - Las imágenes de productos se almacenan en el bucket público `commerces`, bajo la carpeta `products/{commerce_id}/`.
 - Los productos pertenecen a `commerce_products`, no a las publicaciones del Mercado.
 - No se incluirá ninguna llave privada o `service_role` en el navegador.
+- Los eventos usan la tabla `posts` con `type='event'`. El panel permite administrar su portada compacta 16:9, rango desde/hasta, tipo, ubicación, condiciones de entrada y visibilidad.
+- Las categorías de Eventos son globales para El Barrio. El administrador puede crearlas, editarlas, asignar un ícono u ocultarlas desde el panel; los eventos existentes conservan su categoría aunque esta se oculte para futuras publicaciones.
+- Los eventos pagados pueden definir varias tarifas con etiqueta y valor; el primer valor sigue respaldando el campo histórico `event_price`.
+- La asistencia y la opción de mostrar confirmados están deshabilitadas temporalmente por incompatibilidad entre la tabla antigua `events` y los eventos actuales almacenados en `posts`.
 
 ## Reglas de trabajo
 
@@ -49,4 +53,4 @@
 
 ## Pendiente inmediato
 
-- Validar visual y funcionalmente la edición de un comercio real y la creación de un producto.
+- Mantener deshabilitada la asistencia. No crear ni aplicar cambios de asistencia hasta definir y autorizar cómo alinear `event_attendees` con los eventos actuales de `posts`.

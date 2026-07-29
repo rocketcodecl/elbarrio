@@ -72,7 +72,7 @@ El botón de creación abre `CreatePost.jsx`, salvo la creación de comercios, q
 - `TabBar.jsx`: navegación inferior y acceso a creación.
 - `CreatePost.jsx`: creación y edición de publicaciones, alertas, servicios y eventos.
 - `Marketplace.jsx` / `ProductDetail.jsx`: feed y detalle del mercado.
-- `Events.jsx` / `EventDetail.jsx`: feed, detalle y asistencia a eventos.
+- `Events.jsx` / `EventDetail.jsx`: feed y detalle de eventos; la asistencia está deshabilitada temporalmente.
 - `Services.jsx`: directorio de servicios vecinales.
 - `Comercios.jsx` / `CommerceForm.jsx`: feed, detalle y formulario de comercios.
 - `ChatList.jsx` / `ChatConversation.jsx`: mensajería asociada a usuarios y publicaciones.
@@ -110,6 +110,7 @@ El botón de creación abre `CreatePost.jsx`, salvo la creación de comercios, q
 - La navegación seguirá siendo por estado; no se incorporará otro router sin autorización.
 - Plus Jakarta Sans es la tipografía oficial actual.
 - Las alertas destacadas del inicio deben ser oficiales, no alertas vecinales comunes.
+- La sección “Alerta oficial” del Inicio solo se muestra cuando existe al menos una alerta oficial activa; si no hay ninguna, no ocupa espacio en el feed.
 - El mercado prioriza un feed compacto y visual, con mezcla de venta, regalo y trueque.
 - Las publicaciones pueden mostrar el badge `Conversable` cuando corresponda.
 - El detalle de una publicación propia permite editarla.
@@ -118,6 +119,9 @@ El botón de creación abre `CreatePost.jsx`, salvo la creación de comercios, q
 - Los eventos tienen feed y página de detalle propios; no deben reutilizar la interfaz de una publicación de venta.
 - Los eventos son publicados por actores autorizados o administradores; el detalle no muestra un organizador como usuario común.
 - Los eventos contemplan opciones como entrada gratuita o pagada y condiciones como pet friendly.
+- Los eventos pueden tener un rango horario opcional (`starts_at` / `ends_at`). Sus categorías son globales y administrables desde el panel, con nombre e ícono; las categorías antiguas se conservan como respaldo visual.
+- Los eventos pagados permiten múltiples tarifas etiquetadas mediante `event_ticket_prices`; `event_price` se conserva como respaldo para eventos antiguos.
+- La asistencia a eventos está deshabilitada temporalmente en el feed, el detalle y el panel. La tabla existente `event_attendees` referencia la estructura antigua `events`, mientras los eventos actuales se guardan en `posts`; no debe reactivarse hasta definir y autorizar la alineación del esquema.
 - El feed de eventos debe mostrar inmediatamente un evento recién publicado sin exigir refrescar manualmente.
 - La página del comercio debe priorizar información, contacto, imágenes, promociones, productos y opiniones; su diseño no debe reutilizar estructuras antiguas deficientes.
 - En el feed de Comercios, los destacados abren la ficha completa. Los comercios normales despliegan una ficha básica dentro del listado con descripción, horario, ubicación, WhatsApp y cómo llegar; solo uno puede estar abierto a la vez.
@@ -131,6 +135,7 @@ El botón de creación abre `CreatePost.jsx`, salvo la creación de comercios, q
 - Los feeds de Mercado, Servicios, Eventos, Chat y Comercios usan un header interno común: botón volver, título centrado en gris carbón con `el barrio` en verde de marca, un ícono lineal grande y translúcido propio de la sección hacia el lado izquierdo, y una línea verde inferior. Inicio conserva su header propio.
 - Los CTA de publicación de Mercado y Servicios comparten proporciones compactas y muestran su emoji principal sin círculo; el CTA de Servicios usa la acción `Publícate` y comunica que publicar es gratis.
 - Las distancias del feed y detalle de Comercios se calculan desde el GPS del navegador; mientras este responde o si el permiso falla, usan como respaldo las coordenadas verificadas del perfil del vecino.
+- El formato oficial de `opening_hours` es el del panel: claves numéricas de JavaScript (`0` domingo a `6` sábado). La app mantiene lectura de claves abreviadas antiguas para no invalidar comercios previos.
 
 ## Convenciones de código
 
@@ -185,7 +190,7 @@ El botón de creación abre `CreatePost.jsx`, salvo la creación de comercios, q
 - Flujo de chat y contador de mensajes no leídos.
 - Feed de servicios con categorías y sección comercial de destacados.
 - Creación de eventos con ubicación y mapa.
-- Feed de eventos, detalle independiente y confirmación de asistencia.
+- Feed de eventos, detalle independiente y tarifas múltiples. La asistencia está deshabilitada temporalmente.
 - Actualización automática del feed después de publicar un evento.
 - Feed y detalle funcional de comercios, con promociones y opiniones consultadas desde Supabase.
 - Los vecinos verificados pueden publicar o editar una opinión por comercio, con calificación de 1 a 5 estrellas y comentario; el promedio se actualiza desde Supabase.
@@ -194,6 +199,9 @@ El botón de creación abre `CreatePost.jsx`, salvo la creación de comercios, q
 - La tabla `commerce_products` y sus políticas están aplicadas en Supabase; el catálogo permanece vacío hasta cargar productos.
 - Base independiente del panel web administrativo con login, validación de rol, navegación lateral y resumen general.
 - Módulo web administrativo de comercios separado en directorio, editor completo y catálogo de productos, incluida la subida de fotografías.
+- Módulo web administrativo de Eventos con listado, creación, edición y pausa/publicación; utiliza `posts` con `type='event'` y los permisos ya existentes para administradores.
+- El módulo web de Eventos permite definir rango desde/hasta y administrar categorías con ícono. La migración correspondiente está versionada y pendiente de ejecutarse en Supabase.
+- El panel de Eventos permite varias tarifas de entrada para eventos pagados y decidir si se muestran los asistentes; las migraciones correspondientes están versionadas y pendientes de ejecutarse en Supabase.
 - El editor web de comercios incluye búsqueda de dirección y selector cartográfico con marcador móvil; al cambiar el punto sincroniza dirección, latitud y longitud.
 - Alertas, detalle de alerta, noticias y notificaciones.
 - Perfil propio, perfil público y módulos administrativos conectados.
@@ -205,7 +213,11 @@ El botón de creación abre `CreatePost.jsx`, salvo la creación de comercios, q
 - Terminar y aprobar visualmente la página de detalle del comercio.
 - Cargar productos reales de prueba en `commerce_products`.
 - Validar el módulo web de Comercios y luego migrar Eventos, Farmacias, Incidentes y Usuarios.
-- Unificar el formato de `opening_hours`: el editor web guarda claves numéricas y `Comercios.jsx` todavía interpreta claves abreviadas en español.
+- Validar visual y funcionalmente la publicación y edición de eventos desde el panel web.
+- Ejecutar la migración `202607280001_event_schedule_and_categories.sql` en Supabase y probar rango horario y categorías administrables.
+- Ejecutar la migración `202607280002_event_ticket_prices.sql` en Supabase y probar tarifas múltiples.
+- Ejecutar la migración `202607280003_event_attendance_visibility.sql` en Supabase y probar la visibilidad de asistentes.
+- Definir y autorizar una estrategia para alinear `event_attendees` con los eventos actuales de `posts` antes de reactivar la asistencia. No crear ni aplicar cambios de asistencia mientras siga esta incompatibilidad.
 - Habilitar el flujo real de Invitar vecinos; la pantalla existe, pero el acceso está marcado como próximo.
 - Conectar el formulario de contacto con un canal real de soporte; actualmente solo confirma localmente.
 - Definir y conectar enlaces oficiales de redes sociales y soporte.

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import {
   C, T, S, iniciales,
@@ -28,7 +28,7 @@ import {
     - MAÑANA (amarillo) si el evento es mañana
 
   Asistencia:
-    - Intenta persistir en `event_attendees` (user_id + post_id).
+    - Persiste en `event_attendees` (user_id + event_id).
     - Si la tabla no existe o falla RLS, hace toggle visual con toast
       "Funcion disponible pronto".
 */
@@ -121,7 +121,7 @@ const IcoCalendarioVacio = ({ size = 64, color = '#16a34a' }) => (
 // Miramos `category` y `event_type` (campos comunes en posts de evento)
 // y hacemos fallback por keyword en el titulo.
 // ════════════════════════════════════════════════
-const FILTROS = [
+const FILTROS_BASE = [
   { key: 'todos',      label: 'Todos',      emoji: '📋' },
   { key: 'asambleas',  label: 'Asambleas',  emoji: '🏛️' },
   { key: 'ferias',     label: 'Ferias',     emoji: '🥬' },
@@ -130,12 +130,20 @@ const FILTROS = [
   { key: 'otros',      label: 'Otros',      emoji: '📌' },
 ]
 
+const ATTENDANCE_ENABLED = false
+
 const CAT_UI = {
   asambleas: { label: 'Comunidad', emoji: '🏛️', color: '#0f7a3f', bg: '#dcfce7' },
   ferias: { label: 'Feria', emoji: '🥬', color: '#a35412', bg: '#ffedd5' },
   talleres: { label: 'Taller', emoji: '🎨', color: '#7c3aed', bg: '#f3e8ff' },
   deportes: { label: 'Deporte', emoji: '⚽', color: '#087ca7', bg: '#e0f2fe' },
   otros: { label: 'Actividad', emoji: '📌', color: '#475569', bg: '#f1f5f9' },
+}
+
+const categoryInfo = (event, categories) => {
+  const dynamic = categories[event?.category]
+  if (dynamic) return dynamic
+  return CAT_UI[catDePost(event)] || CAT_UI.otros
 }
 
 const catDePost = (p) => {
@@ -206,6 +214,8 @@ const hhmm = (fecha) => {
   return `${hh}:${mm}`
 }
 
+const horarioEvento = (startsAt, endsAt) => endsAt ? `${hhmm(startsAt)}–${hhmm(endsAt)} hrs` : `${hhmm(startsAt)} hrs`
+
 const diaMesCorto = (fecha) => {
   const d = new Date(fecha)
   return { mes: MESES_CORTOS[d.getMonth()], dia: d.getDate() }
@@ -239,6 +249,7 @@ function Events({ currentUser, onNavigate, onCrear }) {
   const [asistenciasCount, setAsistenciasCount] = useState({}) // { [postId]: n }
   const [toast, setToast] = useState('')
   const [pulso, setPulso] = useState(null) // postId que acaba de confirmar (animacion)
+  const [eventCategories, setEventCategories] = useState([])
 
   // Pull-to-refresh
   const scrollRef = useRef(null)
@@ -261,6 +272,12 @@ function Events({ currentUser, onNavigate, onCrear }) {
       .then(({ data }) => { if (active) setProfile(data || null) })
     return () => { active = false }
   }, [currentUser?.id])
+
+  useEffect(() => {
+    supabase.from('event_categories').select('key, name, icon, is_active').order('sort_order').then(({ data }) => {
+      if (data) setEventCategories(data)
+    })
+  }, [])
 
   // ═══════ Cargar eventos ═══════
   const cargar = useCallback(async (esRefresh = false) => {
@@ -296,20 +313,20 @@ function Events({ currentUser, onNavigate, onCrear }) {
       // Si la tabla event_attendees no existe o falla RLS, se ignora silenciosamente
       // y se muestra 0 en el contador.
       // TODO: cuando exista event_attendees con RLS adecuada, esto deberia andar solo.
-      if ((data || []).length > 0) {
+      if (ATTENDANCE_ENABLED && (data || []).length > 0) {
         const ids = data.map((p) => p.id)
         try {
           const { data: asist, error: ea } = await supabase
             .from('event_attendees')
-            .select('post_id, user_id')
-            .in('post_id', ids)
+            .select('event_id, user_id')
+            .in('event_id', ids)
           if (!ea && asist) {
             const counts = {}
             const yo = {}
             const myUserId = currentUser?.id
             asist.forEach((row) => {
-              counts[row.post_id] = (counts[row.post_id] || 0) + 1
-              if (row.user_id === myUserId) yo[row.post_id] = true
+              counts[row.event_id] = (counts[row.event_id] || 0) + 1
+              if (row.user_id === myUserId) yo[row.event_id] = true
             })
             setAsistenciasCount(counts)
             setAsistiendo(yo)
@@ -344,6 +361,10 @@ function Events({ currentUser, onNavigate, onCrear }) {
 
   // ═══════ Toggle asistencia ═══════
   const toggleAsistir = async (postId) => {
+    if (!currentUser?.id || !profile?.id) {
+      mostrarToast('No pudimos identificar tu perfil. Recarga e inténtalo nuevamente.')
+      return
+    }
     const ya = !!asistiendo[postId]
     // Optimista
     setAsistiendo((s) => ({ ...s, [postId]: !ya }))
@@ -363,26 +384,28 @@ function Events({ currentUser, onNavigate, onCrear }) {
         const { error: ed } = await supabase
           .from('event_attendees')
           .delete()
-          .eq('post_id', postId)
+          .eq('event_id', postId)
           .eq('user_id', currentUser?.id)
+          .eq('profile_id', profile.id)
         if (ed) throw ed
       } else {
         // Insertar asistencia
         // TODO: cuando exista event_attendees, persistir asistencia (insert).
         const { error: ei } = await supabase
           .from('event_attendees')
-          .insert({ post_id: postId, user_id: currentUser?.id })
+          .insert({ event_id: postId, user_id: currentUser.id, profile_id: profile.id })
         if (ei) throw ei
       }
     } catch (err) {
       // Rollback visual + toast amable
-      console.warn('[el barrio] No se pudo persistir asistencia:', err)
+      console.error('[el barrio] Error real al persistir asistencia:', err)
       setAsistiendo((s) => ({ ...s, [postId]: ya }))
       setAsistenciasCount((c) => ({
         ...c,
         [postId]: Math.max(0, (c[postId] || 0) + (ya ? 1 : -1)),
       }))
-      mostrarToast('Funcion disponible pronto')
+      const diagnostic = [err?.code, err?.message, err?.details, err?.hint].filter(Boolean).join(' · ')
+      mostrarToast(diagnostic ? `Error asistencia: ${diagnostic}` : 'No pudimos actualizar tu asistencia')
     }
   }
 
@@ -418,9 +441,15 @@ function Events({ currentUser, onNavigate, onCrear }) {
   }
 
   // ═══════ Filtrado y agrupamiento ═══════
+  const categoryMap = useMemo(() => Object.fromEntries(eventCategories.map(category => [category.key, {
+    label: category.name, emoji: category.icon, color: C.verdeOsc, bg: C.verdeSuave,
+  }])), [eventCategories])
+  const filtros = eventCategories.some(category => category.is_active)
+    ? [{ key: 'todos', label: 'Todos', emoji: '📋' }, ...eventCategories.filter(category => category.is_active).map(category => ({ key: category.key, label: category.name, emoji: category.icon }))]
+    : FILTROS_BASE
   const eventosFiltrados = filtro === 'todos'
     ? eventos
-    : eventos.filter((e) => catDePost(e) === filtro)
+    : eventos.filter((e) => e.category === filtro || catDePost(e) === filtro)
 
   const estaSemana = eventos.filter((e) => esDentroDe7Dias(e.starts_at)).slice(0, 12)
   const destacados = [...eventosFiltrados]
@@ -428,7 +457,7 @@ function Events({ currentUser, onNavigate, onCrear }) {
     .slice(0, 6)
 
   const conteos = eventos.reduce((acc, e) => {
-    const k = catDePost(e)
+    const k = categoryMap[e.category] ? e.category : catDePost(e)
     acc[k] = (acc[k] || 0) + 1
     acc.todos = (acc.todos || 0) + 1
     return acc
@@ -479,10 +508,9 @@ function Events({ currentUser, onNavigate, onCrear }) {
 
         {/* ══════ FILTROS ══════ */}
         <div style={s.filtros}>
-          {FILTROS.map((f) => {
+          {filtros.map((f) => {
             const activo = filtro === f.key
             const count = conteos[f.key] || 0
-            if (f.key !== 'todos' && count === 0 && !cargando) return null
             return (
               <button
                 key={f.key}
@@ -530,6 +558,9 @@ function Events({ currentUser, onNavigate, onCrear }) {
                       evento={ev}
                       asistiendo={!!asistiendo[ev.id]}
                       count={asistenciasCount[ev.id] || 0}
+                      attendanceEnabled={ATTENDANCE_ENABLED}
+                      showAttendees={ev.event_show_attendees !== false}
+                      categories={categoryMap}
                       onToggle={() => toggleAsistir(ev.id)}
                       onClick={() => nav('eventdetail', { postId: ev.id })}
                     />
@@ -552,6 +583,9 @@ function Events({ currentUser, onNavigate, onCrear }) {
                     evento={ev}
                     asistiendo={!!asistiendo[ev.id]}
                     count={asistenciasCount[ev.id] || 0}
+                    attendanceEnabled={ATTENDANCE_ENABLED}
+                    showAttendees={ev.event_show_attendees !== false}
+                    categories={categoryMap}
                     pulso={pulso === ev.id}
                     onToggle={() => toggleAsistir(ev.id)}
                     onClick={() => nav('eventdetail', { postId: ev.id })}
@@ -597,8 +631,8 @@ function Events({ currentUser, onNavigate, onCrear }) {
 // ════════════════════════════════════════════════
 // TARJETA DE EVENTO (card grande)
 // ════════════════════════════════════════════════
-function HeroEventCard({ evento, asistiendo, count, onToggle, onClick }) {
-  const category = CAT_UI[catDePost(evento)] || CAT_UI.otros
+function HeroEventCard({ evento, asistiendo, count, attendanceEnabled, showAttendees, categories, onToggle, onClick }) {
+  const category = categoryInfo(evento, categories)
   const image = evento.images?.[0]
   const place = evento.location_text || 'Lugar por confirmar'
   return (
@@ -611,15 +645,15 @@ function HeroEventCard({ evento, asistiendo, count, onToggle, onClick }) {
         </div>
       )}
       <div style={s.heroShade} />
-      <span style={s.heroCategory}>{category.label.toUpperCase()}</span>
+      <span style={s.heroCategory}>{category.emoji} {category.label.toUpperCase()}</span>
       <div style={s.heroContent}>
         <strong style={s.heroTitle}>{evento.title || 'Evento del barrio'}</strong>
         <span style={s.heroMeta}>
-          <IcoCalendario size={12} /> {fechaCorta(evento.starts_at)} · {hhmm(evento.starts_at)}
+          <IcoCalendario size={12} /> {fechaCorta(evento.starts_at)} · {horarioEvento(evento.starts_at, evento.ends_at)}
         </span>
         <span style={s.heroMeta}><IcoPin size={12} /> {place}</span>
-        <div style={s.heroBottom}>
-          <span style={s.heroCount}><IcoPersonas size={13} /> {count > 0 ? `${count} asistirán` : 'Sé el primero'}</span>
+        {attendanceEnabled && <div style={s.heroBottom}>
+          {showAttendees && <span style={s.heroCount}><IcoPersonas size={13} /> {count > 0 ? `${count} asistirán` : 'Sé el primero'}</span>}
           <span
             role="button"
             style={{ ...s.heroAttend, ...(asistiendo ? s.heroAttendOn : {}) }}
@@ -627,16 +661,16 @@ function HeroEventCard({ evento, asistiendo, count, onToggle, onClick }) {
           >
             {asistiendo ? '✓ Asistiré' : 'Asistiré'}
           </span>
-        </div>
+        </div>}
       </div>
     </div>
   )
 }
 
-function EventCard({ evento, asistiendo, count, pulso, onToggle, onClick }) {
+function EventCard({ evento, asistiendo, count, attendanceEnabled, showAttendees, categories, pulso, onToggle, onClick }) {
   const f = evento.starts_at
   const { mes, dia } = diaMesCorto(f)
-  const category = CAT_UI[catDePost(evento)] || CAT_UI.otros
+  const category = categoryInfo(evento, categories)
   const image = evento.images?.[0]
   const lugar = evento.location_text || 'Lugar por confirmar'
 
@@ -649,17 +683,17 @@ function EventCard({ evento, asistiendo, count, pulso, onToggle, onClick }) {
       <div style={s.listBody}>
         <div style={s.listTitleRow}>
           <strong style={s.listTitle}>{evento.title || 'Evento del barrio'}</strong>
-          <span style={{ ...s.listCategory, color: category.color }}>{category.label}</span>
+          <span style={{ ...s.listCategory, color: category.color }}>{category.emoji} {category.label}</span>
         </div>
-        <span style={s.listMeta}>{fechaCorta(f)} · {hhmm(f)} · {lugar}</span>
-        <div style={s.listBottom}>
-          <span style={s.listCount}><IcoPersonas size={12} /> {count > 0 ? `${count} vecinos van` : 'Aún sin asistentes'}</span>
+        <span style={s.listMeta}>{fechaCorta(f)} · {horarioEvento(f, evento.ends_at)} · {lugar}</span>
+        {attendanceEnabled && <div style={s.listBottom}>
+          {showAttendees && <span style={s.listCount}><IcoPersonas size={12} /> {count > 0 ? `${count} vecinos van` : 'Aún sin asistentes'}</span>}
           <button
             style={{ ...s.listAttend, ...(asistiendo ? s.listAttendOn : {}), ...(pulso ? s.asistBtnPulso : {}) }}
             onClick={(e) => { e.stopPropagation(); onToggle() }}
             aria-label={asistiendo ? 'Cancelar asistencia' : 'Asistir'}
           >{asistiendo ? <IcoCheck size={15} /> : <IcoPlus size={17} />}</button>
-        </div>
+        </div>}
       </div>
     </div>
   )

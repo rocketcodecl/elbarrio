@@ -428,7 +428,7 @@ export default function App() {
       return <ProductDetail postId={params?.postId} currentUser={user} onNavigate={onNavigate} onEdit={onEditarPost} />
     }
     if (currentScreen === 'eventDetail') {
-      return <EventDetail postId={params?.postId} currentUser={user} onNavigate={onNavigate} />
+      return <EventDetail postId={params?.postId} onNavigate={onNavigate} />
     }
     if (currentScreen === 'chatConversation') {
       return (
