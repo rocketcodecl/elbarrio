@@ -208,6 +208,8 @@ El botón de creación abre `CreatePost.jsx`, salvo la creación de comercios, q
 
 ## Funcionalidades terminadas
 
+- Notificaciones internas: `notifications.user_id` y `from_user_id` referencian `profiles.id`. La campana del Home cuenta filas no leídas en tiempo real; la pantalla permite filtrar, marcar una o todas como leídas con rollback y abrir mensajes o publicaciones. La migración `202607290012_in_app_notifications.sql` genera notificaciones por mensajes, comentarios y likes, evitando auto-notificaciones.
+
 - Servicios: las publicaciones normales usan tarjeta compacta desplegable en el feed; el rubro reemplaza el estado “Nuevo” en la cabecera. Teléfono, WhatsApp e Instagram son datos opcionales del servicio y se muestran en el desplegable y la ficha completa (requiere migración `202607290011_service_contacts.sql`).
 
 - Flujo de registro, login, perfil, verificación y entrada a la aplicación.

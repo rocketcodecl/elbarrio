@@ -314,6 +314,27 @@ function Home({ currentUser, onNavigate, onCrear }) {
   const [verMasActividad, setVerMasActividad] = useState(false)
   const [userCoords, setUserCoords] = useState(null)
 
+  // La campana representa notificaciones de la app, no mensajes del chat.
+  useEffect(() => {
+    if (!profile?.id) return undefined
+    let active = true
+    const cargarNotificacionesNoLeidas = async () => {
+      const { count, error } = await supabase
+        .from('notifications')
+        .select('id', { count: 'exact', head: true })
+        .eq('user_id', profile.id)
+        .is('read_at', null)
+        .or('read.is.null,read.eq.false')
+      if (!error && active) setNoLeidos(count || 0)
+    }
+    cargarNotificacionesNoLeidas()
+    const channel = supabase
+      .channel(`home-notifications-${profile.id}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'notifications', filter: `user_id=eq.${profile.id}` }, cargarNotificacionesNoLeidas)
+      .subscribe()
+    return () => { active = false; supabase.removeChannel(channel) }
+  }, [profile?.id])
+
   // ── CACHE LOCAL (stale-while-revalidate) ──
   // La primera vez que entra, baja todo y lo guarda en localStorage con
   // timestamp. La segunda vez, pinta INSTANTANEAMENTE con el cache viejo
@@ -458,9 +479,10 @@ function Home({ currentUser, onNavigate, onCrear }) {
           .order('created_at', { ascending: false })
           .limit(60),
 
-        supabase.from('messages')
+        supabase.from('notifications')
           .select('id', { count: 'exact', head: true })
-          .eq('receiver_id', p.id).eq('read', false),
+          .eq('user_id', p.id).is('read_at', null)
+          .or('read.is.null,read.eq.false'),
       ])
 
       // Si el profile refrescado trae datos nuevos, los usamos.

@@ -34,6 +34,7 @@ const IcoMention    = (p) => <Svg {...p}><circle cx="12" cy="12" r="4" /><path d
 const IcoCalendar   = (p) => <Svg {...p}><rect x="3" y="4" width="18" height="18" rx="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" /></Svg>
 const IcoGear       = (p) => <Svg {...p}><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" /></Svg>
 const IcoBell       = (p) => <Svg {...p}><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.73 21a2 2 0 0 1-3.46 0" /></Svg>
+const IcoHeart      = (p) => <Svg {...p}><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1.1-1.1a5.5 5.5 0 0 0-7.8 7.8l1.1 1.1L12 21.2l7.8-7.8a5.5 5.5 0 0 0 1-7.8z" /></Svg>
 const IcoBellOff    = (p) => <Svg {...p}><path d="M13.73 21a2 2 0 0 1-3.46 0" /><path d="M18.63 13A17.89 17.89 0 0 1 18 8" /><path d="M6.26 6.26A5.86 5.86 0 0 0 6 8c0 7-3 9-3 9h14" /><path d="M18 8a6 6 0 0 0-9.33-5" /><line x1="1" y1="1" x2="23" y2="23" /></Svg>
 const IcoCheck      = (p) => <Svg {...p} stroke={2.6}><polyline points="20 6 9 17 4 12" /></Svg>
 const IcoCheckCheck = (p) => <Svg {...p} stroke={2.2}><polyline points="18 6 7 17 2 12" /><polyline points="22 6 11 17" /></Svg>
@@ -47,6 +48,7 @@ const TYPE_CONFIG = {
   alert:   { bg: '#fee2e2', color: '#dc2626', Icon: IcoAlert },
   mention: { bg: '#f3e8ff', color: '#9333ea', Icon: IcoMention },
   event:   { bg: '#cffafe', color: '#0891b2', Icon: IcoCalendar },
+  like:    { bg: '#fce7f3', color: '#db2777', Icon: IcoHeart },
   system:  { bg: '#f3f4f6', color: '#6b7280', Icon: IcoGear },
   default: { bg: '#f3f4f6', color: '#6b7280', Icon: IcoBell },
 }
@@ -106,7 +108,7 @@ const ANIM_STYLE = `
 function Notifications({ currentUser, onNavigate }) {
   const [notifs, setNotifs]     = useState([])
   const [loading, setLoading]   = useState(true)
-  const [error, setError]       = useState(false)
+  const [error, setError]       = useState('')
   const [tab, setTab]           = useState('todas')   // 'todas' | 'noleidas'
   const [markingAll, setMarkingAll] = useState(false)
 
@@ -115,16 +117,17 @@ function Notifications({ currentUser, onNavigate }) {
   const [refreshing, setRefreshing] = useState(false)
   const startYRef  = useRef(null)
   const scrollRef  = useRef(null)
+  const recipientId = currentUser?.profileId || currentUser?.id
 
   /* ── CARGA INICIAL ── */
   const loadNotifications = async () => {
-    if (!currentUser?.id) return
-    setError(false)
+    if (!recipientId) return
+    setError('')
     try {
       const { data, error: qErr } = await supabase
         .from('notifications')
         .select('*')
-        .eq('user_id', currentUser.id)
+        .eq('user_id', recipientId)
         .order('created_at', { ascending: false })
         .limit(50)
 
@@ -134,7 +137,7 @@ function Notifications({ currentUser, onNavigate }) {
       // Tabla inexistente, RLS bloqueando, o error de red:
       // NO rompemos la pantalla. Mostramos estado vacío amistoso.
       console.warn('[Notifications] error cargando:', err?.message || err)
-      setError(true)
+      setError(err?.message || 'No pudimos cargar tus notificaciones.')
       setNotifs([])
     } finally {
       setLoading(false)
@@ -143,17 +146,17 @@ function Notifications({ currentUser, onNavigate }) {
 
   /* ── EFFECT: carga + suscripción realtime ── */
   useEffect(() => {
-    if (!currentUser?.id) return
+    if (!recipientId) return
     loadNotifications()
 
     const canal = supabase
-      .channel(`notif-${currentUser.id}`)
+      .channel(`notif-${recipientId}`)
       .on('postgres_changes',
         {
           event: 'INSERT',
           schema: 'public',
           table: 'notifications',
-          filter: `user_id=eq.${currentUser.id}`,
+          filter: `user_id=eq.${recipientId}`,
         },
         (payload) => {
           // Hidratación optimista: lo agrega al tope si no estaba.
@@ -168,7 +171,7 @@ function Notifications({ currentUser, onNavigate }) {
           event: 'UPDATE',
           schema: 'public',
           table: 'notifications',
-          filter: `user_id=eq.${currentUser.id}`,
+          filter: `user_id=eq.${recipientId}`,
         },
         (payload) => {
           setNotifs(prev => prev.map(n => n.id === payload.new.id ? payload.new : n))
@@ -179,37 +182,49 @@ function Notifications({ currentUser, onNavigate }) {
     return () => {
       supabase.removeChannel(canal)
     }
-  }, [currentUser?.id])
+  }, [recipientId])
 
   /* ── FILTROS DERIVADOS ── */
-  const noLeidas = notifs.filter(n => !n.read_at)
+  const noLeidas = notifs.filter(n => !n.read_at && n.read !== true)
   const visibles = tab === 'noleidas' ? noLeidas : notifs
 
   /* ── MARCAR UNA COMO LEÍDA (optimista + fade-in vía transición CSS) ── */
   const marcarLeida = async (notif) => {
-    if (notif.read_at) return
+    if (notif.read_at || notif.read === true) return
     const stamp = new Date().toISOString()
-    setNotifs(prev => prev.map(n => n.id === notif.id ? { ...n, read_at: stamp } : n))
-    try {
-      await supabase
-        .from('notifications')
-        .update({ read_at: stamp })
-        .eq('id', notif.id)
-    } catch (err) {
-      console.warn('[Notifications] error marcando leída:', err?.message || err)
+    setNotifs(prev => prev.map(n => n.id === notif.id ? { ...n, read: true, read_at: stamp } : n))
+    const { error: updateError } = await supabase
+      .from('notifications')
+      .update({ read: true, read_at: stamp })
+      .eq('id', notif.id)
+      .eq('user_id', recipientId)
+    if (updateError) {
+      setNotifs(prev => prev.map(n => n.id === notif.id ? notif : n))
+      console.warn('[Notifications] error marcando leída:', updateError.message)
     }
   }
 
   /* ── CLICK EN UNA NOTIFICACIÓN ── */
-  const handleClick = (notif) => {
-    marcarLeida(notif)
+  const handleClick = async (notif) => {
+    await marcarLeida(notif)
     const data = notif.data || {}
-    if (data.postId) {
-      onNavigate('productdetail', { postId: data.postId })
-    } else if (data.chatId || data.sellerId) {
-      onNavigate('chatconversation', { sellerId: data.sellerId || data.chatId })
-    } else if (data.alertId) {
-      onNavigate('alerta', { id: data.alertId })
+    const postId = notif.post_id || data.postId || data.post_id
+    const entityType = data.entityType || data.entity_type || data.postType || data.post_type
+    const senderId = notif.from_user_id || data.sellerId || data.seller_id || data.senderId || data.sender_id || data.chatId || data.chat_id
+    if (notif.type === 'message' && senderId) {
+      onNavigate('chatconversation', { sellerId: senderId, postId })
+    } else if (postId) {
+      let type = entityType
+      if (!type) {
+        const { data: post } = await supabase.from('posts').select('type').eq('id', postId).maybeSingle()
+        type = post?.type
+      }
+      const destination = type === 'service' ? 'servicedetail' : type === 'event' ? 'eventdetail' : 'productdetail'
+      onNavigate(destination, { postId })
+    } else if (senderId) {
+      onNavigate('chatconversation', { sellerId: senderId })
+    } else if (data.alertId || data.alert_id || data.incidentId || data.incident_id) {
+      onNavigate('alerta', { id: data.alertId || data.alert_id || data.incidentId || data.incident_id })
     }
     // Si no hay data de navegación, queda acá (sólo se marca leída).
   }
@@ -219,19 +234,20 @@ function Notifications({ currentUser, onNavigate }) {
     if (noLeidas.length === 0 || markingAll) return
     setMarkingAll(true)
     const stamp = new Date().toISOString()
+    const previous = notifs
     // Optimista
-    setNotifs(prev => prev.map(n => n.read_at ? n : { ...n, read_at: stamp }))
-    try {
-      await supabase
-        .from('notifications')
-        .update({ read_at: stamp })
-        .eq('user_id', currentUser.id)
-        .is('read_at', null)
-    } catch (err) {
-      console.warn('[Notifications] error marcando todas:', err?.message || err)
-    } finally {
-      setMarkingAll(false)
+    setNotifs(prev => prev.map(n => (n.read_at || n.read === true) ? n : { ...n, read: true, read_at: stamp }))
+    const { error: updateError } = await supabase
+      .from('notifications')
+      .update({ read: true, read_at: stamp })
+      .eq('user_id', recipientId)
+      .is('read_at', null)
+      .or('read.is.null,read.eq.false')
+    if (updateError) {
+      setNotifs(previous)
+      console.warn('[Notifications] error marcando todas:', updateError.message)
     }
+    setMarkingAll(false)
   }
 
   /* ── PULL-TO-REFRESH ── */
@@ -359,16 +375,16 @@ function Notifications({ currentUser, onNavigate }) {
         )}
 
         {/* ESTADO ERROR (tabla inexistente u otro error de query) */}
-        {!loading && error && (
+        {!loading && Boolean(error) && (
           <div style={s.empty}>
             <div style={s.emptyIconBox}>
               <IcoBell size={36} color={C.textoTenue} />
             </div>
-            <div style={s.emptyTitle}>Todavía no tenés notificaciones</div>
+            <div style={s.emptyTitle}>No pudimos cargar tus notificaciones</div>
             <div style={s.emptySub}>
-              Cuando alguien te escriba, responda tus publicaciones o
-              pase algo en el barrio, lo vas a ver acá.
+              {error}
             </div>
+            <button type="button" style={s.retryBtn} onClick={() => { setLoading(true); loadNotifications() }}>Reintentar</button>
           </div>
         )}
 
@@ -406,7 +422,7 @@ function Notifications({ currentUser, onNavigate }) {
             {visibles.map(notif => {
               const tcfg    = getType(notif.type)
               const Icon    = tcfg.Icon
-              const noLeida = !notif.read_at
+              const noLeida = !notif.read_at && notif.read !== true
               return (
                 <div
                   key={notif.id}
@@ -678,6 +694,7 @@ const s = {
     fontSize: 13.5, color: C.textoSuave, lineHeight: 1.5,
     maxWidth: 280,
   },
+  retryBtn: { marginTop: 8, minHeight: 40, padding: '0 16px', border: 0, borderRadius: 11, color: '#fff', background: C.verde, fontSize: 12.5, fontWeight: 800 },
 }
 
 export default Notifications

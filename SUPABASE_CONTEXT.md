@@ -194,7 +194,10 @@ consulta `.from('<tabla>')` o en el archivo SQL versionado.
 
 ### `notifications` [CONFIRMADO]
 - `id` [CONFIRMADO]
-- `user_id` (FK → `auth.users.id` o `profiles.id`) [CONFIRMADO — `Notifications.jsx` filter `user_id=eq.${currentUser.id}`]
+- `user_id` (FK → `profiles.id`) [CONFIRMADO — consulta de constraints del proyecto]
+- `from_user_id` (FK → `profiles.id`, nullable) [CONFIRMADO — consulta de constraints del proyecto]
+- `post_id` (FK → `posts.id`, nullable) [CONFIRMADO — consulta de constraints del proyecto]
+- `read` (boolean, default false) [CONFIRMADO — consulta de columnas del proyecto]
 - `read_at` (timestamptz, nullable) [CONFIRMADO — `Notifications.jsx` `.update({ read_at: stamp })` y `.is('read_at', null)`]
 - `created_at` [CONFIRMADO]
 - Campos de payload (`type`, `title`, `body`, `data`) [INFERIDO — no aparecen explícitamente en select `*`]

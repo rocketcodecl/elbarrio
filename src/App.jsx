@@ -494,7 +494,7 @@ export default function App() {
       )
     }
     if (currentScreen === 'notificaciones') {
-      return <Notifications currentUser={user} onNavigate={onNavigate} />
+      return <Notifications currentUser={{ ...user, profileId: profile?.id }} onNavigate={onNavigate} />
     }
     if (currentScreen === 'sellerProfile') {
       return (
