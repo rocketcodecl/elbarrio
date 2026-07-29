@@ -41,6 +41,24 @@ function initials(name = '') {
   return name.split(' ').filter(Boolean).slice(0, 2).map(part => part[0]).join('').toUpperCase() || 'V'
 }
 
+function profileCoordinates(user) {
+  const candidates = [
+    { lat: user?.lat, lng: user?.lng, source: 'GPS registrado' },
+    { lat: user?.address_lat, lng: user?.address_lng, source: 'Dirección verificada' },
+  ]
+
+  return candidates.map(candidate => ({
+    ...candidate,
+    lat: Number(candidate.lat),
+    lng: Number(candidate.lng),
+    hasValues: candidate.lat != null && candidate.lat !== '' && candidate.lng != null && candidate.lng !== '',
+  })).find(candidate => candidate.hasValues
+    && Number.isFinite(candidate.lat)
+    && Number.isFinite(candidate.lng)
+    && Math.abs(candidate.lat) <= 90
+    && Math.abs(candidate.lng) <= 180) || null
+}
+
 function UserBadges({ user }) {
   return <div className="user-badges">
     {isSuspended(user) && <span className="user-badge suspended">Suspendido</span>}
@@ -51,10 +69,10 @@ function UserBadges({ user }) {
 }
 
 function ProfileMap({ user }) {
-  const lat = Number(user.lat)
-  const lng = Number(user.lng)
-  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return <div className="user-map-empty">Este perfil todavía no registró una ubicación GPS.</div>
-  return <MapContainer className="user-profile-map" center={[lat, lng]} zoom={16} dragging={false} doubleClickZoom={false} scrollWheelZoom={false} zoomControl={false} attributionControl={false}>
+  const coordinates = profileCoordinates(user)
+  if (!coordinates) return <div className="user-map-empty">Este perfil todavía no registró coordenadas de su ubicación.</div>
+  const { lat, lng } = coordinates
+  return <MapContainer key={`${user.id}-${lat}-${lng}`} className="user-profile-map" center={[lat, lng]} zoom={16} dragging={false} doubleClickZoom={false} scrollWheelZoom={false} zoomControl={false} attributionControl={false}>
     <TileLayer url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png" subdomains="abcd" maxZoom={20} />
     <Marker position={[lat, lng]} icon={profileMarker} />
   </MapContainer>
@@ -77,6 +95,7 @@ export default function UserManager({ profile }) {
   const [notice, setNotice] = useState('')
 
   const selected = users.find(user => user.id === selectedId) || null
+  const selectedCoordinates = profileCoordinates(selected)
   const isSelf = selected?.id === profile?.id
 
   const loadUsers = useCallback(async preferredId => {
@@ -218,7 +237,7 @@ export default function UserManager({ profile }) {
           <div className="user-detail-grid">
             <section className="user-info-card"><h3>Identidad y verificación</h3><dl><div><dt>RUT</dt><dd>{selected.rut || 'No informado'}</dd></div><div><dt>Correo</dt><dd>{selected.email || 'No informado'}</dd></div><div><dt>Dirección</dt><dd>{selected.address || 'No informada'}</dd></div><div><dt>Comuna / barrio</dt><dd>{[selected.barrio, selected.comuna].filter(Boolean).join(', ') || 'No informado'}</dd></div><div><dt>Estado de verificación</dt><dd>{isVerified(selected) ? `Verificado · ${dateLabel(selected.verified_at)}` : selected.verification_status || 'Pendiente'}</dd></div><div><dt>Tipo de perfil</dt><dd>{selected.user_type || 'Vecino'}</dd></div></dl>{!isVerified(selected) && <button className="user-primary-action" type="button" disabled={!!changing} onClick={() => manage('verify')}>{changing === 'verify' ? 'Guardando…' : '✓ Aprobar verificación'}</button>}</section>
 
-            <section className="user-info-card user-location-card"><h3>Ubicación registrada</h3><div className="user-location-status"><span>{isVerified(selected) && selected.neighborhood_id ? '✓' : '!'}</span><div><strong>{isVerified(selected) && selected.neighborhood_id ? 'GPS verificado en el barrio' : 'Ubicación todavía no verificada'}</strong><small>{neighborhood ? `${neighborhood.name}${neighborhood.uv_code ? ` · Unidad Vecinal ${neighborhood.uv_code}` : ''}` : selected.address || 'Sin dirección registrada'}</small></div></div><ProfileMap user={selected} />{Number.isFinite(Number(selected.lat)) && Number.isFinite(Number(selected.lng)) && <p className="user-map-coordinates">GPS: {Number(selected.lat).toFixed(6)}, {Number(selected.lng).toFixed(6)}</p>}</section>
+            <section className="user-info-card user-location-card"><h3>Ubicación registrada</h3><div className="user-location-status"><span>{isVerified(selected) && selected.neighborhood_id ? '✓' : '!'}</span><div><strong>{isVerified(selected) && selected.neighborhood_id ? 'GPS verificado en el barrio' : 'Ubicación todavía no verificada'}</strong><small>{neighborhood ? `${neighborhood.name}${neighborhood.uv_code ? ` · Unidad Vecinal ${neighborhood.uv_code}` : ''}` : selected.address || 'Sin dirección registrada'}</small></div></div><ProfileMap user={selected} />{selectedCoordinates && <p className="user-map-coordinates">{selectedCoordinates.source}: {selectedCoordinates.lat.toFixed(6)}, {selectedCoordinates.lng.toFixed(6)}</p>}</section>
 
             <section className="user-info-card user-permissions-card"><h3>Permisos</h3><div className="permission-row"><span>📅</span><div><strong>Publicación de eventos</strong><small>Para juntas de vecinos, municipalidades y actores autorizados.</small></div>{selected.can_publish_events ? <button type="button" disabled={!!changing} onClick={() => manage('revoke_actor')}>Retirar</button> : <button className="positive" type="button" disabled={!!changing || !isVerified(selected) || isSuspended(selected)} onClick={() => manage('approve_actor')}>Autorizar</button>}</div><div className="permission-row"><span>🛡️</span><div><strong>Administración</strong><small>Entrega acceso completo al panel administrativo.</small></div>{selected.role === 'admin' ? <button type="button" disabled={!!changing || isSelf} onClick={() => manage('remove_admin')}>{isSelf ? 'Tu cuenta' : 'Retirar'}</button> : <button className="positive" type="button" disabled={!!changing || isSuspended(selected)} onClick={() => manage('assign_admin')}>Hacer admin</button>}</div></section>
 

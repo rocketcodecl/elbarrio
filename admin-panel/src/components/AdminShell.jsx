@@ -1,8 +1,10 @@
 const NAVIGATION = [
   { id: 'dashboard', icon: '▦', label: 'Resumen' },
   { id: 'comercios', icon: '🏪', label: 'Comercios' },
+  { id: 'servicios', icon: '🧰', label: 'Servicios' },
   { id: 'eventos', icon: '📅', label: 'Eventos' },
   { id: 'farmacias', icon: '💊', label: 'Farmacias' },
+  { id: 'noticias', icon: '📰', label: 'Noticias' },
   { id: 'incidentes', icon: '🚨', label: 'Incidentes' },
   { id: 'usuarios', icon: '👥', label: 'Usuarios' },
 ]

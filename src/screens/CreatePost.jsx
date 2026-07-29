@@ -242,7 +242,7 @@ function CreatePost({ onClose, onPublished, startWith, existingPost = null }) {
   const [selectedType, setSelectedType] = useState(initialType)
 
   const [title, setTitle] = useState(existingPost?.title || '')
-  const [content, setContent] = useState(existingPost?.content || '')
+  const [content, setContent] = useState(existingPost?.content || existingPost?.description || '')
   const [price, setPrice] = useState(existingPost?.price != null ? Number(existingPost.price).toLocaleString('es-CL') : '')
   const [isNegotiable, setIsNegotiable] = useState(existingPost?.is_negotiable === true)
   const [category, setCategory] = useState(existingPost?.category || '')
@@ -250,15 +250,22 @@ function CreatePost({ onClose, onPublished, startWith, existingPost = null }) {
 
   // Pedido Vecinal
   const [rubro, setRubro] = useState(existingPost?.service_key || '')
+  const [servicePhone, setServicePhone] = useState(existingPost?.service_phone || '')
+  const [serviceWhatsapp, setServiceWhatsapp] = useState(existingPost?.service_whatsapp || '')
+  const [serviceInstagram, setServiceInstagram] = useState(existingPost?.service_instagram || '')
   const [budget, setBudget] = useState('')
   const [budgetOpen, setBudgetOpen] = useState(false)
   const [plazo, setPlazo] = useState('')
 
   // Alerta vecinal
-  const [alertCategory, setAlertCategory] = useState('')
-  const [alertLocation, setAlertLocation] = useState('')
+  const [alertCategory, setAlertCategory] = useState(existingPost?.category || '')
+  const [alertLocation, setAlertLocation] = useState(existingPost?.location_text || '')
   const [mapaAbierto, setMapaAbierto] = useState(false)
-  const [pinCoords, setPinCoords] = useState(null)
+  const [pinCoords, setPinCoords] = useState(() => {
+    const lat = existingPost?.latitude ?? existingPost?.lat
+    const lng = existingPost?.longitude ?? existingPost?.lng
+    return lat != null && lng != null ? { lat: Number(lat), lng: Number(lng) } : null
+  })
   const [barrioCoords, setBarrioCoords] = useState(null)
   const [userCoords, setUserCoords] = useState(null)
   const [searchQ, setSearchQ] = useState('')
@@ -690,9 +697,7 @@ function CreatePost({ onClose, onPublished, startWith, existingPost = null }) {
       }
 
       if (t === 'alert') {
-        const incident = {
-          reporter_id: profile.id,
-          neighborhood_id: profile.neighborhood_id,
+        const incidentData = {
           title: title.trim(),
           description: content.trim(),
           category: alertCategory,
@@ -701,6 +706,25 @@ function CreatePost({ onClose, onPublished, startWith, existingPost = null }) {
           longitude: pinCoords?.lng || null,
           images: urls.length > 0 ? urls : null,
           expires_at: calcExpiresAt(alertCategory),
+        }
+
+        if (editing) {
+          const { error: updateErr } = await supabase
+            .from('incident_reports')
+            .update(incidentData)
+            .eq('id', existingPost.id)
+          if (updateErr) throw updateErr
+
+          clearDraft()
+          setStep('success')
+          setTimeout(() => { onPublished?.('alert'); onClose?.() }, 1400)
+          return
+        }
+
+        const incident = {
+          ...incidentData,
+          reporter_id: profile.id,
+          neighborhood_id: profile.neighborhood_id,
           status: 'pendiente',
           confirms_count: 0,
         }
@@ -728,7 +752,7 @@ function CreatePost({ onClose, onPublished, startWith, existingPost = null }) {
         }
         clearDraft()
         setStep('success')
-        setTimeout(() => { onPublished?.(); onClose?.() }, 1400)
+        setTimeout(() => { onPublished?.('alert'); onClose?.() }, 1400)
         return
       }
 
@@ -758,6 +782,10 @@ function CreatePost({ onClose, onPublished, startWith, existingPost = null }) {
         post.service_key = rubro
         post.category = rubro
         post.price = price ? toNumber(price) : null
+        post.service_phone = servicePhone.trim() || null
+        post.service_whatsapp = serviceWhatsapp.trim() || null
+        post.service_instagram = serviceInstagram.trim().replace(/^@/, '') || null
+        if (!editing) post.status = 'pending'
       } else if (t === 'event') {
         post.category = eventType
         post.starts_at = new Date(eventStartsAt).toISOString()
@@ -950,6 +978,8 @@ function CreatePost({ onClose, onPublished, startWith, existingPost = null }) {
               ? 'Tu alerta ya llegó a tus vecinos'
               : selectedType.id === 'event'
               ? 'Tu evento ya está visible para el barrio'
+              : selectedType.id === 'service'
+              ? 'Tu servicio fue enviado y aparecerá cuando sea aprobado'
               : 'Tus vecinos ya lo pueden ver'}
           </div>
         </div>
@@ -1543,6 +1573,11 @@ function CreatePost({ onClose, onPublished, startWith, existingPost = null }) {
                 style={s.priceInput}
               />
             </div>
+
+            <label style={s.label}>Datos de contacto <span style={s.optional}>(opcionales)</span></label>
+            <input type="tel" placeholder="Teléfono" value={servicePhone} onChange={(e) => setServicePhone(e.target.value)} style={s.input} />
+            <input type="tel" placeholder="WhatsApp" value={serviceWhatsapp} onChange={(e) => setServiceWhatsapp(e.target.value)} style={{ ...s.input, marginTop: 8 }} />
+            <input type="text" placeholder="Instagram (sin @)" value={serviceInstagram} onChange={(e) => setServiceInstagram(e.target.value)} style={{ ...s.input, marginTop: 8 }} />
 
             <Fotos images={images} previews={previews} onUpload={handleImageUpload} onRemove={removeImage} />
           </div>

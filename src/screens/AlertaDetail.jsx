@@ -53,8 +53,8 @@ const IcoShare = (p) => (
 const IcoFlag = (p) => (
   <Ico {...p}><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z" /><line x1="4" y1="22" x2="4" y2="15" /></Ico>
 )
-const IcoReloj = (p) => (
-  <Ico {...p}><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></Ico>
+const IcoEditar = (p) => (
+  <Ico {...p}><path d="M12 20h9" /><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L8 18l-4 1 1-4Z" /></Ico>
 )
 const IcoCerrar = (p) => (
   <Ico {...p}><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></Ico>
@@ -103,6 +103,19 @@ function getTipoInfo(alert) {
   return FALLBACK_TIPO
 }
 
+function getAlertImages(value) {
+  if (Array.isArray(value)) return value.filter((url) => typeof url === 'string' && url.trim())
+  if (typeof value !== 'string' || !value.trim()) return []
+  try {
+    const parsed = JSON.parse(value)
+    return Array.isArray(parsed)
+      ? parsed.filter((url) => typeof url === 'string' && url.trim())
+      : [value]
+  } catch {
+    return [value]
+  }
+}
+
 const SEVERIDAD = {
   alta:  { label: 'Severidad alta',  bg: C.rojo,   emoji: '🔴' },
   media: { label: 'Severidad media', bg: C.dorado, emoji: '🟡' },
@@ -135,8 +148,9 @@ const KEYFRAMES = `
 // ──────────────────────────────────────────────────────────────
 // COMPONENTE PRINCIPAL
 // ──────────────────────────────────────────────────────────────
-function AlertaDetail({ alertId, currentUser, onNavigate }) {
+function AlertaDetail({ alertId, currentUser, onNavigate, onEdit }) {
   const [alert, setAlert] = useState(null)
+  const [currentProfile, setCurrentProfile] = useState(null)
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState('')   // error de carga (red)
   const [notFound, setNotFound] = useState(false)  // 404 (no existe)
@@ -151,6 +165,7 @@ function AlertaDetail({ alertId, currentUser, onNavigate }) {
   const [resolving, setResolving] = useState(false)
   const [toast, setToast] = useState('')
   const [showReportModal, setShowReportModal] = useState(false)
+  const [activeImageIndex, setActiveImageIndex] = useState(0)
 
   const toastTimer = useRef(null)
   const inputRef = useRef(null)
@@ -174,7 +189,7 @@ function AlertaDetail({ alertId, currentUser, onNavigate }) {
     try {
       const { data, error } = await supabase
         .from('incident_reports')
-        .select('*, reporter:profiles!reporter_id (full_name, avatar_url, badge_founder, verified)')
+        .select('*, reporter:profiles!reporter_id (id, user_id, full_name, avatar_url, badge_founder, verified)')
         .eq('id', alertId)
         .single()
 
@@ -188,6 +203,7 @@ function AlertaDetail({ alertId, currentUser, onNavigate }) {
         setLoading(false)
         return
       }
+      setActiveImageIndex(0)
       setAlert(data)
       setLoading(false)
     } catch (err) {
@@ -196,28 +212,27 @@ function AlertaDetail({ alertId, currentUser, onNavigate }) {
     }
   }
 
+  const cargarPerfilActual = async () => {
+    if (!currentUser?.id) return
+    const { data } = await supabase
+      .from('profiles')
+      .select('id, user_id, full_name, avatar_url, verified')
+      .eq('user_id', currentUser.id)
+      .maybeSingle()
+    setCurrentProfile(data || null)
+  }
+
   /* ─────────── CARGA DE COMENTARIOS ─────────── */
   const cargarComentarios = async () => {
     setCommentsLoading(true)
     setCommentsError(false)
     try {
-      // El esquema nominal de `comments` usa post_id + author_id + content.
-      // Si por algun motivo la columna post_id no existe (algun deploy usa
-      // incident_id), reintentamos con esa columna. Si ambos fallan, mostramos
-      // "Sin comentarios todavia" sin romper la pantalla.
       const sel = '*, profiles!comments_author_id_fkey(full_name, avatar_url)'
-      let r = await supabase
+      const r = await supabase
         .from('comments')
         .select(sel)
-        .eq('post_id', alertId)
+        .eq('incident_id', alertId)
         .order('created_at', { ascending: true })
-      if (r.error) {
-        r = await supabase
-          .from('comments')
-          .select(sel)
-          .eq('incident_id', alertId)
-          .order('created_at', { ascending: true })
-      }
       if (r.error) throw r.error
       setComments(r.data || [])
     } catch (err) {
@@ -237,6 +252,7 @@ function AlertaDetail({ alertId, currentUser, onNavigate }) {
       return
     }
     cargarAlerta()
+    cargarPerfilActual()
     cargarComentarios()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [alertId])
@@ -248,7 +264,7 @@ function AlertaDetail({ alertId, currentUser, onNavigate }) {
       .channel(`alerta-detail-${alertId}`)
       .on(
         'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'comments', filter: `post_id=eq.${alertId}` },
+        { event: 'INSERT', schema: 'public', table: 'comments', filter: `incident_id=eq.${alertId}` },
         async (payload) => {
           const nuevo = payload.new
           if (!nuevo) return
@@ -289,7 +305,7 @@ function AlertaDetail({ alertId, currentUser, onNavigate }) {
   /* ─────────── ENVIAR COMENTARIO ─────────── */
   const enviarComentario = async () => {
     const text = nuevoComentario.trim()
-    if (!text || enviando || !currentUser?.id) return
+    if (!text || enviando || !currentProfile?.id) return
 
     setEnviando(true)
     const textoLocal = text
@@ -300,28 +316,23 @@ function AlertaDetail({ alertId, currentUser, onNavigate }) {
     const tempId = `temp-${Date.now()}`
     const optimisticComment = {
       id: tempId,
-      post_id: alertId,
-      author_id: currentUser.id,
+      incident_id: alertId,
+      author_id: currentProfile.id,
       content: textoLocal,
       created_at: new Date().toISOString(),
-      profiles: null, // se hidrata despues
+      profiles: currentProfile,
       _optimistic: true,
     }
     setComments((prev) => [...prev, optimisticComment])
 
     try {
-      // El esquema nominal usa post_id + author_id + content. Si post_id no
-      // existe en el deploy del user, reintentamos con incident_id.
       const sel = '*, profiles!comments_author_id_fkey(full_name, avatar_url)'
-      const build = (col) => ({
-        [col]: alertId,
-        author_id: currentUser.id,
+      const payload = {
+        incident_id: alertId,
+        author_id: currentProfile.id,
         content: textoLocal,
-      })
-      let r = await supabase.from('comments').insert(build('post_id')).select(sel).single()
-      if (r.error) {
-        r = await supabase.from('comments').insert(build('incident_id')).select(sel).single()
       }
+      const r = await supabase.from('comments').insert(payload).select(sel).single()
       const { data, error } = r
       if (error) throw error
 
@@ -339,7 +350,7 @@ function AlertaDetail({ alertId, currentUser, onNavigate }) {
           const { data: prof } = await supabase
             .from('profiles')
             .select('full_name, avatar_url, verified')
-            .eq('id', currentUser.id)
+            .eq('id', currentProfile.id)
             .maybeSingle()
           if (prof) {
             setComments((prev) =>
@@ -360,7 +371,7 @@ function AlertaDetail({ alertId, currentUser, onNavigate }) {
 
   /* ─────────── MARCAR COMO RESUELTA ─────────── */
   const marcarResuelta = async () => {
-    if (!alert || alert.reporter_id !== currentUser?.id || resolving) return
+    if (!alert || alert.reporter_id !== currentProfile?.id || resolving) return
     setResolving(true)
     try {
       const { error } = await supabase
@@ -368,7 +379,7 @@ function AlertaDetail({ alertId, currentUser, onNavigate }) {
         .update({
           status: 'resuelto',
           resolved_at: new Date().toISOString(),
-          resolved_by: currentUser?.id,
+          resolved_by: currentProfile.id,
         })
         .eq('id', alert.id)
       if (error) throw error
@@ -447,12 +458,16 @@ function AlertaDetail({ alertId, currentUser, onNavigate }) {
   /* ─────────── DATOS DERIVADOS ─────────── */
   const tipo = getTipoInfo(alert)
   const autor = alert.reporter || alert.profiles || {}
-  const esAutor = alert.reporter_id === currentUser?.id
+  const esAutor = !!currentProfile?.id && alert.reporter_id === currentProfile.id
   const estaResuelta = alert.status === 'resuelto'
   const severidad = alert.severity ? SEVERIDAD[alert.severity] : null
-  const tieneMapa = alert.lat != null && alert.lng != null &&
-    !Number.isNaN(Number(alert.lat)) && !Number.isNaN(Number(alert.lng))
+  const alertLat = alert.latitude ?? alert.lat
+  const alertLng = alert.longitude ?? alert.lng
+  const tieneMapa = alertLat != null && alertLng != null &&
+    !Number.isNaN(Number(alertLat)) && !Number.isNaN(Number(alertLng))
   const titulo = alert.title || alert.category || tipo.label || 'Alerta'
+  const imagenes = getAlertImages(alert.images)
+  const imagenPrincipal = imagenes[activeImageIndex] || imagenes[0]
 
   return (
     <div style={s.wrap}>
@@ -479,32 +494,64 @@ function AlertaDetail({ alertId, currentUser, onNavigate }) {
             </div>
           )}
 
-          {/* ── HERO ── */}
-          <div style={{ ...s.hero, background: tipo.bg, borderColor: tipo.color }}>
-            <div style={{ ...s.heroBanda, background: tipo.color }} />
-            <div style={s.heroCuerpo}>
-              <div style={{ ...s.heroIcono, background: '#fff', color: tipo.color }}>
-                <span style={{ fontSize: 34, lineHeight: 1 }}>{tipo.emoji}</span>
+          {/* ── FOTO PRINCIPAL + TIRA DE FOTOS ── */}
+          {imagenes.length > 0 ? (
+            <div style={s.gallery}>
+              <img src={imagenPrincipal} alt={titulo} style={s.galleryMain} />
+              <div style={s.galleryThumbs}>
+                {imagenes.slice(0, 3).map((url, index) => (
+                  <button
+                    key={`${url}-${index}`}
+                    style={{
+                      ...s.galleryThumbBtn,
+                      borderColor: activeImageIndex === index ? C.verde : 'transparent',
+                    }}
+                    onClick={() => setActiveImageIndex(index)}
+                    aria-label={`Ver foto ${index + 1}`}
+                  >
+                    <img src={url} alt='' style={s.galleryThumb} />
+                    {index === 2 && imagenes.length > 3 && (
+                      <span style={s.galleryMore}>+{imagenes.length - 3}</span>
+                    )}
+                  </button>
+                ))}
               </div>
-              <div style={s.heroLabel} >
-                <span style={{ color: tipo.color }}>{tipo.label}</span>
-              </div>
-              {severidad && (
-                <span style={{ ...s.heroSev, background: severidad.bg }}>
-                  {severidad.emoji} {severidad.label}
-                </span>
-              )}
             </div>
-          </div>
+          ) : (
+            <div style={{ ...s.hero, background: tipo.bg, borderColor: tipo.color }}>
+              <div style={{ ...s.heroBanda, background: tipo.color }} />
+              <div style={s.heroCuerpo}>
+                <div style={{ ...s.heroIcono, background: '#fff', color: tipo.color }}>
+                  <span style={{ fontSize: 34, lineHeight: 1 }}>{tipo.emoji}</span>
+                </div>
+                <div style={s.heroLabel} >
+                  <span style={{ color: tipo.color }}>{tipo.label}</span>
+                </div>
+                {severidad && (
+                  <span style={{ ...s.heroSev, background: severidad.bg }}>
+                    {severidad.emoji} {severidad.label}
+                  </span>
+                )}
+              </div>
+            </div>
+          )}
 
           {/* ── TITULO + FECHA + AUTOR ── */}
           <div style={s.tituloBlock}>
+            {imagenes.length > 0 && (
+              <div style={s.tipoBadgeRow}>
+                <span style={{ ...s.tipoBadge, background: tipo.bg, color: tipo.color }}>
+                  {tipo.emoji} {tipo.label}
+                </span>
+                {severidad && (
+                  <span style={{ ...s.tipoBadge, background: severidad.bg, color: '#fff' }}>
+                    {severidad.emoji} {severidad.label}
+                  </span>
+                )}
+              </div>
+            )}
             <h1 style={s.titulo}>{titulo}</h1>
             <div style={s.meta}>
-              <span style={s.metaItem}>
-                <IcoReloj size={12} />
-                <span>{hace(alert.created_at)}</span>
-              </span>
               {tieneMapa && (
                 <span style={s.metaItem}>
                   <IcoPin size={12} />
@@ -524,7 +571,7 @@ function AlertaDetail({ alertId, currentUser, onNavigate }) {
                   {autor.full_name || 'Vecino del barrio'}
                   {autor.verified && <span style={s.verifiedDot}>✓</span>}
                 </div>
-                <div style={s.autorSub}>Reportó esta alerta</div>
+                <div style={s.autorSub}>Reportó esta alerta · {hace(alert.created_at)}</div>
               </div>
             </div>
           </div>
@@ -532,7 +579,7 @@ function AlertaDetail({ alertId, currentUser, onNavigate }) {
           {/* ── DESCRIPCION ── */}
           {alert.description && (
             <div style={s.section}>
-              <div style={s.sectionTit}>Qué está pasando</div>
+              <div style={{ ...s.sectionTit, marginBottom: 8 }}>Qué está pasando</div>
               <div style={s.descBox}>
                 <div style={s.descTxt}>{alert.description}</div>
               </div>
@@ -542,10 +589,10 @@ function AlertaDetail({ alertId, currentUser, onNavigate }) {
           {/* ── MAPA ── */}
           {tieneMapa && (
             <div style={s.section}>
-              <div style={s.sectionTit}>Ubicación</div>
+              <div style={{ ...s.sectionTit, marginBottom: 8 }}>Ubicación</div>
               <MiniMap
-                lat={Number(alert.lat)}
-                lng={Number(alert.lng)}
+                lat={Number(alertLat)}
+                lng={Number(alertLng)}
                 height={200}
                 color={tipo.color}
               />
@@ -558,6 +605,19 @@ function AlertaDetail({ alertId, currentUser, onNavigate }) {
 
           {/* ── ACCIONES ── */}
           <div style={s.acciones}>
+            {esAutor && (
+              <button
+                style={{ ...s.accionBtn, color: C.verdeOsc }}
+                onClick={() => onEdit?.({
+                  ...alert,
+                  type: 'alert',
+                  content: alert.description || '',
+                })}
+              >
+                <IcoEditar size={16} />
+                <span>Editar</span>
+              </button>
+            )}
             <button style={s.accionBtn} onClick={compartir}>
               <IcoShare size={16} />
               <span>Compartir</span>
@@ -635,7 +695,7 @@ function AlertaDetail({ alertId, currentUser, onNavigate }) {
               enviarComentario()
             }
           }}
-          disabled={enviando}
+          disabled={enviando || !currentProfile?.id}
         />
         <button
           style={{
@@ -645,7 +705,7 @@ function AlertaDetail({ alertId, currentUser, onNavigate }) {
               : { background: C.fondo, color: C.textoTenue }),
           }}
           onClick={enviarComentario}
-          disabled={!nuevoComentario.trim() || enviando}
+          disabled={!nuevoComentario.trim() || enviando || !currentProfile?.id}
           aria-label='Enviar comentario'
         >
           <IcoEnviar size={18} />
@@ -893,6 +953,39 @@ const s = {
     fontSize: 13, fontWeight: 700, color: C.verdeOsc,
   },
 
+  /* ── galería de evidencia ── */
+  gallery: { marginTop: 14 },
+  galleryMain: {
+    width: '100%', height: 190,
+    display: 'block', objectFit: 'cover',
+    borderRadius: 16,
+    background: C.bordeSuave,
+  },
+  galleryThumbs: {
+    display: 'flex', gap: 8,
+    marginTop: 8,
+  },
+  galleryThumbBtn: {
+    position: 'relative',
+    width: 'calc((100% - 16px) / 3)', height: 58,
+    padding: 2, borderRadius: 10,
+    border: '2px solid transparent',
+    overflow: 'hidden', background: C.card,
+    cursor: 'pointer', flexShrink: 0,
+  },
+  galleryThumb: {
+    width: '100%', height: '100%',
+    display: 'block', objectFit: 'cover',
+    borderRadius: 7,
+  },
+  galleryMore: {
+    position: 'absolute', inset: 2,
+    borderRadius: 7,
+    background: 'rgba(18, 29, 22, 0.55)', color: '#fff',
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    fontSize: 14, fontWeight: 800,
+  },
+
   /* ── hero ── */
   hero: {
     position: 'relative',
@@ -927,6 +1020,15 @@ const s = {
 
   /* ── titulo + autor ── */
   tituloBlock: { padding: '18px 0 4px' },
+  tipoBadgeRow: {
+    display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 7,
+    marginBottom: 9,
+  },
+  tipoBadge: {
+    display: 'inline-flex', alignItems: 'center', gap: 5,
+    padding: '5px 9px', borderRadius: 999,
+    fontSize: 11, fontWeight: 700,
+  },
   titulo: {
     fontSize: 21, fontWeight: 800, color: C.texto,
     margin: 0, lineHeight: 1.25, letterSpacing: '-0.3px',

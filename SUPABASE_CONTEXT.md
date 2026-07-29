@@ -119,6 +119,7 @@ consulta `.from('<tabla>')` o en el archivo SQL versionado.
 - `created_at` (timestamptz) [CONFIRMADO — `.order('created_at', ...)` en múltiples pantallas]
 - `lat`, `lng` [CONFIRMADO — `Marketplace.jsx` select incluye `lat, lng`]
 - `image_url` / imágenes [INFERIDO — `CreatePost.jsx` sube a bucket `posts` y guarda URL]
+- `service_phone`, `service_whatsapp`, `service_instagram` (text, nullable) [VERSIONADO — migración `202607290011_service_contacts.sql`; contacto público opcional de publicaciones `service`]
 
 ### `incident_reports` [CONFIRMADO]
 - `id` [CONFIRMADO]

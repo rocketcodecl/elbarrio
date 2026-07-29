@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 
 // keyframes del spinner. Se inyectan una sola vez.
@@ -90,6 +90,9 @@ function ChatList({ currentUser, onNavigate }) {
   const [conversations, setConversations] = useState([])
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
+  const [refreshing, setRefreshing] = useState(false)
+  const [pullDistance, setPullDistance] = useState(0)
+  const pullStartYRef = useRef(null)
 
   const myProfileId = currentUser?.profileId || currentUser?.id
   const myIds = [...new Set([myProfileId, currentUser?.id].filter(Boolean))]
@@ -255,6 +258,26 @@ function ChatList({ currentUser, onNavigate }) {
     }
   }
 
+  const onPullStart = event => {
+    if (event.currentTarget.scrollTop > 0 || refreshing) return
+    pullStartYRef.current = event.touches?.[0]?.clientY ?? null
+  }
+  const onPullMove = event => {
+    if (pullStartYRef.current == null || event.currentTarget.scrollTop > 0) return
+    const currentY = event.touches?.[0]?.clientY
+    if (currentY == null) return
+    setPullDistance(Math.max(0, Math.min((currentY - pullStartYRef.current) * 0.42, 68)))
+  }
+  const onPullEnd = async () => {
+    const shouldRefresh = pullDistance >= 44
+    pullStartYRef.current = null
+    setPullDistance(0)
+    if (!shouldRefresh || refreshing) return
+    setRefreshing(true)
+    await loadConversations()
+    setRefreshing(false)
+  }
+
   // Filtrar en vivo por buscador
   const filteredConversations = conversations.filter(c => 
     c.otherUser.fullName.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -315,7 +338,8 @@ function ChatList({ currentUser, onNavigate }) {
       </div>
 
       {/* ÁREA DE CONTENIDO */}
-      <div style={s.scrollArea}>
+      <div style={s.scrollArea} onTouchStart={onPullStart} onTouchMove={onPullMove} onTouchEnd={onPullEnd} onTouchCancel={onPullEnd}>
+        <div style={{ ...s.pullRefresh, height: refreshing ? 38 : pullDistance, opacity: refreshing ? 1 : Math.min(pullDistance / 44, 1) }}><span style={{ ...s.pullRefreshIcon, transform: refreshing ? undefined : `rotate(${Math.min(pullDistance * 4, 180)}deg)`, animation: refreshing ? 'clSpin 750ms linear infinite' : 'none' }}>↻</span><span>{refreshing ? 'Actualizando' : 'Suelta para actualizar'}</span></div>
         {filteredConversations.length === 0 ? (
           <div style={s.empty}>
             <div style={s.emptyIconBox}>
@@ -500,6 +524,8 @@ const s = {
     backgroundColor: '#f4f7f4', // Fondo sutil para destacar las cards blancas estilo Airbnb
     WebkitOverflowScrolling: 'touch'
   },
+  pullRefresh: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7, overflow: 'hidden', color: '#166534', fontSize: 10.5, fontWeight: 600, transition: 'height 180ms ease, opacity 140ms ease' },
+  pullRefreshIcon: { width: 18, height: 18, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', color: '#16a34a', fontSize: 18, lineHeight: 1 },
 
   list: {
     display: 'flex',

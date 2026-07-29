@@ -27,6 +27,7 @@ button, input, textarea, select {
 
 /* Frame de iPhone para simular mobile */
 .phone-frame {
+  --home-header-safe-top: 34px;
   width: 393px;
   height: 852px;
   background: #FAFAF7;
@@ -86,10 +87,14 @@ button, input, textarea, select {
     background: #FAFAF7;
   }
   .phone-frame {
+    --home-header-safe-top: max(env(safe-area-inset-top, 0px), 12px);
     width: 100%;
     height: 100vh;
     border-radius: 0;
     box-shadow: none;
+  }
+  .phone-content {
+    padding-top: 0 !important;
   }
   .phone-notch,
   .phone-home-indicator {

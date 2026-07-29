@@ -42,6 +42,7 @@ const initialState = event => ({
   event_requires_registration: !!event?.event_requires_registration,
   event_registration_url: event?.event_registration_url || '',
   event_show_attendees: event?.event_show_attendees !== false,
+  show_in_activity: event?.show_in_activity === true,
   status: event?.status || 'active',
 })
 
@@ -125,6 +126,7 @@ export default function EventEditor({ event, profile, onBack, onSaved }) {
       event_requires_registration: draft.event_requires_registration,
       event_registration_url: draft.event_requires_registration ? (draft.event_registration_url.trim() || null) : null,
       event_show_attendees: draft.event_show_attendees,
+      show_in_activity: draft.show_in_activity,
       status: draft.status,
     }
 
@@ -205,6 +207,11 @@ export default function EventEditor({ event, profile, onBack, onSaved }) {
         <section className="editor-section">
           <div className="editor-section-title"><span>4</span><div><h2>Visibilidad</h2><p>Un evento pausado deja de aparecer en la aplicación.</p></div></div>
           <div className="event-status-row"><button type="button" className={draft.status === 'active' ? 'is-selected' : ''} onClick={() => set('status', 'active')}>● Publicado</button><button type="button" className={draft.status !== 'active' ? 'is-selected' : ''} onClick={() => set('status', 'closed')}>○ Pausado</button></div>
+          <label className={`activity-feed-toggle ${draft.show_in_activity ? 'is-selected' : ''}`}>
+            <input type="checkbox" checked={draft.show_in_activity} onChange={e => set('show_in_activity', e.target.checked)} />
+            <span>📣</span>
+            <div><strong>Mostrar también en Actividad</strong><small>Aparecerá mezclado con la actividad vecinal, además del feed de Eventos.</small></div>
+          </label>
         </section>
 
         <footer className="commerce-editor-footer"><button className="button button-secondary" type="button" onClick={onBack}>Cancelar</button><button className="button button-primary" type="submit" disabled={saving || uploading}>{saving ? 'Guardando…' : event ? 'Guardar cambios' : 'Publicar evento'}</button></footer>

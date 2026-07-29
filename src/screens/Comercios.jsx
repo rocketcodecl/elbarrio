@@ -1185,6 +1185,9 @@ function Comercios({ currentUser, onNavigate, onCrear, onEditar }) {
   const [busqueda, setBusqueda] = useState('')
   const [featuredIndex, setFeaturedIndex] = useState(0)
   const [featuredOrder, setFeaturedOrder] = useState([])
+  const [refrescando, setRefrescando] = useState(false)
+  const [pullDistance, setPullDistance] = useState(0)
+  const pullStartYRef = useRef(null)
   const featuredScrollRef = useRef(null)
   const featuredPausedRef = useRef(false)
   const featuredResumeTimerRef = useRef(null)
@@ -1200,12 +1203,12 @@ function Comercios({ currentUser, onNavigate, onCrear, onEditar }) {
     )
   }, [])
 
-  const cargar = async () => {
+  const cargar = async ({ silencioso = false } = {}) => {
     if (!currentUser?.id) {
       setCargando(false)
       return
     }
-    setCargando(true)
+    if (!silencioso) setCargando(true)
     try {
       const { data: p } = await supabase
         .from('profiles').select('*')
@@ -1243,8 +1246,28 @@ function Comercios({ currentUser, onNavigate, onCrear, onEditar }) {
     } catch (err) {
       console.error('Error cargando comercios:', err)
     } finally {
-      setCargando(false)
+      if (!silencioso) setCargando(false)
     }
+  }
+
+  const onPullStart = event => {
+    if (event.currentTarget.scrollTop > 0 || refrescando) return
+    pullStartYRef.current = event.touches?.[0]?.clientY ?? null
+  }
+  const onPullMove = event => {
+    if (pullStartYRef.current == null || event.currentTarget.scrollTop > 0) return
+    const currentY = event.touches?.[0]?.clientY
+    if (currentY == null) return
+    setPullDistance(Math.max(0, Math.min((currentY - pullStartYRef.current) * 0.42, 68)))
+  }
+  const onPullEnd = async () => {
+    const shouldRefresh = pullDistance >= 44
+    pullStartYRef.current = null
+    setPullDistance(0)
+    if (!shouldRefresh || refrescando) return
+    setRefrescando(true)
+    await cargar({ silencioso: true })
+    setRefrescando(false)
   }
 
   const filtrados = comercios.filter((c) => {
@@ -1384,6 +1407,7 @@ function Comercios({ currentUser, onNavigate, onCrear, onEditar }) {
           from { opacity: 0.7; transform: translate3d(0, 100%, 0); }
           to { opacity: 1; transform: translate3d(0, 0, 0); }
         }
+        @keyframes commerceRefreshSpin { to { transform: rotate(360deg); } }
         @media (prefers-reduced-motion: reduce) {
           .commerce-feed-header { animation: none !important; }
           .commerce-basic-motion,
@@ -1458,7 +1482,8 @@ function Comercios({ currentUser, onNavigate, onCrear, onEditar }) {
       </div>
 
       {/* LISTADO — una sola lista, sin secciones */}
-      <div style={s.scroll}>
+      <div style={s.scroll} onTouchStart={onPullStart} onTouchMove={onPullMove} onTouchEnd={onPullEnd} onTouchCancel={onPullEnd}>
+        <div style={{ ...s.pullRefresh, height: refrescando ? 38 : pullDistance, opacity: refrescando ? 1 : Math.min(pullDistance / 44, 1) }}><span style={{ ...s.pullRefreshIcon, transform: refrescando ? undefined : `rotate(${Math.min(pullDistance * 4, 180)}deg)`, animation: refrescando ? 'commerceRefreshSpin 750ms linear infinite' : 'none' }}>↻</span><span>{refrescando ? 'Actualizando' : 'Suelta para actualizar'}</span></div>
         {cargando ? (
           <div style={s.cargando}>
             <img src="/isotipo.png" alt="" style={{ width: 58, opacity: 0.4 }} />
@@ -1688,6 +1713,8 @@ const s = {
     padding: '4px 16px 0',
     WebkitOverflowScrolling: 'touch',
   },
+  pullRefresh: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7, overflow: 'hidden', color: C.verdeOsc, fontSize: 10.5, fontWeight: 600, transition: 'height 180ms ease, opacity 140ms ease' },
+  pullRefreshIcon: { width: 18, height: 18, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', color: C.verde, fontSize: 18, lineHeight: 1 },
   feedSection: { marginBottom: 36 },
   feedHeading: {
     display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8,

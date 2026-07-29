@@ -27,6 +27,7 @@ import CommerceForm from './components/CommerceForm'
 
 /* ── TASK 59: pantallas nuevas (Services, Events, Notifications, AlertaDetail) ── */
 import Services from './screens/Services'
+import ServiceDetail from './screens/ServiceDetail'
 import Events from './screens/Events'
 import EventDetail from './screens/EventDetail'
 import Notifications from './screens/Notifications'
@@ -76,7 +77,9 @@ export default function App() {
   const [createOpen, setCreateOpen] = useState(false)
   const [createType, setCreateType] = useState(null)
   const [editingPost, setEditingPost] = useState(null)
+  const [homeRevision, setHomeRevision] = useState(0)
   const [eventsRevision, setEventsRevision] = useState(0)
+  const [detailRevision, setDetailRevision] = useState(0)
   const [noLeidos, setNoLeidos] = useState(0)
   const [navigationMotion, setNavigationMotion] = useState('forward')
   const historyRef = useRef([])
@@ -236,7 +239,7 @@ export default function App() {
       return
     }
 
-    const subScreens = ['post', 'productdetail', 'eventdetail', 'chatconversation', 'dealdone', 'alerta', 'notificaciones', 'sellerprofile', 'noticias', 'admin', 'adminfarmacias', 'admincomercios', 'adminusuarios', 'adminincidentes', 'settings', 'about', 'terms', 'prohibited', 'invite', 'contact']
+    const subScreens = ['post', 'productdetail', 'servicedetail', 'eventdetail', 'chatconversation', 'dealdone', 'alerta', 'notificaciones', 'sellerprofile', 'noticias', 'admin', 'adminfarmacias', 'admincomercios', 'adminusuarios', 'adminincidentes', 'settings', 'about', 'terms', 'prohibited', 'invite', 'contact']
     if (subScreens.includes(lower)) {
       setNavigationMotion('forward')
       historyRef.current.push({ screen: currentScreen, params })
@@ -252,6 +255,8 @@ export default function App() {
 
     if (lower === 'post' || lower === 'productdetail') {
       setCurrentScreen('productDetail')
+    } else if (lower === 'servicedetail') {
+      setCurrentScreen('serviceDetail')
     } else if (lower === 'eventdetail') {
       setCurrentScreen('eventDetail')
     } else if (lower === 'chatconversation') {
@@ -345,13 +350,17 @@ export default function App() {
     }
     else if (publishedType === 'service') setActiveTab('servicios')
     else if (['sell', 'gift', 'trade'].includes(publishedType)) setActiveTab('mercado')
-    else setActiveTab('inicio')
+    else {
+      setHomeRevision(value => value + 1)
+      setActiveTab('inicio')
+    }
   }, [])
 
   const onActualizado = useCallback(() => {
     setCreateOpen(false)
     setCreateType(null)
     setEditingPost(null)
+    setDetailRevision(value => value + 1)
   }, [])
 
   const onChangeTab = useCallback((tabId) => {
@@ -369,13 +378,13 @@ export default function App() {
 
   /* ── SCREEN RENDER ── */
   const flowScreens = ['splash', 'onboarding', 'register', 'profile', 'verification', 'complete']
-  const modalScreens = ['productDetail', 'chatConversation', 'dealDone', 'alertaDetail', 'notificaciones', 'sellerProfile', 'noticiasScreen', 'admin', 'adminFarmacias', 'adminComercios', 'adminUsuarios', 'adminIncidentes', 'settings', 'about', 'terms', 'prohibited', 'invite', 'contact']
+  const modalScreens = ['productDetail', 'serviceDetail', 'chatConversation', 'dealDone', 'alertaDetail', 'notificaciones', 'sellerProfile', 'noticiasScreen', 'admin', 'adminFarmacias', 'adminComercios', 'adminUsuarios', 'adminIncidentes', 'settings', 'about', 'terms', 'prohibited', 'invite', 'contact']
   const isModalScreen = modalScreens.includes(currentScreen)
   const isCommunityScreen = ['settings', 'about', 'terms', 'prohibited', 'invite', 'contact'].includes(currentScreen)
   const isMainApp = !flowScreens.includes(currentScreen) && !isModalScreen
   const screenIdentity = currentScreen === 'main'
     ? `main-${activeTab}`
-    : `${currentScreen}-${params?.postId || params?.id || params?.sellerId || ''}`
+    : `${currentScreen}-${params?.postId || params?.id || params?.sellerId || ''}-${detailRevision}`
 
   const renderScreen = () => {
     if (loading) {
@@ -452,6 +461,9 @@ export default function App() {
     if (currentScreen === 'productDetail') {
       return <ProductDetail postId={params?.postId} currentUser={user} onNavigate={onNavigate} onEdit={onEditarPost} />
     }
+    if (currentScreen === 'serviceDetail') {
+      return <ServiceDetail postId={params?.postId} currentUser={{ ...user, profileId: profile?.id }} onNavigate={onNavigate} onEdit={onEditarPost} />
+    }
     if (currentScreen === 'eventDetail') {
       return <EventDetail postId={params?.postId} onNavigate={onNavigate} />
     }
@@ -477,6 +489,7 @@ export default function App() {
           alertId={params?.id}
           currentUser={user}
           onNavigate={onNavigate}
+          onEdit={onEditarPost}
         />
       )
     }
@@ -525,7 +538,7 @@ export default function App() {
     }
 
     /* ── MAIN APP (TABS) ── */
-    if (activeTab === 'inicio') return <Home currentUser={user} onNavigate={onNavigate} onCrear={onCrear} />
+    if (activeTab === 'inicio') return <Home key={`home-${homeRevision}`} currentUser={user} onNavigate={onNavigate} onCrear={onCrear} />
     if (activeTab === 'mercado') return <Marketplace currentUser={user} onNavigate={onNavigate} onCrear={onCrear} />
     if (activeTab === 'servicios') return <Services currentUser={user} onNavigate={onNavigate} onCrear={onCrear} />
     if (activeTab === 'eventos') return <Events key={`events-${eventsRevision}`} currentUser={user} onNavigate={onNavigate} onCrear={onCrear} />
@@ -534,7 +547,7 @@ export default function App() {
     if (activeTab === 'alertas') return <Alertas currentUser={user} onNavigate={onNavigate} onCrear={onCrear} />
     if (activeTab === 'perfil') return <MyProfile currentUser={user} onNavigate={onNavigate} onLogout={handleLogout} />
     
-    return <Home currentUser={user} onNavigate={onNavigate} onCrear={onCrear} />
+    return <Home key={`home-${homeRevision}`} currentUser={user} onNavigate={onNavigate} onCrear={onCrear} />
   }
 
   return (
@@ -590,7 +603,7 @@ export default function App() {
 
 /* ── ESTILOS ── */
 const s = {
-  contentPad: { paddingTop: 30, paddingBottom: 0 },
+  contentPad: { paddingTop: 0, paddingBottom: 0 },
   /* modalScreens (chat, noticias, sellerprofile, productDetail, alertaDetail)
      controlan su propio safe-area-top dentro de su header. Acá NO agregamos
      padding superior, para que la pantalla llegue hasta el borde superior del

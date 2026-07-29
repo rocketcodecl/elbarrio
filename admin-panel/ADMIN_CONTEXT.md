@@ -2,6 +2,8 @@
 
 ## Estado actual
 
+- El panel permite crear y editar servicios con el mismo formulario, incluyendo teléfono, WhatsApp e Instagram opcionales (requiere migración `202607290011_service_contacts.sql`). La edición conserva estado, patrocinio e imágenes si no se reemplaza la portada.
+
 - Aplicación web independiente ubicada en `admin-panel/`.
 - Construida con Vite, React, Supabase y Plus Jakarta Sans.
 - Usa el mismo proyecto Supabase que la aplicación de vecinos.
@@ -20,7 +22,8 @@
 - Resumen: implementado.
 - Comercios: implementado el directorio real, búsqueda, filtros, creación y edición completa.
 - Eventos: implementado con listado, creación, edición y pausa/publicación desde el panel.
-- Farmacias: pendiente.
+- Farmacias: implementado con listado, búsqueda, creación, edición, ubicación cartográfica, visibilidad, turno independiente, prioridad en Inicio y eliminación.
+- Noticias: implementado con listado, búsqueda, filtros, creación, edición, publicación/pausa y selección para Actividad.
 - Incidentes: implementado con bandeja de moderación, detalle, ubicación, evidencia y trazabilidad.
 - Usuarios: implementado con directorio, verificación, permisos, suspensión y trazabilidad.
 
@@ -37,8 +40,12 @@
 - El catálogo permite crear, editar, ocultar, destacar o eliminar productos de `commerce_products` desde una subpágina propia.
 - Las imágenes de productos se almacenan en el bucket público `commerces`, bajo la carpeta `products/{commerce_id}/`.
 - Los productos pertenecen a `commerce_products`, no a las publicaciones del Mercado.
+- Farmacias utiliza la tabla vigente `farmacias`. `is_active` controla si pertenece al directorio visible, `is_on_duty` si se destaca como farmacia de turno y `sort_order` cuál se presenta primero; el formulario reutiliza el selector cartográfico común para mantener dirección y coordenadas sincronizadas.
+- Noticias utiliza `posts` con `type='news'`. `news_is_official` identifica una comunicación oficial, `news_source` conserva su fuente y `show_in_activity` decide si también se integra en “Actividad de el barrio”. El editor admite hasta ocho imágenes en `posts.images`, permite escoger la portada y eliminar imágenes de la galería. Las categorías se administran en `news_categories` con nombre, ícono y visibilidad.
+- Servicios permite crear una publicación administrativa asociándola a un perfil del barrio, además de moderar y programar su visibilidad patrocinada.
 - No se incluirá ninguna llave privada o `service_role` en el navegador.
 - Los eventos usan la tabla `posts` con `type='event'`. El panel permite administrar su portada compacta 16:9, rango desde/hasta, tipo, ubicación, condiciones de entrada y visibilidad.
+- En Eventos, `active` significa publicado, `closed` pausado y reactivable, y `cancelled` cancelado definitivamente dentro del panel. La eliminación es una acción separada, irreversible y confirmada.
 - Las categorías de Eventos son globales para El Barrio. El administrador puede crearlas, editarlas, asignar un ícono u ocultarlas desde el panel; los eventos existentes conservan su categoría aunque esta se oculte para futuras publicaciones.
 - Los eventos pagados pueden definir varias tarifas con etiqueta y valor; el primer valor sigue respaldando el campo histórico `event_price`.
 - La asistencia y la opción de mostrar confirmados están deshabilitadas temporalmente por incompatibilidad entre la tabla antigua `events` y los eventos actuales almacenados en `posts`.
@@ -64,3 +71,5 @@
 - Ejecutar `supabase/migrations/202607290002_user_administration.sql` y validar el flujo completo del módulo Usuarios.
 - Ejecutar `supabase/migrations/202607290003_user_verification_activity.sql` y validar mapa, correo e historial de actividad.
 - Ejecutar `supabase/migrations/202607290004_beta_neighborhood_polygon.sql` y validar puntos dentro y fuera del barrio beta.
+- Ejecutar `supabase/migrations/202607290009_news_management.sql` y validar publicación, pausa, marca oficial y aparición opcional en Actividad.
+- Ejecutar `supabase/migrations/202607290010_news_categories.sql` y validar la administración y filtros de categorías de Noticias.

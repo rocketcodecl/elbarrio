@@ -48,6 +48,7 @@ La barra inferior muestra Inicio, Mercado, Servicios, Eventos y Chat. Comercios,
 ### Subpantallas conectadas
 
 - Detalle y edición de producto
+- Detalle propio de servicio
 - Detalle de evento
 - Conversación de chat
 - Confirmación de transacción
@@ -55,7 +56,7 @@ La barra inferior muestra Inicio, Mercado, Servicios, Eventos y Chat. Comercios,
 - Notificaciones
 - Perfil público de vendedor
 - Noticias
-- Panel administrativo y sus cuatro módulos
+- Panel administrativo y sus módulos conectados
 - Información y ayuda
 - Nosotros
 - Términos y condiciones
@@ -74,6 +75,8 @@ El botón de creación abre `CreatePost.jsx`, salvo la creación de comercios, q
 - `Marketplace.jsx` / `ProductDetail.jsx`: feed y detalle del mercado.
 - `Events.jsx` / `EventDetail.jsx`: feed y detalle de eventos; la asistencia está deshabilitada temporalmente.
 - `Services.jsx`: directorio de servicios vecinales.
+- `ServiceDetail.jsx`: ficha específica de un servicio, prestador, galería compacta y contacto.
+- `Noticias.jsx`: feed de noticias reales, filtros editoriales y lectura completa en modal con galería.
 - `Comercios.jsx` / `CommerceForm.jsx`: feed, detalle y formulario de comercios.
 - `ChatList.jsx` / `ChatConversation.jsx`: mensajería asociada a usuarios y publicaciones.
 - `MyProfile.jsx`: perfil propio y accesos personales o administrativos.
@@ -109,7 +112,7 @@ El botón de creación abre `CreatePost.jsx`, salvo la creación de comercios, q
 - `Search.jsx` tampoco está conectado actualmente.
 - La navegación seguirá siendo por estado; no se incorporará otro router sin autorización.
 - Plus Jakarta Sans es la tipografía oficial actual.
-- Las alertas destacadas del inicio deben ser oficiales, no alertas vecinales comunes.
+- Las alertas oficiales activas ocupan una franja propia bajo clima/farmacia; las alertas vecinales activas se integran en “Actividad de el barrio” junto a pedidos y publicaciones generales.
 - La sección “Alerta oficial” del Inicio solo se muestra cuando existe al menos una alerta oficial activa; si no hay ninguna, no ocupa espacio en el feed.
 - Los reportes de alerta nuevos se guardan como `pendiente` y no son visibles para los vecinos hasta que un administrador los aprueba. `active` significa publicado, `rechazado` significa descartado y `resuelto` significa cerrado. La marca `is_official` distingue las alertas que aparecen en Inicio.
 - Toda aprobación, rechazo, cambio de oficialidad o cierre se realiza mediante `admin_moderate_incident` y deja trazabilidad en `incident_admin_actions` con el perfil administrador responsable.
@@ -120,7 +123,14 @@ El botón de creación abre `CreatePost.jsx`, salvo la creación de comercios, q
 - El detalle de una publicación propia permite editarla.
 - El chat puede abrirse en modo de prueba o vista previa cuando todas las publicaciones pertenecen al mismo usuario.
 - Servicios destacados es una posición comercial identificada como patrocinada o destacada; no implica que sea el mejor servicio.
+- Los servicios nuevos se guardan con `posts.status='pending'` y no aparecen en el feed hasta ser aprobados desde el panel. El panel puede aprobar, rechazar, pausar o reactivar servicios.
+- La visibilidad patrocinada de Servicios se guarda en `posts.is_featured`, `featured_starts_at`, `featured_until` y `featured_by`; solo aparece durante su vigencia y siempre se identifica como patrocinada.
+- El panel puede crear servicios en nombre de un perfil del barrio. Los destacados se aleatorizan al cargar, avanzan automáticamente con transición suave, se pausan durante la interacción y muestran indicadores.
+- Los servicios tienen una ficha propia y no reutilizan el detalle visual del Mercado. Un precio vacío o igual a cero se presenta como `Valor a convenir`.
+- Las calificaciones de servicios usan `service_reviews`, no la tabla de comercios ni estructuras antiguas. Solo un vecino verificado puede dejar una opinión por servicio, puede editarla y no puede calificar su propio servicio. El promedio y la cantidad se consolidan en `posts.rating` y `posts.rating_count`.
 - Los eventos tienen feed y página de detalle propios; no deben reutilizar la interfaz de una publicación de venta.
+- Los eventos solo se mezclan en “Actividad de el barrio” cuando el panel activa `posts.show_in_activity`; continúan apareciendo normalmente en el feed de Eventos.
+- El panel diferencia eventos publicados (`active`), pausados (`closed`) y cancelados (`cancelled`). Pausar permite reactivar; cancelar conserva el registro sin volver a publicarlo; eliminar requiere confirmación y borra el evento definitivamente.
 - Los eventos son publicados por actores autorizados o administradores; el detalle no muestra un organizador como usuario común.
 - Los eventos contemplan opciones como entrada gratuita o pagada y condiciones como pet friendly.
 - Los eventos pueden tener un rango horario opcional (`starts_at` / `ends_at`). Sus categorías son globales y administrables desde el panel, con nombre e ícono; las categorías antiguas se conservan como respaldo visual.
@@ -142,6 +152,8 @@ El botón de creación abre `CreatePost.jsx`, salvo la creación de comercios, q
 - La verificación residencial exige dos comprobaciones: la dirección geocodificada debe quedar a un máximo de 250 metros del GPS y ese GPS debe estar dentro del polígono oficial del MVP mediante `barrio_en_punto_mvp`. El perfil conserva ambos puntos y la distancia calculada.
 - El polígono oficial del MVP está versionado en `supabase/geo/barrio_beta_polygon.geojson`; la migración `202607290004_beta_neighborhood_polygon.sql` lo asigna únicamente cuando existe exactamente un registro `neighborhoods.is_beta=true`.
 - El formato oficial de `opening_hours` es el del panel: claves numéricas de JavaScript (`0` domingo a `6` sábado). La app mantiene lectura de claves abreviadas antiguas para no invalidar comercios previos.
+- En Farmacias, `is_active` controla si una farmacia pertenece al directorio visible y `is_on_duty` indica si se destaca actualmente como de turno. La franja del Home muestra solo turnos; su modal con scroll muestra primero los turnos y luego las demás farmacias visibles.
+- Las noticias se guardan en `posts` con `type='news'`. `news_is_official` identifica comunicaciones oficiales, `news_source` guarda la fuente y `show_in_activity` controla si también aparecen en “Actividad de el barrio”. `images` admite hasta ocho imágenes desde un botón independiente del panel: la primera funciona como portada y el modal las recorre automáticamente en un carrusel con control manual. Sus categorías se administran en `news_categories` con nombre, ícono, orden y visibilidad; el feed conserva categorías conocidas como respaldo. No utiliza noticias de demostración ni reutiliza el detalle del Mercado.
 
 ## Convenciones de código
 
@@ -174,8 +186,10 @@ El botón de creación abre `CreatePost.jsx`, salvo la creación de comercios, q
 - `src/screens/Marketplace.jsx`
 - `src/screens/ProductDetail.jsx`
 - `src/screens/Services.jsx`
+- `src/screens/ServiceDetail.jsx`
 - `src/screens/Events.jsx`
 - `src/screens/EventDetail.jsx`
+- `src/screens/Noticias.jsx`
 - `src/screens/Comercios.jsx`
 - `src/components/CommerceForm.jsx`
 - `src/screens/ChatList.jsx`
@@ -187,8 +201,14 @@ El botón de creación abre `CreatePost.jsx`, salvo la creación de comercios, q
 - `admin-panel/src/App.jsx`
 - `admin-panel/src/screens/IncidentManager.jsx`
 - `admin-panel/src/screens/UserManager.jsx`
+- `admin-panel/src/screens/ServiceManager.jsx`
+- `admin-panel/src/screens/PharmacyManager.jsx`
+- `admin-panel/src/screens/NewsManager.jsx`
+- `admin-panel/src/screens/NewsCategoryManager.jsx`
 
 ## Funcionalidades terminadas
+
+- Servicios: las publicaciones normales usan tarjeta compacta desplegable en el feed; el rubro reemplaza el estado “Nuevo” en la cabecera. Teléfono, WhatsApp e Instagram son datos opcionales del servicio y se muestran en el desplegable y la ficha completa (requiere migración `202607290011_service_contacts.sql`).
 
 - Flujo de registro, login, perfil, verificación y entrada a la aplicación.
 - Feed inicial conectado a `Home.jsx`.
@@ -197,6 +217,8 @@ El botón de creación abre `CreatePost.jsx`, salvo la creación de comercios, q
 - Detalle de producto con comentarios, likes, compartir, contacto, edición y eliminación cuando corresponde.
 - Flujo de chat y contador de mensajes no leídos.
 - Feed de servicios con categorías y sección comercial de destacados.
+- Detalle propio de servicios con imagen horizontal compacta, prestador, descripción, precio opcional y contacto por chat; el autor puede abrir la edición.
+- Opiniones de servicios con 1 a 5 estrellas, comentario opcional, edición de la opinión propia y promedio visible en detalle y feed; la migración `202607290007_service_reviews.sql` está aplicada.
 - Creación de eventos con ubicación y mapa.
 - Feed de eventos, detalle independiente y tarifas múltiples. La asistencia está deshabilitada temporalmente.
 - Actualización automática del feed después de publicar un evento.
@@ -207,14 +229,18 @@ El botón de creación abre `CreatePost.jsx`, salvo la creación de comercios, q
 - La tabla `commerce_products` y sus políticas están aplicadas en Supabase; el catálogo permanece vacío hasta cargar productos.
 - Base independiente del panel web administrativo con login, validación de rol, navegación lateral y resumen general.
 - Módulo web administrativo de comercios separado en directorio, editor completo y catálogo de productos, incluida la subida de fotografías.
-- Módulo web administrativo de Eventos con listado, creación, edición y pausa/publicación; utiliza `posts` con `type='event'` y los permisos ya existentes para administradores.
+- Módulo web administrativo de Eventos con listado, creación, edición, pausa/publicación y selección para Actividad; utiliza `posts` con `type='event'` y los permisos ya existentes para administradores.
 - El módulo web de Eventos permite definir rango desde/hasta y administrar categorías con ícono. La migración correspondiente está versionada y pendiente de ejecutarse en Supabase.
 - El panel de Eventos permite varias tarifas de entrada para eventos pagados y decidir si se muestran los asistentes; las migraciones correspondientes están versionadas y pendientes de ejecutarse en Supabase.
 - Módulo web administrativo de Incidentes y alertas con listado, búsqueda, filtros, revisión de contenido, evidencia y ubicación, aprobación, rechazo, oficialización, cierre e historial de acciones administrativas.
 - Módulo web administrativo de Usuarios con listado, búsqueda, filtros, revisión de verificación, autorización de actores, asignación administrativa, suspensión, reactivación y auditoría.
+- Módulo web administrativo de Servicios con listado, búsqueda, moderación de publicaciones y programación de visibilidad patrocinada.
+- Módulo web administrativo de Farmacias con listado, búsqueda, creación, edición, mapa sincronizado, visibilidad, turno independiente, prioridad en Inicio y eliminación; utiliza la tabla vigente `farmacias`.
+- Módulo web administrativo de Noticias con listado, búsqueda, filtros, portada, contenido, categoría, fuente, marca oficial, publicación/pausa y selección para Actividad.
+- Feed móvil de Noticias conectado exclusivamente a publicaciones reales; permite filtrar y desplegar la noticia completa sin abrir una ficha de venta.
 - El detalle administrativo de usuario muestra su ubicación GPS, barrio verificado y actividad consolidada: ventas, regalos, trueques, comentarios, alertas, opiniones, servicios y eventos.
 - El editor web de comercios incluye búsqueda de dirección y selector cartográfico con marcador móvil; al cambiar el punto sincroniza dirección, latitud y longitud.
-- Alertas, detalle de alerta, noticias y notificaciones.
+- Alertas, detalle de alerta, noticias y notificaciones. El autor puede editar y marcar resuelto su incidente; los comentarios de incidentes usan `comments.incident_id` y el ID del perfil.
 - Perfil propio, perfil público y módulos administrativos conectados.
 - Plus Jakarta Sans instalada y aplicada globalmente.
 - Páginas Nosotros, Términos, Productos prohibidos, Invitar vecinos, Contáctanos e Información y ayuda conectadas.
@@ -223,11 +249,17 @@ El botón de creación abre `CreatePost.jsx`, salvo la creación de comercios, q
 
 - Terminar y aprobar visualmente la página de detalle del comercio.
 - Cargar productos reales de prueba en `commerce_products`.
-- Validar los módulos web de Comercios, Eventos, Incidentes y Usuarios; Farmacias sigue pendiente.
+- Validar los módulos web de Comercios, Eventos, Incidentes, Usuarios y Farmacias.
+- Ejecutar la migración `202607290008_pharmacy_duty.sql` y validar la separación entre farmacias visibles y farmacias de turno.
+- Ejecutar la migración `202607290009_news_management.sql` y validar el ciclo crear → publicar/pausar → mostrar en Noticias y, cuando corresponda, en Actividad.
+- Ejecutar la migración `202607290010_news_categories.sql` y validar creación, edición, ocultamiento y filtros de categorías de Noticias.
+- Ejecutar la migración `202607290006_service_moderation_and_featured.sql` y validar el ciclo servicio pendiente → aprobado → patrocinado/pausado/rechazado.
+- Validar creación, edición, bloqueo de autoevaluación y actualización del promedio de opiniones de servicios.
 - Ejecutar la migración `202607290001_incident_moderation.sql` en Supabase y probar el ciclo completo pendiente → aprobado/oficial → resuelto o rechazado.
 - Ejecutar la migración `202607290002_user_administration.sql` en Supabase y probar verificación, autorización, roles y suspensión.
 - Ejecutar la migración `202607290003_user_verification_activity.sql` para guardar la coincidencia dirección/GPS, completar correos y habilitar el historial administrativo.
 - Ejecutar la migración `202607290004_beta_neighborhood_polygon.sql` para activar el polígono oficial del barrio beta y la RPC `barrio_en_punto_mvp`.
+- Ejecutar la migración `202607290005_posts_activity_selection.sql` para habilitar la selección editorial de eventos en Actividad.
 - Validar visual y funcionalmente la publicación y edición de eventos desde el panel web.
 - Ejecutar la migración `202607280001_event_schedule_and_categories.sql` en Supabase y probar rango horario y categorías administrables.
 - Ejecutar la migración `202607280002_event_ticket_prices.sql` en Supabase y probar tarifas múltiples.

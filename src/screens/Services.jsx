@@ -80,6 +80,9 @@ const IcoAlert = (p) => (
 const IcoChevronRight = (p) => (
   <Ico {...p}><polyline points="9 18 15 12 9 6" /></Ico>
 )
+const IcoInstagram = (p) => (
+  <Ico {...p}><rect x="3" y="3" width="18" height="18" rx="5" /><circle cx="12" cy="12" r="4" /><circle cx="17.5" cy="6.5" r=".7" fill="currentColor" stroke="none" /></Ico>
+)
 const IcoVerified = ({ size = 13 }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill={C.verde}
     stroke="#fff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -110,18 +113,25 @@ const getDistanceLabel = (post) => {
 }
 
 const getRating = (post) => {
-  const r = post?.rating ?? post?.author?.reputation_score
-  if (r !== null && r !== undefined && r !== '' && !Number.isNaN(Number(r))) {
-    const count = Number(post?.rating_count) || 0
-    return { value: Number(r).toFixed(1), count }
-  }
-  return null
+  const count = Number(post?.rating_count) || 0
+  const rating = Number(post?.rating) || 0
+  if (count <= 0 || rating <= 0) return null
+  return { value: rating.toFixed(1), count }
 }
 
 const formatPrice = (post) => {
+  if (post?.price === null || post?.price === undefined || post?.price === '') return null
   const p = Number(post?.price)
-  if (!p && p !== 0) return null
+  if (!Number.isFinite(p) || p <= 0) return null
   return `$${p.toLocaleString('es-CL')}`
+}
+
+const isFeaturedActive = (svc) => {
+  if (!(svc.is_featured === true || svc.is_promoted === true || svc.sponsored === true)) return false
+  const starts = svc.featured_starts_at || svc.promoted_starts_at
+  const until = svc.featured_until || svc.promoted_until
+  const now = Date.now()
+  return (!starts || new Date(starts).getTime() <= now) && (!until || new Date(until).getTime() > now)
 }
 
 /* ============================================================
@@ -134,6 +144,12 @@ export default function Services({ currentUser, onNavigate, onCrear }) {
   const [category, setCategory] = useState('Todos')
   const [search, setSearch] = useState('')
   const [searchOpen, setSearchOpen] = useState(false)
+  const [expandedServiceId, setExpandedServiceId] = useState(null)
+  const [featuredOrder, setFeaturedOrder] = useState([])
+  const [featuredIndex, setFeaturedIndex] = useState(0)
+  const featuredScrollRef = useRef(null)
+  const featuredPausedRef = useRef(false)
+  const featuredResumeRef = useRef(null)
 
   // Pull-to-refresh
   const scrollRef = useRef(null)
@@ -157,7 +173,15 @@ export default function Services({ currentUser, onNavigate, onCrear }) {
       q = q.order('created_at', { ascending: false }).limit(40)
       const { data, error: e } = await q
       if (e) throw e
-      setServices(data || [])
+      const nextServices = data || []
+      const order = nextServices.filter(isFeaturedActive).map(service => service.id)
+      for (let index = order.length - 1; index > 0; index -= 1) {
+        const randomIndex = Math.floor(Math.random() * (index + 1))
+        ;[order[index], order[randomIndex]] = [order[randomIndex], order[index]]
+      }
+      setFeaturedOrder(order)
+      setFeaturedIndex(0)
+      setServices(nextServices)
     } catch (err) {
       console.error('Services fetch error:', err)
       setError(err?.message || 'No pudimos cargar los servicios.')
@@ -179,15 +203,44 @@ export default function Services({ currentUser, onNavigate, onCrear }) {
     return t.includes(q) || d.includes(q)
   })
 
-  // Preparado para la futura activación comercial. No inventamos destacados:
-  // solo entran publicaciones marcadas y con una vigencia válida.
-  const isFeaturedActive = (svc) => {
-    if (!(svc.is_featured === true || svc.is_promoted === true || svc.sponsored === true)) return false
-    const until = svc.featured_until || svc.promoted_until
-    return !until || new Date(until).getTime() > Date.now()
-  }
-  const featured = filtered.filter(isFeaturedActive)
+  const featured = filtered.filter(isFeaturedActive).sort((first, second) => {
+    const firstIndex = featuredOrder.indexOf(first.id)
+    const secondIndex = featuredOrder.indexOf(second.id)
+    return (firstIndex < 0 ? 999 : firstIndex) - (secondIndex < 0 ? 999 : secondIndex)
+  })
   const regular = filtered.filter((svc) => !isFeaturedActive(svc))
+
+  const scrollFeaturedTo = index => {
+    const container = featuredScrollRef.current
+    const card = container?.children?.[index]
+    if (!container || !card) return
+    container.scrollTo({ left: card.offsetLeft - 16, behavior: 'smooth' })
+    setFeaturedIndex(index)
+  }
+
+  const pauseFeatured = () => {
+    featuredPausedRef.current = true
+    if (featuredResumeRef.current) window.clearTimeout(featuredResumeRef.current)
+  }
+  const resumeFeatured = () => {
+    if (featuredResumeRef.current) window.clearTimeout(featuredResumeRef.current)
+    featuredResumeRef.current = window.setTimeout(() => { featuredPausedRef.current = false }, 2800)
+  }
+
+  useEffect(() => {
+    if (featured.length <= 1) return undefined
+    const timer = window.setInterval(() => {
+      if (featuredPausedRef.current) return
+      setFeaturedIndex(current => {
+        const next = (current + 1) % featured.length
+        const container = featuredScrollRef.current
+        const card = container?.children?.[next]
+        if (container && card) container.scrollTo({ left: card.offsetLeft - 16, behavior: 'smooth' })
+        return next
+      })
+    }, 4200)
+    return () => { window.clearInterval(timer); if (featuredResumeRef.current) window.clearTimeout(featuredResumeRef.current) }
+  }, [featured.length])
 
   /* ── Pull-to-refresh visual ── */
   const onTouchStart = (e) => {
@@ -292,15 +345,24 @@ export default function Services({ currentUser, onNavigate, onCrear }) {
     const catEmoji = CAT_EMOJI[serviceKey] || '🛠️'
     const desc = svc.description || svc.content || ''
     const verified = author?.badge_trusted_seller || author?.badge_founder
+    const expanded = expandedServiceId === svc.id
+    const phone = (svc.service_phone || '').trim()
+    const whatsapp = (svc.service_whatsapp || '').replace(/\D/g, '')
+    const instagram = (svc.service_instagram || '').trim().replace(/^@/, '')
+
+    const openExternal = (event, url) => {
+      event.stopPropagation()
+      window.open(url, '_blank', 'noopener,noreferrer')
+    }
 
     return (
       <div
         key={svc.id}
         className="services-card"
         style={s.card}
-        onClick={() => nav('productdetail', { postId: svc.id })}
+        onClick={() => setExpandedServiceId(current => current === svc.id ? null : svc.id)}
       >
-        {/* Header: avatar + nombre + rating */}
+        {/* Header: prestador + rubro */}
         <div style={s.cardHeader}>
           <div style={s.authorBlock}>
             {author?.avatar_url ? (
@@ -316,38 +378,32 @@ export default function Services({ currentUser, onNavigate, onCrear }) {
               <div style={s.authorMeta}>Vecino del barrio</div>
             </div>
           </div>
-          {rating && <div style={s.ratingBlock}>
-            <IcoStar size={12} />
-            <span style={s.ratingText}>{rating.value}</span>
-            {rating.count > 0 && <span style={s.ratingCount}>({rating.count})</span>}
-          </div>}
-        </div>
-
-        {/* Tags: categoría + distancia */}
-        <div style={s.tagsRow}>
-          <span style={s.catBadge}>
-            <span style={s.catEmoji}>{catEmoji}</span>
-            <span>{rubro?.label || svc.category || 'Servicio'}</span>
-          </span>
-          {distLabel && <span style={s.distTag}>
-            <IcoPin size={11} />
-            <span>{distLabel}</span>
-          </span>}
+          <div style={s.ratingBlock}>
+            <span style={s.categoryCompact}>{catEmoji} {rubro?.label || svc.category || 'Servicio'}</span>
+          </div>
         </div>
 
         {/* Título */}
         <div style={s.cardTitle}>{svc.title || 'Servicio disponible'}</div>
 
-        {/* Descripción (2 líneas máx) */}
-        {desc && <div style={s.cardDesc}>{desc}</div>}
+        <div style={s.compactMeta}>
+          <span>{rating ? <><IcoStar size={11} /><strong>{rating.value}</strong> ({rating.count})</> : 'Nuevo'}</span>
+          {distLabel && <span><IcoPin size={11} /> {distLabel}</span>}
+          {price && <strong style={s.compactPrice}>Desde {price}</strong>}
+          <span style={{ ...s.expandChevron, transform: expanded ? 'rotate(90deg)' : 'none' }}><IcoChevronRight size={16} /></span>
+        </div>
 
-        {/* Footer: precio */}
-        {price && (
-          <div style={s.cardFooter}>
-            <span style={s.priceLabel}>Desde</span>
-            <span style={s.priceValue}>{price}</span>
+        <div style={{ ...s.cardExpansion, ...(expanded ? s.cardExpansionOpen : {}) }}>
+          <div style={s.cardExpansionInner}>
+            {desc && <p style={s.expandedDesc}>{desc}</p>}
+            <div style={s.contactActions}>
+              {phone && <button type="button" style={s.contactAction} onClick={event => openExternal(event, `tel:${phone}`)}>📞 Llamar</button>}
+              {whatsapp && <button type="button" style={s.contactAction} onClick={event => openExternal(event, `https://wa.me/${whatsapp}`)}>💬 WhatsApp</button>}
+              {instagram && <button type="button" style={s.contactAction} onClick={event => openExternal(event, `https://instagram.com/${instagram}`)}><IcoInstagram size={15} /> Instagram</button>}
+              <button type="button" style={s.detailAction} onClick={event => { event.stopPropagation(); nav('servicedetail', { postId: svc.id }) }}>Ver ficha completa</button>
+            </div>
           </div>
-        )}
+        </div>
       </div>
     )
   }
@@ -357,18 +413,26 @@ export default function Services({ currentUser, onNavigate, onCrear }) {
     const serviceKey = svc.service_key || svc.category
     const rubro = RUBROS.find(r => r.key === serviceKey)
     const price = formatPrice(svc)
+    const rating = getRating(svc)
+    const image = Array.isArray(svc.images) ? svc.images.find(Boolean) : null
     return (
-      <button key={svc.id} style={s.featuredCard} onClick={() => nav('productdetail', { postId: svc.id })}>
-        <div style={s.sponsoredLabel}>PATROCINADO</div>
-        <div style={s.featuredTop}>
-          {author?.avatar_url
-            ? <img src={author.avatar_url} alt="" style={s.featuredAvatar} />
-            : <span style={s.featuredAvatarFallback}>{iniciales(author?.full_name)}</span>}
-          <span style={s.featuredEmoji}>{rubro?.emoji || '🛠️'}</span>
+      <button key={svc.id} style={s.featuredCard} onClick={() => nav('servicedetail', { postId: svc.id })}>
+        <div style={s.featuredVisual}>
+          {image ? <img src={image} alt="" style={s.featuredImage} /> : <span style={s.featuredImageFallback}>{rubro?.emoji || '🛠️'}</span>}
+          <span style={s.sponsoredLabel}>✦ DESTACADO</span>
         </div>
-        <strong style={s.featuredTitle}>{svc.title || 'Servicio disponible'}</strong>
-        <span style={s.featuredProvider}>{author?.full_name || 'Prestador del barrio'}</span>
-        <span style={s.featuredBottom}>{price ? `Desde ${price}` : 'Consultar'} <IcoChevronRight size={13} /></span>
+        <div style={s.featuredBody}>
+          <span style={s.featuredCategory}>{rubro?.emoji || '🛠️'} {rubro?.label || svc.category || 'Servicio'}</span>
+          <strong style={s.featuredTitle}>{svc.title || 'Servicio disponible'}</strong>
+          <div style={s.featuredProviderRow}>
+            {author?.avatar_url ? <img src={author.avatar_url} alt="" style={s.featuredAvatar} /> : <span style={s.featuredAvatarFallback}>{iniciales(author?.full_name)}</span>}
+            <span style={s.featuredProvider}>{author?.full_name || 'Prestador del barrio'}</span>
+          </div>
+          <div style={s.featuredMeta}>
+            <span style={s.featuredRating}>{rating ? <><IcoStar size={12} /><strong>{rating.value}</strong><small>({rating.count})</small></> : <strong>Nuevo</strong>}</span>
+            <span style={s.featuredBottom}>{price ? `Desde ${price}` : 'Consultar'} <IcoChevronRight size={13} /></span>
+          </div>
+        </div>
       </button>
     )
   }
@@ -471,7 +535,8 @@ export default function Services({ currentUser, onNavigate, onCrear }) {
                   <small>Promociones pagadas</small>
                 </div>
               </div>
-              <div style={s.featuredScroll}>{featured.map(renderFeaturedCard)}</div>
+              <div ref={featuredScrollRef} style={s.featuredScroll} onTouchStart={pauseFeatured} onTouchEnd={resumeFeatured} onMouseEnter={pauseFeatured} onMouseLeave={resumeFeatured}>{featured.map(renderFeaturedCard)}</div>
+              {featured.length > 1 && <div style={s.featuredDots}>{featured.map((service, index) => <button key={service.id} type="button" aria-label={`Ver destacado ${index + 1}`} style={{ ...s.featuredDot, ...(index === featuredIndex ? s.featuredDotActive : {}) }} onClick={() => scrollFeaturedTo(index)} />)}</div>}
             </section>
           )}
 
@@ -684,29 +749,41 @@ const s = {
   },
   featuredScroll: {
     display: 'flex', gap: 10, overflowX: 'auto', padding: '0 16px 4px',
-    scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch',
+    scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch', scrollSnapType: 'x mandatory', scrollBehavior: 'smooth',
   },
   featuredCard: {
-    width: 220, minWidth: 220, padding: 12, borderRadius: 16,
-    border: '1px solid #f0d690', background: 'linear-gradient(145deg, #fffdf6, #fff)',
+    width: 220, minWidth: 220, padding: 0, overflow: 'hidden', borderRadius: 16,
+    border: `1px solid ${C.borde}`, background: C.card,
     boxShadow: '0 4px 14px rgba(146,105,22,0.10)', textAlign: 'left',
     cursor: 'pointer', fontFamily: T.font, color: C.texto,
+    scrollSnapAlign: 'start',
   },
+  featuredDots: { display: 'flex', justifyContent: 'center', gap: 5, paddingTop: 8 },
+  featuredDot: { width: 6, height: 6, padding: 0, border: 0, borderRadius: '50%', background: '#cbd8cf' },
+  featuredDotActive: { width: 18, borderRadius: 999, background: C.verde },
+  featuredVisual: { height: 112, position: 'relative', overflow: 'hidden', background: 'linear-gradient(145deg, #e8f7ed, #f7fbf8)' },
+  featuredImage: { width: '100%', height: '100%', display: 'block', objectFit: 'cover' },
+  featuredImageFallback: { width: '100%', height: '100%', display: 'grid', placeItems: 'center', fontSize: 42 },
   sponsoredLabel: {
-    fontSize: 8.5, fontWeight: 700, letterSpacing: '0.8px', color: '#9a6b10', marginBottom: 8,
+    position: 'absolute', top: 9, right: 9, padding: '5px 8px', borderRadius: 999,
+    fontSize: 8, fontWeight: 800, letterSpacing: '0.55px', color: '#fff', background: C.verde,
+    boxShadow: '0 2px 8px rgba(5,101,49,.25)',
   },
-  featuredTop: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 9 },
-  featuredAvatar: { width: 32, height: 32, borderRadius: '50%', objectFit: 'cover' },
+  featuredBody: { padding: 11 },
+  featuredCategory: { display: 'block', marginBottom: 5, color: C.verdeOsc, fontSize: 9.5, fontWeight: 700 },
+  featuredAvatar: { width: 24, height: 24, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 },
   featuredAvatarFallback: {
-    width: 32, height: 32, borderRadius: '50%', background: C.verde, color: '#fff',
-    display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 700,
+    width: 24, height: 24, borderRadius: '50%', background: C.verde, color: '#fff', flexShrink: 0,
+    display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 8, fontWeight: 700,
   },
-  featuredEmoji: { fontSize: 22 },
-  featuredTitle: { display: 'block', fontSize: 14, lineHeight: 1.25, marginBottom: 4 },
-  featuredProvider: { display: 'block', fontSize: 11, color: C.textoSuave, marginBottom: 12 },
+  featuredTitle: { display: 'block', minHeight: 35, fontSize: 14, lineHeight: 1.25, marginBottom: 8 },
+  featuredProviderRow: { display: 'flex', alignItems: 'center', gap: 7, marginBottom: 10 },
+  featuredProvider: { minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 10.5, color: C.textoSuave },
+  featuredMeta: { paddingTop: 8, borderTop: `1px solid ${C.bordeSuave}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 7 },
+  featuredRating: { display: 'flex', alignItems: 'center', gap: 3, color: C.textoSuave, fontSize: 9.5 },
   featuredBottom: {
     display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-    color: C.verde, fontSize: 12, fontWeight: 600,
+    gap: 3, color: C.verde, fontSize: 10.5, fontWeight: 700,
   },
   monetizationCard: {
     marginTop: 14, padding: '11px 12px', borderRadius: 14,
@@ -731,7 +808,7 @@ const s = {
   card: {
     background: C.card,
     borderRadius: 18,
-    padding: 14,
+    padding: 12,
     border: `1px solid ${C.borde}`,
     boxShadow: '0 2px 10px rgba(0,0,0,0.04)',
     cursor: 'pointer',
@@ -741,7 +818,7 @@ const s = {
     alignItems: 'flex-start',
     justifyContent: 'space-between',
     gap: 10,
-    marginBottom: 10,
+    marginBottom: 7,
   },
   authorBlock: {
     display: 'flex',
@@ -751,15 +828,15 @@ const s = {
     minWidth: 0,
   },
   avatar: {
-    width: 38,
-    height: 38,
+    width: 34,
+    height: 34,
     borderRadius: '50%',
     objectFit: 'cover',
     flexShrink: 0,
   },
   avatarFallback: {
-    width: 38,
-    height: 38,
+    width: 34,
+    height: 34,
     borderRadius: '50%',
     background: C.verde,
     color: '#fff',
@@ -806,6 +883,11 @@ const s = {
     color: C.textoTenue,
     fontWeight: 500,
   },
+  newRating: {
+    padding: '4px 7px', borderRadius: 999, color: C.verdeOsc,
+    background: C.verdeBg, fontSize: 10, fontWeight: 700,
+  },
+  categoryCompact: { maxWidth: 118, padding: '4px 7px', overflow: 'hidden', borderRadius: 999, color: C.verdeOsc, background: C.verdeBg, fontSize: 10, fontWeight: 700, textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
 
   /* ── TAGS (categoría + distancia) ── */
   tagsRow: {
@@ -840,11 +922,11 @@ const s = {
 
   /* ── TÍTULO Y DESCRIPCIÓN ── */
   cardTitle: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: 700,
     color: C.texto,
     lineHeight: 1.3,
-    marginBottom: 4,
+    marginBottom: 5,
   },
   cardDesc: {
     fontSize: 13.5,
@@ -876,6 +958,16 @@ const s = {
     fontWeight: 800,
     color: C.verde,
   },
+  compactMeta: { minHeight: 18, display: 'flex', alignItems: 'center', gap: 9, color: C.textoTenue, fontSize: 10.5 },
+  compactPrice: { marginLeft: 'auto', color: C.verde, fontSize: 11.5 },
+  expandChevron: { display: 'grid', placeItems: 'center', color: C.verdeOsc, transition: 'transform .22s ease' },
+  cardExpansion: { display: 'grid', gridTemplateRows: '0fr', opacity: 0, transition: 'grid-template-rows .28s ease, opacity .2s ease' },
+  cardExpansionOpen: { gridTemplateRows: '1fr', opacity: 1 },
+  cardExpansionInner: { minHeight: 0, overflow: 'hidden' },
+  expandedDesc: { margin: '11px 0 0', paddingTop: 10, borderTop: `1px solid ${C.bordeSuave}`, color: C.textoSuave, fontSize: 12, lineHeight: 1.5 },
+  contactActions: { marginTop: 10, display: 'flex', gap: 6, flexWrap: 'wrap' },
+  contactAction: { minHeight: 32, padding: '0 9px', display: 'inline-flex', alignItems: 'center', gap: 5, border: `1px solid ${C.borde}`, borderRadius: 9, color: C.texto, background: '#fff', fontSize: 10.5, fontWeight: 700 },
+  detailAction: { minHeight: 32, padding: '0 10px', border: 0, borderRadius: 9, color: '#fff', background: C.verde, fontSize: 10.5, fontWeight: 800 },
 
   /* ── SKELETON ── */
   skeletonCard: {

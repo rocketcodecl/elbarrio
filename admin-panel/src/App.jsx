@@ -4,6 +4,9 @@ import AdminShell from './components/AdminShell.jsx'
 import AdminLogin from './screens/AdminLogin.jsx'
 import Dashboard from './screens/Dashboard.jsx'
 import CommerceManager from './screens/CommerceManager.jsx'
+import ServiceManager from './screens/ServiceManager.jsx'
+import PharmacyManager from './screens/PharmacyManager.jsx'
+import NewsManager from './screens/NewsManager.jsx'
 import EventManager from './screens/EventManager.jsx'
 import IncidentManager from './screens/IncidentManager.jsx'
 import UserManager from './screens/UserManager.jsx'
@@ -119,10 +122,13 @@ export default function App() {
     >
       {activeSection === 'dashboard' && <Dashboard profile={profile} onNavigate={setActiveSection} />}
       {activeSection === 'comercios' && <CommerceManager profile={profile} />}
+      {activeSection === 'servicios' && <ServiceManager profile={profile} />}
+      {activeSection === 'farmacias' && <PharmacyManager />}
+      {activeSection === 'noticias' && <NewsManager profile={profile} />}
       {activeSection === 'eventos' && <EventManager profile={profile} />}
       {activeSection === 'incidentes' && <IncidentManager profile={profile} />}
       {activeSection === 'usuarios' && <UserManager profile={profile} />}
-      {!['dashboard', 'comercios', 'eventos', 'incidentes', 'usuarios'].includes(activeSection) && (
+      {!['dashboard', 'comercios', 'servicios', 'eventos', 'farmacias', 'noticias', 'incidentes', 'usuarios'].includes(activeSection) && (
         <section className="placeholder-module"><span>🚧</span><h1>Módulo en preparación</h1><p>Lo construiremos en una siguiente fase.</p></section>
       )}
     </AdminShell>
