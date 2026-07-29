@@ -2,6 +2,8 @@
 
 ## Estado actual
 
+- En Usuarios, un administrador puede enviar una notificación interna manual al perfil seleccionado mediante la RPC segura `admin_send_notification`; requiere la migración `202607290013_admin_send_notification.sql`.
+
 - El panel permite crear y editar servicios con el mismo formulario, incluyendo teléfono, WhatsApp e Instagram opcionales (requiere migración `202607290011_service_contacts.sql`). La edición conserva estado, patrocinio e imágenes si no se reemplaza la portada.
 
 - Aplicación web independiente ubicada en `admin-panel/`.

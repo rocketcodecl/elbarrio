@@ -39,6 +39,7 @@ const IcoBellOff    = (p) => <Svg {...p}><path d="M13.73 21a2 2 0 0 1-3.46 0" />
 const IcoCheck      = (p) => <Svg {...p} stroke={2.6}><polyline points="20 6 9 17 4 12" /></Svg>
 const IcoCheckCheck = (p) => <Svg {...p} stroke={2.2}><polyline points="18 6 7 17 2 12" /><polyline points="22 6 11 17" /></Svg>
 const IcoRefresh    = (p) => <Svg {...p}><polyline points="23 4 23 10 17 10" /><polyline points="1 20 1 14 7 14" /><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" /></Svg>
+const IcoTrash      = (p) => <Svg {...p}><path d="M3 6h18" /><path d="M8 6V4h8v2" /><path d="M19 6l-1 15H6L5 6" /><path d="M10 11v5M14 11v5" /></Svg>
 
 /* ===== CONFIG DE TYPES (color del círculo + ícono) ===== */
 const TYPE_CONFIG = {
@@ -111,6 +112,8 @@ function Notifications({ currentUser, onNavigate }) {
   const [error, setError]       = useState('')
   const [tab, setTab]           = useState('todas')   // 'todas' | 'noleidas'
   const [markingAll, setMarkingAll] = useState(false)
+  const [deletingId, setDeletingId] = useState(null)
+  const [actionError, setActionError] = useState('')
 
   // Pull-to-refresh
   const [pullDist, setPullDist]   = useState(0)
@@ -177,6 +180,15 @@ function Notifications({ currentUser, onNavigate }) {
           setNotifs(prev => prev.map(n => n.id === payload.new.id ? payload.new : n))
         }
       )
+      .on('postgres_changes',
+        {
+          event: 'DELETE',
+          schema: 'public',
+          table: 'notifications',
+          filter: `user_id=eq.${recipientId}`,
+        },
+        (payload) => setNotifs(prev => prev.filter(n => n.id !== payload.old.id))
+      )
       .subscribe()
 
     return () => {
@@ -221,8 +233,6 @@ function Notifications({ currentUser, onNavigate }) {
       }
       const destination = type === 'service' ? 'servicedetail' : type === 'event' ? 'eventdetail' : 'productdetail'
       onNavigate(destination, { postId })
-    } else if (senderId) {
-      onNavigate('chatconversation', { sellerId: senderId })
     } else if (data.alertId || data.alert_id || data.incidentId || data.incident_id) {
       onNavigate('alerta', { id: data.alertId || data.alert_id || data.incidentId || data.incident_id })
     }
@@ -248,6 +258,20 @@ function Notifications({ currentUser, onNavigate }) {
       console.warn('[Notifications] error marcando todas:', updateError.message)
     }
     setMarkingAll(false)
+  }
+
+  const eliminarNotificacion = async (event, notif) => {
+    event.stopPropagation()
+    if (deletingId) return
+    setDeletingId(notif.id)
+    setActionError('')
+    const { error: deleteError } = await supabase.rpc('user_delete_notification', { p_notification_id: notif.id })
+    setDeletingId(null)
+    if (deleteError) {
+      setActionError(`No pudimos eliminar la notificación: ${deleteError.message}`)
+      return
+    }
+    setNotifs(prev => prev.filter(n => n.id !== notif.id))
   }
 
   /* ── PULL-TO-REFRESH ── */
@@ -345,6 +369,7 @@ function Notifications({ currentUser, onNavigate }) {
         onTouchMove={onTouchMove}
         onTouchEnd={onTouchEnd}
       >
+        {actionError && <div style={s.actionError}>{actionError}<button type="button" onClick={() => setActionError('')}>×</button></div>}
         {/* Pull indicator */}
         <div style={{
           ...s.pullIndicator,
@@ -454,7 +479,7 @@ function Notifications({ currentUser, onNavigate }) {
                       }}>
                         {notif.title || 'Notificación'}
                       </span>
-                      <span style={s.time}>{timeAgo(notif.created_at)}</span>
+                      <span style={s.timeActions}><span style={s.time}>{timeAgo(notif.created_at)}</span><button type="button" style={s.deleteBtn} disabled={deletingId === notif.id} onClick={event => eliminarNotificacion(event, notif)} aria-label="Eliminar notificación"><IcoTrash size={14} /></button></span>
                     </div>
                     {notif.body && (
                       <div style={s.bodyText}>{notif.body}</div>
@@ -652,6 +677,9 @@ const s = {
     flexShrink: 0,
     whiteSpace: 'nowrap',
   },
+  timeActions: { flexShrink: 0, display: 'flex', alignItems: 'center', gap: 5 },
+  deleteBtn: { width: 28, height: 28, padding: 0, display: 'grid', placeItems: 'center', border: 0, borderRadius: 8, color: '#8a968d', background: 'transparent' },
+  actionError: { margin: '10px 16px 0', padding: '9px 11px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, borderRadius: 10, color: '#991b1b', background: '#fee2e2', fontSize: 10.5 },
   bodyText: {
     fontSize: 13, color: C.textoSuave,
     lineHeight: 1.4,

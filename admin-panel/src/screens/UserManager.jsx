@@ -93,6 +93,8 @@ export default function UserManager({ profile }) {
   const [changing, setChanging] = useState('')
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
+  const [notificationDraft, setNotificationDraft] = useState({ title: '', body: '' })
+  const [notificationSaving, setNotificationSaving] = useState(false)
 
   const selected = users.find(user => user.id === selectedId) || null
   const selectedCoordinates = profileCoordinates(selected)
@@ -206,6 +208,26 @@ export default function UserManager({ profile }) {
     await loadHistory(selected.id)
   }
 
+  const sendNotification = async event => {
+    event.preventDefault()
+    if (!selected || notificationSaving) return
+    const title = notificationDraft.title.trim()
+    const body = notificationDraft.body.trim()
+    if (!title || !body) return setError('Completa el título y el mensaje de la notificación.')
+    setNotificationSaving(true)
+    setError('')
+    const { error: sendError } = await supabase.rpc('admin_send_notification', {
+      p_target_profile_id: selected.id,
+      p_title: title,
+      p_body: body,
+    })
+    setNotificationSaving(false)
+    if (sendError) return setError(`No fue posible enviar la notificación: ${sendError.message}`)
+    setNotificationDraft({ title: '', body: '' })
+    setNotice(`Notificación enviada a ${selected.full_name || 'el vecino'}`)
+    window.setTimeout(() => setNotice(''), 2600)
+  }
+
   return <div className="user-manager">
     <section className="page-heading commerce-page-heading">
       <div><p className="eyebrow">Comunidad y permisos</p><h1>Usuarios</h1><p>Verifica vecinos, autoriza actores y protege el acceso a El Barrio.</p></div>
@@ -242,6 +264,8 @@ export default function UserManager({ profile }) {
             <section className="user-info-card user-permissions-card"><h3>Permisos</h3><div className="permission-row"><span>📅</span><div><strong>Publicación de eventos</strong><small>Para juntas de vecinos, municipalidades y actores autorizados.</small></div>{selected.can_publish_events ? <button type="button" disabled={!!changing} onClick={() => manage('revoke_actor')}>Retirar</button> : <button className="positive" type="button" disabled={!!changing || !isVerified(selected) || isSuspended(selected)} onClick={() => manage('approve_actor')}>Autorizar</button>}</div><div className="permission-row"><span>🛡️</span><div><strong>Administración</strong><small>Entrega acceso completo al panel administrativo.</small></div>{selected.role === 'admin' ? <button type="button" disabled={!!changing || isSelf} onClick={() => manage('remove_admin')}>{isSelf ? 'Tu cuenta' : 'Retirar'}</button> : <button className="positive" type="button" disabled={!!changing || isSuspended(selected)} onClick={() => manage('assign_admin')}>Hacer admin</button>}</div></section>
 
             <section className="user-info-card user-account-card"><h3>Estado de la cuenta</h3>{isSuspended(selected) ? <div className="account-state suspended"><strong>Cuenta suspendida</strong><p>El usuario no puede utilizar la aplicación.</p>{selected.suspended_at && <small>Desde {dateLabel(selected.suspended_at)}</small>}<button type="button" disabled={!!changing} onClick={() => manage('reactivate')}>Reactivar usuario</button></div> : <div className="account-state active"><strong>Cuenta activa</strong><p>El usuario puede ingresar y usar las funciones habilitadas.</p><button type="button" disabled={!!changing || isSelf} onClick={() => manage('suspend')}>{isSelf ? 'No puedes suspenderte' : 'Suspender usuario'}</button></div>}</section>
+
+            <section className="user-info-card user-notification-card"><div className="user-card-heading"><h3>Enviar notificación</h3><span>🔔 Interna</span></div><p>Se mostrará inmediatamente en la campana de {selected.full_name || 'este vecino'}.</p><form onSubmit={sendNotification}><label>Título<input maxLength="90" value={notificationDraft.title} onChange={event => setNotificationDraft(current => ({ ...current, title: event.target.value }))} placeholder="Ej: Información importante" /></label><label>Mensaje<textarea rows="4" maxLength="300" value={notificationDraft.body} onChange={event => setNotificationDraft(current => ({ ...current, body: event.target.value }))} placeholder="Escribe un mensaje claro y breve…" /></label><button type="submit" disabled={notificationSaving}>{notificationSaving ? 'Enviando…' : 'Enviar notificación'}</button></form></section>
 
             <section className="user-info-card user-history-card"><h3>Historial administrativo</h3>{historyLoading && <p className="user-muted">Cargando historial…</p>}{!historyLoading && history.length === 0 && <p className="user-muted">Aún no hay acciones administrativas.</p>}{!historyLoading && history.length > 0 && <ol>{history.map(item => <li key={item.id}><span>✓</span><div><strong>{ACTION_LABELS[item.action] || item.action}</strong><p>{adminNames[item.admin_profile_id] || 'Administrador'} · {dateLabel(item.created_at)}</p></div></li>)}</ol>}</section>
 
