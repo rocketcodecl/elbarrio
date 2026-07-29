@@ -701,7 +701,7 @@ function CreatePost({ onClose, onPublished, startWith, existingPost = null }) {
           longitude: pinCoords?.lng || null,
           images: urls.length > 0 ? urls : null,
           expires_at: calcExpiresAt(alertCategory),
-          status: 'active',
+          status: 'pendiente',
           confirms_count: 0,
         }
         const { error: alertErr } = await supabase

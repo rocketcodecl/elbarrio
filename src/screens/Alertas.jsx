@@ -135,12 +135,12 @@ function Alertas({ currentUser, onNavigate, onCrear }) {
       //   Uso .or() porque .eq('col', null) en Postgres devuelve 0 rows.
       // · Si el user NO tiene neighborhood_id, no filtramos por barrio y
       //   mostramos TODOS los incidentes (para que la lista no quede vacía).
-      // · Status: el admin normaliza 'active' → 'pendiente' al mostrar, pero
-      //   en la DB pueden existir ambos valores. Usamos .in() para captarlos.
+      // Solo las alertas aprobadas por administración quedan en `active`.
+      // Los reportes `pendiente` no son visibles para los vecinos.
       let q = supabase
         .from('incident_reports')
         .select('*, reporter:profiles!reporter_id (full_name, avatar_url, badge_founder, verified)')
-        .in('status', ['active', 'pendiente'])
+        .eq('status', 'active')
 
       if (p.neighborhood_id) {
         q = q.or(`neighborhood_id.eq.${p.neighborhood_id},neighborhood_id.is.null`)

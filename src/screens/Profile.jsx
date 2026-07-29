@@ -163,6 +163,7 @@ function Profile({ onFinish, onBack }) {
         full_name: fullName.trim(),
         rut: rut,
         phone: phone || null,
+        email: user.email || null,
       }
       if (avatarUrl) updateData.avatar_url = avatarUrl
 

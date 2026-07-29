@@ -21,8 +21,8 @@
 - Comercios: implementado el directorio real, búsqueda, filtros, creación y edición completa.
 - Eventos: implementado con listado, creación, edición y pausa/publicación desde el panel.
 - Farmacias: pendiente.
-- Incidentes: pendiente.
-- Usuarios: pendiente.
+- Incidentes: implementado con bandeja de moderación, detalle, ubicación, evidencia y trazabilidad.
+- Usuarios: implementado con directorio, verificación, permisos, suspensión y trazabilidad.
 
 ## Decisiones
 
@@ -42,6 +42,12 @@
 - Las categorías de Eventos son globales para El Barrio. El administrador puede crearlas, editarlas, asignar un ícono u ocultarlas desde el panel; los eventos existentes conservan su categoría aunque esta se oculte para futuras publicaciones.
 - Los eventos pagados pueden definir varias tarifas con etiqueta y valor; el primer valor sigue respaldando el campo histórico `event_price`.
 - La asistencia y la opción de mostrar confirmados están deshabilitadas temporalmente por incompatibilidad entre la tabla antigua `events` y los eventos actuales almacenados en `posts`.
+- Los nuevos reportes de incidentes quedan en `pendiente`; solo `active` se publica en la app. El administrador puede aprobar, rechazar, marcar o desmarcar como oficial y cerrar como resuelto.
+- Las acciones de moderación se ejecutan mediante la función segura `admin_moderate_incident` y se registran en `incident_admin_actions` con el perfil administrador responsable.
+- `profiles.role` es el único origen de permisos administrativos. `user_type` clasifica el perfil y `can_publish_events` representa la autorización específica para publicar eventos.
+- El módulo Usuarios usa `admin_manage_profile` para verificar, autorizar actores, asignar administradores, suspender y reactivar; cada acción queda en `user_admin_actions`.
+- El detalle de Usuarios muestra el GPS guardado durante el registro, el barrio asignado y una cronología consolidada de publicaciones, comentarios, alertas y opiniones mediante `admin_get_user_activity`.
+- El límite oficial del MVP vive en `supabase/geo/barrio_beta_polygon.geojson` y se aplica al único barrio `is_beta=true` mediante una migración PostGIS segura.
 
 ## Reglas de trabajo
 
@@ -54,3 +60,7 @@
 ## Pendiente inmediato
 
 - Mantener deshabilitada la asistencia. No crear ni aplicar cambios de asistencia hasta definir y autorizar cómo alinear `event_attendees` con los eventos actuales de `posts`.
+- Ejecutar `supabase/migrations/202607290001_incident_moderation.sql` y validar el flujo completo del módulo Incidentes.
+- Ejecutar `supabase/migrations/202607290002_user_administration.sql` y validar el flujo completo del módulo Usuarios.
+- Ejecutar `supabase/migrations/202607290003_user_verification_activity.sql` y validar mapa, correo e historial de actividad.
+- Ejecutar `supabase/migrations/202607290004_beta_neighborhood_polygon.sql` y validar puntos dentro y fuera del barrio beta.

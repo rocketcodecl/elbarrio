@@ -111,6 +111,10 @@ El botón de creación abre `CreatePost.jsx`, salvo la creación de comercios, q
 - Plus Jakarta Sans es la tipografía oficial actual.
 - Las alertas destacadas del inicio deben ser oficiales, no alertas vecinales comunes.
 - La sección “Alerta oficial” del Inicio solo se muestra cuando existe al menos una alerta oficial activa; si no hay ninguna, no ocupa espacio en el feed.
+- Los reportes de alerta nuevos se guardan como `pendiente` y no son visibles para los vecinos hasta que un administrador los aprueba. `active` significa publicado, `rechazado` significa descartado y `resuelto` significa cerrado. La marca `is_official` distingue las alertas que aparecen en Inicio.
+- Toda aprobación, rechazo, cambio de oficialidad o cierre se realiza mediante `admin_moderate_incident` y deja trazabilidad en `incident_admin_actions` con el perfil administrador responsable.
+- `profiles.role` es el único campo que entrega permisos administrativos (`admin` o `vecino`). `user_type` queda reservado para clasificar públicamente el tipo de perfil y `can_publish_events` autoriza actores institucionales a publicar eventos sin convertirlos en administradores.
+- Las cuentas suspendidas usan `account_status='suspended'` y quedan bloqueadas tanto en la aplicación como en el panel; la aplicación escucha cambios del perfil para aplicar el bloqueo sin esperar un nuevo inicio de sesión. Las acciones administrativas sobre usuarios se ejecutan mediante `admin_manage_profile` y quedan registradas en `user_admin_actions`.
 - El mercado prioriza un feed compacto y visual, con mezcla de venta, regalo y trueque.
 - Las publicaciones pueden mostrar el badge `Conversable` cuando corresponda.
 - El detalle de una publicación propia permite editarla.
@@ -135,6 +139,8 @@ El botón de creación abre `CreatePost.jsx`, salvo la creación de comercios, q
 - Los feeds de Mercado, Servicios, Eventos, Chat y Comercios usan un header interno común: botón volver, título centrado en gris carbón con `el barrio` en verde de marca, un ícono lineal grande y translúcido propio de la sección hacia el lado izquierdo, y una línea verde inferior. Inicio conserva su header propio.
 - Los CTA de publicación de Mercado y Servicios comparten proporciones compactas y muestran su emoji principal sin círculo; el CTA de Servicios usa la acción `Publícate` y comunica que publicar es gratis.
 - Las distancias del feed y detalle de Comercios se calculan desde el GPS del navegador; mientras este responde o si el permiso falla, usan como respaldo las coordenadas verificadas del perfil del vecino.
+- La verificación residencial exige dos comprobaciones: la dirección geocodificada debe quedar a un máximo de 250 metros del GPS y ese GPS debe estar dentro del polígono oficial del MVP mediante `barrio_en_punto_mvp`. El perfil conserva ambos puntos y la distancia calculada.
+- El polígono oficial del MVP está versionado en `supabase/geo/barrio_beta_polygon.geojson`; la migración `202607290004_beta_neighborhood_polygon.sql` lo asigna únicamente cuando existe exactamente un registro `neighborhoods.is_beta=true`.
 - El formato oficial de `opening_hours` es el del panel: claves numéricas de JavaScript (`0` domingo a `6` sábado). La app mantiene lectura de claves abreviadas antiguas para no invalidar comercios previos.
 
 ## Convenciones de código
@@ -179,6 +185,8 @@ El botón de creación abre `CreatePost.jsx`, salvo la creación de comercios, q
 - `supabase/migrations/`
 - `admin-panel/ADMIN_CONTEXT.md`
 - `admin-panel/src/App.jsx`
+- `admin-panel/src/screens/IncidentManager.jsx`
+- `admin-panel/src/screens/UserManager.jsx`
 
 ## Funcionalidades terminadas
 
@@ -202,6 +210,9 @@ El botón de creación abre `CreatePost.jsx`, salvo la creación de comercios, q
 - Módulo web administrativo de Eventos con listado, creación, edición y pausa/publicación; utiliza `posts` con `type='event'` y los permisos ya existentes para administradores.
 - El módulo web de Eventos permite definir rango desde/hasta y administrar categorías con ícono. La migración correspondiente está versionada y pendiente de ejecutarse en Supabase.
 - El panel de Eventos permite varias tarifas de entrada para eventos pagados y decidir si se muestran los asistentes; las migraciones correspondientes están versionadas y pendientes de ejecutarse en Supabase.
+- Módulo web administrativo de Incidentes y alertas con listado, búsqueda, filtros, revisión de contenido, evidencia y ubicación, aprobación, rechazo, oficialización, cierre e historial de acciones administrativas.
+- Módulo web administrativo de Usuarios con listado, búsqueda, filtros, revisión de verificación, autorización de actores, asignación administrativa, suspensión, reactivación y auditoría.
+- El detalle administrativo de usuario muestra su ubicación GPS, barrio verificado y actividad consolidada: ventas, regalos, trueques, comentarios, alertas, opiniones, servicios y eventos.
 - El editor web de comercios incluye búsqueda de dirección y selector cartográfico con marcador móvil; al cambiar el punto sincroniza dirección, latitud y longitud.
 - Alertas, detalle de alerta, noticias y notificaciones.
 - Perfil propio, perfil público y módulos administrativos conectados.
@@ -212,7 +223,11 @@ El botón de creación abre `CreatePost.jsx`, salvo la creación de comercios, q
 
 - Terminar y aprobar visualmente la página de detalle del comercio.
 - Cargar productos reales de prueba en `commerce_products`.
-- Validar el módulo web de Comercios y luego migrar Eventos, Farmacias, Incidentes y Usuarios.
+- Validar los módulos web de Comercios, Eventos, Incidentes y Usuarios; Farmacias sigue pendiente.
+- Ejecutar la migración `202607290001_incident_moderation.sql` en Supabase y probar el ciclo completo pendiente → aprobado/oficial → resuelto o rechazado.
+- Ejecutar la migración `202607290002_user_administration.sql` en Supabase y probar verificación, autorización, roles y suspensión.
+- Ejecutar la migración `202607290003_user_verification_activity.sql` para guardar la coincidencia dirección/GPS, completar correos y habilitar el historial administrativo.
+- Ejecutar la migración `202607290004_beta_neighborhood_polygon.sql` para activar el polígono oficial del barrio beta y la RPC `barrio_en_punto_mvp`.
 - Validar visual y funcionalmente la publicación y edición de eventos desde el panel web.
 - Ejecutar la migración `202607280001_event_schedule_and_categories.sql` en Supabase y probar rango horario y categorías administrables.
 - Ejecutar la migración `202607280002_event_ticket_prices.sql` en Supabase y probar tarifas múltiples.

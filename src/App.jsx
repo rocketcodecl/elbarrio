@@ -143,6 +143,20 @@ export default function App() {
     return p
   }, [user?.id])
 
+  useEffect(() => {
+    if (!user?.id) return undefined
+    const channel = supabase
+      .channel(`profile-access-${user.id}`)
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'profiles',
+        filter: `user_id=eq.${user.id}`,
+      }, payload => setProfile(payload.new || null))
+      .subscribe()
+    return () => { supabase.removeChannel(channel) }
+  }, [user?.id])
+
   const handleLogout = useCallback(async () => {
     await supabase.auth.signOut()
     setUser(null)
@@ -374,6 +388,17 @@ export default function App() {
         }}>
           <div style={{ fontSize: 56 }}>🏘️</div>
           <div style={{ fontSize: 22, fontWeight: 700, color: C.verde }}>el barrio</div>
+        </div>
+      )
+    }
+
+    if (profile?.account_status === 'suspended') {
+      return (
+        <div style={{ height: '100%', padding: 30, display: 'grid', placeContent: 'center', justifyItems: 'center', gap: 14, color: C.texto, background: C.fondo, fontFamily: T.font, textAlign: 'center' }}>
+          <div style={{ fontSize: 48 }}>🔒</div>
+          <div style={{ fontSize: 22, fontWeight: 800 }}>Tu cuenta está suspendida</div>
+          <div style={{ maxWidth: 310, color: C.textoSuave, fontSize: 14, lineHeight: 1.55 }}>No puedes utilizar El Barrio mientras revisamos tu cuenta. Contacta a soporte si necesitas ayuda.</div>
+          <button type="button" onClick={handleLogout} style={{ marginTop: 8, minHeight: 44, padding: '0 22px', border: 0, borderRadius: 12, color: '#fff', background: C.verde, fontWeight: 700 }}>Cerrar sesión</button>
         </div>
       )
     }

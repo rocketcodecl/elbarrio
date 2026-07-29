@@ -1258,7 +1258,7 @@ function Comercios({ currentUser, onNavigate, onCrear, onEditar }) {
     return true
   })
 
-  const esAdmin = profile?.is_admin || profile?.role === 'admin' || profile?.is_operator
+  const esAdmin = profile?.role === 'admin'
   const destacados = filtrados
     .filter(c => c.is_premium)
     .sort((first, second) => {

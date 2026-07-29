@@ -5,6 +5,8 @@ import AdminLogin from './screens/AdminLogin.jsx'
 import Dashboard from './screens/Dashboard.jsx'
 import CommerceManager from './screens/CommerceManager.jsx'
 import EventManager from './screens/EventManager.jsx'
+import IncidentManager from './screens/IncidentManager.jsx'
+import UserManager from './screens/UserManager.jsx'
 
 const ADMIN_ROLE = 'admin'
 
@@ -104,6 +106,10 @@ export default function App() {
     return <AccessDenied profile={profile} onLogout={handleLogout} />
   }
 
+  if (profile?.account_status === 'suspended') {
+    return <AccessDenied profile={profile} onLogout={handleLogout} />
+  }
+
   return (
     <AdminShell
       activeSection={activeSection}
@@ -114,7 +120,9 @@ export default function App() {
       {activeSection === 'dashboard' && <Dashboard profile={profile} onNavigate={setActiveSection} />}
       {activeSection === 'comercios' && <CommerceManager profile={profile} />}
       {activeSection === 'eventos' && <EventManager profile={profile} />}
-      {!['dashboard', 'comercios', 'eventos'].includes(activeSection) && (
+      {activeSection === 'incidentes' && <IncidentManager profile={profile} />}
+      {activeSection === 'usuarios' && <UserManager profile={profile} />}
+      {!['dashboard', 'comercios', 'eventos', 'incidentes', 'usuarios'].includes(activeSection) && (
         <section className="placeholder-module"><span>🚧</span><h1>Módulo en preparación</h1><p>Lo construiremos en una siguiente fase.</p></section>
       )}
     </AdminShell>
