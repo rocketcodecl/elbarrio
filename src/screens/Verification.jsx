@@ -33,15 +33,38 @@ const COMUNAS = [
 ]
 
 const MAX_FUNDADORES = 70
+const MAX_ADDRESS_DISTANCE_METERS = 250
+
+const distanceMeters = (first, second) => {
+  const toRad = value => value * Math.PI / 180
+  const earthRadius = 6371000
+  const dLat = toRad(second.lat - first.lat)
+  const dLng = toRad(second.lng - first.lng)
+  const a = Math.sin(dLat / 2) ** 2
+    + Math.cos(toRad(first.lat)) * Math.cos(toRad(second.lat)) * Math.sin(dLng / 2) ** 2
+  return Math.round(earthRadius * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)))
+}
+
+const findAddressCoordinates = async (address, comuna) => {
+  const query = `${address}, ${comuna}, Chile`
+  const url = `https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=cl&q=${encodeURIComponent(query)}`
+  const response = await fetch(url, { headers: { 'Accept-Language': 'es' } })
+  if (!response.ok) throw new Error('No pudimos comprobar la dirección escrita.')
+  const results = await response.json()
+  if (!results?.[0]) return null
+  return { lat: Number(results[0].lat), lng: Number(results[0].lon) }
+}
 
 function Verification({ profile, isPending, onFinish, onBack, onLogout }) {
   const [address, setAddress] = useState(profile?.address || '')
   const [comuna, setComuna] = useState(profile?.comuna || '')
   const [showComunaList, setShowComunaList] = useState(false)
 
-  // idle | locating | success | denied | outside | unavailable
+  // idle | locating | success | denied | outside | mismatch | address_not_found | unavailable
   const [gpsState, setGpsState] = useState('idle')
   const [coords, setCoords] = useState(null)
+  const [addressCoords, setAddressCoords] = useState(null)
+  const [addressDistance, setAddressDistance] = useState(null)
   const [neighborhood, setNeighborhood] = useState(null)
 
   const [loading, setLoading] = useState(false)
@@ -61,6 +84,9 @@ function Verification({ profile, isPending, onFinish, onBack, onLogout }) {
   const resetGps = () => {
     setGpsState('idle')
     setCoords(null)
+    setAddressCoords(null)
+    setAddressDistance(null)
+    setNeighborhood(null)
   }
 
   /* ================= GPS REAL + POLÍGONO DE LA UV ================= */
@@ -86,9 +112,28 @@ function Verification({ profile, isPending, onFinish, onBack, onLogout }) {
         setCoords({ lat, lng })
 
         try {
+          const locatedAddress = await findAddressCoordinates(address.trim(), comuna.trim())
+          if (!locatedAddress) {
+            setAddressCoords(null)
+            setAddressDistance(null)
+            setNeighborhood(null)
+            setGpsState('address_not_found')
+            return
+          }
+
+          const matchDistance = distanceMeters({ lat, lng }, locatedAddress)
+          setAddressCoords(locatedAddress)
+          setAddressDistance(matchDistance)
+
+          if (matchDistance > MAX_ADDRESS_DISTANCE_METERS) {
+            setNeighborhood(null)
+            setGpsState('mismatch')
+            return
+          }
+
           // Le preguntamos a Postgres (PostGIS): ¿este punto cae dentro
           // del polígono de alguna unidad vecinal activa?
-          const { data, error: rpcErr } = await supabase.rpc('barrio_en_punto', {
+          const { data, error: rpcErr } = await supabase.rpc('barrio_en_punto_mvp', {
             p_lat: lat,
             p_lng: lng,
           })
@@ -178,6 +223,9 @@ function Verification({ profile, isPending, onFinish, onBack, onLogout }) {
         comuna: comuna.trim(),
         lat,
         lng,
+        address_lat: addressCoords?.lat || null,
+        address_lng: addressCoords?.lng || null,
+        address_match_distance_m: addressDistance,
         neighborhood_id: neighborhood.id,
         verified: true,
         verification_status: 'verified',
@@ -325,6 +373,31 @@ function Verification({ profile, isPending, onFinish, onBack, onLogout }) {
                   El Barrio activo. Si crees que es un error, verifícate desde tu casa.
                 </div>
                 <button onClick={handleUseGPS} style={s.retryBtn}>Reintentar</button>
+              </div>
+            </div>
+          )}
+
+          {gpsState === 'mismatch' && (
+            <div style={s.boxErr}>
+              <div style={s.boxIconErr}><IcoAlerta size={19} /></div>
+              <div style={{ flex: 1 }}>
+                <div style={s.boxTitleErr}>La dirección y tu ubicación no coinciden</div>
+                <div style={s.boxTextErr}>
+                  El GPS está a {addressDistance || 0} metros de la dirección escrita. Revisa calle, número y comuna, o vuelve a intentarlo desde tu domicilio.
+                </div>
+                <button onClick={handleUseGPS} style={s.retryBtn}>Volver a comprobar</button>
+              </div>
+            </div>
+          )}
+
+          {gpsState === 'address_not_found' && (
+            <div style={s.boxErr}>
+              <div style={s.boxIconErr}><IcoAlerta size={19} /></div>
+              <div style={{ flex: 1 }}>
+                <div style={s.boxTitleErr}>No encontramos esa dirección</div>
+                <div style={s.boxTextErr}>
+                  Revisa el nombre de la calle, el número y la comuna antes de confirmar nuevamente.
+                </div>
               </div>
             </div>
           )}
