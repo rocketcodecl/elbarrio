@@ -3,6 +3,15 @@
 > Contexto operativo breve para trabajar sobre el estado vigente del proyecto.
 > Debe actualizarse cuando cambien la arquitectura, la navegación, una decisión de producto importante o el estado de una funcionalidad.
 
+## Estado de continuidad — 29 de julio de 2026
+
+- La aplicación de vecinos y el panel administrativo comparten el mismo proyecto Supabase.
+- El último desarrollo completado en código es el módulo administrativo de notificaciones masivas.
+- El panel compila correctamente después de este cambio.
+- La migración `202607290015_admin_broadcast_notifications.sql` está creada, pero sigue pendiente de ejecución y validación en Supabase hasta que el usuario confirme el resultado.
+- No asumir que una migración está aplicada solo porque existe en el repositorio. Confirmar siempre su ejecución con el usuario.
+- Antes de continuar, revisar `git status`, este archivo y el código específico de la siguiente tarea. No reconstruir ni sustituir módulos existentes sin autorización.
+
 ## Arquitectura actual
 
 - Aplicación web móvil construida con Vite 8, React 19 y JavaScript/JSX.
@@ -205,12 +214,15 @@ El botón de creación abre `CreatePost.jsx`, salvo la creación de comercios, q
 - `admin-panel/src/screens/PharmacyManager.jsx`
 - `admin-panel/src/screens/NewsManager.jsx`
 - `admin-panel/src/screens/NewsCategoryManager.jsx`
+- `admin-panel/src/screens/NotificationManager.jsx`
+- `supabase/migrations/202607290015_admin_broadcast_notifications.sql`
 
 ## Funcionalidades terminadas
 
 - Notificaciones internas: `notifications.user_id` y `from_user_id` referencian `profiles.id`. La campana del Home cuenta filas no leídas en tiempo real; la pantalla permite filtrar, marcar una o todas como leídas con rollback y abrir mensajes o publicaciones. La migración `202607290012_in_app_notifications.sql` genera notificaciones por mensajes, comentarios y likes, evitando auto-notificaciones.
 - El panel de Usuarios permite enviar una notificación interna manual a un vecino mediante la RPC con validación administrativa `admin_send_notification` (migración `202607290013_admin_send_notification.sql`).
 - Cada vecino puede eliminar únicamente sus propias notificaciones mediante `user_delete_notification` (migración `202607290014_user_delete_notification.sql`).
+- El panel tiene un módulo independiente de notificaciones masivas. Permite enviar a todo el barrio, vecinos verificados, comercios o actores autorizados, siempre dentro del barrio del administrador, con confirmación de alcance e historial en `notification_campaigns` (migración `202607290015_admin_broadcast_notifications.sql`).
 
 - Servicios: las publicaciones normales usan tarjeta compacta desplegable en el feed; el rubro reemplaza el estado “Nuevo” en la cabecera. Teléfono, WhatsApp e Instagram son datos opcionales del servicio y se muestran en el desplegable y la ficha completa (requiere migración `202607290011_service_contacts.sql`).
 
@@ -251,6 +263,7 @@ El botón de creación abre `CreatePost.jsx`, salvo la creación de comercios, q
 
 ## Funcionalidades pendientes
 
+- Ejecutar `202607290015_admin_broadcast_notifications.sql` y validar un envío por cada audiencia desde el módulo Notificaciones del panel.
 - Terminar y aprobar visualmente la página de detalle del comercio.
 - Cargar productos reales de prueba en `commerce_products`.
 - Validar los módulos web de Comercios, Eventos, Incidentes, Usuarios y Farmacias.

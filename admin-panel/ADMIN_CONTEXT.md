@@ -2,6 +2,8 @@
 
 ## Estado actual
 
+- Existe un módulo independiente de Notificaciones para seleccionar audiencia, confirmar el número de destinatarios, enviar mensajes internos y consultar el historial. Usa RPC administrativas y requiere `202607290015_admin_broadcast_notifications.sql`.
+
 - En Usuarios, un administrador puede enviar una notificación interna manual al perfil seleccionado mediante la RPC segura `admin_send_notification`; requiere la migración `202607290013_admin_send_notification.sql`.
 
 - El panel permite crear y editar servicios con el mismo formulario, incluyendo teléfono, WhatsApp e Instagram opcionales (requiere migración `202607290011_service_contacts.sql`). La edición conserva estado, patrocinio e imágenes si no se reemplaza la portada.
@@ -28,6 +30,7 @@
 - Noticias: implementado con listado, búsqueda, filtros, creación, edición, publicación/pausa y selección para Actividad.
 - Incidentes: implementado con bandeja de moderación, detalle, ubicación, evidencia y trazabilidad.
 - Usuarios: implementado con directorio, verificación, permisos, suspensión y trazabilidad.
+- Notificaciones: implementado con audiencias por barrio, verificados, comercios y actores autorizados, más historial administrativo.
 
 ## Decisiones
 
@@ -68,6 +71,7 @@
 
 ## Pendiente inmediato
 
+- Ejecutar `supabase/migrations/202607290015_admin_broadcast_notifications.sql` y probar conteos, confirmación, recepción e historial.
 - Mantener deshabilitada la asistencia. No crear ni aplicar cambios de asistencia hasta definir y autorizar cómo alinear `event_attendees` con los eventos actuales de `posts`.
 - Ejecutar `supabase/migrations/202607290001_incident_moderation.sql` y validar el flujo completo del módulo Incidentes.
 - Ejecutar `supabase/migrations/202607290002_user_administration.sql` y validar el flujo completo del módulo Usuarios.

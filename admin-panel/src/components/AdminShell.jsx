@@ -7,6 +7,7 @@ const NAVIGATION = [
   { id: 'noticias', icon: '📰', label: 'Noticias' },
   { id: 'incidentes', icon: '🚨', label: 'Incidentes' },
   { id: 'usuarios', icon: '👥', label: 'Usuarios' },
+  { id: 'notificaciones', icon: '🔔', label: 'Notificaciones' },
 ]
 
 export default function AdminShell({ activeSection, onSelect, profile, onLogout, children }) {
