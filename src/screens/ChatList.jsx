@@ -89,6 +89,7 @@ const formatMessageTime = (dateString) => {
 function ChatList({ currentUser, onNavigate }) {
   const [conversations, setConversations] = useState([])
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState('')
   const [searchQuery, setSearchQuery] = useState('')
   const [refreshing, setRefreshing] = useState(false)
   const [pullDistance, setPullDistance] = useState(0)
@@ -166,7 +167,8 @@ function ChatList({ currentUser, onNavigate }) {
     }
   }, [myProfileId])
 
-  const loadConversations = async () => {
+  async function loadConversations() {
+    setLoadError('')
     try {
       // 1. Obtener todos los mensajes donde soy emisor o receptor
       const { data: messages, error } = await supabase
@@ -253,6 +255,8 @@ function ChatList({ currentUser, onNavigate }) {
       setConversations(populated)
     } catch (err) {
       console.error('Error cargando conversaciones:', err)
+      setConversations([])
+      setLoadError('No pudimos cargar tus conversaciones. Revisa tu conexión e inténtalo nuevamente.')
     } finally {
       setLoading(false)
     }
@@ -340,7 +344,14 @@ function ChatList({ currentUser, onNavigate }) {
       {/* ÁREA DE CONTENIDO */}
       <div style={s.scrollArea} onTouchStart={onPullStart} onTouchMove={onPullMove} onTouchEnd={onPullEnd} onTouchCancel={onPullEnd}>
         <div style={{ ...s.pullRefresh, height: refreshing ? 38 : pullDistance, opacity: refreshing ? 1 : Math.min(pullDistance / 44, 1) }}><span style={{ ...s.pullRefreshIcon, transform: refreshing ? undefined : `rotate(${Math.min(pullDistance * 4, 180)}deg)`, animation: refreshing ? 'clSpin 750ms linear infinite' : 'none' }}>↻</span><span>{refreshing ? 'Actualizando' : 'Suelta para actualizar'}</span></div>
-        {filteredConversations.length === 0 ? (
+        {loadError ? (
+          <div style={s.errorState} role="alert">
+            <div style={s.errorIcon}>!</div>
+            <div style={s.emptyTitle}>No pudimos cargar el chat</div>
+            <div style={s.emptySub}>{loadError}</div>
+            <button type="button" style={s.retryButton} onClick={() => loadConversations()}>Reintentar</button>
+          </div>
+        ) : filteredConversations.length === 0 ? (
           <div style={s.empty}>
             <div style={s.emptyIconBox}>
               <Icon.MessageSquare size={36} color="#16a34a" />
@@ -362,8 +373,9 @@ function ChatList({ currentUser, onNavigate }) {
               const unread = conv.unreadCount > 0
 
               return (
-                <div
-                  key={idx}
+                <button
+                  type="button"
+                  key={`${conv.otherUserId}-${conv.postId || 'general'}-${idx}`}
                   style={s.row}
                   onClick={() => handleSelectConversation(conv)}
                 >
@@ -427,7 +439,7 @@ function ChatList({ currentUser, onNavigate }) {
                       <Icon.ChevronRight />
                     </div>
                   )}
-                </div>
+                </button>
               )
             })}
           </div>
@@ -535,6 +547,11 @@ const s = {
   },
 
   row: {
+    width: '100%',
+    border: 'none',
+    textAlign: 'left',
+    fontFamily: 'inherit',
+    color: '#111',
     display: 'flex',
     alignItems: 'center',
     padding: '16px 18px',
@@ -702,7 +719,24 @@ const s = {
     color: '#888',
     lineHeight: 1.5,
     maxWidth: 240
-  }
+  },
+  errorState: {
+    minHeight: 280,
+    padding: '56px 30px',
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+    textAlign: 'center',
+  },
+  errorIcon: {
+    width: 54, height: 54, marginBottom: 15, display: 'grid', placeItems: 'center',
+    borderRadius: '50%', color: '#9f1239', background: '#ffe4e6', fontSize: 24, fontWeight: 800,
+  },
+  retryButton: {
+    minHeight: 42, marginTop: 16, padding: '0 18px', borderRadius: 12,
+    color: '#fff', background: '#158f66', fontWeight: 800,
+  },
 }
 
 export default ChatList

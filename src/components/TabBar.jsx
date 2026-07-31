@@ -90,13 +90,19 @@ function TabBar({ activeTab, onChangeTab, onCrear, noLeidos = 0, showCreateButto
       {/* ═══ MENÚ DEL "+" ═══ */}
       {showCreateButton && abierto && (
         <div style={s.overlay} onClick={() => setAbierto(false)}>
-          <div style={s.menu} onClick={(e) => e.stopPropagation()}>
-            {CREAR.map((c) => (
-              <button key={c.id} style={s.menuItem} onClick={() => elegir(c.id)}>
-                <span style={{ ...s.menuIcono, background: c.bg }}>{c.emoji}</span>
-                <span style={s.menuLabel}>{c.label}</span>
-              </button>
-            ))}
+          <div style={s.menu} role="dialog" aria-modal="true" aria-label="Crear en El Barrio" onClick={(e) => e.stopPropagation()}>
+            <div style={s.menuHeader}>
+              <span style={s.menuHeaderCopy}><strong>¿Qué quieres publicar?</strong><small>Elige una opción</small></span>
+              <button type="button" style={s.menuClose} onClick={() => setAbierto(false)} aria-label="Cerrar">×</button>
+            </div>
+            <div style={s.menuGrid}>
+              {CREAR.map((c) => (
+                <button type="button" key={c.id} style={s.menuItem} onClick={() => elegir(c.id)}>
+                  <span style={{ ...s.menuIcono, background: c.bg }}>{c.emoji}</span>
+                  <span style={s.menuLabel}>{c.label}</span>
+                </button>
+              ))}
+            </div>
           </div>
         </div>
       )}
@@ -104,6 +110,7 @@ function TabBar({ activeTab, onChangeTab, onCrear, noLeidos = 0, showCreateButto
       {/* ═══ BOTÓN "+" (squircle, no círculo) ═══ */}
       {showCreateButton && (
         <button
+          type="button"
           style={{
             ...s.fab,
             transform: abierto ? 'rotate(45deg)' : 'rotate(0deg)',
@@ -124,12 +131,16 @@ function TabBar({ activeTab, onChangeTab, onCrear, noLeidos = 0, showCreateButto
           return (
             <button
               key={t.id}
-              style={s.tab}
+              type="button"
+              style={{ ...s.tab, ...(activo ? s.tabActive : {}) }}
               onClick={() => { setAbierto(false); onChangeTab(t.id) }}
+              aria-current={activo ? 'page' : undefined}
+              aria-label={t.id === 'chat' && noLeidos > 0 ? `${t.label}, ${noLeidos} mensajes sin leer` : t.label}
             >
               <span style={{
                 ...s.tabIcon,
-                opacity: activo ? 1 : 0.5,
+                ...(activo ? s.tabIconActive : {}),
+                opacity: activo ? 1 : 0.62,
               }}>
                 {t.icon(color)}
               </span>
@@ -156,11 +167,11 @@ const s = {
   barra: {
     position: 'absolute',
     bottom: 0, left: 0, right: 0,
-    height: 76,
+    height: 'calc(76px + env(safe-area-inset-bottom, 0px))',
     display: 'flex', alignItems: 'flex-start',
     background: '#fff',
     borderTop: `1px solid ${C.borde}`,
-    paddingTop: 9,
+    padding: '9px 0 env(safe-area-inset-bottom, 0px)',
     boxShadow: '0 -2px 16px rgba(0,0,0,0.05)',
     zIndex: 100,
     fontFamily: T.font,
@@ -168,15 +179,17 @@ const s = {
   tab: {
     flex: 1, position: 'relative',
     display: 'flex', flexDirection: 'column',
-    alignItems: 'center', gap: 3,
+    alignItems: 'center', justifyContent: 'flex-start', gap: 3,
     background: 'none', border: 'none',
-    cursor: 'pointer', padding: 0, fontFamily: 'inherit',
+    cursor: 'pointer', padding: '0 2px', minHeight: 50, fontFamily: 'inherit',
   },
+  tabActive: { color: C.verde },
   tabIcon: {
     display: 'flex', alignItems: 'center', justifyContent: 'center',
-    height: 24,
-    transition: 'opacity .15s',
+    width: 36, height: 28, borderRadius: 999,
+    transition: 'opacity .15s, background .15s',
   },
+  tabIconActive: { background: C.verdeBg },
   tabLabel: { fontSize: 10.5 },
   badge: {
     position: 'absolute', top: -3, right: '50%', marginRight: -22,
@@ -190,7 +203,7 @@ const s = {
   /* ── FAB squircle (cuadrado con puntas redondeadas) ── */
   fab: {
     position: 'absolute',
-    bottom: 90, right: 18,
+    bottom: 'calc(90px + env(safe-area-inset-bottom, 0px))', right: 18,
     width: 56, height: 56, borderRadius: 18,
     color: '#fff', fontSize: 30, fontWeight: 300,
     border: 'none', cursor: 'pointer',
@@ -205,36 +218,51 @@ const s = {
   overlay: {
     position: 'absolute',
     top: 0, left: 0, right: 0, bottom: 0,
-    background: 'rgba(255,255,255,0.75)',
+    background: 'rgba(17,29,22,0.34)',
     backdropFilter: 'blur(4px)',
     WebkitBackdropFilter: 'blur(4px)',
     zIndex: 200,
   },
   menu: {
     position: 'absolute',
-    bottom: 158, right: 18,
+    left: 12, right: 12,
+    bottom: 'calc(154px + env(safe-area-inset-bottom, 0px))',
+    maxHeight: 'calc(100% - 184px)',
+    overflowY: 'auto',
     background: '#fff',
-    borderRadius: 20,
-    padding: 10,
+    borderRadius: 22,
+    padding: 14,
     boxShadow: '0 12px 40px rgba(0,0,0,0.18)',
     border: `1px solid ${C.borde}`,
-    display: 'flex', flexDirection: 'column', gap: 2,
-    minWidth: 218,
     fontFamily: T.font,
   },
+  menuHeader: {
+    minHeight: 42, marginBottom: 10, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12,
+    color: C.texto,
+  },
+  menuHeaderCopy: {
+    display: 'flex', flexDirection: 'column', gap: 3, fontSize: 14,
+  },
+  menuClose: {
+    width: 36, height: 36, flex: '0 0 auto', display: 'grid', placeItems: 'center',
+    borderRadius: '50%', color: C.textoSuave, background: C.fondo, fontSize: 22,
+  },
+  menuGrid: {
+    display: 'grid', gridTemplateColumns: 'repeat(2,minmax(0,1fr))', gap: 8,
+  },
   menuItem: {
-    display: 'flex', alignItems: 'center', gap: 13,
-    padding: '12px 13px', borderRadius: 14,
-    background: 'none', border: 'none',
+    minHeight: 62, display: 'flex', alignItems: 'center', gap: 10,
+    padding: '9px 10px', borderRadius: 14,
+    background: C.fondo, border: `1px solid ${C.borde}`,
     cursor: 'pointer', fontFamily: 'inherit',
     width: '100%', textAlign: 'left',
   },
   menuIcono: {
-    width: 40, height: 40, borderRadius: 12,
+    width: 38, height: 38, borderRadius: 11,
     display: 'flex', alignItems: 'center', justifyContent: 'center',
     fontSize: 20, flexShrink: 0,
   },
-  menuLabel: { fontSize: 15, fontWeight: 700, color: C.texto },
+  menuLabel: { minWidth: 0, fontSize: 12, lineHeight: 1.2, fontWeight: 700, color: C.texto },
 }
 
 export default TabBar

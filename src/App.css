@@ -66,3 +66,11 @@
     transform: translate3d(0, 0, 0);
   }
 }
+
+@media (prefers-reduced-motion: reduce) {
+  .app-screen-transition,
+  .app-create-transition {
+    animation: none !important;
+    will-change: auto;
+  }
+}

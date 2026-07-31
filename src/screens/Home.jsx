@@ -281,6 +281,7 @@ function Home({ currentUser, onNavigate, onCrear }) {
   const farmaciasTurno = farmaciasLista.filter(farmacia => farmacia.is_on_duty === true)
   const farmaciasOtras = farmaciasLista.filter(farmacia => farmacia.is_on_duty !== true)
   const [cargando, setCargando] = useState(true)
+  const [feedError, setFeedError] = useState('')
   const [refrescando, setRefrescando] = useState(false)
   const [pullDistance, setPullDistance] = useState(0)
   const pullStartY = useRef(null)
@@ -433,6 +434,7 @@ function Home({ currentUser, onNavigate, onCrear }) {
     // Solo mostramos spinner si NO tenemos cache (primera vez).
     const cache = leerCache()
     if (!cache) setCargando(true)
+    setFeedError('')
     try {
       // ── Paso 1 (paralelo con todo): profile del usuario ──
       // Si tenemos neighborhood_id del cache, no necesitamos esperar el
@@ -446,7 +448,10 @@ function Home({ currentUser, onNavigate, onCrear }) {
         // Primera vez: esperamos el profile (no hay otra opción).
         const { data: pData } = await profilePromise
         p = pData
-        if (!p) return
+        if (!p) {
+          setFeedError('No pudimos encontrar tu perfil vecinal.')
+          return
+        }
         setProfile(p)
       }
 
@@ -487,6 +492,9 @@ function Home({ currentUser, onNavigate, onCrear }) {
           .or('read.is.null,read.eq.false'),
       ])
 
+      if (hoodRes.error) throw hoodRes.error
+      if (postsRes.error) throw postsRes.error
+
       // Si el profile refrescado trae datos nuevos, los usamos.
       const profileFresco = profileRes?.data || p
       if (profileFresco && profileFresco !== p) setProfile(profileFresco)
@@ -499,6 +507,7 @@ function Home({ currentUser, onNavigate, onCrear }) {
       // la columna expires_at no existe en el schema.
       if (alertRes.error) {
         console.error('[el barrio] Error cargando alertas:', alertRes.error)
+        setFeedError('La actividad cargó, pero no pudimos actualizar las alertas.')
       }
       const ahoraMs = Date.now()
       const todasLasAlertas = (alertRes.data || []).filter((a) => {
@@ -569,6 +578,9 @@ function Home({ currentUser, onNavigate, onCrear }) {
       }
     } catch (err) {
       console.error('Error cargando el radar:', err)
+      setFeedError(cache
+        ? 'No pudimos actualizar el Inicio. Sigues viendo la última información disponible.'
+        : 'No pudimos cargar la actividad de tu barrio. Revisa tu conexión e inténtalo nuevamente.')
     } finally {
       setCargando(false)
     }
@@ -790,6 +802,13 @@ function Home({ currentUser, onNavigate, onCrear }) {
           }}>↻</span>
           <span>{refrescando ? 'Actualizando' : 'Suelta para actualizar'}</span>
         </div>
+
+        {feedError && (
+          <div style={s.feedError} role="alert">
+            <span>{feedError}</span>
+            <button type="button" style={s.feedErrorButton} onClick={() => cargar(profile?.neighborhood_id)}>Reintentar</button>
+          </div>
+        )}
 
         {/* ══════ CLIMA + FARMACIA ══════ */}
         {clima && (
@@ -1168,6 +1187,16 @@ const s = {
     width: 18, height: 18, borderRadius: '50%',
     display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
     color: C.verde, fontSize: 18, lineHeight: 1,
+  },
+  feedError: {
+    minHeight: 46, margin: '0 0 12px', padding: '9px 10px 9px 12px',
+    display: 'flex', alignItems: 'center', gap: 9,
+    border: '1px solid #fed7aa', borderRadius: 12,
+    color: '#7c2d12', background: '#fff7ed', fontSize: 10.5, lineHeight: 1.4,
+  },
+  feedErrorButton: {
+    flex: '0 0 auto', minHeight: 30, padding: '0 9px', borderRadius: 9,
+    color: '#7c2d12', background: '#ffedd5', fontSize: 9.5, fontWeight: 800,
   },
 
   /* ── clima + farmacia ── */

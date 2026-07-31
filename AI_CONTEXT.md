@@ -5,9 +5,9 @@
 
 ## Estado de continuidad — 30 de julio de 2026
 
-- Superbloque de pulido UX/UI autorizado en curso. Estado: `2/4 — Perfil y Servicios pulidos`.
+- Superbloque de pulido UX/UI autorizado en curso. Estado: `3/4 — navegación, safe areas y resiliencia pulidas`.
 - “Mis publicaciones”, “Mis favoritos” y “Mis compras y ventas” se abren ahora como subpantallas completas desde la parte superior, con retorno y scroll propios; ya no quedan como hojas pegadas al borde inferior cuando tienen poco contenido.
-- Siguiente checkpoint: refinar barra inferior, menú Crear, safe areas, Modo accesible y estados de error de Inicio/Chat.
+- Siguiente checkpoint: builds finales de app y panel, revisión de diff/contexto y cierre del superbloque.
 - Fase larga autorizada en curso: cierre de Comercios, moderación de contenido público con IA, reemplazo de Mi perfil y Modo accesible. Se trabaja por bloques con compilación, actualización de contexto y commit independiente.
 - Bloque actual: `4/4 — fase larga completada y verificada`.
 - La aplicación principal y el panel administrativo compilan en producción. La Edge Function nueva pasa `deno lint`, está desplegada y responde correctamente en red.
@@ -152,6 +152,7 @@ El botón de creación abre `CreatePost.jsx`, salvo la creación de comercios, q
 - En el flujo de Mercado, `auth.users.id` se conserva para `post_likes`, mientras `profiles.id` se usa para autoría de publicaciones, comentarios, perfiles públicos y comprobación de propiedad.
 - La creación de publicaciones valida `posts.author_id → profiles.id → profiles.user_id = auth.uid()`, exige el mismo barrio, cuenta activa y verificación. Los eventos requieren administrador o `can_publish_events`; las noticias requieren administrador. Esta corrección está aplicada mediante `202607300002_post_publishing_policies.sql`.
 - El chat puede abrirse en modo de prueba o vista previa cuando todas las publicaciones pertenecen al mismo usuario.
+- La lista de Chat diferencia una bandeja vacía de un error de carga, ofrece reintento y representa cada conversación como un control accesible por teclado.
 - Los tratos de venta, regalo y trueque usan `marketplace_deals`. El interesado propone un encuentro, el autor acepta o rechaza, ambos continúan en el mismo chat y solo el autor puede cerrar un match aceptado. Al cerrar, la publicación pasa a `sold` y deja de aparecer en los feeds activos. Las acciones se ejecutan exclusivamente mediante `marketplace_propose_deal` y `marketplace_respond_deal`.
 - Servicios destacados es una posición comercial identificada como patrocinada o destacada; no implica que sea el mejor servicio.
 - Los servicios nuevos se guardan con `posts.status='pending'` y no aparecen en el feed hasta ser aprobados desde el panel. El panel puede aprobar, rechazar, pausar o reactivar servicios.
@@ -181,6 +182,8 @@ El botón de creación abre `CreatePost.jsx`, salvo la creación de comercios, q
 - Mi perfil usa una sola implementación basada en la referencia aprobada: identidad centrada, reputación, estadísticas reales, progreso, insignias y menú personal. “Mis publicaciones”, “Mis favoritos” y “Mis compras y ventas” abren hojas con datos reales; no muestran contadores simulados.
 - Las secciones de actividad de Mi perfil se presentan como subpantallas completas y no como bottom sheets: la información empieza arriba, el contenido breve conserva jerarquía y la barra inferior queda cubierta mientras se revisa una sección.
 - El Modo accesible es una preferencia local persistente controlada por `App.jsx`. Aplica texto y controles más grandes, foco visible y movimiento reducido a toda la aplicación; puede alternarse desde Mi perfil y Configuración. Es una ayuda práctica para adultos mayores, no una declaración formal de cumplimiento WCAG.
+- La barra inferior y el menú Crear respetan el safe area del dispositivo. El menú universal usa una cuadrícula desplazable con título y cierre explícito; los tabs identifican semánticamente la sección activa y anuncian mensajes sin leer.
+- Inicio distingue una actualización fallida de un feed realmente vacío: conserva la última información disponible cuando existe caché y muestra un aviso con reintento. Las consultas principales de barrio y publicaciones ya no fallan silenciosamente.
 - Las páginas comunitarias comparten la identidad visual vigente, el header simple con retorno y scroll independiente.
 - Los feeds de Mercado, Servicios, Eventos, Chat y Comercios usan un header interno común: botón volver, título centrado en gris carbón con `el barrio` en verde de marca, un ícono lineal grande y translúcido propio de la sección hacia el lado izquierdo, y una línea verde inferior. Inicio conserva su header propio.
 - Comercios ocupa el cuarto acceso de la barra inferior. Eventos se abre desde los accesos rápidos de Inicio.
