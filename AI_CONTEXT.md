@@ -7,6 +7,7 @@
 
 - Cierre posterior implementado en código: los favoritos abren la ficha exacta del comercio y “Hoy en tu barrio” queda oculto por defecto, con selección independiente desde Eventos del panel. App y panel pasan build y ESLint focalizado.
 - La migración `202607300005_home_event_spotlight.sql` está preparada pero no debe asumirse aplicada. Hasta su confirmación, Inicio falla cerrado y omite la portada sin afectar el resto del feed; el control administrativo requiere la RPC nueva para funcionar.
+- La aplicación principal está desplegada en `https://elbarrio.lat/el-barrio/` y el panel en `https://elbarrio.lat/el-barrio/admin/`. La ruta histórica `https://elbarrio.lat/app.php` redirige a la aplicación React. Los builds reproducibles para Plesk usan `npm run build:plesk` en cada proyecto.
 - Superbloque de adquisición y pulido visual implementado: alta con campos separados `Nombre` y `Apellido` sin alterar el schema, mapa territorial explicativo en la verificación, favoritos con mayor jerarquía, controles circulares protegidos en Modo accesible y portada editorial “Hoy en tu barrio” basada solo en eventos reales seleccionados.
 - La aplicación principal y el panel administrativo compilan después del superbloque. Los archivos focalizados de Perfil, Verificación, MiniMap y Mi perfil pasan ESLint. La revisión visual automatizada sigue pendiente porque no había ningún navegador conectado al entorno.
 - Este bloque no agrega ni ejecuta migraciones. La visualización territorial usa una copia cliente del GeoJSON versionado; la confirmación residencial continúa dependiendo de la RPC existente y su estado remoto no se presume.
@@ -19,7 +20,7 @@
 - Las instrucciones y el registro de la migración de auditoría están en `supabase/MVP_CIERRE_INSTRUCCIONES.md`. No se cargaron datos simulados.
 - La Edge Function `moderate-community-content` está desplegada y validada en red: el preflight responde HTTP 200 y una solicitud sin sesión responde HTTP 401.
 - La migración `202607300004_content_moderation_events.sql` fue aplicada el 30 de julio de 2026 según confirmación manual. PostgREST reconoce la tabla y rechaza el acceso anónimo con HTTP 401, como corresponde a sus permisos.
-- No incluir `landing-page/` ni `supabase/.temp/` en los commits de esta fase.
+- `landing-page/` contiene ahora la landing pública independiente y debe versionarse como producto propio. `supabase/.temp/` continúa fuera de los commits.
 - La aplicación de vecinos y el panel administrativo comparten el mismo proyecto Supabase.
 - El último cierre funcional corrigió identidad de perfiles, estados de carga, contenido simulado y aislamiento territorial en feeds, detalles y perfiles públicos activos.
 - La aplicación principal y el panel compilan correctamente después de estos cambios.
@@ -32,6 +33,7 @@
 
 - Aplicación web móvil construida con Vite 8, React 19 y JavaScript/JSX.
 - Existe una aplicación web administrativa independiente en `admin-panel/`, conectada al mismo Supabase y orientada al uso desde computador.
+- Existe una landing pública independiente en `landing-page/`, construida con HTML, CSS y JavaScript estáticos para desplegarse directamente sin afectar la aplicación ni el panel.
 - La interfaz se presenta dentro de un marco de teléfono en escritorio y ocupa la pantalla disponible en móvil.
 - `src/main.jsx` monta `src/App.jsx`.
 - `App.jsx` funciona como orquestador: controla autenticación, navegación, tabs, historial interno, overlays y usuario activo.
@@ -260,10 +262,11 @@ El botón de creación abre `CreatePost.jsx`, salvo la creación de comercios, q
 
 ## Funcionalidades terminadas
 
+- Landing pública de El Barrio con navegación responsive, imágenes originales generadas para el proyecto, hero cinematográfico, demo ficticia de la aplicación, scrollytelling de cuatro etapas, propuesta para vecinos y comercios, comunidad y formulario de contacto por correo. No utiliza datos ni pantallas reales de la aplicación.
 - Alta y verificación territorial refinadas: Nombre y Apellido separados sin migración, copy de privacidad coherente, scroll interno, mapa del polígono MVP, geocodificación automática de dirección y marcador previo al GPS.
 - Inicio incorpora una portada editorial real para el próximo evento elegido desde el panel, sin datos simulados ni duplicación inmediata en Actividad. Mi perfil amplía las tarjetas de favoritos y el Modo accesible conserva cuadrados los controles circulares.
 - Pulido UX/UI final de la app vecinal: subpantallas superiores de Perfil, buscador permanente y jerarquía real en Servicios, detalle con métricas reales y CTA dominante, menú Crear adaptable, safe areas, reducción de movimiento, Chat con recuperación y Home con caché más aviso de actualización fallida.
-- La fase larga autorizada quedó cerrada en cuatro checkpoints: continuidad, moderación preventiva, Comercios y Productos, y Perfil con Modo accesible. App y panel pasan sus builds de producción; los archivos ajenos `landing-page/` y `supabase/.temp/` permanecen fuera de los commits.
+- La fase larga autorizada quedó cerrada en cuatro checkpoints: continuidad, moderación preventiva, Comercios y Productos, y Perfil con Modo accesible. App y panel pasan sus builds de producción; `supabase/.temp/` permanece fuera de los commits.
 - `MyProfile.jsx` fue reemplazado, sin pantalla paralela, por la composición visual aprobada. Reputación, ventas, regalos, ayudas, publicaciones, favoritos y tratos se derivan de Supabase o muestran cero/sin calificación; el perfil no inventa valores. El Modo accesible persiste en `localStorage` y se aplica globalmente.
 - El cierre funcional de Comercios fue auditado en la aplicación y el panel: feed territorial con error y reintento explícitos, contacto correcto por WhatsApp, ficha con promociones/catálogo/galería/opiniones, y catálogo administrativo con creación, edición, disponibilidad y destacados. Los builds de producción de ambas aplicaciones pasan.
 - La moderación preventiva de texto público está integrada en publicaciones, comentarios de Mercado y Alertas, y opiniones de Servicios y Comercios mediante `moderate-community-content`. La función está desplegada; CORS y rechazo sin sesión fueron validados. La auditoría administrativa `content_moderation_events` está aplicada y protegida contra lectura anónima.

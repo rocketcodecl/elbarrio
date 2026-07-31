@@ -1,0 +1,229 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#f4f7f4" />
+    <meta name="description" content="El Barrio conecta vecinos, comercios, servicios, eventos y alertas que ocurren cerca de ti." />
+    <meta property="og:title" content="El Barrio — Todo tu barrio, en un solo lugar" />
+    <meta property="og:description" content="La red local para saber qué pasa, encontrar lo que necesitas y participar donde vives." />
+    <title>El Barrio — Tu barrio, más cerca que nunca</title>
+    <link rel="icon" href="assets/isotipo.png" />
+    <link rel="stylesheet" href="styles.css" />
+    <script src="script.js" defer></script>
+  </head>
+  <body>
+    <div class="progress" aria-hidden="true"><span></span></div>
+
+    <header class="site-header" data-header>
+      <a class="brand" href="#inicio" aria-label="El Barrio, volver al inicio">
+        <img src="assets/isotipo.png" alt="" />
+        <span>El Barrio</span>
+      </a>
+      <nav class="desktop-nav" aria-label="Navegación principal">
+        <a href="#como-funciona">Cómo funciona</a>
+        <a href="#vecinos">Para vecinos</a>
+        <a href="#comercios">Para comercios</a>
+        <a href="#comunidad">Comunidad</a>
+      </nav>
+      <a class="nav-cta" href="#sumate">Quiero ser parte <span>↗</span></a>
+      <button class="menu-button" type="button" aria-label="Abrir menú" aria-expanded="false" data-menu-button>
+        <span></span><span></span>
+      </button>
+      <nav class="mobile-nav" aria-label="Navegación móvil" data-mobile-nav>
+        <a href="#como-funciona">Cómo funciona</a>
+        <a href="#vecinos">Para vecinos</a>
+        <a href="#comercios">Para comercios</a>
+        <a href="#comunidad">Comunidad</a>
+        <a href="#sumate">Quiero ser parte</a>
+      </nav>
+    </header>
+
+    <main>
+      <section class="hero" id="inicio">
+        <div class="hero-media" aria-hidden="true">
+          <img src="assets/hero-barrio.jpg" alt="" />
+          <div class="hero-shade"></div>
+        </div>
+        <div class="hero-content">
+          <p class="eyebrow light"><span></span> Beta en Las Condes</p>
+          <h1>Tu barrio,<br /><em>más cerca que nunca.</em></h1>
+          <p class="hero-lead">Vecinos, comercios, servicios y todo lo que está pasando a pocos pasos de tu casa.</p>
+          <div class="hero-actions">
+            <a class="button primary" href="#sumate">Quiero entrar al barrio <span>→</span></a>
+            <a class="button ghost" href="#comercios">Tengo un comercio</a>
+          </div>
+          <div class="hero-proof">
+            <div class="avatar-stack" aria-hidden="true"><span>FV</span><span>SM</span><span>JP</span><span>+42</span></div>
+            <p>Una comunidad real<br />empieza cerca de casa.</p>
+          </div>
+        </div>
+        <div class="hero-float hero-float-one"><span>📍</span><div><small>Estás en</small><strong>El Barrio · Las Condes</strong></div></div>
+        <div class="hero-float hero-float-two"><span>🏪</span><div><small>Comercio cercano</small><strong>Pan recién horneado</strong></div></div>
+        <a class="scroll-cue" href="#manifiesto"><span>Descubre</span><i>↓</i></a>
+      </section>
+
+      <section class="manifesto section" id="manifiesto">
+        <div class="manifesto-grid">
+          <p class="eyebrow"><span></span> La vida ocurre cerca</p>
+          <div>
+            <h2>Tu barrio está lleno de cosas importantes. El problema es que hoy están <em>repartidas en todas partes.</em></h2>
+            <p>Un evento en una cuenta que no sigues. Un comercio que nunca viste. Una vecina que necesita ayuda. El Barrio reúne lo local para que deje de pasar desapercibido.</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="story" id="como-funciona">
+        <div class="story-intro section">
+          <p class="eyebrow"><span></span> Una aplicación, tu vida local</p>
+          <h2>Del “¿alguien sabe?”<br />al <em>“aquí está”.</em></h2>
+        </div>
+
+        <div class="story-layout">
+          <div class="phone-stage">
+            <div class="phone-glow"></div>
+            <div class="demo-phone" aria-label="Demostración visual de la aplicación El Barrio">
+              <div class="phone-island"></div>
+              <div class="phone-screen">
+                <div class="app-top">
+                  <div><small>¡Hola, Fernando! 👋</small><strong>📍 El Barrio, Las Condes</strong></div>
+                  <span>🔔</span>
+                </div>
+
+                <div class="demo-scene active" data-scene-panel="inicio">
+                  <div class="weather-card"><span>☀️</span><div><b>18°C</b><small>Despejado · Las Condes</small></div><p>💊 Farmacia de turno<br /><strong>Farmacias Ahumada</strong></p></div>
+                  <div class="quick-grid"><span>🏪<small>Comercios</small></span><span>📰<small>Noticias</small></span><span>🚨<small>Alertas</small></span></div>
+                  <div class="help-strip">🙋 <strong>¿Necesitas una mano?</strong><b>¡Pídelo!</b></div>
+                  <h4>Actividad de el barrio</h4>
+                  <div class="feed-card"><i class="pink"></i><div><b>Se perdió Boby 🐕</b><small>Por Camila · hace 8 min</small><p>Fue visto cerca de la plaza.</p></div></div>
+                  <div class="feed-card"><i class="orange"></i><div><b>Feria de emprendedores</b><small>Evento · Sábado 11:00</small><p>Productos locales y música.</p></div></div>
+                </div>
+
+                <div class="demo-scene" data-scene-panel="mercado">
+                  <div class="app-section-title"><span>🏷️</span><div><small>Mercado de</small><strong>el barrio</strong></div></div>
+                  <div class="publish-strip">¿Algo que ya no usas? <b>¡Publícalo! →</b></div>
+                  <div class="category-pills"><span>Todos</span><span>🎁 Regalos</span><span>🔄 Trueque</span></div>
+                  <h4>Publicaciones recientes</h4>
+                  <div class="market-grid"><article><div class="product bike">🚲</div><strong>$85.000</strong><p>Bicicleta urbana</p><small>📍 a 180 m</small></article><article><div class="product books">📚</div><strong class="free">Gratis</strong><p>Libros infantiles</p><small>📍 a 240 m</small></article></div>
+                </div>
+
+                <div class="demo-scene" data-scene-panel="servicios">
+                  <div class="app-section-title"><span>🧰</span><div><small>Servicios de</small><strong>el barrio</strong></div></div>
+                  <div class="service-hero"><span>🔧</span><div><small>Gasfitería</small><strong>Soluciones Don Pedro</strong><p>⭐ 4.9 · A 350 m</p></div><b>Contactar</b></div>
+                  <h4>Recomendados por vecinos</h4>
+                  <div class="service-row"><span>💡</span><div><b>Electricidad segura</b><small>Marcelo · 4.8 ★</small></div><i>›</i></div>
+                  <div class="service-row"><span>🌱</span><div><b>Jardinería y poda</b><small>Andrea · 5.0 ★</small></div><i>›</i></div>
+                  <div class="service-row"><span>🐕</span><div><b>Paseo de mascotas</b><small>Josefa · 4.9 ★</small></div><i>›</i></div>
+                </div>
+
+                <div class="demo-scene" data-scene-panel="eventos">
+                  <div class="app-section-title"><span>📅</span><div><small>Eventos de</small><strong>el barrio</strong></div></div>
+                  <div class="event-cover"><img src="assets/comunidad-barrio.jpg" alt="" /><div><small>Comunidad</small><strong>Encuentro vecinal</strong><p>Hoy · 17:30 · Plaza del Barrio</p></div></div>
+                  <h4>Próximamente</h4>
+                  <div class="event-row"><span>🧘</span><div><b>Yoga en la plaza</b><small>Mañana · 09:00</small></div><em>Gratis</em></div>
+                  <div class="event-row"><span>🎨</span><div><b>Taller para niños</b><small>Sábado · 11:30</small></div><em>Ver</em></div>
+                </div>
+
+                <div class="app-tabs"><span class="selected">⌂<small>Inicio</small></span><span>▣<small>Mercado</small></span><span>⌕<small>Servicios</small></span><span>□<small>Eventos</small></span><span>○<small>Chat</small></span></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="story-steps" id="vecinos">
+            <article class="story-step active" data-scene="inicio">
+              <span class="step-number">01</span>
+              <p class="eyebrow">Todo empieza aquí</p>
+              <h3>Entérate de lo que pasa, sin buscarlo por todas partes.</h3>
+              <p>Información útil de tu sector: alertas, noticias, comercios de turno y actividad vecinal relevante.</p>
+            </article>
+            <article class="story-step" data-scene="mercado">
+              <span class="step-number">02</span>
+              <p class="eyebrow">Mercado local</p>
+              <h3>Lo que necesitas puede estar a dos cuadras.</h3>
+              <p>Compra, vende, regala o intercambia con personas que realmente viven cerca de ti.</p>
+            </article>
+            <article class="story-step" data-scene="servicios">
+              <span class="step-number">03</span>
+              <p class="eyebrow">Servicios confiables</p>
+              <h3>Encuentra a quien sabe hacerlo dentro del barrio.</h3>
+              <p>Datos claros, recomendaciones de vecinos y contacto directo con prestadores locales.</p>
+            </article>
+            <article class="story-step" data-scene="eventos">
+              <span class="step-number">04</span>
+              <p class="eyebrow">Tu barrio se mueve</p>
+              <h3>Descubre actividades antes de que ya hayan pasado.</h3>
+              <p>Eventos comunitarios, talleres y panoramas ordenados por cercanía y fecha.</p>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <section class="commerce section" id="comercios">
+        <div class="commerce-photo reveal"><img src="assets/comercio-local.jpg" alt="Comerciante local entregando pan fresco a una vecina" /><span>Comercio local · a 300 m</span></div>
+        <div class="commerce-copy reveal">
+          <p class="eyebrow"><span></span> Para comercios</p>
+          <h2>No necesitas llegar a todo el mundo. Necesitas llegar a <em>tu barrio.</em></h2>
+          <p>Una vitrina pensada para las personas que viven, caminan y compran cerca de tu negocio.</p>
+          <ul>
+            <li><span>01</span><div><strong>Perfil comercial completo</strong><small>Horarios, ubicación, contacto, fotos y opiniones.</small></div></li>
+            <li><span>02</span><div><strong>Productos y promociones</strong><small>Haz visible lo que te hace especial.</small></div></li>
+            <li><span>03</span><div><strong>Visibilidad con sentido</strong><small>Destácate frente a vecinos de tu propio sector.</small></div></li>
+          </ul>
+          <a class="text-link" href="#sumate">Quiero sumar mi comercio <span>→</span></a>
+        </div>
+      </section>
+
+      <section class="trust">
+        <div class="section trust-inner">
+          <p class="eyebrow"><span></span> Confianza hiperlocal</p>
+          <h2>Un barrio digital que sigue sintiéndose <em>humano.</em></h2>
+          <div class="trust-grid">
+            <article><span>📍</span><h3>Realmente cerca</h3><p>La experiencia cambia según el lugar donde vives.</p></article>
+            <article><span>✅</span><h3>Comunidad verificada</h3><p>Personas vinculadas a un territorio concreto.</p></article>
+            <article><span>🤝</span><h3>Útil antes que viral</h3><p>Menos ruido. Más información para la vida cotidiana.</p></article>
+          </div>
+        </div>
+      </section>
+
+      <section class="community" id="comunidad">
+        <div class="community-media"><img src="assets/comunidad-barrio.jpg" alt="Encuentro comunitario de vecinos en una plaza de Las Condes" /></div>
+        <div class="community-overlay"></div>
+        <div class="community-content section reveal">
+          <p class="eyebrow light"><span></span> Más que una aplicación</p>
+          <h2>Cuando sabemos quién está cerca, es más fácil <em>hacer comunidad.</em></h2>
+          <p>El Barrio convierte la proximidad en algo útil: descubrir, participar, ayudar y fortalecer la economía local.</p>
+        </div>
+      </section>
+
+      <section class="join section" id="sumate">
+        <div class="join-card">
+          <div class="join-copy">
+            <p class="eyebrow light"><span></span> Próximamente</p>
+            <h2>El barrio que necesitas ya está más cerca.</h2>
+            <p>Estamos construyendo la primera comunidad en Las Condes. Déjanos tus datos para ser de los primeros.</p>
+          </div>
+          <form class="join-form" data-join-form>
+            <fieldset>
+              <legend>Quiero participar como</legend>
+              <label><input type="radio" name="tipo" value="Vecino" checked /><span>🏠 Vecino</span></label>
+              <label><input type="radio" name="tipo" value="Comercio" /><span>🏪 Comercio</span></label>
+            </fieldset>
+            <label class="input-label">Tu nombre<input type="text" name="nombre" placeholder="¿Cómo te llamas?" required /></label>
+            <label class="input-label">Tu correo<input type="email" name="correo" placeholder="tu@correo.cl" required /></label>
+            <button class="button dark" type="submit">Quiero ser parte <span>→</span></button>
+            <p class="form-note" data-form-note>Te contactaremos cuando abramos el acceso en tu sector.</p>
+          </form>
+        </div>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner section">
+        <div class="footer-brand"><a class="brand" href="#inicio"><img src="assets/isotipo.png" alt="" /><span>El Barrio</span></a><p>Conectando lo que importa, cerca de casa.</p></div>
+        <div><strong>Explora</strong><a href="#como-funciona">Cómo funciona</a><a href="#vecinos">Para vecinos</a><a href="#comercios">Para comercios</a></div>
+        <div><strong>Contacto</strong><a href="mailto:elbarrio.lat@gmail.com">elbarrio.lat@gmail.com</a><span>Las Condes · Santiago</span></div>
+      </div>
+      <div class="footer-bottom"><span>© 2026 El Barrio</span><span>Hecho para barrios que quieren estar más cerca.</span></div>
+    </footer>
+  </body>
+</html>
