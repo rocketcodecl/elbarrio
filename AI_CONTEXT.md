@@ -5,9 +5,9 @@
 
 ## Estado de continuidad — 30 de julio de 2026
 
-- Superbloque de pulido UX/UI autorizado en curso. Estado: `1/4 — subpantallas de Perfil corregidas`.
+- Superbloque de pulido UX/UI autorizado en curso. Estado: `2/4 — Perfil y Servicios pulidos`.
 - “Mis publicaciones”, “Mis favoritos” y “Mis compras y ventas” se abren ahora como subpantallas completas desde la parte superior, con retorno y scroll propios; ya no quedan como hojas pegadas al borde inferior cuando tienen poco contenido.
-- Siguiente checkpoint: pulir Servicios y su detalle con patrones factibles de las referencias, usando exclusivamente información real.
+- Siguiente checkpoint: refinar barra inferior, menú Crear, safe areas, Modo accesible y estados de error de Inicio/Chat.
 - Fase larga autorizada en curso: cierre de Comercios, moderación de contenido público con IA, reemplazo de Mi perfil y Modo accesible. Se trabaja por bloques con compilación, actualización de contexto y commit independiente.
 - Bloque actual: `4/4 — fase larga completada y verificada`.
 - La aplicación principal y el panel administrativo compilan en producción. La Edge Function nueva pasa `deno lint`, está desplegada y responde correctamente en red.
@@ -158,6 +158,7 @@ El botón de creación abre `CreatePost.jsx`, salvo la creación de comercios, q
 - La visibilidad patrocinada de Servicios se guarda en `posts.is_featured`, `featured_starts_at`, `featured_until` y `featured_by`; solo aparece durante su vigencia y siempre se identifica como patrocinada.
 - El panel puede crear servicios en nombre de un perfil del barrio. Los destacados se aleatorizan al cargar, avanzan automáticamente con transición suave, se pausan durante la interacción y muestran indicadores.
 - Los servicios tienen una ficha propia y no reutilizan el detalle visual del Mercado. Un precio vacío o igual a cero se presenta como `Valor a convenir`.
+- El buscador de Servicios permanece visible para reducir pasos. La ficha prioriza al prestador, valoración, cantidad de opiniones y precio reales; el estado “Disponible para conversar” solo comunica que la publicación está activa y que la coordinación ocurre por chat. No se inventan experiencia, distancia, disponibilidad horaria ni porcentaje de recomendación.
 - Las calificaciones de servicios usan `service_reviews`, no la tabla de comercios ni estructuras antiguas. Solo un vecino verificado puede dejar una opinión por servicio, puede editarla y no puede calificar su propio servicio. El promedio y la cantidad se consolidan en `posts.rating` y `posts.rating_count`.
 - Los eventos tienen feed y página de detalle propios; no deben reutilizar la interfaz de una publicación de venta.
 - Los eventos solo se mezclan en “Actividad de el barrio” cuando el panel activa `posts.show_in_activity`; continúan apareciendo normalmente en el feed de Eventos.

@@ -124,6 +124,9 @@ export default function ServiceDetail({ postId, currentUser, onNavigate, onEdit 
   const reviewAverage = Number(service.rating) || (reviews.length
     ? reviews.reduce((total, review) => total + Number(review.rating || 0), 0) / reviews.length
     : 0)
+  const metricPrice = service.price != null && Number(service.price) > 0
+    ? plata(service.price)
+    : 'A convenir'
 
   const openReview = () => {
     setReviewDraft({ rating: Number(ownReview?.rating) || 0, comment: ownReview?.comment || '' })
@@ -201,18 +204,25 @@ export default function ServiceDetail({ postId, currentUser, onNavigate, onEdit 
         </header>
 
         <main style={s.main}>
+          <button type="button" style={s.providerCard} onClick={() => nav('sellerprofile', { sellerId: service.author_id })}>
+            {author.avatar_url ? <img src={author.avatar_url} alt="" style={s.avatar} /> : <span style={s.avatarFallback}>{iniciales(author.full_name)}</span>}
+            <span style={s.providerCopy}><small style={s.providerLabel}>{category.emoji} {category.label}</small><strong style={s.providerName}>{author.full_name || 'Vecino del barrio'}</strong><em style={s.providerState}>{verified ? <><Check /> Perfil verificado</> : 'Vecino del barrio'}</em></span>
+            <span style={s.chevron}>›</span>
+          </button>
+
           <section style={s.intro}>
-            <span style={s.categoryBadgeInline}>{category.emoji} {category.label}</span>
             <div style={s.introTop}><span style={s.price}>{price}</span><span style={s.time}>{hace(service.created_at)}</span></div>
             <h1 style={s.title}>{service.title || 'Servicio disponible'}</h1>
             {service.is_featured && <span style={s.sponsored}>✦ Patrocinado</span>}
           </section>
 
-          <button type="button" style={s.providerCard} onClick={() => nav('sellerprofile', { sellerId: service.author_id })}>
-            {author.avatar_url ? <img src={author.avatar_url} alt="" style={s.avatar} /> : <span style={s.avatarFallback}>{iniciales(author.full_name)}</span>}
-            <span style={s.providerCopy}><small style={s.providerLabel}>Ofrecido por</small><strong style={s.providerName}>{author.full_name || 'Vecino del barrio'}</strong><em style={s.providerState}>{verified ? <><Check /> Perfil verificado</> : 'Vecino del barrio'}</em></span>
-            <span style={s.chevron}>›</span>
-          </button>
+          <section style={s.metricsGrid} aria-label="Resumen del servicio">
+            <div style={s.metricCard}><strong style={s.metricValue}>{reviewAverage > 0 ? reviewAverage.toFixed(1) : 'Nuevo'}</strong><span style={s.metricLabel}>valoración</span></div>
+            <div style={s.metricCard}><strong style={s.metricValue}>{reviewCount}</strong><span style={s.metricLabel}>{reviewCount === 1 ? 'opinión' : 'opiniones'}</span></div>
+            <div style={s.metricCard}><strong style={s.metricValue}>{metricPrice}</strong><span style={s.metricLabel}>valor</span></div>
+          </section>
+
+          <div style={s.availabilityBar}><i style={s.availabilityDot} /> <span>Disponible para conversar · Coordina por chat</span></div>
 
           <section style={s.infoCard}>
             <h2 style={s.sectionTitle}>Acerca del servicio</h2>
@@ -251,11 +261,9 @@ export default function ServiceDetail({ postId, currentUser, onNavigate, onEdit 
 
       <footer style={s.footer}>
         <div style={s.footerActions}>
-          {whatsapp && <a href={`https://wa.me/${whatsapp}`} target="_blank" rel="noreferrer" style={s.footerSocial}><span>💬</span><strong>WhatsApp</strong></a>}
-          {isOwn && !whatsapp && <button type="button" style={s.footerSocialEmpty} onClick={() => onEdit?.(service)}><span>💬</span><strong>Agregar WhatsApp</strong></button>}
-          {instagram && <a href={`https://instagram.com/${instagram}`} target="_blank" rel="noreferrer" style={s.footerSocial}><Instagram /><strong>Instagram</strong></a>}
-          {isOwn && !instagram && <button type="button" style={s.footerSocialEmpty} onClick={() => onEdit?.(service)}><Instagram /><strong>Agregar Instagram</strong></button>}
-          <button type="button" style={s.contactBtn} onClick={contact}>{isOwn ? <Edit /> : <Message />}<span>{isOwn ? 'Editar' : 'Chat'}</span></button>
+          {whatsapp && <a href={`https://wa.me/${whatsapp}`} target="_blank" rel="noreferrer" style={s.footerSocial} aria-label="Abrir WhatsApp" title="WhatsApp"><span>💬</span></a>}
+          {instagram && <a href={`https://instagram.com/${instagram}`} target="_blank" rel="noreferrer" style={s.footerSocial} aria-label="Abrir Instagram" title="Instagram"><Instagram /></a>}
+          <button type="button" style={s.contactBtn} onClick={contact}>{isOwn ? <Edit /> : <Message />}<span>{isOwn ? 'Editar servicio' : 'Contactar'}</span></button>
         </div>
       </footer>
 
@@ -312,6 +320,12 @@ const s = {
   providerName: { overflow: 'hidden', fontSize: 13, textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
   providerState: { display: 'flex', alignItems: 'center', gap: 3, color: C.verdeOsc, fontSize: 9, fontStyle: 'normal' },
   chevron: { color: C.textoTenue, fontSize: 24 },
+  metricsGrid: { display: 'grid', gridTemplateColumns: 'repeat(3,minmax(0,1fr))', gap: 7, marginBottom: 12 },
+  metricCard: { minHeight: 68, padding: '10px 5px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 4, overflow: 'hidden', border: `1px solid ${C.borde}`, borderRadius: 13, background: '#fff', textAlign: 'center' },
+  metricValue: { maxWidth: '100%', overflow: 'hidden', color: C.verde, fontSize: 15, lineHeight: 1.15, textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+  metricLabel: { color: C.textoTenue, fontSize: 9 },
+  availabilityBar: { minHeight: 46, marginBottom: 12, padding: '0 13px', display: 'flex', alignItems: 'center', gap: 8, border: `1px solid ${C.verdeSuave}`, borderRadius: 13, color: C.verdeOsc, background: C.verdeBg, fontSize: 11.5, fontWeight: 700 },
+  availabilityDot: { width: 7, height: 7, flex: '0 0 auto', borderRadius: '50%', background: C.verde },
   infoCard: { marginTop: 12, padding: 16, border: `1px solid ${C.borde}`, borderRadius: 15, background: '#fff' },
   sectionTitle: { margin: '0 0 9px', fontSize: 15 },
   description: { margin: 0, color: C.textoSuave, fontSize: 13, lineHeight: 1.65, whiteSpace: 'pre-wrap' },
@@ -337,9 +351,8 @@ const s = {
   trustText: { color: C.textoSuave, fontSize: 11.5 },
   footer: { padding: '10px 16px calc(env(safe-area-inset-bottom, 0px) + 12px)', borderTop: `1px solid ${C.borde}`, background: 'rgba(255,255,255,.96)', boxShadow: '0 -6px 20px rgba(31,55,39,.06)' },
   footerActions: { display: 'flex', gap: 8 },
-  footerSocial: { minHeight: 48, flex: 1, padding: '0 8px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5, border: `1px solid ${C.borde}`, borderRadius: 13, color: C.texto, background: '#fff', textDecoration: 'none', fontSize: 10.5 },
-  footerSocialEmpty: { minHeight: 48, flex: 1, padding: '0 7px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4, border: `1px dashed ${C.verde}`, borderRadius: 13, color: C.verdeOsc, background: C.verdeBg, fontSize: 9.5 },
-  contactBtn: { minHeight: 48, flex: 1, padding: '0 8px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, border: 0, borderRadius: 13, color: '#fff', background: C.verde, fontSize: 12, fontWeight: 800, boxShadow: '0 7px 18px rgba(22,163,74,.22)' },
+  footerSocial: { width: 48, minWidth: 48, minHeight: 48, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', border: `1px solid ${C.borde}`, borderRadius: 13, color: C.verdeOsc, background: '#fff', textDecoration: 'none', fontSize: 17 },
+  contactBtn: { minHeight: 48, flex: 1, padding: '0 14px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, border: 0, borderRadius: 13, color: '#fff', background: C.verde, fontSize: 13, fontWeight: 800, boxShadow: '0 7px 18px rgba(22,163,74,.22)' },
   sheetOverlay: { position: 'absolute', inset: 0, zIndex: 60, display: 'flex', alignItems: 'flex-end', background: 'rgba(15,23,18,.46)', backdropFilter: 'blur(2px)' },
   reviewSheet: { width: '100%', maxHeight: 'calc(100% - 44px)', padding: '10px 18px calc(env(safe-area-inset-bottom, 0px) + 18px)', overflowY: 'auto', borderRadius: '22px 22px 0 0', background: '#fff', boxShadow: '0 -12px 35px rgba(0,0,0,.18)' },
   sheetHandle: { width: 38, height: 4, margin: '0 auto 14px', display: 'block', borderRadius: 999, background: '#d6ded8' },

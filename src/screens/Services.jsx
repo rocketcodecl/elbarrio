@@ -143,13 +143,13 @@ export default function Services({ currentUser, onNavigate, onCrear }) {
   const [error, setError] = useState(null)
   const [category, setCategory] = useState('Todos')
   const [search, setSearch] = useState('')
-  const [searchOpen, setSearchOpen] = useState(false)
   const [expandedServiceId, setExpandedServiceId] = useState(null)
   const [featuredOrder, setFeaturedOrder] = useState([])
   const [featuredIndex, setFeaturedIndex] = useState(0)
   const featuredScrollRef = useRef(null)
   const featuredPausedRef = useRef(false)
   const featuredResumeRef = useRef(null)
+  const searchInputRef = useRef(null)
 
   // Pull-to-refresh
   const scrollRef = useRef(null)
@@ -458,22 +458,23 @@ export default function Services({ currentUser, onNavigate, onCrear }) {
           <strong style={s.headerTit}>
             Servicios de <span style={s.headerBrand}>el barrio</span>
           </strong>
-          <button style={s.searchToggle} onClick={() => { setSearchOpen(v => !v); if (searchOpen) setSearch('') }} aria-label="Buscar servicios">
+          <button type="button" style={s.searchToggle} onClick={() => searchInputRef.current?.focus()} aria-label="Ir al buscador de servicios">
             <IcoSearch size={18} />
           </button>
         </div>
 
         {/* Buscador */}
-        {searchOpen && <div style={s.searchWrap}>
+        <div style={s.searchWrap}>
           <div style={s.searchIcon}><IcoSearch size={18} /></div>
           <input
+            ref={searchInputRef}
             style={s.searchInput}
-            placeholder="Buscar plomería, clases, peluquería..."
+            placeholder="¿Qué necesitas? Ej: gasfíter, clases…"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            autoFocus
           />
-        </div>}
+          {search && <button type="button" style={s.searchClear} onClick={() => setSearch('')} aria-label="Limpiar búsqueda">×</button>}
+        </div>
 
         <button style={s.offerBanner} onClick={() => onCrear?.('service')}>
           <span style={s.offerIcon}>🧰</span>
@@ -641,10 +642,10 @@ const s = {
   searchWrap: {
     position: 'relative',
     marginTop: 10,
-    marginBottom: 8,
+    marginBottom: 2,
   },
   offerBanner: {
-    width: '100%', marginTop: 20, marginBottom: 10, padding: '10px 11px',
+    width: '100%', marginTop: 10, marginBottom: 10, padding: '10px 11px',
     border: 'none', borderRadius: 13,
     background: 'linear-gradient(120deg, #18ad57 0%, #08743b 100%)',
     color: '#fff', display: 'flex', alignItems: 'center', gap: 10,
@@ -685,6 +686,12 @@ const s = {
     outline: 'none',
     fontFamily: 'inherit',
     boxSizing: 'border-box',
+  },
+  searchClear: {
+    position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)',
+    width: 34, height: 34, padding: 0, display: 'grid', placeItems: 'center',
+    borderRadius: '50%', color: C.textoTenue, background: 'transparent',
+    fontSize: 21, lineHeight: 1,
   },
 
   /* ── CHIPS DE CATEGORÍA ── */
