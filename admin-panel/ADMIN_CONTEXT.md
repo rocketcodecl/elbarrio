@@ -3,7 +3,7 @@
 ## Estado actual
 
 - Eventos incorpora un control independiente para poner o quitar un evento en la portada “Hoy en tu barrio”. La migración `202607300005_home_event_spotlight.sql` fue ejecutada con resultado `Success` el 31 de julio de 2026; una consulta remota confirmó la columna `posts.show_on_home`.
-- El panel está desplegado temporalmente en `https://elbarrio.lat/el-barrio/admin/`. Su build reproducible usa `npm run build:plesk`; `admin.elbarrio.lat` queda como dominio futuro cuando se configure el subdominio.
+- El panel está desplegado en `https://admin.elbarrio.lat/`, con DNS, HTTPS y certificado Let’s Encrypt propios. Su build reproducible para la raíz del subdominio usa `npm run build:plesk`; la ruta temporal `/el-barrio/admin/` redirige al dominio vigente.
 - Fase larga autorizada completada: moderación pública con IA, cierre integral de Comercios y Productos, reemplazo de Perfil y Modo accesible. Bloque actual: `4/4 — verificación final aprobada por build`.
 
 - El superbloque posterior de pulido UX/UI de la aplicación vecinal también está completado. No modificó este panel; ambos proyectos siguen compilando para producción.
@@ -45,7 +45,7 @@
 
 ## Decisiones
 
-- El panel utiliza temporalmente `/el-barrio/admin/`; se migrará posteriormente a `admin.elbarrio.lat` cuando exista el subdominio y su directorio web.
+- El panel utiliza `admin.elbarrio.lat` como dominio administrativo oficial y no debe volver a publicarse como aplicación principal bajo `/el-barrio/admin/`.
 - No se reutilizarán visualmente las pantallas administrativas móviles antiguas.
 - Los módulos antiguos sirven solo como referencia de consultas y reglas vigentes.
 - El primer módulo funcional será Comercios + Productos.
