@@ -297,7 +297,6 @@ const haversine = (lat1, lng1, lat2, lng2) => {
 }
 
 function Home({ currentUser, onNavigate, onCrear }) {
-  const [mountedAt] = useState(Date.now)
   const [profile, setProfile] = useState(null)
   const [barrio, setBarrio] = useState(null)
   const [alertas, setAlertas] = useState([])
@@ -306,6 +305,7 @@ function Home({ currentUser, onNavigate, onCrear }) {
   const [ventas, setVentas] = useState([])
   const [regalos, setRegalos] = useState([])
   const [eventos, setEventos] = useState([])
+  const [eventoPortada, setEventoPortada] = useState(null)
   const [actividad, setActividad] = useState([])
   const [noLeidos, setNoLeidos] = useState(0)
   const [clima, setClima] = useState(null)
@@ -415,6 +415,7 @@ function Home({ currentUser, onNavigate, onCrear }) {
       setVentas(cache.ventas || [])
       setRegalos(cache.regalos || [])
       setEventos(cache.eventos || [])
+      setEventoPortada(cache.eventoPortada || null)
       setActividad(cache.actividad || [])
       setNoLeidos(cache.noLeidos || 0)
       setClima(cache.clima || null)
@@ -500,7 +501,7 @@ function Home({ currentUser, onNavigate, onCrear }) {
       const TIPOS_FEED = ['request', 'sell', 'gift', 'trade', 'event', 'news', 'general']
       const selectPost = '*, author:profiles!author_id (full_name, avatar_url, badge_founder, verified)'
 
-      const [profileRes, hoodRes, alertRes, postsRes, msgRes] = await Promise.all([
+      const [profileRes, hoodRes, alertRes, postsRes, msgRes, spotlightRes] = await Promise.all([
         // Refresca el profile en background si lo teníamos del cache.
         cache ? profilePromise : Promise.resolve({ data: p }),
         supabase.from('neighborhoods').select('*')
@@ -527,10 +528,27 @@ function Home({ currentUser, onNavigate, onCrear }) {
           .select('id', { count: 'exact', head: true })
           .eq('user_id', p.id).is('read_at', null)
           .or('read.is.null,read.eq.false'),
+
+        supabase.from('posts')
+          .select(selectPost)
+          .eq('neighborhood_id', neighborhoodId)
+          .eq('type', 'event')
+          .eq('status', 'active')
+          .eq('show_on_home', true)
+          .gte('starts_at', new Date().toISOString())
+          .order('starts_at', { ascending: true })
+          .limit(1)
+          .maybeSingle(),
       ])
 
       if (hoodRes.error) throw hoodRes.error
       if (postsRes.error) throw postsRes.error
+      if (spotlightRes.error) {
+        // La portada editorial falla cerrada: si la migración aún no existe o
+        // la consulta falla, Inicio sigue funcionando y no muestra el bloque.
+        console.warn('[home] portada editorial no disponible:', spotlightRes.error.message)
+      }
+      const spotlightEvent = spotlightRes.error ? null : spotlightRes.data
 
       // Si el profile refrescado trae datos nuevos, los usamos.
       const profileFresco = profileRes?.data || p
@@ -580,6 +598,7 @@ function Home({ currentUser, onNavigate, onCrear }) {
       setVentas(ventas)
       setRegalos(regalos)
       setEventos(eventos)
+      setEventoPortada(spotlightEvent || null)
       setActividad(actividad)
       setNoLeidos(msgRes.count || 0)
 
@@ -590,7 +609,7 @@ function Home({ currentUser, onNavigate, onCrear }) {
         alertas: alertasActivas,
         alertasVecinales: alertasVecinalesActivas,
         pedidos: pedidosActivos,
-        ventas, regalos, eventos, actividad,
+        ventas, regalos, eventos, eventoPortada: spotlightEvent || null, actividad,
         noLeidos: msgRes.count || 0,
         clima: cache?.clima || null,
       })
@@ -703,9 +722,7 @@ function Home({ currentUser, onNavigate, onCrear }) {
     __incident: true,
   }))
   const eventosActividad = eventos.filter((evento) => evento.show_in_activity === true)
-  const eventoDestacado = eventosActividad
-    .filter(evento => evento.starts_at && new Date(evento.starts_at).getTime() >= mountedAt)
-    .sort((a, b) => new Date(a.starts_at).getTime() - new Date(b.starts_at).getTime())[0] || null
+  const eventoDestacado = eventoPortada
   const eventosActividadSecundarios = eventoDestacado
     ? eventosActividad.filter(evento => evento.id !== eventoDestacado.id)
     : eventosActividad

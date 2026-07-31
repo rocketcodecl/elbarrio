@@ -45,7 +45,10 @@ export default function EventManager({ profile }) {
     setLoading(false)
   }, [isSuperadmin, neighborhoodId])
 
-  useEffect(() => { loadEvents() }, [loadEvents])
+  useEffect(() => {
+    const timer = window.setTimeout(loadEvents, 0)
+    return () => window.clearTimeout(timer)
+  }, [loadEvents])
 
   useEffect(() => {
     supabase.from('event_categories').select('key, name, icon').then(({ data }) => {
@@ -73,21 +76,41 @@ export default function EventManager({ profile }) {
     if (event.status === 'cancelled') return
     const nextStatus = event.status === 'active' ? 'closed' : 'active'
     setChangingId(event.id)
-    const { error: updateError } = await supabase.from('posts').update({ status: nextStatus }).eq('id', event.id)
+    const patch = nextStatus === 'active' ? { status: nextStatus } : { status: nextStatus, show_on_home: false }
+    const { error: updateError } = await supabase.from('posts').update(patch).eq('id', event.id)
     setChangingId(null)
     if (updateError) return setError(`No fue posible actualizar la visibilidad del evento: ${updateError.message}`)
-    setEvents(current => current.map(item => item.id === event.id ? { ...item, status: nextStatus } : item))
+    setEvents(current => current.map(item => item.id === event.id ? { ...item, ...patch } : item))
     showNotice(nextStatus === 'active' ? 'Evento publicado' : 'Evento pausado')
+  }
+
+  const toggleHomeSpotlight = async event => {
+    const nextValue = event.show_on_home !== true
+    setChangingId(event.id)
+    setError('')
+    const { error: updateError } = await supabase.rpc('admin_set_home_event_spotlight', {
+      p_event_id: event.id,
+      p_show: nextValue,
+    })
+    setChangingId(null)
+    if (updateError) return setError(`No fue posible actualizar la portada de Inicio: ${updateError.message}`)
+    setEvents(current => current.map(item => ({
+      ...item,
+      show_on_home: item.neighborhood_id === event.neighborhood_id
+        ? (item.id === event.id ? nextValue : false)
+        : item.show_on_home,
+    })))
+    showNotice(nextValue ? 'Evento destacado en Inicio' : 'Evento retirado de Inicio')
   }
 
   const cancelEvent = async event => {
     if (!window.confirm(`¿Cancelar “${event.title}”? Dejará de aparecer en la aplicación y no podrá reactivarse.`)) return
     setChangingId(event.id)
     setError('')
-    const { error: updateError } = await supabase.from('posts').update({ status: 'cancelled' }).eq('id', event.id).eq('type', 'event')
+    const { error: updateError } = await supabase.from('posts').update({ status: 'cancelled', show_on_home: false }).eq('id', event.id).eq('type', 'event')
     setChangingId(null)
     if (updateError) return setError(`No fue posible cancelar el evento: ${updateError.message}`)
-    setEvents(current => current.map(item => item.id === event.id ? { ...item, status: 'cancelled' } : item))
+    setEvents(current => current.map(item => item.id === event.id ? { ...item, status: 'cancelled', show_on_home: false } : item))
     showNotice('Evento cancelado')
   }
 
@@ -121,7 +144,7 @@ export default function EventManager({ profile }) {
         </header>
         {loading && <div className="panel-loading directory-loading">Cargando eventos…</div>}
         {!loading && filtered.length === 0 && <div className="panel-empty directory-empty"><span>📅</span><strong>Sin eventos</strong><small>Crea el primero para publicarlo en El Barrio.</small></div>}
-        {!loading && filtered.length > 0 && <div className="commerce-table-wrap"><table className="commerce-table event-table"><thead><tr><th>Evento</th><th>Fecha</th><th>Lugar</th><th>Estado</th><th>Acciones</th></tr></thead><tbody>{filtered.map(event => <tr key={event.id}><td><div className="table-commerce"><span>{eventImage(event) ? <img src={eventImage(event)} alt="" /> : '📅'}</span><div><strong>{event.title}</strong><small>{categoryLabels[event.category] || '📌 Actividad'}</small></div></div></td><td><span className="event-date-cell">{dateLabel(event.starts_at)}</span></td><td><span className="table-address">{event.location_text || 'Sin ubicación'}</span></td><td><span className={`table-status ${event.status === 'active' ? 'active' : event.status === 'cancelled' ? 'cancelled' : ''}`}><i />{event.status === 'active' ? 'Publicado' : event.status === 'cancelled' ? 'Cancelado' : 'Pausado'}</span></td><td><div className="table-actions event-table-actions">{event.status !== 'cancelled' && <><button type="button" onClick={() => setView({ type: 'edit', event })}>Editar</button><button className={event.status === 'active' ? 'event-pause-action' : 'table-products-action'} type="button" disabled={changingId === event.id} onClick={() => toggleStatus(event)}>{changingId === event.id ? 'Guardando…' : event.status === 'active' ? 'Pausar' : 'Reactivar'}</button><button className="event-cancel-action" type="button" disabled={changingId === event.id} onClick={() => cancelEvent(event)}>Cancelar</button></>}<button className="event-delete-action" type="button" disabled={changingId === event.id} onClick={() => deleteEvent(event)}>Eliminar</button></div></td></tr>)}</tbody></table></div>}
+        {!loading && filtered.length > 0 && <div className="commerce-table-wrap"><table className="commerce-table event-table"><thead><tr><th>Evento</th><th>Fecha</th><th>Lugar</th><th>Estado</th><th>Inicio</th><th>Acciones</th></tr></thead><tbody>{filtered.map(event => <tr key={event.id}><td><div className="table-commerce"><span>{eventImage(event) ? <img src={eventImage(event)} alt="" /> : '📅'}</span><div><strong>{event.title}</strong><small>{categoryLabels[event.category] || '📌 Actividad'}</small></div></div></td><td><span className="event-date-cell">{dateLabel(event.starts_at)}</span></td><td><span className="table-address">{event.location_text || 'Sin ubicación'}</span></td><td><span className={`table-status ${event.status === 'active' ? 'active' : event.status === 'cancelled' ? 'cancelled' : ''}`}><i />{event.status === 'active' ? 'Publicado' : event.status === 'cancelled' ? 'Cancelado' : 'Pausado'}</span></td><td><span className={`table-status ${event.show_on_home ? 'active' : ''}`}><i />{event.show_on_home ? 'En portada' : 'Normal'}</span></td><td><div className="table-actions event-table-actions">{event.status !== 'cancelled' && <><button type="button" onClick={() => setView({ type: 'edit', event })}>Editar</button><button className={event.show_on_home ? 'event-pause-action' : 'table-products-action'} type="button" disabled={changingId === event.id || event.status !== 'active'} onClick={() => toggleHomeSpotlight(event)}>{changingId === event.id ? 'Guardando…' : event.show_on_home ? 'Quitar de Inicio' : 'Poner en Inicio'}</button><button className={event.status === 'active' ? 'event-pause-action' : 'table-products-action'} type="button" disabled={changingId === event.id} onClick={() => toggleStatus(event)}>{changingId === event.id ? 'Guardando…' : event.status === 'active' ? 'Pausar' : 'Reactivar'}</button><button className="event-cancel-action" type="button" disabled={changingId === event.id} onClick={() => cancelEvent(event)}>Cancelar</button></>}<button className="event-delete-action" type="button" disabled={changingId === event.id} onClick={() => deleteEvent(event)}>Eliminar</button></div></td></tr>)}</tbody></table></div>}
       </section>
     </div>
   )

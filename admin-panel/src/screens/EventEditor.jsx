@@ -43,6 +43,7 @@ const initialState = event => ({
   event_registration_url: event?.event_registration_url || '',
   event_show_attendees: event?.event_show_attendees !== false,
   show_in_activity: event?.show_in_activity === true,
+  show_on_home: event?.show_on_home === true,
   status: event?.status || 'active',
 })
 
@@ -156,10 +157,20 @@ export default function EventEditor({ event, profile, onBack, onSaved }) {
     const request = event
       ? supabase.from('posts').update(payload).eq('id', event.id).select().single()
       : supabase.from('posts').insert({ ...payload, author_id: profile?.id, neighborhood_id: neighborhoodId }).select().single()
-    const { error: saveError } = await request
-    setSaving(false)
+    const { data: savedEvent, error: saveError } = await request
     if (saveError) {
+      setSaving(false)
       setError(saveError.message || 'No fue posible guardar el evento.')
+      return
+    }
+
+    const { error: spotlightError } = await supabase.rpc('admin_set_home_event_spotlight', {
+      p_event_id: savedEvent.id,
+      p_show: draft.status === 'active' && draft.show_on_home,
+    })
+    setSaving(false)
+    if (spotlightError) {
+      setError(`El evento se guardó, pero no pudimos actualizar la portada de Inicio: ${spotlightError.message}`)
       return
     }
     onSaved()
@@ -229,11 +240,16 @@ export default function EventEditor({ event, profile, onBack, onSaved }) {
 
         <section className="editor-section">
           <div className="editor-section-title"><span>4</span><div><h2>Visibilidad</h2><p>Un evento pausado deja de aparecer en la aplicación.</p></div></div>
-          <div className="event-status-row"><button type="button" className={draft.status === 'active' ? 'is-selected' : ''} onClick={() => set('status', 'active')}>● Publicado</button><button type="button" className={draft.status !== 'active' ? 'is-selected' : ''} onClick={() => set('status', 'closed')}>○ Pausado</button></div>
+          <div className="event-status-row"><button type="button" className={draft.status === 'active' ? 'is-selected' : ''} onClick={() => set('status', 'active')}>● Publicado</button><button type="button" className={draft.status !== 'active' ? 'is-selected' : ''} onClick={() => setDraft(current => ({ ...current, status: 'closed', show_on_home: false }))}>○ Pausado</button></div>
           <label className={`activity-feed-toggle ${draft.show_in_activity ? 'is-selected' : ''}`}>
             <input type="checkbox" checked={draft.show_in_activity} onChange={e => set('show_in_activity', e.target.checked)} />
             <span>📣</span>
             <div><strong>Mostrar también en Actividad</strong><small>Aparecerá mezclado con la actividad vecinal, además del feed de Eventos.</small></div>
+          </label>
+          <label className={`activity-feed-toggle ${draft.show_on_home ? 'is-selected' : ''}`}>
+            <input type="checkbox" checked={draft.show_on_home} disabled={draft.status !== 'active'} onChange={e => set('show_on_home', e.target.checked)} />
+            <span>🏠</span>
+            <div><strong>Destacar en “Hoy en tu barrio”</strong><small>Ocupará la portada principal. Al activarlo, reemplazará al evento destacado actual de este barrio.</small></div>
           </label>
         </section>
 
