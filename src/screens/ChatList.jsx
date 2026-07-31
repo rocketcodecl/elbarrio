@@ -165,6 +165,8 @@ function ChatList({ currentUser, onNavigate }) {
         supabase.removeChannel(subscription)
       }
     }
+  // La suscripción se reconstruye únicamente cuando cambia la identidad activa.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [myProfileId])
 
   async function loadConversations() {

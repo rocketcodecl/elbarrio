@@ -5,10 +5,10 @@
 
 ## Estado de continuidad — 30 de julio de 2026
 
-- Superbloque de pulido UX/UI autorizado en curso. Estado: `3/4 — navegación, safe areas y resiliencia pulidas`.
+- Superbloque de pulido UX/UI completado. Estado: `4/4 — verificado por build y lint focalizado`.
 - “Mis publicaciones”, “Mis favoritos” y “Mis compras y ventas” se abren ahora como subpantallas completas desde la parte superior, con retorno y scroll propios; ya no quedan como hojas pegadas al borde inferior cuando tienen poco contenido.
-- Siguiente checkpoint: builds finales de app y panel, revisión de diff/contexto y cierre del superbloque.
-- Fase larga autorizada en curso: cierre de Comercios, moderación de contenido público con IA, reemplazo de Mi perfil y Modo accesible. Se trabaja por bloques con compilación, actualización de contexto y commit independiente.
+- La aplicación principal y el panel compilan después del pulido. `MyProfile.jsx`, `TabBar.jsx` y `ChatList.jsx` pasan ESLint sin errores ni advertencias. Falta la aprobación visual con sesión real porque no hubo navegador conectado.
+- Fase larga anterior completada: cierre de Comercios, moderación de contenido público con IA, reemplazo de Mi perfil y Modo accesible.
 - Bloque actual: `4/4 — fase larga completada y verificada`.
 - La aplicación principal y el panel administrativo compilan en producción. La Edge Function nueva pasa `deno lint`, está desplegada y responde correctamente en red.
 - Las instrucciones y el registro de la migración de auditoría están en `supabase/MVP_CIERRE_INSTRUCCIONES.md`. No se cargaron datos simulados.
@@ -251,6 +251,7 @@ El botón de creación abre `CreatePost.jsx`, salvo la creación de comercios, q
 
 ## Funcionalidades terminadas
 
+- Pulido UX/UI final de la app vecinal: subpantallas superiores de Perfil, buscador permanente y jerarquía real en Servicios, detalle con métricas reales y CTA dominante, menú Crear adaptable, safe areas, reducción de movimiento, Chat con recuperación y Home con caché más aviso de actualización fallida.
 - La fase larga autorizada quedó cerrada en cuatro checkpoints: continuidad, moderación preventiva, Comercios y Productos, y Perfil con Modo accesible. App y panel pasan sus builds de producción; los archivos ajenos `landing-page/` y `supabase/.temp/` permanecen fuera de los commits.
 - `MyProfile.jsx` fue reemplazado, sin pantalla paralela, por la composición visual aprobada. Reputación, ventas, regalos, ayudas, publicaciones, favoritos y tratos se derivan de Supabase o muestran cero/sin calificación; el perfil no inventa valores. El Modo accesible persiste en `localStorage` y se aplica globalmente.
 - El cierre funcional de Comercios fue auditado en la aplicación y el panel: feed territorial con error y reintento explícitos, contacto correcto por WhatsApp, ficha con promociones/catálogo/galería/opiniones, y catálogo administrativo con creación, edición, disponibilidad y destacados. Los builds de producción de ambas aplicaciones pasan.
@@ -318,7 +319,7 @@ El botón de creación abre `CreatePost.jsx`, salvo la creación de comercios, q
 
 ## Funcionalidades pendientes
 
-- Validar visualmente Mi perfil y el Modo accesible con una sesión real dentro del marco móvil; el build y ESLint focalizado pasan, pero no hubo un navegador conectado para aprobar la captura final.
+- Validar visualmente con una sesión real las subpantallas de Mi perfil, Servicios, su detalle, el menú Crear y el Modo accesible dentro del marco móvil; los builds y ESLint focalizado pasan, pero no hubo un navegador conectado para aprobar la captura final.
 - Validar una sugerencia de publicación con fotografía mediante `analyze-listing-image` usando una sesión real.
 - Validar con una sesión real un texto permitido y un texto bloqueable en publicación o comentario; el endpoint ya fue validado para CORS y rechazo sin sesión.
 - Validar visualmente con dos sesiones reales el ciclo proponer encuentro → aceptar → continuar chat → cerrar trato.

@@ -4,6 +4,8 @@
 
 - Fase larga autorizada completada: moderación pública con IA, cierre integral de Comercios y Productos, reemplazo de Perfil y Modo accesible. Bloque actual: `4/4 — verificación final aprobada por build`.
 
+- El superbloque posterior de pulido UX/UI de la aplicación vecinal también está completado. No modificó este panel; ambos proyectos siguen compilando para producción.
+
 - La aplicación principal y este panel compilan para producción. La migración de auditoría de moderación fue aplicada el 30 de julio de 2026; no se cargaron datos simulados.
 
 - La aplicación vecinal modera texto público antes de guardar publicaciones, comentarios y opiniones mediante la Edge Function autenticada `moderate-community-content`. Los chats privados quedan fuera. La auditoría administrativa `content_moderation_events` está aplicada y rechaza acceso anónimo.
