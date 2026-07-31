@@ -6,7 +6,7 @@
 
 No volver a ejecutarla salvo que se esté reconstruyendo otro entorno.
 
-## Qué hace falta cargar
+## Migraciones aplicadas
 
 No hace falta cargar datos de demostración ni productos ficticios.
 
@@ -14,20 +14,15 @@ La migración de moderación ya está aplicada:
 
 - `migrations/202607300004_content_moderation_events.sql`
 
-La única migración nueva pendiente de este cierre es:
+La migración de portada también fue ejecutada con resultado `Success` el 31 de julio de 2026:
 
 - `migrations/202607300005_home_event_spotlight.sql`
 
-Agrega el control editorial `show_on_home` y la RPC segura `admin_set_home_event_spotlight`. Por defecto ningún evento ocupa “Hoy en tu barrio”; desde el panel se puede poner o quitar uno, con un máximo de un evento destacado por barrio.
+Agrega el control editorial `show_on_home` y la RPC segura `admin_set_home_event_spotlight`. Una consulta remota confirmó que la columna existe. No volver a ejecutarla salvo que se esté reconstruyendo otro entorno.
 
-## Orden seguro
+## Validación de referencia
 
-1. Abre el proyecto Supabase de El Barrio: `mpecgsiidswcxjrlafkz`.
-2. Entra a **SQL Editor** y crea una consulta nueva.
-3. Copia el contenido completo de `migrations/202607300005_home_event_spotlight.sql`.
-4. Ejecuta la consulta una sola vez.
-5. Confirma que Supabase muestre `Success`.
-6. Ejecuta esta validación de solo lectura:
+Si se necesita volver a auditar el entorno, ejecuta esta validación de solo lectura en el proyecto Supabase de El Barrio (`mpecgsiidswcxjrlafkz`):
 
 ```sql
 select
@@ -46,7 +41,7 @@ El resultado esperado es:
 - `home_column`: `true`
 - `home_rpc`: `admin_set_home_event_spotlight(uuid,boolean)`
 
-Después, informa explícitamente que el SQL fue ejecutado para actualizar `AI_CONTEXT.md`. No debe asumirse aplicado antes de esa confirmación.
+La ejecución ya fue confirmada y registrada en `AI_CONTEXT.md`.
 
 ## Advertencia importante
 

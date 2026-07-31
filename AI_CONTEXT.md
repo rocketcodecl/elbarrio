@@ -6,7 +6,7 @@
 ## Estado de continuidad — 30 de julio de 2026
 
 - Cierre posterior implementado en código: los favoritos abren la ficha exacta del comercio y “Hoy en tu barrio” queda oculto por defecto, con selección independiente desde Eventos del panel. App y panel pasan build y ESLint focalizado.
-- La migración `202607300005_home_event_spotlight.sql` está preparada pero no debe asumirse aplicada. Hasta su confirmación, Inicio falla cerrado y omite la portada sin afectar el resto del feed; el control administrativo requiere la RPC nueva para funcionar.
+- La migración `202607300005_home_event_spotlight.sql` fue ejecutada con resultado `Success` el 31 de julio de 2026 según confirmación manual. La consulta remota de solo lectura confirmó que `posts.show_on_home` existe; la RPC queda restringida al rol autenticado como define la migración.
 - La aplicación principal está desplegada en `https://elbarrio.lat/el-barrio/` y el panel en `https://elbarrio.lat/el-barrio/admin/`. La ruta histórica `https://elbarrio.lat/app.php` redirige a la aplicación React. Los builds reproducibles para Plesk usan `npm run build:plesk` en cada proyecto.
 - Superbloque de adquisición y pulido visual implementado: alta con campos separados `Nombre` y `Apellido` sin alterar el schema, mapa territorial explicativo en la verificación, favoritos con mayor jerarquía, controles circulares protegidos en Modo accesible y portada editorial “Hoy en tu barrio” basada solo en eventos reales seleccionados.
 - La aplicación principal y el panel administrativo compilan después del superbloque. Los archivos focalizados de Perfil, Verificación, MiniMap y Mi perfil pasan ESLint. La revisión visual automatizada sigue pendiente porque no había ningún navegador conectado al entorno.
@@ -333,7 +333,7 @@ El botón de creación abre `CreatePost.jsx`, salvo la creación de comercios, q
 
 ## Funcionalidades pendientes
 
-- Ejecutar `202607300005_home_event_spotlight.sql` y validar desde el panel poner un evento en Inicio, reemplazarlo por otro y quitarlo.
+- Validar desde el panel poner un evento en Inicio, reemplazarlo por otro y quitarlo después de la ejecución confirmada de `202607300005_home_event_spotlight.sql`.
 - Validar visualmente con una sesión real las subpantallas de Mi perfil, Servicios, su detalle, el menú Crear y el Modo accesible dentro del marco móvil; los builds y ESLint focalizado pasan, pero no hubo un navegador conectado para aprobar la captura final.
 - Validar una sugerencia de publicación con fotografía mediante `analyze-listing-image` usando una sesión real.
 - Validar con una sesión real un texto permitido y un texto bloqueable en publicación o comentario; el endpoint ya fue validado para CORS y rechazo sin sesión.

@@ -2,7 +2,7 @@
 
 ## Estado actual
 
-- Eventos incorpora en código un control independiente para poner o quitar un evento en la portada “Hoy en tu barrio”. La migración `202607300005_home_event_spotlight.sql` y la RPC `admin_set_home_event_spotlight` están preparadas pero no deben asumirse aplicadas.
+- Eventos incorpora un control independiente para poner o quitar un evento en la portada “Hoy en tu barrio”. La migración `202607300005_home_event_spotlight.sql` fue ejecutada con resultado `Success` el 31 de julio de 2026; una consulta remota confirmó la columna `posts.show_on_home`.
 - El panel está desplegado temporalmente en `https://elbarrio.lat/el-barrio/admin/`. Su build reproducible usa `npm run build:plesk`; `admin.elbarrio.lat` queda como dominio futuro cuando se configure el subdominio.
 - Fase larga autorizada completada: moderación pública con IA, cierre integral de Comercios y Productos, reemplazo de Perfil y Modo accesible. Bloque actual: `4/4 — verificación final aprobada por build`.
 
@@ -87,7 +87,7 @@
 
 ## Pendiente inmediato
 
-- Ejecutar `supabase/migrations/202607300005_home_event_spotlight.sql` y validar poner, reemplazar y quitar el evento de portada.
+- Validar poner, reemplazar y quitar el evento de portada después de la ejecución confirmada de `supabase/migrations/202607300005_home_event_spotlight.sql`.
 - Validar con una cuenta admin territorial la separación efectiva respecto del superadministrador.
 - Mantener deshabilitada la asistencia. No crear ni aplicar cambios de asistencia hasta definir y autorizar cómo alinear `event_attendees` con los eventos actuales de `posts`.
 - Ejecutar `supabase/migrations/202607290001_incident_moderation.sql` y validar el flujo completo del módulo Incidentes.
