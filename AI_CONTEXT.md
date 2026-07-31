@@ -6,8 +6,9 @@
 ## Estado de continuidad — 30 de julio de 2026
 
 - Fase larga autorizada en curso: cierre de Comercios, moderación de contenido público con IA, reemplazo de Mi perfil y Modo accesible. Se trabaja por bloques con compilación, actualización de contexto y commit independiente.
-- Bloque actual: `3/4 — Perfil reemplazado y Modo accesible integrado`.
-- Siguiente bloque: verificación final de ambas aplicaciones, revisión del estado Git, actualización de pendientes e instrucciones ordenadas para el único SQL preparado.
+- Bloque actual: `4/4 — fase larga completada y verificada`.
+- La aplicación principal y el panel administrativo compilan en producción. La Edge Function nueva pasa `deno lint`, está desplegada y responde correctamente en red.
+- Las instrucciones para la única migración nueva opcional están en `supabase/MVP_CIERRE_INSTRUCCIONES.md`. No se ejecutó ninguna migración ni se cargaron datos simulados.
 - La Edge Function `moderate-community-content` está desplegada y validada en red: el preflight responde HTTP 200 y una solicitud sin sesión responde HTTP 401.
 - La migración `202607300004_content_moderation_events.sql` está preparada, pero **no está aplicada ni debe asumirse aplicada**. Su ausencia no bloquea la moderación: solo impide guardar el registro administrativo de decisiones.
 - No incluir `landing-page/` ni `supabase/.temp/` en los commits de esta fase.
@@ -228,6 +229,7 @@ El botón de creación abre `CreatePost.jsx`, salvo la creación de comercios, q
 - `src/screens/MyProfile.jsx`
 - `src/screens/CommunityPagesV2.jsx`
 - `supabase/migrations/`
+- `supabase/MVP_CIERRE_INSTRUCCIONES.md`
 - `admin-panel/ADMIN_CONTEXT.md`
 - `admin-panel/src/App.jsx`
 - `admin-panel/src/screens/IncidentManager.jsx`
@@ -241,6 +243,7 @@ El botón de creación abre `CreatePost.jsx`, salvo la creación de comercios, q
 
 ## Funcionalidades terminadas
 
+- La fase larga autorizada quedó cerrada en cuatro checkpoints: continuidad, moderación preventiva, Comercios y Productos, y Perfil con Modo accesible. App y panel pasan sus builds de producción; los archivos ajenos `landing-page/` y `supabase/.temp/` permanecen fuera de los commits.
 - `MyProfile.jsx` fue reemplazado, sin pantalla paralela, por la composición visual aprobada. Reputación, ventas, regalos, ayudas, publicaciones, favoritos y tratos se derivan de Supabase o muestran cero/sin calificación; el perfil no inventa valores. El Modo accesible persiste en `localStorage` y se aplica globalmente.
 - El cierre funcional de Comercios fue auditado en la aplicación y el panel: feed territorial con error y reintento explícitos, contacto correcto por WhatsApp, ficha con promociones/catálogo/galería/opiniones, y catálogo administrativo con creación, edición, disponibilidad y destacados. Los builds de producción de ambas aplicaciones pasan.
 - La moderación preventiva de texto público está integrada en publicaciones, comentarios de Mercado y Alertas, y opiniones de Servicios y Comercios mediante `moderate-community-content`. La función está desplegada; CORS y rechazo sin sesión fueron validados. El registro administrativo requiere la migración preparada `202607300004_content_moderation_events.sql`, todavía no aplicada.
