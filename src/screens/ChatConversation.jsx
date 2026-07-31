@@ -501,7 +501,7 @@ export default function ChatConversation({ postId, sellerId, currentUser, previe
           <div style={s.emptyChat}>Cargando conversación…</div>
         ) : messages.length === 0 ? (
           <div style={s.emptyChat}>
-            <img src="/isotipo.png" alt="" style={{ width: 70, opacity: 0.4, marginBottom: 12 }} />
+            <img src={`${import.meta.env.BASE_URL}isotipo.png`} alt="" style={{ width: 70, opacity: 0.4, marginBottom: 12 }} />
             <div style={{ fontSize: 13, fontWeight: 600, color: '#555' }}>Aún no hay mensajes</div>
             <div style={{ fontSize: 12, color: '#888', marginTop: 4 }}>Rompe el hielo con un saludo</div>
           </div>

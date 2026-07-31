@@ -98,7 +98,7 @@ export function ProhibitedProducts({ onNavigate }) {
 }
 
 export function InviteNeighbors({ onNavigate }) {
-  const [copied,setCopied]=useState(false); const url=`${window.location.origin}?invite=elbarrio-las-condes`
+  const [copied,setCopied]=useState(false); const url=new URL(`${import.meta.env.BASE_URL}?invite=elbarrio-las-condes`,window.location.origin).toString()
   const copy=async()=>{await navigator.clipboard?.writeText(url);setCopied(true);setTimeout(()=>setCopied(false),1800)}
   const share=async()=>navigator.share?navigator.share({title:'El Barrio',text:'Únete a nuestro barrio',url}):copy()
   return <Screen title="Invitar vecinos" onNavigate={onNavigate}>

@@ -1671,7 +1671,7 @@ function Barrio({ currentUser, onNavigate }) {
     const rubro = servicioCat !== 'todos' ? getRubro(servicioCat) : null
     return (
       <div style={s.emptyServ}>
-        <img src="/isotipo.png" alt="" style={s.emptyIso} />
+        <img src={`${import.meta.env.BASE_URL}isotipo.png`} alt="" style={s.emptyIso} />
         <div style={s.emptyTitle}>
           Aún no hay {rubro ? rubro.label.toLowerCase() : 'servicios'} en tu barrio
         </div>
@@ -1795,7 +1795,7 @@ function Barrio({ currentUser, onNavigate }) {
 
           {comercios.length === 0 ? (
             <div style={s.emptyBox}>
-              <img src="/isotipo.png" alt="" style={s.emptyLogo} />
+              <img src={`${import.meta.env.BASE_URL}isotipo.png`} alt="" style={s.emptyLogo} />
               <div style={s.emptyTitle}>Todavía no hay comercios</div>
               <div style={s.emptyText}>
                 Los locales del barrio van a aparecer acá.
@@ -1833,7 +1833,7 @@ function Barrio({ currentUser, onNavigate }) {
               ) : currentProfile?.full_name ? (
                 <div style={s.headerAvatarFallback}>{getInitials(currentProfile.full_name)}</div>
               ) : (
-                <img src="/isotipo.png" alt="" style={{ width: 22, opacity: 0.6 }} />
+                <img src={`${import.meta.env.BASE_URL}isotipo.png`} alt="" style={{ width: 22, opacity: 0.6 }} />
               )}
             </div>
           </div>

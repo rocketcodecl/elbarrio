@@ -534,7 +534,7 @@ function Feed({ currentUser, onNavigate }) {
   if (loading) {
     return (
       <div style={s.loadingWrap}>
-        <img src="/isotipo.png" alt="" style={{ width: 60, opacity: 0.5 }} />
+        <img src={`${import.meta.env.BASE_URL}isotipo.png`} alt="" style={{ width: 60, opacity: 0.5 }} />
         <p style={{ marginTop: 12, color: '#888', fontSize: 13 }}>Cargando tu barrio...</p>
       </div>
     )
@@ -571,7 +571,7 @@ function Feed({ currentUser, onNavigate }) {
                   {getInitials(myProfile.full_name)}
                 </div>
               ) : (
-                <img src="/isotipo.png" alt="" style={{ width: 22, opacity: 0.6 }} />
+                <img src={`${import.meta.env.BASE_URL}isotipo.png`} alt="" style={{ width: 22, opacity: 0.6 }} />
               )}
             </div>
           </div>
@@ -627,7 +627,7 @@ function Feed({ currentUser, onNavigate }) {
 
         {posts.length === 0 && (
           <div style={s.empty}>
-            <img src="/isotipo.png" alt="" style={{ width: 80, opacity: 0.4, marginBottom: 12 }} />
+            <img src={`${import.meta.env.BASE_URL}isotipo.png`} alt="" style={{ width: 80, opacity: 0.4, marginBottom: 12 }} />
             <div style={{ fontWeight: 600, color: '#111' }}>Tu barrio está tranquilo hoy</div>
             <div style={{ fontSize: 13, color: '#888', marginTop: 4 }}>Sé el primero en publicar algo</div>
           </div>

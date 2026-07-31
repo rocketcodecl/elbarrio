@@ -568,7 +568,7 @@ export default function ProductDetail({ postId, currentUser, onNavigate, onEdit 
   // ───── Compartir (Web Share API con fallback a clipboard) ─────
   const handleShare = async () => {
     if (!post) return
-    const url = `${window.location.origin}/?post=${post.id}`
+    const url = new URL(`${import.meta.env.BASE_URL}?post=${post.id}`, window.location.origin).toString()
     const text = `${post.title} — ${precioLabel(post)} en El Barrio`
     try {
       if (navigator.share) {

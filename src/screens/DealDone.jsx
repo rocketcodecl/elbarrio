@@ -171,7 +171,7 @@ export default function DealDone({ postId, sellerId, currentUser, onNavigate }) 
 
       <div style={s.scrollArea}>
         <div style={s.illustration}>
-          <img src="/isotipo.png" alt="" style={s.isoImg} />
+          <img src={`${import.meta.env.BASE_URL}isotipo.png`} alt="" style={s.isoImg} />
         </div>
 
         <h1 style={s.title}>¡Trato cerrado!</h1>

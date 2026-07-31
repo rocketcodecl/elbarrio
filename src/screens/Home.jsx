@@ -754,7 +754,7 @@ function Home({ currentUser, onNavigate, onCrear }) {
     return (
       <div style={s.wrap}>
         <div style={s.cargando}>
-          <img src="/isotipo.png" alt="" style={{ width: 58, opacity: 0.4 }} />
+          <img src={`${import.meta.env.BASE_URL}isotipo.png`} alt="" style={{ width: 58, opacity: 0.4 }} />
         </div>
       </div>
     )

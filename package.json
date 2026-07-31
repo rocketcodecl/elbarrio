@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "build:plesk": "vite build --base=/el-barrio/",
     "lint": "eslint .",
     "preview": "vite preview"
   },

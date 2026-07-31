@@ -399,7 +399,7 @@ export default function SellerProfile({ sellerId, currentUser, onNavigate }) {
   /* ─────── COMPARTIR ─────── */
   const compartir = async () => {
     const url = typeof window !== 'undefined'
-      ? `${window.location.origin}/?seller=${sellerId}`
+      ? new URL(`${import.meta.env.BASE_URL}?seller=${sellerId}`, window.location.origin).toString()
       : `elbarrio://seller/${sellerId}`
     const titulo = seller?.full_name ? `${seller.full_name} en El Barrio` : 'Perfil en El Barrio'
     const texto = seller?.comuna

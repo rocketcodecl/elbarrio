@@ -358,7 +358,7 @@ function ChatList({ currentUser, onNavigate }) {
             <div style={s.emptyIconBox}>
               <Icon.MessageSquare size={36} color="#16a34a" />
             </div>
-            <img src="/isotipo.png" alt="" style={s.emptyIso} />
+            <img src={`${import.meta.env.BASE_URL}isotipo.png`} alt="" style={s.emptyIso} />
             <div style={s.emptyTitle}>
               {searchQuery ? 'Sin resultados para la búsqueda' : 'Aún no tienes mensajes'}
             </div>

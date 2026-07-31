@@ -1534,7 +1534,7 @@ function Comercios({ currentUser, onNavigate, onCrear, onEditar, initialCommerce
         <div style={{ ...s.pullRefresh, height: refrescando ? 38 : pullDistance, opacity: refrescando ? 1 : Math.min(pullDistance / 44, 1) }}><span style={{ ...s.pullRefreshIcon, transform: refrescando ? undefined : `rotate(${Math.min(pullDistance * 4, 180)}deg)`, animation: refrescando ? 'commerceRefreshSpin 750ms linear infinite' : 'none' }}>↻</span><span>{refrescando ? 'Actualizando' : 'Suelta para actualizar'}</span></div>
         {cargando ? (
           <div style={s.cargando}>
-            <img src="/isotipo.png" alt="" style={{ width: 58, opacity: 0.4 }} />
+            <img src={`${import.meta.env.BASE_URL}isotipo.png`} alt="" style={{ width: 58, opacity: 0.4 }} />
           </div>
         ) : loadError ? (
           <div style={s.vacio} role="alert">
