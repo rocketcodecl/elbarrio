@@ -129,9 +129,9 @@ export function ContactUs({ onNavigate }) {
   </Screen>
 }
 
-export function SettingsHub({ onNavigate }) {
+export function SettingsHub({ onNavigate, accessibleMode = false, onAccessibleModeChange }) {
   const links=[['about','heart','Nosotros'],['invite','users','Invitar vecinos',true],['terms','file','Términos y condiciones'],['prohibited','shield','Productos prohibidos'],['contact','mail','Contáctanos']]
-  return <Screen title="Información y ayuda" onNavigate={onNavigate}><p style={s.settingsIntro}>Conoce el proyecto y encuentra ayuda cuando la necesites.</p><div className="settings" style={s.settings}>{links.map(([route,icon,label,pending])=><button key={route} disabled={pending} style={{opacity:pending ? 0.58 : 1}} onClick={()=>onNavigate?.(route)}><Icon name={icon}/><span>{label}{pending&&<small>Próximamente</small>}</span>{!pending&&<Icon name="arrow" size={18} color={C.textoTenue}/>}</button>)}</div></Screen>
+  return <Screen title="Configuración" onNavigate={onNavigate}><p style={s.settingsIntro}>Ajusta la experiencia y revisa la información importante de tu cuenta.</p><div className="settings" style={s.settings}><button type="button" onClick={()=>onAccessibleModeChange?.(!accessibleMode)}><Icon name="users"/><span>Modo accesible<small>Texto más grande, controles claros y menos movimiento</small></span><strong className={`settings-switch${accessibleMode?' is-on':''}`}><i/></strong></button>{links.map(([route,icon,label,pending])=><button key={route} disabled={pending} style={{opacity:pending ? 0.58 : 1}} onClick={()=>onNavigate?.(route)}><Icon name={icon}/><span>{label}{pending&&<small>Próximamente</small>}</span>{!pending&&<Icon name="arrow" size={18} color={C.textoTenue}/>}</button>)}</div></Screen>
 }
 
 const s={
@@ -154,4 +154,5 @@ if(typeof document!=='undefined'&&!document.getElementById('community-v2-css')){
 .community-v2 .progress div{height:7px;border-radius:999px;background:${C.borde};margin:12px 0 8px;overflow:hidden}.community-v2 .progress div span{display:block;width:84%;height:100%;background:${C.verde};border-radius:inherit}.community-v2 .support p{color:rgba(255,255,255,.82);font-size:11px}.community-v2 .support button{flex-shrink:0;padding:10px 12px;border-radius:10px;background:${C.verdeOsc};color:#fff;font-weight:700}
 .community-v2 .socials>div{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:16px}.community-v2 .socials span{display:flex;align-items:center;gap:8px;font-size:12.5px;color:${C.textoSuave}}
 .community-v2 .settings button{width:100%;min-height:58px;padding:0 16px;display:grid;grid-template-columns:28px 1fr 20px;align-items:center;gap:10px;border-bottom:1px solid ${C.borde};text-align:left;color:${C.texto};font-size:13.5px}.community-v2 .settings button:last-child{border-bottom:0}
+.community-v2 .settings-switch{width:36px;height:21px;padding:3px;border-radius:999px;background:#cfd6d2}.community-v2 .settings-switch i{display:block;width:15px;height:15px;border-radius:50%;background:white;transition:transform .2s}.community-v2 .settings-switch.is-on{background:${C.verde}}.community-v2 .settings-switch.is-on i{transform:translateX(15px)}
 `;document.head.appendChild(el)}

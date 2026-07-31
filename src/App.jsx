@@ -45,6 +45,8 @@ import AdminUsuarios from './screens/AdminUsuarios'
 import AdminIncidentes from './screens/AdminIncidentes'
 import { AboutUs, Terms, ProhibitedProducts, InviteNeighbors, ContactUs, SettingsHub } from './screens/CommunityPagesV2'
 
+const ACCESSIBLE_MODE_KEY = 'elbarrio:accessible-mode'
+
 function Placeholder({ titulo, onBack, mensaje }) {
   return (
     <div style={s.placeholderWrap}>
@@ -82,6 +84,9 @@ export default function App() {
   const [detailRevision, setDetailRevision] = useState(0)
   const [noLeidos, setNoLeidos] = useState(0)
   const [navigationMotion, setNavigationMotion] = useState('forward')
+  const [accessibleMode, setAccessibleMode] = useState(() => {
+    try { return localStorage.getItem(ACCESSIBLE_MODE_KEY) === 'true' } catch { return false }
+  })
   const historyRef = useRef([])
   // Track del tab previo para que el back desde tabs con flecha (ej: perfil) funcione.
   // El perfil es un tab, no una sub-pantalla, así que no entra en historyRef.
@@ -92,6 +97,11 @@ export default function App() {
   // Mantiene activeTabRef sincronizado con activeTab para poder leerlo
   // dentro de useCallback sin agregarlo a las dependencias.
   useEffect(() => { activeTabRef.current = activeTab }, [activeTab])
+
+  useEffect(() => {
+    document.documentElement.classList.toggle('accessible-mode', accessibleMode)
+    try { localStorage.setItem(ACCESSIBLE_MODE_KEY, String(accessibleMode)) } catch { /* almacenamiento no disponible */ }
+  }, [accessibleMode])
 
   /* ── AUTH + checkSession (decide pantalla inicial según perfil) ── */
   const checkSession = useCallback(async () => {
@@ -560,7 +570,7 @@ export default function App() {
     if (currentScreen === 'adminIncidentes') {
       return <AdminIncidentes currentUser={user} profile={profile} onNavigate={onNavigate} />
     }
-    if (currentScreen === 'settings') return <SettingsHub onNavigate={onNavigate} />
+    if (currentScreen === 'settings') return <SettingsHub onNavigate={onNavigate} accessibleMode={accessibleMode} onAccessibleModeChange={setAccessibleMode} />
     if (currentScreen === 'about') return <AboutUs onNavigate={onNavigate} />
     if (currentScreen === 'terms') return <Terms onNavigate={onNavigate} />
     if (currentScreen === 'prohibited') return <ProhibitedProducts onNavigate={onNavigate} />
@@ -604,7 +614,16 @@ export default function App() {
     if (activeTab === 'chat') return <ChatList currentUser={{ ...user, profileId: profile?.id }} onNavigate={onNavigate} />
     if (activeTab === 'comercios') return <Comercios currentUser={user} onNavigate={onNavigate} onCrear={onCrear} />
     if (activeTab === 'alertas') return <Alertas currentUser={user} onNavigate={onNavigate} onCrear={onCrear} />
-    if (activeTab === 'perfil') return <MyProfile currentUser={user} onNavigate={onNavigate} onLogout={handleLogout} />
+    if (activeTab === 'perfil') return (
+      <MyProfile
+        currentUser={user}
+        profile={profile}
+        onNavigate={onNavigate}
+        onLogout={handleLogout}
+        accessibleMode={accessibleMode}
+        onAccessibleModeChange={setAccessibleMode}
+      />
+    )
     
     return <Home key={`home-${homeRevision}`} currentUser={user} onNavigate={onNavigate} onCrear={onCrear} />
   }

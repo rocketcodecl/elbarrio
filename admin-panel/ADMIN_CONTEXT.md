@@ -2,7 +2,7 @@
 
 ## Estado actual
 
-- Fase larga autorizada en curso: moderación pública con IA, cierre integral de Comercios y Productos, reemplazo de Perfil y Modo accesible, con continuidad documentada por bloque. Bloque actual: `2/4 — Comercios y Productos cerrados funcionalmente`.
+- Fase larga autorizada en curso: moderación pública con IA, cierre integral de Comercios y Productos, reemplazo de Perfil y Modo accesible, con continuidad documentada por bloque. Bloque actual: `3/4 — Perfil y Modo accesible integrados en la aplicación vecinal`.
 
 - La aplicación vecinal modera texto público antes de guardar publicaciones, comentarios y opiniones mediante la Edge Function autenticada `moderate-community-content`. Los chats privados quedan fuera. La migración opcional de auditoría administrativa `202607300004_content_moderation_events.sql` está preparada, pero no aplicada ni debe asumirse aplicada.
 

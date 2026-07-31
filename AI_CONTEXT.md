@@ -6,8 +6,8 @@
 ## Estado de continuidad — 30 de julio de 2026
 
 - Fase larga autorizada en curso: cierre de Comercios, moderación de contenido público con IA, reemplazo de Mi perfil y Modo accesible. Se trabaja por bloques con compilación, actualización de contexto y commit independiente.
-- Bloque actual: `2/4 — moderación y cierre funcional de Comercios terminados`.
-- Siguiente bloque: reemplazar `MyProfile.jsx` con la composición visual aprobada e integrar un Modo accesible persistente.
+- Bloque actual: `3/4 — Perfil reemplazado y Modo accesible integrado`.
+- Siguiente bloque: verificación final de ambas aplicaciones, revisión del estado Git, actualización de pendientes e instrucciones ordenadas para el único SQL preparado.
 - La Edge Function `moderate-community-content` está desplegada y validada en red: el preflight responde HTTP 200 y una solicitud sin sesión responde HTTP 401.
 - La migración `202607300004_content_moderation_events.sql` está preparada, pero **no está aplicada ni debe asumirse aplicada**. Su ausencia no bloquea la moderación: solo impide guardar el registro administrativo de decisiones.
 - No incluir `landing-page/` ni `supabase/.temp/` en los commits de esta fase.
@@ -95,7 +95,7 @@ El botón de creación abre `CreatePost.jsx`, salvo la creación de comercios, q
 - `Noticias.jsx`: feed de noticias reales, filtros editoriales y lectura completa en modal con galería.
 - `Comercios.jsx` / `CommerceForm.jsx`: feed, detalle y formulario de comercios.
 - `ChatList.jsx` / `ChatConversation.jsx`: mensajería asociada a usuarios y publicaciones.
-- `MyProfile.jsx`: perfil propio y accesos personales o administrativos.
+- `MyProfile.jsx`: perfil propio aprobado, reputación, insignias, accesos personales y hojas de actividad real.
 - `CommunityPagesV2.jsx`: páginas informativas, legales y de contacto.
 - `MiniMap.jsx`: mapa reutilizable y selección de ubicación.
 - `PostCard.jsx` / `PedidoCard.jsx`: tarjetas reutilizables.
@@ -173,6 +173,8 @@ El botón de creación abre `CreatePost.jsx`, salvo la creación de comercios, q
 - El carrusel de comercios destacados muestra una tarjeta de ancho completo por vez, avanza automáticamente con transición lateral, se pausa durante la interacción y muestra indicadores. El orden se aleatoriza de forma estable al cargar el feed para repartir la exposición pagada sin repetir comercios antes de completar la ronda.
 - El feed de Comercios distingue un directorio realmente vacío de un error de sesión, perfil, barrio o consulta. Ante un fallo muestra el motivo seguro y permite reintentar; nunca consulta sin `neighborhood_id`. La ficha usa `whatsapp` como contacto prioritario y `phone` como respaldo.
 - Invitar vecinos debe permanecer pendiente de habilitación aunque exista una pantalla implementada.
+- Mi perfil usa una sola implementación basada en la referencia aprobada: identidad centrada, reputación, estadísticas reales, progreso, insignias y menú personal. “Mis publicaciones”, “Mis favoritos” y “Mis compras y ventas” abren hojas con datos reales; no muestran contadores simulados.
+- El Modo accesible es una preferencia local persistente controlada por `App.jsx`. Aplica texto y controles más grandes, foco visible y movimiento reducido a toda la aplicación; puede alternarse desde Mi perfil y Configuración. Es una ayuda práctica para adultos mayores, no una declaración formal de cumplimiento WCAG.
 - Las páginas comunitarias comparten la identidad visual vigente, el header simple con retorno y scroll independiente.
 - Los feeds de Mercado, Servicios, Eventos, Chat y Comercios usan un header interno común: botón volver, título centrado en gris carbón con `el barrio` en verde de marca, un ícono lineal grande y translúcido propio de la sección hacia el lado izquierdo, y una línea verde inferior. Inicio conserva su header propio.
 - Comercios ocupa el cuarto acceso de la barra inferior. Eventos se abre desde los accesos rápidos de Inicio.
@@ -239,6 +241,7 @@ El botón de creación abre `CreatePost.jsx`, salvo la creación de comercios, q
 
 ## Funcionalidades terminadas
 
+- `MyProfile.jsx` fue reemplazado, sin pantalla paralela, por la composición visual aprobada. Reputación, ventas, regalos, ayudas, publicaciones, favoritos y tratos se derivan de Supabase o muestran cero/sin calificación; el perfil no inventa valores. El Modo accesible persiste en `localStorage` y se aplica globalmente.
 - El cierre funcional de Comercios fue auditado en la aplicación y el panel: feed territorial con error y reintento explícitos, contacto correcto por WhatsApp, ficha con promociones/catálogo/galería/opiniones, y catálogo administrativo con creación, edición, disponibilidad y destacados. Los builds de producción de ambas aplicaciones pasan.
 - La moderación preventiva de texto público está integrada en publicaciones, comentarios de Mercado y Alertas, y opiniones de Servicios y Comercios mediante `moderate-community-content`. La función está desplegada; CORS y rechazo sin sesión fueron validados. El registro administrativo requiere la migración preparada `202607300004_content_moderation_events.sql`, todavía no aplicada.
 - El panel implementa dos alcances administrativos: territorial y supremo. Las listas fallan cerradas para admins sin barrio, el nivel supremo puede revisar todos los barrios, las altas globales exigen barrio explícito y solo el superadministrador ve controles para administrar otros permisos administrativos. La protección backend de `202607300001_admin_scope_and_superadmin.sql` está aplicada según confirmación manual.
@@ -304,6 +307,7 @@ El botón de creación abre `CreatePost.jsx`, salvo la creación de comercios, q
 
 ## Funcionalidades pendientes
 
+- Validar visualmente Mi perfil y el Modo accesible con una sesión real dentro del marco móvil; el build y ESLint focalizado pasan, pero no hubo un navegador conectado para aprobar la captura final.
 - Validar una sugerencia de publicación con fotografía mediante `analyze-listing-image` usando una sesión real.
 - Ejecutar manualmente, si se desea conservar auditoría de moderación, `supabase/migrations/202607300004_content_moderation_events.sql` y confirmar su aplicación. No usar `supabase db push`.
 - Validar con una sesión real un texto permitido y un texto bloqueable en publicación o comentario; el endpoint ya fue validado para CORS y rechazo sin sesión.
