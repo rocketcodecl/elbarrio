@@ -5,6 +5,9 @@
 
 ## Estado de continuidad — 30 de julio de 2026
 
+- Superbloque de adquisición y pulido visual implementado: alta con campos separados `Nombre` y `Apellido` sin alterar el schema, mapa territorial explicativo en la verificación, favoritos con mayor jerarquía, controles circulares protegidos en Modo accesible y portada editorial “Hoy en tu barrio” basada solo en eventos reales seleccionados.
+- La aplicación principal y el panel administrativo compilan después del superbloque. Los archivos focalizados de Perfil, Verificación, MiniMap y Mi perfil pasan ESLint. La revisión visual automatizada sigue pendiente porque no había ningún navegador conectado al entorno.
+- Este bloque no agrega ni ejecuta migraciones. La visualización territorial usa una copia cliente del GeoJSON versionado; la confirmación residencial continúa dependiendo de la RPC existente y su estado remoto no se presume.
 - Superbloque de pulido UX/UI completado. Estado: `4/4 — verificado por build y lint focalizado`.
 - “Mis publicaciones”, “Mis favoritos” y “Mis compras y ventas” se abren ahora como subpantallas completas desde la parte superior, con retorno y scroll propios; ya no quedan como hojas pegadas al borde inferior cuando tienen poco contenido.
 - La aplicación principal y el panel compilan después del pulido. `MyProfile.jsx`, `TabBar.jsx` y `ChatList.jsx` pasan ESLint sin errores ni advertencias. Falta la aprobación visual con sesión real porque no hubo navegador conectado.
@@ -132,6 +135,7 @@ El botón de creación abre `CreatePost.jsx`, salvo la creación de comercios, q
 ## Decisiones tomadas
 
 - `Home.jsx` es el feed principal y controla el tab Inicio.
+- Inicio puede mostrar una portada compacta “Hoy en tu barrio” con imagen, categoría, horario, lugar, resumen y acceso al detalle. Usa el próximo evento activo marcado `show_in_activity=true`, no inventa contenido y retira ese mismo evento de la lista inmediata de Actividad para evitar duplicación.
 - `Barrio.jsx` y `Feed.jsx` permanecen en el repositorio, pero no están conectados a la aplicación.
 - `Search.jsx` tampoco está conectado actualmente.
 - La navegación seguirá siendo por estado; no se incorporará otro router sin autorización.
@@ -180,8 +184,9 @@ El botón de creación abre `CreatePost.jsx`, salvo la creación de comercios, q
 - El feed de Comercios distingue un directorio realmente vacío de un error de sesión, perfil, barrio o consulta. Ante un fallo muestra el motivo seguro y permite reintentar; nunca consulta sin `neighborhood_id`. La ficha usa `whatsapp` como contacto prioritario y `phone` como respaldo.
 - Invitar vecinos debe permanecer pendiente de habilitación aunque exista una pantalla implementada.
 - Mi perfil usa una sola implementación basada en la referencia aprobada: identidad centrada, reputación, estadísticas reales, progreso, insignias y menú personal. “Mis publicaciones”, “Mis favoritos” y “Mis compras y ventas” abren hojas con datos reales; no muestran contadores simulados.
+- Los comercios favoritos se muestran en tarjetas de mayor tamaño dentro de Mi perfil, con fotografía, nombre y rubro reales.
 - Las secciones de actividad de Mi perfil se presentan como subpantallas completas y no como bottom sheets: la información empieza arriba, el contenido breve conserva jerarquía y la barra inferior queda cubierta mientras se revisa una sección.
-- El Modo accesible es una preferencia local persistente controlada por `App.jsx`. Aplica texto y controles más grandes, foco visible y movimiento reducido a toda la aplicación; puede alternarse desde Mi perfil y Configuración. Es una ayuda práctica para adultos mayores, no una declaración formal de cumplimiento WCAG.
+- El Modo accesible es una preferencia local persistente controlada por `App.jsx`. Aplica texto y controles más grandes, foco visible y movimiento reducido a toda la aplicación; puede alternarse desde Mi perfil y Configuración. Los controles iconográficos con forma circular conservan relación 1:1 y no reciben el alto textual de 48 px. Es una ayuda práctica para adultos mayores, no una declaración formal de cumplimiento WCAG.
 - La barra inferior y el menú Crear respetan el safe area del dispositivo. El menú universal usa una cuadrícula desplazable con título y cierre explícito; los tabs identifican semánticamente la sección activa y anuncian mensajes sin leer.
 - Inicio distingue una actualización fallida de un feed realmente vacío: conserva la última información disponible cuando existe caché y muestra un aviso con reintento. Las consultas principales de barrio y publicaciones ya no fallan silenciosamente.
 - Las páginas comunitarias comparten la identidad visual vigente, el header simple con retorno y scroll independiente.
@@ -191,6 +196,8 @@ El botón de creación abre `CreatePost.jsx`, salvo la creación de comercios, q
 - Las distancias del feed y detalle de Comercios se calculan desde el GPS del navegador; mientras este responde o si el permiso falla, usan como respaldo las coordenadas verificadas del perfil del vecino.
 - La verificación residencial exige dos comprobaciones: la dirección geocodificada debe quedar a un máximo de 250 metros del GPS y ese GPS debe estar dentro del polígono oficial del MVP mediante `barrio_en_punto_mvp`. El perfil conserva ambos puntos y la distancia calculada.
 - El polígono oficial del MVP está versionado en `supabase/geo/barrio_beta_polygon.geojson`; la migración `202607290004_beta_neighborhood_polygon.sql` lo asigna únicamente cuando existe exactamente un registro `neighborhoods.is_beta=true`.
+- El alta solicita `Nombre` y `Apellido` en campos independientes, pero los compone en `profiles.full_name`; no se agregan columnas estructuradas para el MVP. La pantalla tiene scroll interno y explica correctamente que el nombre identifica el perfil mientras el RUT permanece privado.
+- La verificación muestra el territorio activo antes del GPS mediante `MiniMap` y una copia cliente de la geometría versionada en `src/data/barrioBetaBoundary.js`. Cuando dirección y comuna son válidas, geocodifica con espera breve y muestra el punto sobre el polígono. Esta ayuda visual no reemplaza la validación backend por `barrio_en_punto_mvp`.
 - El formato oficial de `opening_hours` es el del panel: claves numéricas de JavaScript (`0` domingo a `6` sábado). La app mantiene lectura de claves abreviadas antiguas para no invalidar comercios previos.
 - En Farmacias, `is_active` controla si una farmacia pertenece al directorio visible y `is_on_duty` indica si se destaca actualmente como de turno. La franja del Home muestra solo turnos; su modal con scroll muestra primero los turnos y luego las demás farmacias visibles.
 - Las noticias se guardan en `posts` con `type='news'`. `news_is_official` identifica comunicaciones oficiales, `news_source` guarda la fuente y `show_in_activity` controla si también aparecen en “Actividad de el barrio”. `images` admite hasta ocho imágenes desde un botón independiente del panel: la primera funciona como portada y el modal las recorre automáticamente en un carrusel con control manual. Sus categorías se administran en `news_categories` con nombre, ícono, orden y visibilidad; el feed conserva categorías conocidas como respaldo. No utiliza noticias de demostración ni reutiliza el detalle del Mercado.
@@ -251,6 +258,8 @@ El botón de creación abre `CreatePost.jsx`, salvo la creación de comercios, q
 
 ## Funcionalidades terminadas
 
+- Alta y verificación territorial refinadas: Nombre y Apellido separados sin migración, copy de privacidad coherente, scroll interno, mapa del polígono MVP, geocodificación automática de dirección y marcador previo al GPS.
+- Inicio incorpora una portada editorial real para el próximo evento elegido desde el panel, sin datos simulados ni duplicación inmediata en Actividad. Mi perfil amplía las tarjetas de favoritos y el Modo accesible conserva cuadrados los controles circulares.
 - Pulido UX/UI final de la app vecinal: subpantallas superiores de Perfil, buscador permanente y jerarquía real en Servicios, detalle con métricas reales y CTA dominante, menú Crear adaptable, safe areas, reducción de movimiento, Chat con recuperación y Home con caché más aviso de actualización fallida.
 - La fase larga autorizada quedó cerrada en cuatro checkpoints: continuidad, moderación preventiva, Comercios y Productos, y Perfil con Modo accesible. App y panel pasan sus builds de producción; los archivos ajenos `landing-page/` y `supabase/.temp/` permanecen fuera de los commits.
 - `MyProfile.jsx` fue reemplazado, sin pantalla paralela, por la composición visual aprobada. Reputación, ventas, regalos, ayudas, publicaciones, favoritos y tratos se derivan de Supabase o muestran cero/sin calificación; el perfil no inventa valores. El Modo accesible persiste en `localStorage` y se aplica globalmente.
