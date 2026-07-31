@@ -47,14 +47,14 @@ La ejecución ya fue confirmada y registrada en `AI_CONTEXT.md`.
 
 No ejecutar `supabase db push`. El historial remoto de migraciones está desalineado y la CLI intentaría aplicar archivos antiguos que en parte ya existen en producción.
 
-## Pendientes preparados — ejecutar manualmente en orden
+## Migraciones de contenido e invitaciones aplicadas
 
-Estas migraciones todavía no deben considerarse aplicadas:
+Ambas migraciones fueron ejecutadas con resultado `Success` el 31 de julio de 2026:
 
 1. `migrations/202607310002_editable_app_content.sql`
 2. `migrations/202607310003_neighbor_invites.sql`
 
-Ejecuta cada archivo completo por separado en el SQL Editor de Supabase y confirma `Success` antes de continuar con el siguiente. La segunda agrega enlaces personales, trazabilidad de invitados, la insignia Conector y las métricas del panel. No requiere cargar datos simulados.
+La segunda agrega enlaces personales, trazabilidad de invitados, la insignia Conector y las métricas del panel. Las RPC fueron reconocidas posteriormente por PostgREST y rechazaron solicitudes anónimas con HTTP 401, como corresponde. No volver a ejecutar estos archivos salvo que se esté reconstruyendo otro entorno.
 
 Después de aplicar la segunda, valida con esta consulta de solo lectura:
 
