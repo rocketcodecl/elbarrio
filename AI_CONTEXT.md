@@ -5,6 +5,9 @@
 
 ## Estado de continuidad — 30 de julio de 2026
 
+- Superbloque de pulido UX/UI autorizado en curso. Estado: `1/4 — subpantallas de Perfil corregidas`.
+- “Mis publicaciones”, “Mis favoritos” y “Mis compras y ventas” se abren ahora como subpantallas completas desde la parte superior, con retorno y scroll propios; ya no quedan como hojas pegadas al borde inferior cuando tienen poco contenido.
+- Siguiente checkpoint: pulir Servicios y su detalle con patrones factibles de las referencias, usando exclusivamente información real.
 - Fase larga autorizada en curso: cierre de Comercios, moderación de contenido público con IA, reemplazo de Mi perfil y Modo accesible. Se trabaja por bloques con compilación, actualización de contexto y commit independiente.
 - Bloque actual: `4/4 — fase larga completada y verificada`.
 - La aplicación principal y el panel administrativo compilan en producción. La Edge Function nueva pasa `deno lint`, está desplegada y responde correctamente en red.
@@ -175,6 +178,7 @@ El botón de creación abre `CreatePost.jsx`, salvo la creación de comercios, q
 - El feed de Comercios distingue un directorio realmente vacío de un error de sesión, perfil, barrio o consulta. Ante un fallo muestra el motivo seguro y permite reintentar; nunca consulta sin `neighborhood_id`. La ficha usa `whatsapp` como contacto prioritario y `phone` como respaldo.
 - Invitar vecinos debe permanecer pendiente de habilitación aunque exista una pantalla implementada.
 - Mi perfil usa una sola implementación basada en la referencia aprobada: identidad centrada, reputación, estadísticas reales, progreso, insignias y menú personal. “Mis publicaciones”, “Mis favoritos” y “Mis compras y ventas” abren hojas con datos reales; no muestran contadores simulados.
+- Las secciones de actividad de Mi perfil se presentan como subpantallas completas y no como bottom sheets: la información empieza arriba, el contenido breve conserva jerarquía y la barra inferior queda cubierta mientras se revisa una sección.
 - El Modo accesible es una preferencia local persistente controlada por `App.jsx`. Aplica texto y controles más grandes, foco visible y movimiento reducido a toda la aplicación; puede alternarse desde Mi perfil y Configuración. Es una ayuda práctica para adultos mayores, no una declaración formal de cumplimiento WCAG.
 - Las páginas comunitarias comparten la identidad visual vigente, el header simple con retorno y scroll independiente.
 - Los feeds de Mercado, Servicios, Eventos, Chat y Comercios usan un header interno común: botón volver, título centrado en gris carbón con `el barrio` en verde de marca, un ícono lineal grande y translúcido propio de la sección hacia el lado izquierdo, y una línea verde inferior. Inicio conserva su header propio.
