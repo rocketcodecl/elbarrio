@@ -239,7 +239,7 @@ const fechaLarga = (fecha) => {
 // COMPONENTE PRINCIPAL
 // ════════════════════════════════════════════════
 function Events({ currentUser, onNavigate, onCrear }) {
-  const [profile, setProfile] = useState(null)
+  const [profile, setProfile] = useState(undefined)
   const [eventos, setEventos] = useState([])
   const [filtro, setFiltro] = useState('todos')
   const [cargando, setCargando] = useState(true)
@@ -269,7 +269,10 @@ function Events({ currentUser, onNavigate, onCrear }) {
       .select('*')
       .eq('user_id', currentUser.id)
       .maybeSingle()
-      .then(({ data }) => { if (active) setProfile(data || null) })
+      .then(({ data, error: profileError }) => {
+        if (!active) return
+        setProfile(profileError ? null : (data || null))
+      })
     return () => { active = false }
   }, [currentUser?.id])
 
@@ -281,25 +284,27 @@ function Events({ currentUser, onNavigate, onCrear }) {
 
   // ═══════ Cargar eventos ═══════
   const cargar = useCallback(async (esRefresh = false) => {
+    if (!profile?.neighborhood_id) {
+      setEventos([])
+      setError('No pudimos confirmar tu barrio. Intenta nuevamente.')
+      setCargando(false)
+      setRefrescando(false)
+      return
+    }
     if (esRefresh) setRefrescando(true)
     else setCargando(true)
     setError('')
     try {
       // Query base (segun spec del task): posts con type='event', status='active',
       // futuros, ordenados por starts_at asc, con join a profiles.
-      let q = supabase
+      const q = supabase
         .from('posts')
         .select('*, author:profiles!author_id(full_name, avatar_url, badge_founder)')
+        .eq('neighborhood_id', profile.neighborhood_id)
         .eq('type', 'event')
         .eq('status', 'active')
         .gte('starts_at', new Date().toISOString())
         .order('starts_at', { ascending: true })
-
-      // Filtro por barrio si el perfil del user tiene neighborhood_id
-      // (mismo patron que Alertas.jsx).
-      if (profile?.neighborhood_id) {
-        q = q.eq('neighborhood_id', profile.neighborhood_id)
-      }
 
       const { data, error: e } = await q.limit(60)
       if (e) {
@@ -344,20 +349,12 @@ function Events({ currentUser, onNavigate, onCrear }) {
       setCargando(false)
       setRefrescando(false)
     }
-  }, [profile?.neighborhood_id, currentUser?.id])
+  }, [profile, currentUser])
 
   useEffect(() => {
-    // Esperamos a tener el perfil (o a que falle) antes de cargar,
-    // para poder filtrar por barrio. Si despues de 1.5s no hay perfil,
-    // cargamos igual (no bloqueamos al user).
-    if (profile !== null) {
-      cargar()
-      return
-    }
-    const t = setTimeout(() => cargar(), 1500)
-    return () => clearTimeout(t)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [profile])
+    if (profile === undefined) return
+    cargar()
+  }, [cargar, profile])
 
   // ═══════ Toggle asistencia ═══════
   const toggleAsistir = async (postId) => {

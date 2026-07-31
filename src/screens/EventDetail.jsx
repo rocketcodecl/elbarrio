@@ -30,7 +30,7 @@ const formatSchedule = (startsAt, endsAt) => {
   return `${start}–${end} hrs`
 }
 
-export default function EventDetail({ postId, onNavigate }) {
+export default function EventDetail({ postId, neighborhoodId, onNavigate }) {
   const [event, setEvent] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -40,8 +40,21 @@ export default function EventDetail({ postId, onNavigate }) {
   useEffect(() => {
     let active = true
     const load = async () => {
+      if (!postId || !neighborhoodId) {
+        setEvent(null)
+        setError('No pudimos confirmar este evento dentro de tu barrio.')
+        setLoading(false)
+        return
+      }
       const [{ data: post, error: postError }, { data: eventCategories }] = await Promise.all([
-        supabase.from('posts').select('*, author:profiles!author_id(full_name, avatar_url, badge_founder)').eq('id', postId).maybeSingle(),
+        supabase
+          .from('posts')
+          .select('*, author:profiles!author_id(full_name, avatar_url, badge_founder)')
+          .eq('id', postId)
+          .eq('type', 'event')
+          .eq('status', 'active')
+          .eq('neighborhood_id', neighborhoodId)
+          .maybeSingle(),
         supabase.from('event_categories').select('key, name, icon'),
       ])
       if (!active) return
@@ -56,7 +69,7 @@ export default function EventDetail({ postId, onNavigate }) {
     }
     load()
     return () => { active = false }
-  }, [postId])
+  }, [postId, neighborhoodId])
 
   const share = async () => {
     const data = { title: event?.title || 'Evento del barrio', text: `${event?.title || 'Evento'} en El Barrio`, url: window.location.href }

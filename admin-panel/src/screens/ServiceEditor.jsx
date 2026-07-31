@@ -27,8 +27,14 @@ export default function ServiceEditor({ service = null, profile, onBack, onSaved
   const set = (field, value) => setDraft(current => ({ ...current, [field]: value }))
 
   useEffect(() => {
-    let request = supabase.from('profiles').select('id, full_name, avatar_url, verified, verification_status').order('full_name').limit(500)
-    if (profile?.neighborhood_id) request = request.eq('neighborhood_id', profile.neighborhood_id)
+    if (!profile?.is_superadmin && !profile?.neighborhood_id) {
+      setProviders([])
+      setError('Tu cuenta administrativa no tiene un barrio asignado.')
+      setLoadingProviders(false)
+      return
+    }
+    let request = supabase.from('profiles').select('id, full_name, avatar_url, verified, verification_status, neighborhood_id').order('full_name').limit(500)
+    if (!profile?.is_superadmin) request = request.eq('neighborhood_id', profile.neighborhood_id)
     request.then(({ data, error: providerError }) => {
       if (providerError) setError(`No fue posible cargar los prestadores: ${providerError.message}`)
       const rows = data || []
@@ -36,7 +42,7 @@ export default function ServiceEditor({ service = null, profile, onBack, onSaved
       setDraft(current => ({ ...current, authorId: current.authorId || rows[0]?.id || profile?.id || '' }))
       setLoadingProviders(false)
     })
-  }, [profile?.id, profile?.neighborhood_id])
+  }, [profile?.id, profile?.is_superadmin, profile?.neighborhood_id])
 
   const uploadImage = async event => {
     const file = event.target.files?.[0]
@@ -62,11 +68,14 @@ export default function ServiceEditor({ service = null, profile, onBack, onSaved
   const save = async event => {
     event.preventDefault()
     if (!draft.authorId || !draft.title.trim() || !draft.content.trim()) return setError('Selecciona un prestador y completa título y descripción.')
+    const selectedProvider = providers.find(provider => provider.id === draft.authorId)
+    const targetNeighborhoodId = service?.neighborhood_id || selectedProvider?.neighborhood_id
+    if (!targetNeighborhoodId) return setError('El prestador seleccionado no tiene un barrio asignado.')
     const price = draft.price === '' ? null : Number(draft.price)
     if (price !== null && (!Number.isFinite(price) || price < 0)) return setError('El precio no es válido.')
     setSaving(true)
     setError('')
-    const payload = { author_id: draft.authorId, neighborhood_id: service?.neighborhood_id || profile?.neighborhood_id, type: 'service', title: draft.title.trim(), content: draft.content.trim(), service_key: draft.serviceKey, category: draft.serviceKey, price, service_phone: draft.phone.trim() || null, service_whatsapp: draft.whatsapp.trim() || null, service_instagram: draft.instagram.trim().replace(/^@/, '') || null }
+    const payload = { author_id: draft.authorId, neighborhood_id: targetNeighborhoodId, type: 'service', title: draft.title.trim(), content: draft.content.trim(), service_key: draft.serviceKey, category: draft.serviceKey, price, service_phone: draft.phone.trim() || null, service_whatsapp: draft.whatsapp.trim() || null, service_instagram: draft.instagram.trim().replace(/^@/, '') || null }
     if (!editing || imageChanged) payload.images = draft.image ? [draft.image] : null
     if (!editing) payload.status = 'active'
     const request = editing

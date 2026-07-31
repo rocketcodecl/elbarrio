@@ -1,15 +1,8 @@
 // lib/ia.js
 //
 // ✨ Autocompletar con IA desde la foto.
-// Usa OPENROUTER (gratis, no pide tarjeta) — agregador de modelos con visión.
-//
-// ACTIVAR (3 pasos):
-//   1. Entrá a https://openrouter.ai/keys
-//   2. Iniciá sesión con Google o GitHub → "Create Key" → copiala
-//      (empieza con sk-or-v1-... y tiene ~70 caracteres)
-//   3. En tu .env (o .env.local), agregá:
-//        VITE_OPENROUTER_API_KEY=sk-or-v1-tu-clave-aqui
-//   Reiniciá npm run dev (Ctrl+C + npm run dev). Listo.
+// Usa OpenRouter a través de la Edge Function `analyze-listing-image`,
+// para que la clave de producción nunca llegue al navegador.
 //
 // LÍMITES GRATIS DE OPENROUTER:
 //   · 50 pedidos por día en modelos :free (sin agregar crédito)
@@ -21,20 +14,21 @@
 // prueba, cuánto tarda, qué responde, y por qué falla.
 // ============================================================
 
-const OPENROUTER_KEY = import.meta.env.VITE_OPENROUTER_API_KEY
-const URL = 'https://openrouter.ai/api/v1/chat/completions'
+import { supabase } from './supabase'
 
-// Modelos de visión gratis en OpenRouter, en orden de preferencia.
-// Verificados disponibles el 2026-07-19 vía https://openrouter.ai/api/v1/models
-// OpenRouter rota estos modelos seguido. Si fallan todos, revisar:
+const EDGE_FUNCTION = 'analyze-listing-image'
+
+// Modelos de visión en OpenRouter, en orden de preferencia.
+// Verificados disponibles el 2026-07-30 en OpenRouter.
+// Gemini Flash Lite usa saldo pagado por su mayor estabilidad. Los modelos
+// gratuitos quedan únicamente como respaldo y OpenRouter puede rotarlos.
+// Si fallan todos, revisar:
 //   https://openrouter.ai/models?q=vision (filtrar por :free)
-// ORDEN IMPORTANTE: gemma primero porque NO es modelo de razonamiento
-// (responde el JSON directo). nemotron SÍ razona: gasta tokens "pensando"
-// y con max_tokens bajo se queda sin espacio para la respuesta final →
-// devuelve contenido vacío. Por eso lo dejamos último.
+// Nemotron queda último porque puede gastar tokens de salida razonando.
 const MODELOS_VISION = [
-  'google/gemma-4-26b-a4b-it:free',
+  'google/gemini-2.5-flash-lite',
   'google/gemma-4-31b-it:free',
+  'google/gemma-4-26b-a4b-it:free',
   'nvidia/nemotron-nano-12b-v2-vl:free',
 ]
 
@@ -63,81 +57,77 @@ Mirá esta foto y devolvé ÚNICAMENTE un JSON válido (sin markdown, sin texto 
 {"title":"Bicicleta MTB Trek talla M","description":"Descripción honesta de 2-3 oraciones, máximo 500 caracteres. Estado visible, marca solo si se lee claro, color, tamaño. Tono cercano, español chileno.","category":"Bicicletas","suggestedPrice":15000,"condition":"usado","lookingFor":"Teclado electrónico o bici plegable"}
 
 Reglas:
+- Identifica el objeto físico principal aunque no puedas reconocer su marca o modelo. En ese caso usa un nombre genérico y describe solo lo visible.
 - title: corto y concreto, máximo 60 caracteres. No empieces con "Vendo" ni "Se vende".
 - category: una de estas EXACTAS: ${CATEGORIAS_VALIDAS.join(', ')}
 - suggestedPrice: número entero en pesos chilenos. Si no es vendible, null.
 - condition: "nuevo", "usado" o "con detalles".
 - lookingFor: qué sería razonable pedir a cambio (máx 60 caracteres). Si no aplica, null.
-- Si la foto no muestra un objeto claro, devolvé: {"title":"","description":"","category":"Otros","suggestedPrice":null,"condition":"usado","lookingFor":null}
+- Usa la respuesta vacía únicamente cuando de verdad no haya ningún objeto físico identificable, por ejemplo una imagen negra, vacía o un paisaje sin objeto principal: {"title":"","description":"","category":"Otros","suggestedPrice":null,"condition":"usado","lookingFor":null}
 - No inventes marca si no se ve claramente.
 - Respondé SOLO el JSON. Nada más.`
 }
 
+async function extraerErrorEdge(error, response) {
+  const status = response?.status
+  try {
+    const errorData = await response?.json()
+    const body = errorData?.error?.message || errorData?.message || JSON.stringify(errorData)
+    return { status, body }
+  } catch {
+    return { status, body: error?.message || '' }
+  }
+}
+
+async function llamarEdgeFunction(model, prompt, imageDataUrl, timeoutMs) {
+  const { data, error, response } = await supabase.functions.invoke(EDGE_FUNCTION, {
+    body: { model, prompt, imageDataUrl },
+    timeout: timeoutMs,
+  })
+
+  if (!error) return data
+
+  const { status, body } = await extraerErrorEdge(error, response)
+  const reachedFunction = response?.headers?.get('x-el-barrio-function') === EDGE_FUNCTION
+  const unavailable =
+    !reachedFunction &&
+    (status === 404 || error?.name === 'FunctionsFetchError' || error?.name === 'FunctionsRelayError')
+
+  if (unavailable) {
+    const e = new Error('La función segura de IA todavía no está disponible.')
+    e.code = 'EDGE_UNAVAILABLE'
+    e.status = status
+    throw e
+  }
+
+  const e = new Error(body || error?.message || 'La función de IA no pudo responder.')
+  e.status = status
+  throw e
+}
+
 async function llamarOpenRouter(model, prompt, imageDataUrl, timeoutMs) {
   console.log(`[IA] → Probando modelo: ${model} (timeout ${timeoutMs / 1000}s)`)
-  const controller = new AbortController()
-  const timeout = setTimeout(() => controller.abort(), timeoutMs)
   const t0 = Date.now()
+  let data
 
-  let res
   try {
-    res = await fetch(URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${OPENROUTER_KEY}`,
-        'HTTP-Referer': 'https://elbarrio.app',
-        'X-Title': 'El Barrio',
-      },
-      body: JSON.stringify({
-        model,
-        messages: [
-          {
-            role: 'user',
-            content: [
-              { type: 'text', text: prompt },
-              { type: 'image_url', image_url: { url: imageDataUrl } },
-            ],
-          },
-        ],
-        temperature: 0.5,
-        // 800 tokens: suficiente para razonamiento (nemotron) + respuesta JSON.
-        // Con 500, nemotron se quedaba sin tokens y devolvía contenido vacío.
-        max_tokens: 800,
-      }),
-      signal: controller.signal,
-    })
+    data = await llamarEdgeFunction(model, prompt, imageDataUrl, timeoutMs)
   } catch (err) {
-    clearTimeout(timeout)
     const ms = Date.now() - t0
-    if (err.name === 'AbortError') {
+    const aborted =
+      err?.name === 'AbortError' ||
+      (err?.name === 'FunctionsFetchError' && err?.context?.name === 'AbortError')
+    if (aborted) {
       console.warn(`[IA] ✗ ${model} TIMEOUT después de ${ms}ms`)
       const e = new Error(`Timeout ${timeoutMs / 1000}s con ${model}`)
       e.status = 408
       throw e
     }
-    console.warn(`[IA] ✗ ${model} error de red:`, err.message)
+    console.warn(`[IA] ✗ ${model} falló en ${ms}ms:`, err.message)
     throw err
   }
-  clearTimeout(timeout)
+
   const ms = Date.now() - t0
-
-  if (!res.ok) {
-    let errorBody = ''
-    try {
-      const errJson = await res.json()
-      errorBody = errJson?.error?.message || JSON.stringify(errJson)
-    } catch {
-      try { errorBody = await res.text() } catch {}
-    }
-    console.warn(`[IA] ✗ ${model} HTTP ${res.status} en ${ms}ms: ${errorBody}`)
-    const e = new Error(`OpenRouter ${res.status}: ${errorBody}`)
-    e.status = res.status
-    e.body = errorBody
-    throw e
-  }
-
-  const data = await res.json()
   const choice = data?.choices?.[0]
   const msg = choice?.message
   let content = msg?.content
@@ -168,36 +158,36 @@ async function llamarOpenRouter(model, prompt, imageDataUrl, timeoutMs) {
   return content
 }
 
-// Parser robusto: nunca lanza. Si todo falla, devuelve {} y el caller
-// usa valores por defecto.
+// Parser robusto: nunca lanza. Retorna null cuando la respuesta no contiene
+// un objeto JSON válido, para diferenciar formato inválido de foto no reconocida.
 function parsearRespuesta(content) {
-  if (!content || typeof content !== 'string') return {}
+  if (!content || typeof content !== 'string') return null
   try {
-    return JSON.parse(content)
-  } catch {}
+    const parsed = JSON.parse(content)
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) return parsed
+  } catch { /* puede venir rodeado por markdown */ }
   const sinFence = content.replace(/```(?:json)?/gi, '').replace(/```/g, '').trim()
   try {
-    return JSON.parse(sinFence)
-  } catch {}
+    const parsed = JSON.parse(sinFence)
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) return parsed
+  } catch { /* buscar el primer objeto JSON */ }
   const m = sinFence.match(/\{[\s\S]*\}/)
   if (m) {
-    try { return JSON.parse(m[0]) } catch {}
+    try {
+      const parsed = JSON.parse(m[0])
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) return parsed
+    } catch { /* probar el siguiente modelo */ }
   }
   console.warn('[IA] No se pudo parsear JSON. Respuesta cruda:', content.slice(0, 300))
-  return {}
+  return null
 }
 
 export async function describirFoto(imageDataUrl, type) {
   console.log(`[IA] === describirFoto START type=${type} ===`)
-  if (!OPENROUTER_KEY) {
-    console.error('[IA] ✗ Falta VITE_OPENROUTER_API_KEY en .env')
-    const e = new Error('NO_KEY')
-    e.code = 'NO_KEY'
-    throw e
-  }
-
   const prompt = buildPrompt(type)
   let lastError = null
+  let attemptedModels = 0
+  let emptyResponses = 0
   const inicio = Date.now()
 
   for (const model of MODELOS_VISION) {
@@ -208,10 +198,16 @@ export async function describirFoto(imageDataUrl, type) {
     }
     const restante = TIMEOUT_TOTAL_MS - transcurrido
     const timeoutEste = Math.min(TIMEOUT_MODELO_MS, restante)
+    attemptedModels += 1
 
     try {
       const content = await llamarOpenRouter(model, prompt, imageDataUrl, timeoutEste)
       const parsed = parsearRespuesta(content)
+      if (!parsed) {
+        const e = new Error('La IA respondió con un formato inválido.')
+        e.code = 'IA_FORMATO'
+        throw e
+      }
       console.log('[IA] JSON parseado:', parsed)
 
       const title = typeof parsed.title === 'string' ? parsed.title.slice(0, 60) : ''
@@ -230,11 +226,8 @@ export async function describirFoto(imageDataUrl, type) {
 
       const resultado = { title, description, category, suggestedPrice, condition, lookingFor }
 
-      // Detectar respuesta vacía: la IA devolvió el JSON de fallback
-      // ("la foto no muestra un objeto claro"). En vez de retornar silenciosamente
-      // algo que no completa nada, lanzar error específico para que el cliente
-      // pueda avisar al usuario y NO aplicar cooldown (puede reintentar con
-      // otra foto o completar a mano).
+      // Una respuesta vacía de un modelo no decide el resultado final:
+      // se prueba el siguiente antes de informar que la foto no fue reconocida.
       if (!title && !description) {
         console.warn('[IA] Respuesta vacía (IA no reconoció objeto en la foto)')
         const e = new Error('IA_VACIA')
@@ -246,18 +239,21 @@ export async function describirFoto(imageDataUrl, type) {
       return resultado
     } catch (e) {
       console.warn(`[IA] ${model} falló:`, e.status || '', e.message)
-      // IA_VACIA: la IA respondió bien pero no vio un objeto claro.
-      // No tiene sentido probar otro modelo — propagar de inmediato.
-      if (e.code === 'IA_VACIA') throw e
+      if (e.code === 'EDGE_UNAVAILABLE') throw e
       lastError = e
+      if (e.code === 'IA_VACIA') {
+        emptyResponses += 1
+        continue
+      }
+      if (e.code === 'IA_FORMATO') continue
       if (e.status === 404) continue
       if (e.status === 408) continue
       if (e.status === 402) continue
       if (e.status === 429) {
-        throw new Error('Límite por minuto. Espera 60 segundos.')
+        throw new Error('Límite por minuto. Espera 60 segundos.', { cause: e })
       }
       if (e.status === 401) {
-        throw new Error('Clave de OpenRouter inválida. Revisa tu .env')
+        throw new Error('La sesión o la configuración del servicio de IA no es válida.', { cause: e })
       }
       // Cualquier otro error (red, parseo): probar el siguiente modelo.
       continue
@@ -266,11 +262,19 @@ export async function describirFoto(imageDataUrl, type) {
 
   const totalMs = Date.now() - inicio
   console.error(`[IA] === describirFoto FALLÓ después de ${totalMs}ms. Último error:`, lastError)
+  if (attemptedModels > 0 && emptyResponses === attemptedModels) {
+    const e = new Error('IA_VACIA')
+    e.code = 'IA_VACIA'
+    throw e
+  }
   if (lastError?.status === 402) {
     throw new Error('Límite DIARIO gratis agotado en OpenRouter. Volvé mañana o agregá USD $5 de crédito en openrouter.ai/credits para 1,000 pedidos/día.')
   }
   if (lastError?.status === 408 || totalMs >= TIMEOUT_TOTAL_MS) {
     throw new Error('La IA tardó demasiado en responder. Probá de nuevo en un momento.')
+  }
+  if (lastError?.code === 'IA_FORMATO') {
+    throw new Error('La IA respondió de forma incompleta. Intenta nuevamente.')
   }
   throw new Error('Ningún modelo de visión gratis está disponible ahora. Revisa https://openrouter.ai/models?q=vision o intenta más tarde.')
 }

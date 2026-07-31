@@ -11,11 +11,11 @@ import {
   Estructura del feed:
     1. Header
     2. Clima + Farmacia
-    3. Accesos: Pedidos · Comercios · Noticias · Alertas
+    3. Accesos: Eventos · Noticias · Alertas
     4. Pedidos vecinales (barra amarilla + cards full-width)
     5. Alertas (cards full-width, con distancia "Estás a xx m")
     6. Mercado (scroll lateral: ventas + regalos + trueques juntos)
-    7. Actividad de el barrio (vertical, 6 + pill "+ ver más")  ← feed principal
+    7. Actividad de el barrio (vertical, 10 + pill "+ ver más")  ← feed principal
     8. Eventos (scroll lateral, abajo del feed principal)
 
   "el barrio" siempre minúscula y en verde (C.verde).
@@ -163,10 +163,12 @@ const ClimaIcon = ({ type, size = 34 }) => {
 }
 
 const ACCESOS_HOME = [
-  { id: 'comercios', emoji: '🏪', label: 'Comercios' },
+  { id: 'eventos',   emoji: '📅', label: 'Eventos' },
   { id: 'noticias',  emoji: '📰', label: 'Noticias' },
   { id: 'alertas',   emoji: '🚨', label: 'Alertas' },
 ]
+
+const ACTIVIDAD_VISIBLE_INICIAL = 10
 
 /* ── Íconos lineales (verde marca) para títulos de sección ──
    Mismo lenguaje visual que el TabBar: trazo 1.9, sin relleno,
@@ -491,12 +493,8 @@ function Home({ currentUser, onNavigate, onCrear }) {
 
       setBarrio(hoodRes.data)
 
-      // Alertas: SOLO aparecen en la sección "Alertas" del feed las
-      // alertas OFICIALES (is_official = true), que las sube el admin
-      // (tú) desde el panel de administración o directo en Supabase.
-      // Las alertas que publican vecinos comunes (is_official != true)
-      // se consultan desde el centro de alertas, pero no se mezclan con
-      // la portada ni con el feed social de Actividad.
+      // Las alertas oficiales usan la huincha destacada de portada. Las
+      // alertas vecinales activas se incorporan inmediatamente a Actividad.
       // Filtramos expiradas en JS (no en el servidor) para no romper si
       // la columna expires_at no existe en el schema.
       if (alertRes.error) {
@@ -528,8 +526,8 @@ function Home({ currentUser, onNavigate, onCrear }) {
       const ventas = todos.filter((x) => x.type === 'sell').slice(0, 10)
       const regalos = todos.filter((x) => x.type === 'gift' || x.type === 'trade').slice(0, 10)
       const eventos = todos.filter((x) => x.type === 'event').slice(0, 10)
-      // Actividad es el feed social: solo publicaciones generales.
-      // Pedidos, alertas, mercado y eventos ya tienen su propia sección.
+      // Las publicaciones generales y noticias editoriales forman la base de
+      // Actividad; las alertas vecinales activas se incorporan más abajo.
       const actividad = todos.filter((x) => x.type === 'general' || (x.type === 'news' && x.show_in_activity === true)).slice(0, 20)
 
       setPedidos(pedidosActivos)
@@ -673,7 +671,6 @@ function Home({ currentUser, onNavigate, onCrear }) {
 
   const onAcceso = (id) => {
     if (id === 'pedidos') crear('request')
-    else if (id === 'comercios') nav('comercios')
     else if (id === 'noticias') nav('noticias')
     else if (id === 'alertas') nav('alertas')
     else nav(id)
@@ -922,7 +919,7 @@ function Home({ currentUser, onNavigate, onCrear }) {
           </div>
         )}
 
-        {/* ══════ ACTIVIDAD DE EL BARRIO (vertical, 6 + "+ ver más") ══════
+        {/* ══════ ACTIVIDAD DE EL BARRIO (vertical, 10 + "+ ver más") ══════
             Feed principal — publicaciones generales de vecinos.
             Ahora queda ARRIBA de Eventos para que no se pierda. */}
         <div style={s.seccion}>
@@ -941,7 +938,7 @@ function Home({ currentUser, onNavigate, onCrear }) {
             </div>
           ) : (
             <>
-              {filtrados.slice(0, verMasActividad ? filtrados.length : 6).map((p) => {
+              {filtrados.slice(0, verMasActividad ? filtrados.length : ACTIVIDAD_VISIBLE_INICIAL).map((p) => {
                 const reporte = p.__incident ? (REPORTES[p.category] || REPORTES.seguridad) : null
                 const t = reporte
                   ? { ...reporte, corto: reporte.label }
@@ -964,7 +961,10 @@ function Home({ currentUser, onNavigate, onCrear }) {
                         : <span style={s.postEmoji}>{t.emoji}</span>}
                     </div>
 
-                    <div style={s.postInfo}>
+                    <div style={{
+                      ...s.postInfo,
+                      ...(p.__incident ? s.alertActivityInfo : {}),
+                    }}>
                       <div style={s.postTit}>{p.title}</div>
                       {p.content && <div style={s.postTxt}>{p.content}</div>}
 
@@ -983,19 +983,22 @@ function Home({ currentUser, onNavigate, onCrear }) {
                         {p.is_negotiable && <span style={s.chipNeg}>Conversable</span>}
                       </div>
                     </div>
+                    {p.__incident && (
+                      <span style={s.alertActivityBeacon} aria-label="Alerta vecinal">🚨</span>
+                    )}
                   </div>
                 )
               })}
 
-              {!verMasActividad && filtrados.length > 6 && (
+              {!verMasActividad && filtrados.length > ACTIVIDAD_VISIBLE_INICIAL && (
                 <button
                   style={s.verMasBtn}
                   onClick={() => setVerMasActividad(true)}
                 >
-                  + ver más ({filtrados.length - 6})
+                  + ver más ({filtrados.length - ACTIVIDAD_VISIBLE_INICIAL})
                 </button>
               )}
-              {verMasActividad && filtrados.length > 6 && (
+              {verMasActividad && filtrados.length > ACTIVIDAD_VISIBLE_INICIAL && (
                 <button
                   style={s.verMasBtn}
                   onClick={() => setVerMasActividad(false)}
@@ -1568,11 +1571,17 @@ const s = {
 
   /* ── posts verticales (Actividad, Option A) ── */
   postCard: {
+    position: 'relative',
     display: 'flex', gap: 12,
     background: C.card, borderRadius: 14, padding: 10,
     border: `1px solid ${C.borde}`,
     marginBottom: 9, cursor: 'pointer',
   },
+  alertActivityBeacon: {
+    position: 'absolute', top: 7, right: 8,
+    fontSize: 14, lineHeight: 1, pointerEvents: 'none',
+  },
+  alertActivityInfo: { paddingRight: 17 },
   postFoto: {
     width: 56, height: 'auto', minHeight: 56,
     alignSelf: 'stretch', borderRadius: 11, flexShrink: 0, overflow: 'hidden',

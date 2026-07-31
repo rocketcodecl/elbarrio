@@ -169,16 +169,24 @@ export default function Noticias({ currentUser, onNavigate }) {
   const [refreshing, setRefreshing] = useState(false)
 
   const nav = onNavigate || (() => {})
+  const neighborhoodId = currentUser?.neighborhoodId
 
   const fetchNews = useCallback(async () => {
     setLoading(true)
     setError(null)
+    if (!neighborhoodId) {
+      setNews([])
+      setError('No pudimos confirmar tu barrio. Vuelve a intentarlo cuando tu perfil esté disponible.')
+      setLoading(false)
+      return
+    }
     try {
       const { data, error: e } = await supabase
         .from('posts')
         .select('*, author:profiles!author_id (id, full_name, avatar_url, role, verified, badge_founder, badge_trusted_seller)')
         .eq('type', 'news')
         .eq('status', 'active')
+        .eq('neighborhood_id', neighborhoodId)
         .order('created_at', { ascending: false })
         .limit(50)
       if (e) throw e
@@ -190,7 +198,7 @@ export default function Noticias({ currentUser, onNavigate }) {
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [neighborhoodId])
 
   useEffect(() => {
     fetchNews()

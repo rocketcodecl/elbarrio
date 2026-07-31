@@ -232,14 +232,16 @@ export default function AdminComercios({ currentUser, onNavigate, params }) {
         setLoading(false)
         return
       }
+      if (!prof.is_superadmin && !prof.neighborhood_id) {
+        throw new Error('La cuenta administrativa no tiene un barrio asignado.')
+      }
       let query = supabase
         .from('commerces')
         .select('*')
         .order('is_premium', { ascending: false })
         .order('is_active', { ascending: false })
         .order('name', { ascending: true })
-      // Si el admin tiene barrio, filtra por barrio. Si no, trae todos.
-      if (prof.neighborhood_id) {
+      if (!prof.is_superadmin) {
         query = query.eq('neighborhood_id', prof.neighborhood_id)
       }
       const { data, error } = await query.limit(200)

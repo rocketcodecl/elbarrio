@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase.js'
 import { COMMERCE_CATEGORIES, COMMERCE_CATEGORY_ICONS } from '../lib/design.js'
 import LocationPicker from '../components/LocationPicker.jsx'
@@ -63,8 +63,20 @@ export default function CommerceEditor({ commerce, profile, onBack, onSaved, onD
   const [saving, setSaving] = useState(false)
   const [uploading, setUploading] = useState('')
   const [error, setError] = useState('')
+  const [neighborhoods, setNeighborhoods] = useState([])
+  const [targetNeighborhoodId, setTargetNeighborhoodId] = useState(() => (
+    commerce?.neighborhood_id || (profile?.is_superadmin ? '' : profile?.neighborhood_id || '')
+  ))
 
   const set = (field, value) => setDraft(current => ({ ...current, [field]: value }))
+
+  useEffect(() => {
+    if (!profile?.is_superadmin || commerce) return
+    supabase.from('neighborhoods').select('id, name, uv_code').order('name').then(({ data, error: loadError }) => {
+      if (loadError) setError(`No fue posible cargar los barrios: ${loadError.message}`)
+      setNeighborhoods(data || [])
+    })
+  }, [commerce, profile?.is_superadmin])
 
   const upload = async (file, folder) => {
     if (!file) return null
@@ -138,6 +150,8 @@ export default function CommerceEditor({ commerce, profile, onBack, onSaved, onD
   const save = async event => {
     event.preventDefault()
     if (!draft.name.trim()) return
+    const neighborhoodId = commerce?.neighborhood_id || targetNeighborhoodId
+    if (!neighborhoodId) return setError('Selecciona el barrio donde se publicará el comercio.')
     setSaving(true)
     setError('')
     const numericOrNull = value => value === '' || value == null ? null : Number(value)
@@ -161,7 +175,7 @@ export default function CommerceEditor({ commerce, profile, onBack, onSaved, onD
       opening_hours: draft.opening_hours,
       is_active: !!draft.is_active,
       is_premium: !!draft.is_premium,
-      neighborhood_id: commerce?.neighborhood_id || profile?.neighborhood_id || null,
+      neighborhood_id: neighborhoodId,
     }
 
     if ((payload.lat != null && !Number.isFinite(payload.lat)) || (payload.lng != null && !Number.isFinite(payload.lng))) {
@@ -205,6 +219,12 @@ export default function CommerceEditor({ commerce, profile, onBack, onSaved, onD
       {error && <div className="admin-alert" role="alert"><span>⚠️</span><p>{error}</p><button type="button" onClick={() => setError('')}>×</button></div>}
 
       <form id="commerce-form" className="commerce-editor-form" onSubmit={save}>
+        {profile?.is_superadmin && !commerce && (
+          <section className="editor-section">
+            <div className="editor-section-title"><span>0</span><div><h2>Barrio del comercio</h2><p>El comercio solo será visible para los vecinos del barrio seleccionado.</p></div></div>
+            <label className="field">Barrio<select value={targetNeighborhoodId} onChange={event => setTargetNeighborhoodId(event.target.value)} required><option value="">Selecciona un barrio</option>{neighborhoods.map(neighborhood => <option key={neighborhood.id} value={neighborhood.id}>{neighborhood.name}{neighborhood.uv_code ? ` · UV ${neighborhood.uv_code}` : ''}</option>)}</select></label>
+          </section>
+        )}
         <section className="editor-section editor-media-section">
           <div className="editor-section-title"><span>1</span><div><h2>Identidad visual</h2><p>Portada, logo e imágenes que aparecen en la ficha.</p></div></div>
           <div className="media-preview-label"><strong>Vista previa en la app</strong><span>La portada se recorta en formato 16:9 desde la parte superior.</span></div>

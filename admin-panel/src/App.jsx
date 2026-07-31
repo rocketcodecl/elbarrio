@@ -129,7 +129,7 @@ export default function App() {
       {activeSection === 'eventos' && <EventManager profile={profile} />}
       {activeSection === 'incidentes' && <IncidentManager profile={profile} />}
       {activeSection === 'usuarios' && <UserManager profile={profile} />}
-      {activeSection === 'notificaciones' && <NotificationManager />}
+      {activeSection === 'notificaciones' && <NotificationManager profile={profile} />}
       {!['dashboard', 'comercios', 'servicios', 'eventos', 'farmacias', 'noticias', 'incidentes', 'usuarios', 'notificaciones'].includes(activeSection) && (
         <section className="placeholder-module"><span>🚧</span><h1>Módulo en preparación</h1><p>Lo construiremos en una siguiente fase.</p></section>
       )}

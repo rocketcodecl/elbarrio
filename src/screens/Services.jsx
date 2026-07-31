@@ -159,16 +159,24 @@ export default function Services({ currentUser, onNavigate, onCrear }) {
   const [refreshing, setRefreshing] = useState(false)
 
   const nav = onNavigate || (() => {})
+  const neighborhoodId = currentUser?.neighborhoodId
 
   const fetchServices = useCallback(async () => {
     setLoading(true)
     setError(null)
+    if (!neighborhoodId) {
+      setServices([])
+      setError('No pudimos confirmar tu barrio. Vuelve a intentarlo cuando tu perfil esté disponible.')
+      setLoading(false)
+      return
+    }
     try {
       let q = supabase
         .from('posts')
         .select('*, author:profiles!author_id(full_name, avatar_url, reputation_score, badge_founder, badge_trusted_seller)')
         .eq('type', 'service')
         .eq('status', 'active')
+        .eq('neighborhood_id', neighborhoodId)
       if (category !== 'Todos') q = q.eq('service_key', category)
       q = q.order('created_at', { ascending: false }).limit(40)
       const { data, error: e } = await q
@@ -188,7 +196,7 @@ export default function Services({ currentUser, onNavigate, onCrear }) {
     } finally {
       setLoading(false)
     }
-  }, [category])
+  }, [category, neighborhoodId])
 
   useEffect(() => {
     fetchServices()

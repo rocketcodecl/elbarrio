@@ -40,7 +40,7 @@ export default function AdminShell({ activeSection, onSelect, profile, onLogout,
             {profile?.avatar_url
               ? <img src={profile.avatar_url} alt="" />
               : <span>{firstName.slice(0, 1).toUpperCase()}</span>}
-            <div><strong>{firstName}</strong><small>Administrador</small></div>
+            <div><strong>{firstName}</strong><small>{profile?.is_superadmin ? 'Superadministrador' : 'Administrador territorial'}</small></div>
           </div>
           <button className="logout-link" type="button" onClick={onLogout}>Cerrar sesión</button>
         </div>
@@ -48,7 +48,7 @@ export default function AdminShell({ activeSection, onSelect, profile, onLogout,
 
       <div className="admin-main">
         <header className="topbar">
-          <div><p>Panel de administración</p><strong>El Barrio · Las Condes</strong></div>
+          <div><p>Panel de administración</p><strong>{profile?.is_superadmin ? 'El Barrio · Alcance global' : `El Barrio · ${profile?.barrio || profile?.comuna || 'Barrio asignado'}`}</strong></div>
           <div className="topbar-status"><span /> Conectado a Supabase</div>
         </header>
         <main className="content-area">{children}</main>

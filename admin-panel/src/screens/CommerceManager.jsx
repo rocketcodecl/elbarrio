@@ -6,6 +6,8 @@ import ProductCatalog from './ProductCatalog.jsx'
 const commerceImage = commerce => commerce.cover_url || commerce.logo_url || null
 
 export default function CommerceManager({ profile }) {
+  const isSuperadmin = profile?.is_superadmin === true
+  const neighborhoodId = profile?.neighborhood_id
   const [commerces, setCommerces] = useState([])
   const [productCounts, setProductCounts] = useState({})
   const [query, setQuery] = useState('')
@@ -23,31 +25,43 @@ export default function CommerceManager({ profile }) {
   const loadCommerces = useCallback(async () => {
     setLoading(true)
     setError('')
+    if (!isSuperadmin && !neighborhoodId) {
+      setCommerces([])
+      setProductCounts({})
+      setError('Tu cuenta administrativa no tiene un barrio asignado.')
+      setLoading(false)
+      return
+    }
     let request = supabase
       .from('commerces')
       .select('*')
       .order('is_premium', { ascending: false })
       .order('is_active', { ascending: false })
       .order('name', { ascending: true })
-    if (profile?.neighborhood_id) request = request.eq('neighborhood_id', profile.neighborhood_id)
+    if (!isSuperadmin) request = request.eq('neighborhood_id', neighborhoodId)
 
-    const [commerceResult, productResult] = await Promise.all([
-      request.limit(300),
-      supabase.from('commerce_products').select('id, commerce_id'),
-    ])
+    const commerceResult = await request.limit(300)
     if (commerceResult.error) {
       setError('No fue posible cargar los comercios.')
       setLoading(false)
       return
     }
+    const loadedCommerces = commerceResult.data || []
+    const commerceIds = loadedCommerces.map(commerce => commerce.id)
+    const productResult = commerceIds.length
+      ? await supabase.from('commerce_products').select('id, commerce_id').in('commerce_id', commerceIds)
+      : { data: [], error: null }
+    if (productResult.error) {
+      setError('Los comercios cargaron, pero no fue posible contar sus productos.')
+    }
     const counts = {}
     ;(productResult.data || []).forEach(product => {
       counts[product.commerce_id] = (counts[product.commerce_id] || 0) + 1
     })
-    setCommerces(commerceResult.data || [])
+    setCommerces(loadedCommerces)
     setProductCounts(counts)
     setLoading(false)
-  }, [profile?.neighborhood_id])
+  }, [isSuperadmin, neighborhoodId])
 
   useEffect(() => { loadCommerces() }, [loadCommerces])
 

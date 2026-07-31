@@ -1,15 +1,12 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import Stepper from '../components/Stepper'
 
 // ============================================================
-// MODO DESARROLLO: este Profile.jsx NO bloquea al usuario por
-// RUT. Saca la llamada RPC is_rut_allowed (no existe en el
-// schema) y relaja la validacion a solo formato (no Módulo 11).
-// Tampoco bloquea RUTs duplicados: solo avisa por consola.
-// Cuando el producto decida activar la whitelist de RUTs, hay
-// que crear la funcion RPC is_rut_allowed en Supabase y volver
-// a poner el bloqueo aca.
+// MODO DESARROLLO: no se consulta una whitelist de RUTs porque
+// la RPC is_rut_allowed no existe en el schema actual. El formulario
+// sí valida Módulo 11 y bloquea los RUTs duplicados informados por
+// la restricción única de la base de datos.
 // ============================================================
 
 function Profile({ onFinish, onBack }) {
@@ -66,6 +63,41 @@ function Profile({ onFinish, onBack }) {
 
     return calculatedDv === dv
   }
+
+  useEffect(() => {
+    let active = true
+
+    const loadExistingProfile = async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user || !active) return
+
+      const { data: existingProfile, error: profileError } = await supabase
+        .from('profiles')
+        .select('full_name, rut, phone, avatar_url')
+        .eq('user_id', user.id)
+        .maybeSingle()
+
+      if (!active) return
+      if (profileError) {
+        setError('No pudimos recuperar tus datos. Inténtalo nuevamente.')
+        return
+      }
+
+      if (existingProfile?.full_name) setFullName(existingProfile.full_name)
+      if (existingProfile?.rut) {
+        const formattedRut = formatRut(existingProfile.rut)
+        setRut(formattedRut)
+        setRutValid(validateRut(formattedRut))
+      }
+      if (existingProfile?.phone) {
+        setPhone(existingProfile.phone.replace(/\D/g, '').slice(-9))
+      }
+      if (existingProfile?.avatar_url) setAvatarPreview(existingProfile.avatar_url)
+    }
+
+    loadExistingProfile()
+    return () => { active = false }
+  }, [])
 
   const handleRutChange = (e) => {
     const formatted = formatRut(e.target.value)
@@ -167,23 +199,20 @@ function Profile({ onFinish, onBack }) {
       }
       if (avatarUrl) updateData.avatar_url = avatarUrl
 
-      const { error: updateError } = await supabase
+      const { data: updatedProfile, error: updateError } = await supabase
         .from('profiles')
         .update(updateData)
         .eq('user_id', user.id)
+        .select('id')
+        .maybeSingle()
 
       if (updateError) throw updateError
+      if (!updatedProfile) throw new Error('No encontramos el perfil asociado a tu cuenta.')
 
       onFinish()
     } catch (err) {
-      // ============================================================
-      // MODO DEV: si el error es de RUT duplicado (codigo 23505),
-      // NO bloqueamos al usuario. Solo avisamos por consola y
-      // dejamos que siga. En produccion, volver a mostrar el error.
-      // ============================================================
-      if (err.code === '23505' && err.message?.toLowerCase().includes('rut')) {
-        console.warn('[Profile] RUT ya existe en la base (modo dev: no bloqueamos):', err.message)
-        onFinish()
+      if (err.code === '23505') {
+        setError('Este RUT ya está asociado a otra cuenta. Usa la cuenta anterior o ingresa un RUT diferente.')
         return
       }
       setError(err.message || 'Ocurrio un error al guardar')

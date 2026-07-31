@@ -11,6 +11,8 @@ const dateLabel = value => value ? new Date(value).toLocaleString('es-CL', { wee
 const eventImage = event => event.images?.[0] || null
 
 export default function EventManager({ profile }) {
+  const isSuperadmin = profile?.is_superadmin === true
+  const neighborhoodId = profile?.neighborhood_id
   const [events, setEvents] = useState([])
   const [query, setQuery] = useState('')
   const [filter, setFilter] = useState('all')
@@ -29,13 +31,19 @@ export default function EventManager({ profile }) {
   const loadEvents = useCallback(async () => {
     setLoading(true)
     setError('')
+    if (!isSuperadmin && !neighborhoodId) {
+      setEvents([])
+      setError('Tu cuenta administrativa no tiene un barrio asignado.')
+      setLoading(false)
+      return
+    }
     let request = supabase.from('posts').select('*').eq('type', 'event').order('starts_at', { ascending: true }).limit(300)
-    if (profile?.neighborhood_id) request = request.eq('neighborhood_id', profile.neighborhood_id)
+    if (!isSuperadmin) request = request.eq('neighborhood_id', neighborhoodId)
     const { data, error: loadError } = await request
     if (loadError) setError('No fue posible cargar los eventos.')
     setEvents(data || [])
     setLoading(false)
-  }, [profile?.neighborhood_id])
+  }, [isSuperadmin, neighborhoodId])
 
   useEffect(() => { loadEvents() }, [loadEvents])
 

@@ -20,7 +20,7 @@ import { C, T, S, CATEGORIAS, iniciales, hace, plata, distancia } from '../lib/d
 //   · Scrollbars ocultos en los scrollers horizontales (.mp-hscroll).
 // Mantiene: header con bolsita verde + avatar, CTA "PUBLICA AQUÍ" con
 //           crossfade de 6 emojis, pills, real-time, pull-to-refresh,
-//           skeleton, empty state, demo images, distancia real, verde de marca.
+//           skeleton, empty state, placeholders honestos, distancia real, verde de marca.
 // ============================================================
 
 // ---- Iconos SVG (mismo estilo que Search/Alertas) ----
@@ -153,28 +153,6 @@ const catEmoji = (cat) => {
   return found ? found.emoji : '📦'
 }
 
-// ---- Imágenes demo (cuando el post no tiene foto) ----
-// Usa LoremFlickr por keyword de categoría (imágenes reales, consistentes por seed).
-// Si falla, onError → emoji fallback.
-const DEMO_KEYWORDS = {
-  'Electrónica': 'electronics,gadget',
-  'Ropa': 'clothing,fashion',
-  'Hogar': 'home,decor',
-  'Deportes': 'sports,equipment',
-  'Libros': 'books,reading',
-  'Juguetes': 'toys',
-  'Muebles': 'furniture',
-  'Bicicletas': 'bicycle',
-  'Mascotas': 'pets,cat,dog',
-  'Herramientas': 'tools,workshop',
-  'Otros': 'secondhand,market',
-}
-const demoImgUrl = (post) => {
-  const kw = DEMO_KEYWORDS[post.category] || 'product'
-  const seed = (post.id || 'x').slice(-4)
-  return `https://loremflickr.com/400/400/${kw}?lock=${seed}`
-}
-
 // ---- Helper: tipo info (para badge de card) ----
 const tipoInfo = (type) => {
   const t = (type || '').toLowerCase()
@@ -247,6 +225,7 @@ export default function Marketplace({ currentUser, onNavigate, onCrear }) {
   const [posts, setPosts] = useState([])
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
+  const [loadError, setLoadError] = useState('')
 
   // Pull-to-refresh state
   const [pullDist, setPullDist] = useState(0)
@@ -261,6 +240,7 @@ export default function Marketplace({ currentUser, onNavigate, onCrear }) {
   const [myCoords, setMyCoords] = useState(null)
 
   const nav = onNavigate || (() => {})
+  const neighborhoodId = currentUser?.neighborhoodId
 
   // ---- Cargar posts ----
   // Fetch único: trae 60 posts de TODOS los tipos y los separa en cliente.
@@ -268,6 +248,15 @@ export default function Marketplace({ currentUser, onNavigate, onCrear }) {
   const fetchMarketplace = useCallback(async (isRefresh = false) => {
     if (isRefresh) setRefreshing(true)
     else setLoading(true)
+    setLoadError('')
+
+    if (!neighborhoodId) {
+      setPosts([])
+      setLoadError('No pudimos confirmar tu barrio. Vuelve a intentarlo cuando tu perfil esté disponible.')
+      setLoading(false)
+      setRefreshing(false)
+      return
+    }
 
     const query = supabase
       .from('posts')
@@ -276,16 +265,22 @@ export default function Marketplace({ currentUser, onNavigate, onCrear }) {
       `)
       .in('type', ALL_ALTS)
       .eq('status', 'active')
+      .eq('neighborhood_id', neighborhoodId)
       .order('created_at', { ascending: false })
       .limit(60)
 
     const { data, error } = await query
-    if (error) console.error('Error marketplace:', error)
-    setPosts(data || [])
+    if (error) {
+      console.error('Error marketplace:', error)
+      setPosts([])
+      setLoadError('No pudimos cargar las publicaciones de tu barrio.')
+    } else {
+      setPosts(data || [])
+    }
     setNewFromRT(0)
     setLoading(false)
     setRefreshing(false)
-  }, [])
+  }, [neighborhoodId])
 
   useEffect(() => {
     fetchMarketplace()
@@ -326,20 +321,28 @@ export default function Marketplace({ currentUser, onNavigate, onCrear }) {
 
   // ---- Real-time: cualquier post nuevo entra al top (sin filtrar por pill) ----
   useEffect(() => {
+    if (!neighborhoodId) return undefined
+
     const canal = supabase
       .channel('mercado-todos')
       .on('postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'posts' },
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'posts',
+          filter: `neighborhood_id=eq.${neighborhoodId}`,
+        },
         async (payload) => {
           const nuevo = payload.new
           if (!ALL_ALTS.includes((nuevo.type||'').toLowerCase())) return
           if (nuevo.status !== 'active') return
+          if (nuevo.neighborhood_id !== neighborhoodId) return
 
           // Hidratar author
           const { data: prof } = await supabase
             .from('profiles')
             .select('full_name, avatar_url, reputation_score, badge_founder, badge_trusted_seller, lat, lng')
-            .eq('user_id', nuevo.author_id)
+            .eq('id', nuevo.author_id)
             .maybeSingle()
 
           // ¿El usuario está al top del feed?
@@ -355,7 +358,12 @@ export default function Marketplace({ currentUser, onNavigate, onCrear }) {
         { event: 'UPDATE', schema: 'public', table: 'posts' },
         (payload) => {
           const upd = payload.new
-          setPosts(prev => prev.map(p => p.id === upd.id ? { ...p, ...upd } : p))
+          setPosts(prev => {
+            if (upd.neighborhood_id !== neighborhoodId || upd.status !== 'active') {
+              return prev.filter(p => p.id !== upd.id)
+            }
+            return prev.map(p => p.id === upd.id ? { ...p, ...upd } : p)
+          })
         }
       )
       .on('postgres_changes',
@@ -367,7 +375,7 @@ export default function Marketplace({ currentUser, onNavigate, onCrear }) {
       .subscribe()
 
     return () => supabase.removeChannel(canal)
-  }, [])
+  }, [neighborhoodId])
 
   // ---- Ver nuevos posts (scroll al top + reset contador) ----
   const verNuevos = () => {
@@ -576,6 +584,15 @@ export default function Marketplace({ currentUser, onNavigate, onCrear }) {
 
           {loading ? (
             <SkeletonSections />
+          ) : loadError ? (
+            <div style={s.empty}>
+              <div style={s.emptyEmoji}>⚠️</div>
+              <h2 style={s.emptyTitle}>No pudimos cargar el mercado</h2>
+              <p style={s.emptyText}>{loadError}</p>
+              <button style={s.emptyBtn} onClick={() => fetchMarketplace()}>
+                Reintentar
+              </button>
+            </div>
           ) : posts.length === 0 ? (
             <EmptyState
               pillId={activeTab}
@@ -692,8 +709,7 @@ function MarketCard({ post, currentUser, onClick }) {
   const precio = precioInfo(post)
   const tieneImg = post.images && post.images.length > 0
   const [imgError, setImgError] = useState(false)
-  const demoUrl = !tieneImg ? demoImgUrl(post) : null
-  const imgSrc = tieneImg ? post.images[0] : (!imgError ? demoUrl : null)
+  const imgSrc = tieneImg && !imgError ? post.images[0] : null
   const distM = computeDist(post, currentUser)
   const dist = distM != null && distM >= 20 ? distancia(distM) : null
 
@@ -743,9 +759,7 @@ function HFeedCard({ post, currentUser, onClick }) {
   const nuevo = esNuevo(post.created_at)
   const tieneImg = post.images && post.images.length > 0
   const [imgError, setImgError] = useState(false)
-
-  const demoUrl = !tieneImg ? demoImgUrl(post) : null
-  const imgSrc = tieneImg ? post.images[0] : (!imgError ? demoUrl : null)
+  const imgSrc = tieneImg && !imgError ? post.images[0] : null
 
   const distM = computeDist(post, currentUser)
   const dist = distM != null ? distancia(distM) : null
@@ -808,9 +822,7 @@ function HMiniCard({ post, currentUser, onClick }) {
   const precio = precioInfo(post)
   const tieneImg = post.images && post.images.length > 0
   const [imgError, setImgError] = useState(false)
-
-  const demoUrl = !tieneImg ? demoImgUrl(post) : null
-  const imgSrc = tieneImg ? post.images[0] : (!imgError ? demoUrl : null)
+  const imgSrc = tieneImg && !imgError ? post.images[0] : null
 
   const distM = computeDist(post, currentUser)
   const dist = distM != null ? distancia(distM) : null

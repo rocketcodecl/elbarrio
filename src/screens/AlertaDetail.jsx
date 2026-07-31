@@ -50,14 +50,8 @@ const IcoCheck = (p) => (
 const IcoShare = (p) => (
   <Ico {...p}><circle cx="18" cy="5" r="3" /><circle cx="6" cy="12" r="3" /><circle cx="18" cy="19" r="3" /><line x1="8.59" y1="13.51" x2="15.42" y2="17.49" /><line x1="15.41" y1="6.51" x2="8.59" y2="10.49" /></Ico>
 )
-const IcoFlag = (p) => (
-  <Ico {...p}><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z" /><line x1="4" y1="22" x2="4" y2="15" /></Ico>
-)
 const IcoEditar = (p) => (
   <Ico {...p}><path d="M12 20h9" /><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L8 18l-4 1 1-4Z" /></Ico>
-)
-const IcoCerrar = (p) => (
-  <Ico {...p}><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></Ico>
 )
 
 // ──────────────────────────────────────────────────────────────
@@ -122,13 +116,6 @@ const SEVERIDAD = {
   baja:  { label: 'Severidad baja',  bg: C.verde,  emoji: '🟢' },
 }
 
-const REPORT_OPTIONS = [
-  { key: 'spam',     label: 'Spam',         emoji: '📭' },
-  { key: 'falso',    label: 'Falso',        emoji: '❌' },
-  { key: 'ofensivo', label: 'Ofensivo',     emoji: '🚫' },
-  { key: 'otro',     label: 'Otro',         emoji: 'ℹ️' },
-]
-
 // Inyecta los keyframes una sola vez al montar.
 const KEYFRAMES = `
 @keyframes alertFadeInUp {
@@ -164,7 +151,6 @@ function AlertaDetail({ alertId, currentUser, onNavigate, onEdit }) {
 
   const [resolving, setResolving] = useState(false)
   const [toast, setToast] = useState('')
-  const [showReportModal, setShowReportModal] = useState(false)
   const [activeImageIndex, setActiveImageIndex] = useState(0)
 
   const toastTimer = useRef(null)
@@ -172,6 +158,7 @@ function AlertaDetail({ alertId, currentUser, onNavigate, onEdit }) {
   const scrollRef = useRef(null)
 
   const nav = onNavigate || (() => {})
+  const neighborhoodId = currentUser?.neighborhoodId
 
   /* ─────────── TOAST helper ─────────── */
   const showToast = (msg) => {
@@ -186,11 +173,17 @@ function AlertaDetail({ alertId, currentUser, onNavigate, onEdit }) {
     setLoadError('')
     setNotFound(false)
     console.log('[alerta detail] cargando incidente:', alertId)
+    if (!alertId || !neighborhoodId) {
+      setLoadError('No pudimos confirmar esta alerta dentro de tu barrio.')
+      setLoading(false)
+      return false
+    }
     try {
       const { data, error } = await supabase
         .from('incident_reports')
         .select('*, reporter:profiles!reporter_id (id, user_id, full_name, avatar_url, badge_founder, verified)')
         .eq('id', alertId)
+        .eq('neighborhood_id', neighborhoodId)
         .single()
 
       if (error) {
@@ -201,14 +194,16 @@ function AlertaDetail({ alertId, currentUser, onNavigate, onEdit }) {
           setLoadError(error.message || 'Error desconocido')
         }
         setLoading(false)
-        return
+        return false
       }
       setActiveImageIndex(0)
       setAlert(data)
       setLoading(false)
+      return true
     } catch (err) {
       setLoadError(err?.message || 'Error inesperado')
       setLoading(false)
+      return false
     }
   }
 
@@ -251,15 +246,18 @@ function AlertaDetail({ alertId, currentUser, onNavigate, onEdit }) {
       setLoading(false)
       return
     }
-    cargarAlerta()
-    cargarPerfilActual()
-    cargarComentarios()
+    ;(async () => {
+      const found = await cargarAlerta()
+      await cargarPerfilActual()
+      if (found) await cargarComentarios()
+      else setCommentsLoading(false)
+    })()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [alertId])
+  }, [alertId, neighborhoodId])
 
   /* ─────────── REALTIME: nuevos comentarios ─────────── */
   useEffect(() => {
-    if (!alertId) return
+    if (!alertId || !neighborhoodId || alert?.id !== alertId) return
     const channel = supabase
       .channel(`alerta-detail-${alertId}`)
       .on(
@@ -300,7 +298,7 @@ function AlertaDetail({ alertId, currentUser, onNavigate, onEdit }) {
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [alertId])
+  }, [alertId, neighborhoodId, alert?.id])
 
   /* ─────────── ENVIAR COMENTARIO ─────────── */
   const enviarComentario = async () => {
@@ -416,13 +414,6 @@ function AlertaDetail({ alertId, currentUser, onNavigate, onEdit }) {
     } else {
       showToast('No se puede compartir desde aca')
     }
-  }
-
-  /* ─────────── REPORTAR CONTENIDO ─────────── */
-  const reportar = (_motivoKey) => {
-    // Mock: no persistimos. La idea es que el user sienta que se envio.
-    setShowReportModal(false)
-    showToast('Reporte enviado, gracias')
   }
 
   /* ─────────── RENDER: SKELETON ─────────── */
@@ -622,10 +613,6 @@ function AlertaDetail({ alertId, currentUser, onNavigate, onEdit }) {
               <IcoShare size={16} />
               <span>Compartir</span>
             </button>
-            <button style={s.accionBtn} onClick={() => setShowReportModal(true)}>
-              <IcoFlag size={16} />
-              <span>Reportar contenido</span>
-            </button>
           </div>
 
           {/* ── MARCAR RESUELTA (solo autor) ── */}
@@ -711,40 +698,6 @@ function AlertaDetail({ alertId, currentUser, onNavigate, onEdit }) {
           <IcoEnviar size={18} />
         </button>
       </div>
-
-      {/* ══════ MODAL: REPORTAR ══════ */}
-      {showReportModal && (
-        <div style={s.modalOverlay} onClick={() => setShowReportModal(false)}>
-          <div style={s.modalCard} onClick={(e) => e.stopPropagation()}>
-            <div style={s.modalHeader}>
-              <div style={s.modalTitle}>Reportar contenido</div>
-              <button
-                style={s.modalClose}
-                onClick={() => setShowReportModal(false)}
-                aria-label='Cerrar'
-              >
-                <IcoCerrar size={18} />
-              </button>
-            </div>
-            <div style={s.modalSub}>
-              ¿Por qué estás reportando esta alerta? Tu reporte es anónimo.
-            </div>
-            <div style={s.modalOptions}>
-              {REPORT_OPTIONS.map((opt) => (
-                <button
-                  key={opt.key}
-                  style={s.modalOption}
-                  onClick={() => reportar(opt.key)}
-                >
-                  <span style={s.modalOptionEmoji}>{opt.emoji}</span>
-                  <span style={s.modalOptionLabel}>{opt.label}</span>
-                  <span style={s.modalOptionArrow}>→</span>
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* ══════ TOAST ══════ */}
       {toast && (
@@ -1201,50 +1154,6 @@ const s = {
     flexShrink: 0,
     padding: 0,
   },
-
-  /* ── modal reportar ── */
-  modalOverlay: {
-    position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
-    background: 'rgba(15,31,22,0.55)',
-    display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
-    zIndex: 200,
-    padding: 0,
-  },
-  modalCard: {
-    width: '100%',
-    background: C.card,
-    borderTopLeftRadius: 22, borderTopRightRadius: 22,
-    padding: '18px 18px calc(20px + env(safe-area-inset-bottom, 0px))',
-    boxShadow: '0 -8px 30px rgba(0,0,0,0.18)',
-  },
-  modalHeader: {
-    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-    marginBottom: 6,
-  },
-  modalTitle: { fontSize: 17, fontWeight: 800, color: C.texto },
-  modalClose: {
-    width: 32, height: 32, borderRadius: '50%',
-    background: C.fondo, border: 'none',
-    color: C.textoSuave, cursor: 'pointer', padding: 0,
-    display: 'flex', alignItems: 'center', justifyContent: 'center',
-    fontFamily: 'inherit',
-  },
-  modalSub: {
-    fontSize: 12.5, color: C.textoTenue, lineHeight: 1.45,
-    marginBottom: 14,
-  },
-  modalOptions: { display: 'flex', flexDirection: 'column', gap: 8 },
-  modalOption: {
-    display: 'flex', alignItems: 'center', gap: 12,
-    padding: '13px 14px',
-    background: C.fondo,
-    border: `1px solid ${C.borde}`,
-    borderRadius: 12,
-    cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left',
-  },
-  modalOptionEmoji: { fontSize: 18, flexShrink: 0 },
-  modalOptionLabel: { flex: 1, fontSize: 14, fontWeight: 600, color: C.texto },
-  modalOptionArrow: { color: C.textoTenue, fontSize: 16 },
 
   /* ── toast ── */
   toast: {

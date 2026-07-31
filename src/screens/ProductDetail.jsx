@@ -206,20 +206,6 @@ const catEmoji = (cat) => {
   return found ? found.emoji : '📦'
 }
 
-// Imagen demo por categoría (LoremFlickr).
-const DEMO_KEYWORDS = {
-  'Electrónica': 'electronics,gadget', 'Ropa': 'clothing,fashion',
-  'Hogar': 'home,decor', 'Deportes': 'sports,equipment',
-  'Libros': 'books,reading', 'Juguetes': 'toys',
-  'Muebles': 'furniture', 'Bicicletas': 'bicycle',
-  'Mascotas': 'pet', 'Herramientas': 'tools',
-  'Otros': 'things',
-}
-const demoImg = (cat, seed) => {
-  const kw = DEMO_KEYWORDS[cat] || 'things'
-  return `https://loremflickr.com/600/600/${kw}?lock=${seed || 1}`
-}
-
 // Haversine para distancia real usuario ↔ vendedor.
 const haversine = (a, b) => {
   if (!a || !b) return null
@@ -276,15 +262,21 @@ export default function ProductDetail({ postId, currentUser, onNavigate, onEdit 
 
   const viewBumpedRef = useRef(false)
   const nav = onNavigate || (() => {})
+  const profileId = currentUser?.profileId
+  const neighborhoodId = currentUser?.neighborhoodId
 
   // ───── Fetch inicial del post ─────
   useEffect(() => {
-    if (!postId) return
+    if (!postId || !neighborhoodId) {
+      setPost(null)
+      setLoading(false)
+      return
+    }
     setLoading(true)
     setPost(null)
     setCurrentImage(0)
     fetchPost()
-  }, [postId])
+  }, [postId, neighborhoodId])
 
   const fetchPost = async () => {
     const { data, error } = await supabase
@@ -298,6 +290,7 @@ export default function ProductDetail({ postId, currentUser, onNavigate, onEdit 
         )
       `)
       .eq('id', postId)
+      .eq('neighborhood_id', neighborhoodId)
       .single()
 
     if (error) {
@@ -314,7 +307,7 @@ export default function ProductDetail({ postId, currentUser, onNavigate, onEdit 
 
   // ───── GPS del usuario real (con fallback a coords del perfil) ─────
   useEffect(() => {
-    if (!currentUser?.id) return
+    if (!profileId) return
     let cancelled = false
 
     // 1) Intentar GPS del navegador.
@@ -329,7 +322,7 @@ export default function ProductDetail({ postId, currentUser, onNavigate, onEdit 
           const { data } = await supabase
             .from('profiles')
             .select('lat, lng')
-            .eq('id', currentUser.id)
+            .eq('id', profileId)
             .single()
           if (!cancelled && data && data.lat != null && data.lng != null) {
             setMyCoords({ lat: data.lat, lng: data.lng })
@@ -340,7 +333,7 @@ export default function ProductDetail({ postId, currentUser, onNavigate, onEdit 
     }
 
     return () => { cancelled = true }
-  }, [currentUser?.id])
+  }, [profileId])
 
   // ───── Like status (¿ya le dio like este usuario?) ─────
   useEffect(() => {
@@ -400,17 +393,27 @@ export default function ProductDetail({ postId, currentUser, onNavigate, onEdit 
 
   // ───── Fetch similar ─────
   useEffect(() => {
-    if (!post) return
+    if (!post || !neighborhoodId) {
+      setSimilar([])
+      setLoadingSimilar(false)
+      return
+    }
     setLoadingSimilar(true)
     fetchSimilar()
-  }, [post?.id, post?.type, post?.category])
+  }, [post?.id, post?.type, post?.category, neighborhoodId])
 
   const fetchSimilar = async () => {
-    if (!post) return
+    if (!post || !neighborhoodId) {
+      setSimilar([])
+      setLoadingSimilar(false)
+      return
+    }
     let q = supabase
       .from('posts')
       .select('id, title, price, type, category, images, created_at, distance_meters, author:profiles!author_id (full_name, avatar_url, lat, lng)')
       .neq('id', post.id)
+      .eq('status', 'active')
+      .eq('neighborhood_id', neighborhoodId)
       .order('created_at', { ascending: false })
       .limit(12)
 
@@ -517,8 +520,8 @@ export default function ProductDetail({ postId, currentUser, onNavigate, onEdit 
   const sendComment = async () => {
     const text = commentText.trim()
     if (!text || postingComment) return
-    if (!currentUser?.id) {
-      showToast('Inicia sesión para comentar')
+    if (!profileId) {
+      showToast('No pudimos identificar tu perfil')
       return
     }
 
@@ -527,7 +530,7 @@ export default function ProductDetail({ postId, currentUser, onNavigate, onEdit 
       id: tempId,
       content: text,
       created_at: new Date().toISOString(),
-      author: { id: currentUser.id, full_name: currentUser.full_name || 'Tú', avatar_url: currentUser.avatar_url, badge_founder: false },
+      author: { id: profileId, full_name: currentUser.full_name || 'Tú', avatar_url: currentUser.avatar_url, badge_founder: false },
       _pending: true,
     }
     setComments((prev) => [...prev, optimistic])
@@ -538,7 +541,7 @@ export default function ProductDetail({ postId, currentUser, onNavigate, onEdit 
     try {
       const { data, error } = await supabase
         .from('comments')
-        .insert({ post_id: postId, author_id: currentUser.id, content: text })
+        .insert({ post_id: postId, author_id: profileId, content: text })
         .select('id, content, created_at, author:profiles!author_id (id, full_name, avatar_url, badge_founder)')
         .single()
       if (error) throw error
@@ -619,7 +622,7 @@ export default function ProductDetail({ postId, currentUser, onNavigate, onEdit 
   const tipo = resolverTipo(post)
   const images = (post.images && post.images.length > 0) ? post.images : []
   const dist = computeDist()
-  const isOwn = currentUser?.id && post.author_id === currentUser.id
+  const isOwn = Boolean(profileId && post.author_id === profileId)
   const ctaLabel = post.type === 'event' ? 'Contactar organización' : post.type === 'service' ? 'Contactar' : esRegalo(post.type) ? 'Reclamar' : esTrueque(post.type) ? 'Proponer trueque' : 'Mensaje al vendedor'
   const ctaIcon = esRegalo(post.type) ? <Icon.Gift /> : esTrueque(post.type) ? <Icon.Swap /> : <Icon.Message />
 

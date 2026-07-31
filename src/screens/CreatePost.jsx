@@ -295,9 +295,9 @@ function CreatePost({ onClose, onPublished, startWith, existingPost = null }) {
   const [cooldown, setCooldown] = useState(0) // segundos restantes de enfriamiento
   const cooldownTimer = useRef(null)
 
-  // Cuenta regresiva del enfriamiento (para no topar el límite gratis
-  // de OpenRouter: ~50 pedidos/día en modelos :free). Después de cada
-  // llamado, esperamos 8 segundos. Si viene un 429, esperamos 65 segundos.
+  // Cuenta regresiva usada únicamente cuando el proveedor informa un límite
+  // o después de un error recuperable. Un resultado exitoso se puede volver
+  // a generar inmediatamente.
   useEffect(() => {
     if (cooldown <= 0) return
     cooldownTimer.current = setTimeout(() => setCooldown((c) => c - 1), 1000)
@@ -454,8 +454,7 @@ function CreatePost({ onClose, onPublished, startWith, existingPost = null }) {
   }
 
   /* ---------- IA: autocompletar título, descripción, precio y
-     categoría desde la primera foto. Llama directo a OpenRouter
-     (gratis) vía lib/ia.js. No necesita Supabase Edge Functions. ---------- */
+     categoría desde la primera foto mediante la Edge Function segura. ---------- */
   const autoCompletarConIA = async () => {
     if (!previews[0] || aiLoading || cooldown > 0) return
     const tipo = selectedType?.id
@@ -482,12 +481,8 @@ function CreatePost({ onClose, onPublished, startWith, existingPost = null }) {
         next.lookingFor = true
       }
       setAiSuggested(next)
-      // Enfriamiento corto después de éxito (8s) para no topar el límite.
-      setCooldown(8)
-        } catch (e) {
-      if (e.code === 'NO_KEY' || e.message === 'NO_KEY') {
-        setAiError('Falta la clave de IA. Crea .env con VITE_OPENROUTER_API_KEY=tu-clave (gratuita en openrouter.ai/keys)')
-      } else if (e.code === 'IA_VACIA') {
+    } catch (e) {
+      if (e.code === 'IA_VACIA') {
         // La IA respondió pero no reconoció un objeto claro en la foto.
         // Sin cooldown: el usuario puede cambiar la foto o reintentar ya.
         setAiError('La IA no reconoció un objeto claro en la foto. Prueba con otra mejor iluminada, o completa a mano.')
@@ -725,7 +720,7 @@ function CreatePost({ onClose, onPublished, startWith, existingPost = null }) {
           ...incidentData,
           reporter_id: profile.id,
           neighborhood_id: profile.neighborhood_id,
-          status: 'pendiente',
+          status: 'active',
           confirms_count: 0,
         }
         const { error: alertErr } = await supabase
@@ -752,7 +747,7 @@ function CreatePost({ onClose, onPublished, startWith, existingPost = null }) {
         }
         clearDraft()
         setStep('success')
-        setTimeout(() => { onPublished?.('alert'); onClose?.() }, 1400)
+        setTimeout(() => { onPublished?.('alert'); onClose?.() }, 2200)
         return
       }
 
@@ -821,10 +816,19 @@ function CreatePost({ onClose, onPublished, startWith, existingPost = null }) {
       setTimeout(() => { onPublished?.(selectedType.id); onClose?.() }, 1400)
     } catch (err) {
       console.error('[CreatePost] No se pudo publicar:', err)
+      const typeName = {
+        sell: 'esta venta',
+        gift: 'este regalo',
+        trade: 'este trueque',
+        request: 'este pedido',
+        service: 'este servicio',
+        event: 'este evento',
+        alert: 'esta alerta',
+      }[t] || 'esta publicación'
       const message = err?.code === '42501'
-        ? 'No tienes permisos para publicar este evento. Revisa tu sesión e inténtalo nuevamente.'
+        ? `No pudimos validar tus permisos para publicar ${typeName}. Revisa tu sesión e inténtalo nuevamente.`
         : err?.message?.includes('column') || err?.code === 'PGRST204'
-          ? 'La base de datos todavía no reconoce uno de los datos del evento.'
+          ? `La base de datos todavía no reconoce uno de los datos de ${typeName}.`
           : err.message || 'Algo salió mal. Intenta de nuevo.'
       setError(message)
       setStep('form')
@@ -975,7 +979,7 @@ function CreatePost({ onClose, onPublished, startWith, existingPost = null }) {
               : selectedType.id === 'request'
               ? 'Tus vecinos ya recibieron tu pedido'
               : selectedType.id === 'alert'
-              ? 'Tu alerta ya llegó a tus vecinos'
+              ? 'Tu alerta ya está visible para el barrio'
               : selectedType.id === 'event'
               ? 'Tu evento ya está visible para el barrio'
               : selectedType.id === 'service'
@@ -1775,21 +1779,17 @@ function CreatePost({ onClose, onPublished, startWith, existingPost = null }) {
           </div>
         )}
 
-        {/* Disclaimer sobre responsabilidad del contenido — contextual
-            según el tipo de post. En regalar no hay precio; en trueque
-            se menciona "lo que buscás" en vez de precio.
-            NOTA: Las alertas NO usan IA (no tienen botón AiButton, no tienen
-            título ni precio), así que el disclaimer no aplica y se oculta. */}
+        {/* Recordatorio amable: la IA propone un borrador editable y el vecino
+            conserva siempre la decisión final sobre el contenido publicado. */}
         {['sell', 'gift', 'trade'].includes(t) && (
-          <div style={s.disclaimerBox}>
-            <span style={s.disclaimerIcon}>⚠️</span>
-            <p style={s.disclaimerText}>
-              {t === 'gift'
-                ? <>El título y la descripción los ponés tú. La IA solo sugiere un borrador a partir de la foto — <strong>verificalo antes de publicar</strong>.</>
-                : t === 'trade'
-                ? <>El título, la descripción y lo que buscás los ponés tú. La IA solo sugiere un borrador a partir de la foto — <strong>verificalo antes de publicar</strong>.</>
-                : <>El título, descripción y precio los ponés tú. La IA solo sugiere un borrador a partir de la foto — <strong>verificalo antes de publicar</strong>.</>}
-            </p>
+          <div role="note" style={s.disclaimerBox}>
+            <span style={s.disclaimerIcon}>✨</span>
+            <div style={s.disclaimerBody}>
+              <div style={s.disclaimerTitle}>La IA te ayuda a empezar</div>
+              <p style={s.disclaimerText}>
+                Revisa y ajusta las sugerencias antes de publicar. Tú tienes la última palabra.
+              </p>
+            </div>
           </div>
         )}
 
@@ -1934,7 +1934,7 @@ function Fotos({ images, previews, onUpload, onRemove, required, first, hint, va
 /* ============================================================
    SUBCOMPONENTE: AI BUTTON — autocompletar desde la foto
    Aparece cuando hay al menos 1 foto subida. Llama a la Edge
-   Function `ai-describe-photo` y rellena título, descripción,
+   Function `analyze-listing-image` y rellena título, descripción,
    precio (si es venta) y categoría.
    ============================================================ */
 function AiButton({ loading, onClick, error, filled, cooldown }) {
@@ -2149,22 +2149,29 @@ const s = {
   // Asterisco rojo de campo obligatorio (reemplaza el "(opcional)").
   req: { color: C.rojo, fontWeight: 700, marginLeft: 2 },
 
-  // Disclaimer de responsabilidad sobre título/descripción/precio.
-  // Fondo verde transparente (brand color de El Barrio), tipo alerta
-  // normal. Sin título: solo icono + párrafo.
+  // Ayuda contextual sobre el borrador generado por IA.
   disclaimerBox: {
-    display: 'flex', gap: 9, alignItems: 'flex-start',
-    padding: '11px 13px',
-    background: 'rgba(22, 163, 74, 0.08)',
-    border: `1px solid rgba(22, 163, 74, 0.22)`,
-    borderRadius: 12,
+    display: 'flex', gap: 11, alignItems: 'center',
+    padding: '12px 13px',
+    background: 'linear-gradient(135deg, rgba(22, 163, 74, 0.08), rgba(22, 163, 74, 0.03))',
+    border: '1px solid rgba(22, 163, 74, 0.18)',
+    borderRadius: 14,
     marginTop: 18, marginBottom: 0,
   },
-  disclaimerIcon: { fontSize: 15, lineHeight: 1.5, flexShrink: 0, paddingTop: 1 },
+  disclaimerIcon: {
+    width: 34, height: 34, borderRadius: '50%', flexShrink: 0,
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    background: C.card, boxShadow: '0 3px 10px rgba(22, 163, 74, 0.12)',
+    fontSize: 16,
+  },
+  disclaimerBody: { minWidth: 0 },
+  disclaimerTitle: {
+    fontSize: 12.5, fontWeight: 700, color: C.verdeOsc, marginBottom: 2,
+  },
   disclaimerText: {
     margin: 0,
-    fontSize: 12, fontWeight: 500,
-    color: C.texto, lineHeight: 1.5,
+    fontSize: 11.5, fontWeight: 500,
+    color: C.textoSuave, lineHeight: 1.45,
   },
 
   chipGrid2: { display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8 },

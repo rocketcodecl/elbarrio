@@ -52,6 +52,10 @@ export default function EventEditor({ event, profile, onBack, onSaved }) {
   const [uploading, setUploading] = useState(false)
   const [error, setError] = useState('')
   const [categories, setCategories] = useState(DEFAULT_EVENT_TYPES.map(([key, icon, name]) => ({ key, icon, name })))
+  const [neighborhoods, setNeighborhoods] = useState([])
+  const [targetNeighborhoodId, setTargetNeighborhoodId] = useState(() => (
+    event?.neighborhood_id || (profile?.is_superadmin ? '' : profile?.neighborhood_id || '')
+  ))
 
   const set = (field, value) => setDraft(current => ({ ...current, [field]: value }))
   const setTicket = (index, field, value) => setDraft(current => ({ ...current, ticket_prices: current.ticket_prices.map((ticket, ticketIndex) => ticketIndex === index ? { ...ticket, [field]: value } : ticket) }))
@@ -63,6 +67,14 @@ export default function EventEditor({ event, profile, onBack, onSaved }) {
       if (data?.length) setCategories(data)
     })
   }, [])
+
+  useEffect(() => {
+    if (!profile?.is_superadmin || event) return
+    supabase.from('neighborhoods').select('id, name, uv_code').order('name').then(({ data, error: loadError }) => {
+      if (loadError) setError(`No fue posible cargar los barrios: ${loadError.message}`)
+      setNeighborhoods(data || [])
+    })
+  }, [event, profile?.is_superadmin])
 
   const uploadCover = async input => {
     const file = input.target.files?.[0]
@@ -89,6 +101,11 @@ export default function EventEditor({ event, profile, onBack, onSaved }) {
     submitEvent.preventDefault()
     if (!draft.title.trim() || !draft.content.trim() || !draft.starts_at || !draft.location_text.trim()) {
       setError('Completa nombre, fecha, ubicación y descripción del evento.')
+      return
+    }
+    const neighborhoodId = event?.neighborhood_id || targetNeighborhoodId
+    if (!neighborhoodId) {
+      setError('Selecciona el barrio donde se publicará el evento.')
       return
     }
     if (draft.ends_at && new Date(draft.ends_at).getTime() <= new Date(draft.starts_at).getTime()) {
@@ -138,7 +155,7 @@ export default function EventEditor({ event, profile, onBack, onSaved }) {
 
     const request = event
       ? supabase.from('posts').update(payload).eq('id', event.id).select().single()
-      : supabase.from('posts').insert({ ...payload, author_id: profile?.id, neighborhood_id: profile?.neighborhood_id }).select().single()
+      : supabase.from('posts').insert({ ...payload, author_id: profile?.id, neighborhood_id: neighborhoodId }).select().single()
     const { error: saveError } = await request
     setSaving(false)
     if (saveError) {
@@ -159,6 +176,12 @@ export default function EventEditor({ event, profile, onBack, onSaved }) {
       {error && <div className="admin-alert" role="alert"><span>⚠️</span><p>{error}</p><button type="button" onClick={() => setError('')}>×</button></div>}
 
       <form id="event-form" className="event-editor-form" onSubmit={save}>
+        {profile?.is_superadmin && !event && (
+          <section className="editor-section">
+            <div className="editor-section-title"><span>0</span><div><h2>Barrio de publicación</h2><p>El evento solo será visible para los vecinos del barrio seleccionado.</p></div></div>
+            <label className="field">Barrio<select value={targetNeighborhoodId} onChange={e => setTargetNeighborhoodId(e.target.value)} required><option value="">Selecciona un barrio</option>{neighborhoods.map(neighborhood => <option key={neighborhood.id} value={neighborhood.id}>{neighborhood.name}{neighborhood.uv_code ? ` · UV ${neighborhood.uv_code}` : ''}</option>)}</select></label>
+          </section>
+        )}
         <section className="editor-section">
           <div className="editor-section-title"><span>1</span><div><h2>Portada e información</h2><p>Lo primero que verán los vecinos en el feed.</p></div></div>
           <label className="event-cover-uploader">

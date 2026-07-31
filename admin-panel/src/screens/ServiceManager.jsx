@@ -60,6 +60,8 @@ function StatusBadge({ service }) {
 }
 
 export default function ServiceManager({ profile }) {
+  const isSuperadmin = profile?.is_superadmin === true
+  const neighborhoodId = profile?.neighborhood_id
   const [services, setServices] = useState([])
   const [selectedId, setSelectedId] = useState(null)
   const [query, setQuery] = useState('')
@@ -77,13 +79,20 @@ export default function ServiceManager({ profile }) {
   const loadServices = useCallback(async preferredId => {
     setLoading(true)
     setError('')
+    if (!isSuperadmin && !neighborhoodId) {
+      setServices([])
+      setSelectedId(null)
+      setError('Tu cuenta administrativa no tiene un barrio asignado.')
+      setLoading(false)
+      return
+    }
     let request = supabase
       .from('posts')
       .select('*, author:profiles!author_id(id, full_name, avatar_url, verified, verification_status, badge_founder)')
       .eq('type', 'service')
       .order('created_at', { ascending: false })
       .limit(500)
-    if (profile?.neighborhood_id) request = request.eq('neighborhood_id', profile.neighborhood_id)
+    if (!isSuperadmin) request = request.eq('neighborhood_id', neighborhoodId)
     const { data, error: loadError } = await request
     if (loadError) {
       setServices([])
@@ -97,7 +106,7 @@ export default function ServiceManager({ profile }) {
       })
     }
     setLoading(false)
-  }, [profile?.neighborhood_id])
+  }, [isSuperadmin, neighborhoodId])
 
   useEffect(() => { loadServices() }, [loadServices])
 

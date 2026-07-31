@@ -4,7 +4,7 @@ import { C, T, TIPOS } from '../lib/design'
 /*
   TabBar — la navegación del demo.
 
-  Inicio · Mercado · Servicios · Eventos · Chat
+  Inicio · Mercado · Servicios · Comercios · Chat
   (El Perfil vive en el avatar de la cabecera, no en un tab.)
 
   Y el botón "+" que se despliega en las 7 formas de publicar.
@@ -43,11 +43,13 @@ const Ico = {
       <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" />
     </svg>
   ),
-  eventos: (color) => (
+  comercios: (color) => (
     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
-      <rect x="3" y="4" width="18" height="18" rx="2" />
-      <path d="M3 10h18" />
-      <path d="M8 2v4M16 2v4" />
+      <path d="M3 9h18" />
+      <path d="M5 9v11h14V9" />
+      <path d="M3 9l2-6h14l2 6" />
+      <path d="M8 20v-6h4v6" />
+      <path d="M3 9a3 3 0 0 0 5 2 3 3 0 0 0 4 0 3 3 0 0 0 4 0 3 3 0 0 0 5-2" />
     </svg>
   ),
   chat: (color) => (
@@ -61,7 +63,7 @@ const TABS = [
   { id: 'inicio',    icon: Ico.inicio,    label: 'Inicio' },
   { id: 'mercado',   icon: Ico.mercado,   label: 'Mercado' },
   { id: 'servicios', icon: Ico.servicios, label: 'Servicios' },
-  { id: 'eventos',   icon: Ico.eventos,   label: 'Eventos' },
+  { id: 'comercios', icon: Ico.comercios, label: 'Comercios' },
   { id: 'chat',      icon: Ico.chat,      label: 'Chat' },
 ]
 

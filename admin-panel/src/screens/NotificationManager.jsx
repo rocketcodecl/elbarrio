@@ -12,7 +12,8 @@ const dateLabel = value => value
   ? new Date(value).toLocaleString('es-CL', { dateStyle: 'medium', timeStyle: 'short' })
   : 'Sin fecha'
 
-export default function NotificationManager() {
+export default function NotificationManager({ profile }) {
+  const isSuperadmin = profile?.is_superadmin === true
   const [audience, setAudience] = useState('all')
   const [title, setTitle] = useState('')
   const [body, setBody] = useState('')
@@ -22,16 +23,39 @@ export default function NotificationManager() {
   const [sending, setSending] = useState(false)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
+  const [neighborhoods, setNeighborhoods] = useState([])
+  const [targetNeighborhoodId, setTargetNeighborhoodId] = useState('')
 
   const selectedAudience = useMemo(() => AUDIENCES.find(item => item.id === audience) || AUDIENCES[0], [audience])
   const recipientCount = Number(counts[audience] || 0)
 
+  useEffect(() => {
+    if (!isSuperadmin) return
+    supabase.from('neighborhoods').select('id, name, uv_code').order('name').then(({ data, error: loadError }) => {
+      if (loadError) setError(`No fue posible cargar los barrios: ${loadError.message}`)
+      setNeighborhoods(data || [])
+    })
+  }, [isSuperadmin])
+
   const load = useCallback(async () => {
     setLoading(true)
     setError('')
+    if (isSuperadmin && !targetNeighborhoodId) {
+      setCounts({})
+      setHistory([])
+      setLoading(false)
+      return
+    }
+    const rpcArgs = isSuperadmin ? { p_neighborhood_id: targetNeighborhoodId } : undefined
     const [countsResult, historyResult] = await Promise.all([
-      supabase.rpc('admin_notification_audience_counts'),
-      supabase.rpc('admin_list_notification_campaigns'),
+      supabase.rpc(
+        isSuperadmin ? 'admin_super_notification_audience_counts' : 'admin_notification_audience_counts',
+        rpcArgs
+      ),
+      supabase.rpc(
+        isSuperadmin ? 'admin_super_list_notification_campaigns' : 'admin_list_notification_campaigns',
+        rpcArgs
+      ),
     ])
     setLoading(false)
     if (countsResult.error || historyResult.error) {
@@ -40,7 +64,7 @@ export default function NotificationManager() {
     }
     setCounts(countsResult.data || {})
     setHistory(historyResult.data || [])
-  }, [])
+  }, [isSuperadmin, targetNeighborhoodId])
 
   useEffect(() => { load() }, [load])
 
@@ -55,7 +79,16 @@ export default function NotificationManager() {
     if (!window.confirm(`¿Enviar esta notificación a ${recipientCount} ${recipientCount === 1 ? 'persona' : 'personas'} de “${selectedAudience.name}”?`)) return
 
     setSending(true)
-    const { data, error: sendError } = await supabase.rpc('admin_send_broadcast_notification', { p_audience: audience, p_title: cleanTitle, p_body: cleanBody })
+    const rpcName = isSuperadmin
+      ? 'admin_super_send_broadcast_notification'
+      : 'admin_send_broadcast_notification'
+    const rpcArgs = {
+      ...(isSuperadmin ? { p_neighborhood_id: targetNeighborhoodId } : {}),
+      p_audience: audience,
+      p_title: cleanTitle,
+      p_body: cleanBody,
+    }
+    const { data, error: sendError } = await supabase.rpc(rpcName, rpcArgs)
     setSending(false)
     if (sendError) return setError(`No fue posible enviar la notificación: ${sendError.message}`)
     const sent = Number(data?.recipient_count ?? recipientCount)
@@ -76,6 +109,12 @@ export default function NotificationManager() {
 
       <div className="notification-layout">
         <form className="notification-compose" onSubmit={send}>
+          {isSuperadmin && (
+            <>
+              <div className="notification-section-heading"><span>0</span><div><h2>Elige el barrio</h2><p>Cada campaña queda limitada a un solo barrio.</p></div></div>
+              <label className="field">Barrio<select value={targetNeighborhoodId} onChange={event => setTargetNeighborhoodId(event.target.value)} required><option value="">Selecciona un barrio</option>{neighborhoods.map(neighborhood => <option key={neighborhood.id} value={neighborhood.id}>{neighborhood.name}{neighborhood.uv_code ? ` · UV ${neighborhood.uv_code}` : ''}</option>)}</select></label>
+            </>
+          )}
           <div className="notification-section-heading"><span>1</span><div><h2>Elige la audiencia</h2><p>Solo recibirán el mensaje los perfiles que cumplan este criterio.</p></div></div>
           <div className="audience-grid">
             {AUDIENCES.map(item => <button key={item.id} className={`audience-card ${audience === item.id ? 'is-selected' : ''}`} type="button" onClick={() => setAudience(item.id)}>

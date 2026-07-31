@@ -33,10 +33,18 @@ export default function ServiceDetail({ postId, currentUser, onNavigate, onEdit 
   const [reviewSaving, setReviewSaving] = useState(false)
   const [reviewError, setReviewError] = useState('')
   const nav = onNavigate || (() => {})
+  const neighborhoodId = currentUser?.neighborhoodId
 
   useEffect(() => {
     let active = true
     setLoading(true)
+    setService(null)
+    setError('')
+    if (!postId || !neighborhoodId) {
+      setError('No pudimos confirmar este servicio dentro de tu barrio.')
+      setLoading(false)
+      return () => { active = false }
+    }
     supabase
       .from('posts')
       .select(`
@@ -48,6 +56,8 @@ export default function ServiceDetail({ postId, currentUser, onNavigate, onEdit 
       `)
       .eq('id', postId)
       .eq('type', 'service')
+      .eq('status', 'active')
+      .eq('neighborhood_id', neighborhoodId)
       .maybeSingle()
       .then(({ data, error: loadError }) => {
         if (!active) return
@@ -56,11 +66,11 @@ export default function ServiceDetail({ postId, currentUser, onNavigate, onEdit 
         setLoading(false)
       })
     return () => { active = false }
-  }, [postId])
+  }, [postId, neighborhoodId])
 
   useEffect(() => {
     let active = true
-    if (!postId) return () => { active = false }
+    if (!postId || !neighborhoodId || !service?.id) return () => { active = false }
     supabase
       .from('service_reviews')
       .select(`
@@ -76,7 +86,7 @@ export default function ServiceDetail({ postId, currentUser, onNavigate, onEdit 
         else setReviews(data || [])
       })
     return () => { active = false }
-  }, [postId])
+  }, [postId, neighborhoodId, service?.id])
 
   const share = async () => {
     const data = {

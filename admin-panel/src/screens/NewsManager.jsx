@@ -36,7 +36,19 @@ function NewsEditor({ news, profile, categories, onCategoryCreated, onBack, onSa
   const [categoryName, setCategoryName] = useState('')
   const [categoryIcon, setCategoryIcon] = useState('📰')
   const [categorySaving, setCategorySaving] = useState(false)
+  const [neighborhoods, setNeighborhoods] = useState([])
+  const [targetNeighborhoodId, setTargetNeighborhoodId] = useState(() => (
+    news?.neighborhood_id || (profile?.is_superadmin ? '' : profile?.neighborhood_id || '')
+  ))
   const set = (field, value) => setDraft(current => ({ ...current, [field]: value }))
+
+  useEffect(() => {
+    if (!profile?.is_superadmin || news) return
+    supabase.from('neighborhoods').select('id, name, uv_code').order('name').then(({ data, error: loadError }) => {
+      if (loadError) setError(`No fue posible cargar los barrios: ${loadError.message}`)
+      setNeighborhoods(data || [])
+    })
+  }, [news, profile?.is_superadmin])
 
   const createCategory = async event => {
     event.preventDefault()
@@ -88,6 +100,11 @@ function NewsEditor({ news, profile, categories, onCategoryCreated, onBack, onSa
       setError('Completa el título y el contenido de la noticia.')
       return
     }
+    const neighborhoodId = news?.neighborhood_id || targetNeighborhoodId
+    if (!neighborhoodId) {
+      setError('Selecciona el barrio donde se publicará la noticia.')
+      return
+    }
     const payload = {
       type: 'news',
       title: draft.title.trim(),
@@ -103,7 +120,7 @@ function NewsEditor({ news, profile, categories, onCategoryCreated, onBack, onSa
     setError('')
     const request = news
       ? supabase.from('posts').update(payload).eq('id', news.id).select().single()
-      : supabase.from('posts').insert({ ...payload, author_id: profile?.id, neighborhood_id: profile?.neighborhood_id }).select().single()
+      : supabase.from('posts').insert({ ...payload, author_id: profile?.id, neighborhood_id: neighborhoodId }).select().single()
     const { error: saveError } = await request
     setSaving(false)
     if (saveError) {
@@ -133,6 +150,12 @@ function NewsEditor({ news, profile, categories, onCategoryCreated, onBack, onSa
       {error && <div className="admin-alert" role="alert"><span>⚠️</span><p>{error}</p><button type="button" onClick={() => setError('')}>×</button></div>}
 
       <form id="news-form" className="news-editor-form" onSubmit={save}>
+        {profile?.is_superadmin && !news && (
+          <section className="editor-section">
+            <div className="editor-section-title"><span>0</span><div><h2>Barrio de publicación</h2><p>La noticia solo será visible para los vecinos del barrio seleccionado.</p></div></div>
+            <label className="field">Barrio<select value={targetNeighborhoodId} onChange={event => setTargetNeighborhoodId(event.target.value)} required><option value="">Selecciona un barrio</option>{neighborhoods.map(neighborhood => <option key={neighborhood.id} value={neighborhood.id}>{neighborhood.name}{neighborhood.uv_code ? ` · UV ${neighborhood.uv_code}` : ''}</option>)}</select></label>
+          </section>
+        )}
         <section className="editor-section">
           <div className="editor-section-title"><span>1</span><div><h2>Imágenes y contenido</h2><p>La primera imagen será la portada. Puedes cargar hasta ocho.</p></div></div>
           <div className="event-cover-uploader news-cover-uploader">
@@ -167,6 +190,8 @@ function NewsEditor({ news, profile, categories, onCategoryCreated, onBack, onSa
 }
 
 export default function NewsManager({ profile }) {
+  const isSuperadmin = profile?.is_superadmin === true
+  const neighborhoodId = profile?.neighborhood_id
   const [news, setNews] = useState([])
   const [query, setQuery] = useState('')
   const [filter, setFilter] = useState('all')
@@ -185,13 +210,19 @@ export default function NewsManager({ profile }) {
   const loadNews = useCallback(async () => {
     setLoading(true)
     setError('')
+    if (!isSuperadmin && !neighborhoodId) {
+      setNews([])
+      setError('Tu cuenta administrativa no tiene un barrio asignado.')
+      setLoading(false)
+      return
+    }
     let request = supabase.from('posts').select('*').eq('type', 'news').order('created_at', { ascending: false }).limit(300)
-    if (profile?.neighborhood_id) request = request.eq('neighborhood_id', profile.neighborhood_id)
+    if (!isSuperadmin) request = request.eq('neighborhood_id', neighborhoodId)
     const { data, error: loadError } = await request
     if (loadError) setError(loadError.message || 'No fue posible cargar las noticias.')
     setNews(data || [])
     setLoading(false)
-  }, [profile?.neighborhood_id])
+  }, [isSuperadmin, neighborhoodId])
 
   useEffect(() => { loadNews() }, [loadNews])
 

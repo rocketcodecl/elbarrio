@@ -2,7 +2,9 @@
 
 ## Estado actual
 
-- Existe un módulo independiente de Notificaciones para seleccionar audiencia, confirmar el número de destinatarios, enviar mensajes internos y consultar el historial. Usa RPC administrativas y requiere `202607290015_admin_broadcast_notifications.sql`.
+- Fase larga autorizada en curso: moderación pública con IA, cierre integral de Comercios y Productos, y continuidad documentada por bloque. Bloque actual: `0/4 — checkpoint y continuidad`.
+
+- Existe un módulo independiente de Notificaciones para seleccionar audiencia, confirmar el número de destinatarios, enviar mensajes internos y consultar el historial. Usa RPC administrativas y la migración `202607290015_admin_broadcast_notifications.sql` está aplicada y validada según confirmación manual.
 
 - En Usuarios, un administrador puede enviar una notificación interna manual al perfil seleccionado mediante la RPC segura `admin_send_notification`; requiere la migración `202607290013_admin_send_notification.sql`.
 
@@ -54,9 +56,12 @@
 - Las categorías de Eventos son globales para El Barrio. El administrador puede crearlas, editarlas, asignar un ícono u ocultarlas desde el panel; los eventos existentes conservan su categoría aunque esta se oculte para futuras publicaciones.
 - Los eventos pagados pueden definir varias tarifas con etiqueta y valor; el primer valor sigue respaldando el campo histórico `event_price`.
 - La asistencia y la opción de mostrar confirmados están deshabilitadas temporalmente por incompatibilidad entre la tabla antigua `events` y los eventos actuales almacenados en `posts`.
-- Los nuevos reportes de incidentes quedan en `pendiente`; solo `active` se publica en la app. El administrador puede aprobar, rechazar, marcar o desmarcar como oficial y cerrar como resuelto.
+- Los nuevos reportes de incidentes se publican inmediatamente con estado `active` por su urgencia. El administrador puede rechazar, marcar o desmarcar como oficial y cerrar como resuelto; la aprobación permanece disponible para pendientes antiguos.
 - Las acciones de moderación se ejecutan mediante la función segura `admin_moderate_incident` y se registran en `incident_admin_actions` con el perfil administrador responsable.
 - `profiles.role` es el único origen de permisos administrativos. `user_type` clasifica el perfil y `can_publish_events` representa la autorización específica para publicar eventos.
+- Los administradores conservan `profiles.role='admin'`. `profiles.is_superadmin=true` identifica al nivel global: los administradores normales quedan limitados a su `neighborhood_id`, mientras el superadministrador puede operar en todos los barrios y administrar otros permisos administrativos. `202607300001_admin_scope_and_superadmin.sql` está aplicada y la cuenta principal fue promovida correctamente según confirmación manual; falta validar la separación con una cuenta admin territorial.
+- El superadministrador selecciona explícitamente el barrio al crear comercios, eventos o noticias. Los servicios toman el barrio del prestador seleccionado. Las campañas masivas supremas también se limitan obligatoriamente a un único barrio seleccionado.
+- Las pantallas administrativas móviles antiguas no constituyen una vía alternativa para saltarse el alcance: Usuarios e Incidentes utilizan las mismas RPC seguras y sus listados respetan barrio o nivel supremo.
 - El módulo Usuarios usa `admin_manage_profile` para verificar, autorizar actores, asignar administradores, suspender y reactivar; cada acción queda en `user_admin_actions`.
 - El detalle de Usuarios muestra el GPS guardado durante el registro, el barrio asignado y una cronología consolidada de publicaciones, comentarios, alertas y opiniones mediante `admin_get_user_activity`.
 - El límite oficial del MVP vive en `supabase/geo/barrio_beta_polygon.geojson` y se aplica al único barrio `is_beta=true` mediante una migración PostGIS segura.
@@ -71,7 +76,7 @@
 
 ## Pendiente inmediato
 
-- Ejecutar `supabase/migrations/202607290015_admin_broadcast_notifications.sql` y probar conteos, confirmación, recepción e historial.
+- Validar con una cuenta admin territorial la separación efectiva respecto del superadministrador.
 - Mantener deshabilitada la asistencia. No crear ni aplicar cambios de asistencia hasta definir y autorizar cómo alinear `event_attendees` con los eventos actuales de `posts`.
 - Ejecutar `supabase/migrations/202607290001_incident_moderation.sql` y validar el flujo completo del módulo Incidentes.
 - Ejecutar `supabase/migrations/202607290002_user_administration.sql` y validar el flujo completo del módulo Usuarios.

@@ -81,6 +81,9 @@ export default function ChatConversation({ postId, sellerId, currentUser, previe
   const [loading, setLoading] = useState(true);
   const [showOffer, setShowOffer] = useState(false);
   const [offerAmount, setOfferAmount] = useState("");
+  const [deal, setDeal] = useState(null);
+  const [dealBusy, setDealBusy] = useState(false);
+  const [dealError, setDealError] = useState("");
   // "X está escribiendo..." — llega por broadcast del canal realtime
   const [otherTyping, setOtherTyping] = useState(false);
   const scrollRef = useRef(null);
@@ -185,6 +188,28 @@ export default function ChatConversation({ postId, sellerId, currentUser, previe
           ));
         }
       )
+      .on('postgres_changes',
+        { event: '*', schema: 'public', table: 'marketplace_deals', filter: `post_id=eq.${postId}` },
+        (payload) => {
+          const nextDeal = payload.new?.id ? payload.new : null;
+          if (!nextDeal) {
+            setDeal(null);
+            return;
+          }
+          const isParticipant =
+            (nextDeal.buyer_id === myProfileId && nextDeal.seller_id === otherUserId) ||
+            (nextDeal.buyer_id === otherUserId && nextDeal.seller_id === myProfileId);
+          if (!isParticipant) return;
+          if (['rejected', 'cancelled'].includes(nextDeal.status)) {
+            setDeal(null);
+          } else {
+            setDeal(nextDeal);
+            if (nextDeal.status === 'completed') {
+              setPost(prev => prev ? { ...prev, status: 'sold' } : prev);
+            }
+          }
+        }
+      )
       // Broadcast: typing indicator. El otro escribe → llega este evento.
       .on('broadcast', { event: 'typing' }, ({ payload }) => {
         if (payload?.senderId !== otherUserId || payload?.receiverId !== myProfileId) return;
@@ -210,7 +235,11 @@ export default function ChatConversation({ postId, sellerId, currentUser, previe
 
   const fetchInitial = async () => {
     setLoading(true);
-    const [msgRes, sellerRes, postRes] = await Promise.all([
+    const participantFilter = [
+      `and(buyer_id.eq.${myProfileId},seller_id.eq.${otherUserId})`,
+      `and(buyer_id.eq.${otherUserId},seller_id.eq.${myProfileId})`,
+    ].join(',');
+    const [msgRes, sellerRes, postRes, dealRes] = await Promise.all([
       supabase.from("messages")
         .select("*")
         .eq("post_id", postId)
@@ -226,11 +255,20 @@ export default function ChatConversation({ postId, sellerId, currentUser, previe
       supabase.from("posts")
         .select("title, price, type, images, author_id, status")
         .eq("id", postId)
-        .single()
+        .single(),
+      supabase.from("marketplace_deals")
+        .select("*")
+        .eq("post_id", postId)
+        .or(participantFilter)
+        .in("status", ["proposed", "matched", "completed"])
+        .order("updated_at", { ascending: false })
+        .limit(1)
+        .maybeSingle()
     ]);
     if (msgRes.data) setMessages(msgRes.data);
     if (sellerRes.data) setSeller(sellerRes.data);
     if (postRes.data) setPost(postRes.data);
+    if (dealRes.data) setDeal(dealRes.data);
     setLoading(false);
 
     // Marcar como leídos los mensajes que me llegaron y aún no leo
@@ -317,18 +355,69 @@ export default function ChatConversation({ postId, sellerId, currentUser, previe
     setShowOffer(false);
   };
 
-  const proposeMeeting = () => {
-    sendMessage('🤝 Me gustaría que coordinemos el encuentro. ¿Qué día, hora y lugar público te acomoda?');
-  };
-
   const postType = (post?.type || '').toLowerCase();
   const isGift = ['regalo', 'gratis', 'gift'].includes(postType);
   const isTrade = ['trueque', 'intercambio', 'trade'].includes(postType);
+  const isSeller = post?.author_id === myProfileId;
   const quickActionLabel = isGift ? 'Solicitar regalo' : isTrade ? 'Proponer trueque' : 'Hacer oferta';
   const sendQuickAction = () => {
     if (isGift) sendMessage('🎁 Me interesa este regalo. ¿Sigue disponible?');
     else if (isTrade) sendMessage('🔄 Me interesa hacer un trueque. ¿Qué tipo de intercambio buscas?');
     else setShowOffer(true);
+  };
+
+  const proposeMeeting = async () => {
+    if (previewMode) {
+      sendMessage('🤝 Me gustaría que coordinemos el encuentro. ¿Qué día, hora y lugar público te acomoda?');
+      return;
+    }
+    if (isSeller || dealBusy || deal) return;
+    setDealBusy(true);
+    setDealError("");
+    const { data, error } = await supabase.rpc("marketplace_propose_deal", {
+      p_post_id: postId,
+    });
+    if (error) {
+      console.error("Error proponiendo trato:", error);
+      setDealError(error.message || "No pudimos enviar la propuesta.");
+    } else {
+      setDeal(data);
+      await sendMessage('🤝 Propuse coordinar un encuentro. Si aceptas, seguimos acordando día, hora y lugar por este chat.');
+    }
+    setDealBusy(false);
+  };
+
+  const respondDeal = async (action) => {
+    if (!deal?.id || dealBusy || previewMode) return;
+    setDealBusy(true);
+    setDealError("");
+    const { data, error } = await supabase.rpc("marketplace_respond_deal", {
+      p_deal_id: deal.id,
+      p_action: action,
+    });
+    if (error) {
+      console.error("Error actualizando trato:", error);
+      setDealError(error.message || "No pudimos actualizar el trato.");
+      setDealBusy(false);
+      return;
+    }
+
+    if (action === "accept") {
+      setDeal(data);
+      await sendMessage('✅ Acepté coordinar el encuentro. Sigamos acordando los detalles por aquí.');
+    } else if (action === "reject") {
+      setDeal(null);
+      await sendMessage('Por ahora no puedo coordinar este encuentro.');
+    } else if (action === "cancel") {
+      setDeal(null);
+      await sendMessage('Cancelé la propuesta de encuentro.');
+    } else if (action === "complete") {
+      setDeal(data);
+      setPost(prev => prev ? { ...prev, status: "sold" } : prev);
+      await sendMessage('✅ Trato cerrado. La publicación ya no está disponible en el mercado.');
+      nav("dealDone", { postId, sellerId: otherUserId, dealId: data?.id });
+    }
+    setDealBusy(false);
   };
 
   const getInitials = (name) => {
@@ -497,16 +586,74 @@ export default function ChatConversation({ postId, sellerId, currentUser, previe
 
       {/* ACCIONES + INPUT */}
       <div style={s.bottomBar}>
-        <div style={s.actionsRow}>
-          <button onClick={sendQuickAction} style={s.actionGhost}>
-            <Icon.Tag />
-            <span>{quickActionLabel}</span>
-          </button>
-          <button onClick={proposeMeeting} style={s.actionPrimary}>
-            <Icon.Handshake />
-            <span>Proponer encuentro</span>
-          </button>
-        </div>
+        {dealError && <div style={s.dealError}>{dealError}</div>}
+
+        {deal?.status === "proposed" && (
+          <div style={s.dealCard}>
+            <div style={s.dealText}>
+              <strong>{isSeller ? "Te propusieron coordinar" : "Propuesta enviada"}</strong>
+              <span>
+                {isSeller
+                  ? "Acepta para hacer match y seguir acordando el encuentro."
+                  : "Cuando el vendedor acepte, podrán cerrar el trato desde este chat."}
+              </span>
+            </div>
+            <div style={s.dealButtons}>
+              {isSeller ? (
+                <>
+                  <button disabled={dealBusy} onClick={() => respondDeal("reject")} style={s.dealSecondary}>
+                    Rechazar
+                  </button>
+                  <button disabled={dealBusy} onClick={() => respondDeal("accept")} style={s.dealPrimary}>
+                    {dealBusy ? "Guardando…" : "Aceptar encuentro"}
+                  </button>
+                </>
+              ) : (
+                <button disabled={dealBusy} onClick={() => respondDeal("cancel")} style={s.dealSecondary}>
+                  Cancelar propuesta
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+
+        {deal?.status === "matched" && (
+          <div style={s.dealCardMatched}>
+            <div style={s.dealText}>
+              <strong>🤝 Encuentro aceptado</strong>
+              <span>Sigan acordando día, hora y lugar. Cuando se concrete, el vendedor cierra el trato.</span>
+            </div>
+            {isSeller ? (
+              <button disabled={dealBusy} onClick={() => respondDeal("complete")} style={s.dealPrimary}>
+                {dealBusy ? "Cerrando…" : "Cerrar trato"}
+              </button>
+            ) : (
+              <button disabled={dealBusy} onClick={() => respondDeal("cancel")} style={s.dealSecondary}>
+                Cancelar
+              </button>
+            )}
+          </div>
+        )}
+
+        {deal?.status === "completed" && (
+          <div style={s.dealCardDone}>
+            <strong>✅ Trato cerrado</strong>
+            <span>La publicación ya no aparece disponible en el mercado.</span>
+          </div>
+        )}
+
+        {!deal && post?.status !== "sold" && !isSeller && (
+          <div style={s.actionsRow}>
+            <button onClick={sendQuickAction} style={s.actionGhost}>
+              <Icon.Tag />
+              <span>{quickActionLabel}</span>
+            </button>
+            <button onClick={proposeMeeting} style={s.actionPrimary} disabled={dealBusy}>
+              <Icon.Handshake />
+              <span>{dealBusy ? "Enviando…" : "Proponer encuentro"}</span>
+            </button>
+          </div>
+        )}
 
         <div style={s.inputRow}>
           <textarea
@@ -715,6 +862,40 @@ const s = {
     padding: '10px 12px 22px',
     borderTop: '1px solid #eee',
     backgroundColor: '#fff'
+  },
+  dealError: {
+    padding: '8px 10px', borderRadius: 9, marginBottom: 8,
+    backgroundColor: '#fef2f2', color: '#b91c1c',
+    fontSize: 11.5, fontWeight: 600,
+  },
+  dealCard: {
+    padding: 10, borderRadius: 12, marginBottom: 9,
+    backgroundColor: '#fff7d6', border: '1px solid #ead58b',
+  },
+  dealCardMatched: {
+    padding: 10, borderRadius: 12, marginBottom: 9,
+    backgroundColor: '#ecfdf3', border: '1px solid #86efac',
+  },
+  dealCardDone: {
+    display: 'flex', flexDirection: 'column', gap: 3,
+    padding: 10, borderRadius: 12, marginBottom: 9,
+    backgroundColor: '#f0fdf4', border: '1px solid #86efac',
+    color: '#166534', fontSize: 11.5,
+  },
+  dealText: {
+    display: 'flex', flexDirection: 'column', gap: 3,
+    color: '#3f3f3f', fontSize: 11.5, lineHeight: 1.35,
+  },
+  dealButtons: { display: 'flex', gap: 8, marginTop: 9 },
+  dealPrimary: {
+    flex: 1, border: 'none', borderRadius: 9, marginTop: 8,
+    padding: '9px 11px', backgroundColor: '#16a34a', color: '#fff',
+    fontFamily: 'inherit', fontSize: 11.5, fontWeight: 700, cursor: 'pointer',
+  },
+  dealSecondary: {
+    flex: 1, border: '1px solid #d4d4d4', borderRadius: 9, marginTop: 8,
+    padding: '9px 11px', backgroundColor: '#fff', color: '#525252',
+    fontFamily: 'inherit', fontSize: 11.5, fontWeight: 600, cursor: 'pointer',
   },
   actionsRow: {
     display: 'flex',

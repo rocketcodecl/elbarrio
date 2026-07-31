@@ -429,8 +429,8 @@ export default function App() {
       return (
         <Profile
           onFinish={async () => {
-            await recargarPerfil()
-            setCurrentScreen('verification')
+            const updatedProfile = await recargarPerfil()
+            setCurrentScreen(updatedProfile?.verification_status === 'verified' ? 'main' : 'verification')
           }}
           onBack={handleLogout}
         />
@@ -459,13 +459,43 @@ export default function App() {
 
     /* ── SUB-SCREENS DEL MERCADO ── */
     if (currentScreen === 'productDetail') {
-      return <ProductDetail postId={params?.postId} currentUser={user} onNavigate={onNavigate} onEdit={onEditarPost} />
+      return (
+        <ProductDetail
+          postId={params?.postId}
+          currentUser={{
+            ...user,
+            profileId: profile?.id,
+            neighborhoodId: profile?.neighborhood_id,
+            full_name: profile?.full_name,
+            avatar_url: profile?.avatar_url,
+          }}
+          onNavigate={onNavigate}
+          onEdit={onEditarPost}
+        />
+      )
     }
     if (currentScreen === 'serviceDetail') {
-      return <ServiceDetail postId={params?.postId} currentUser={{ ...user, profileId: profile?.id }} onNavigate={onNavigate} onEdit={onEditarPost} />
+      return (
+        <ServiceDetail
+          postId={params?.postId}
+          currentUser={{
+            ...user,
+            profileId: profile?.id,
+            neighborhoodId: profile?.neighborhood_id,
+          }}
+          onNavigate={onNavigate}
+          onEdit={onEditarPost}
+        />
+      )
     }
     if (currentScreen === 'eventDetail') {
-      return <EventDetail postId={params?.postId} onNavigate={onNavigate} />
+      return (
+        <EventDetail
+          postId={params?.postId}
+          neighborhoodId={profile?.neighborhood_id}
+          onNavigate={onNavigate}
+        />
+      )
     }
     if (currentScreen === 'chatConversation') {
       return (
@@ -487,7 +517,7 @@ export default function App() {
       return (
         <AlertaDetail
           alertId={params?.id}
-          currentUser={user}
+          currentUser={{ ...user, neighborhoodId: profile?.neighborhood_id }}
           onNavigate={onNavigate}
           onEdit={onEditarPost}
         />
@@ -500,13 +530,18 @@ export default function App() {
       return (
         <SellerProfile
           sellerId={params?.sellerId}
-          currentUser={user}
+          currentUser={{ ...user, neighborhoodId: profile?.neighborhood_id }}
           onNavigate={onNavigate}
         />
       )
     }
     if (currentScreen === 'noticiasScreen') {
-      return <Noticias currentUser={user} onNavigate={onNavigate} />
+      return (
+        <Noticias
+          currentUser={{ ...user, neighborhoodId: profile?.neighborhood_id }}
+          onNavigate={onNavigate}
+        />
+      )
     }
 
     /* ── ADMIN PANEL: pantallas de administracion ── */
@@ -539,8 +574,32 @@ export default function App() {
 
     /* ── MAIN APP (TABS) ── */
     if (activeTab === 'inicio') return <Home key={`home-${homeRevision}`} currentUser={user} onNavigate={onNavigate} onCrear={onCrear} />
-    if (activeTab === 'mercado') return <Marketplace currentUser={user} onNavigate={onNavigate} onCrear={onCrear} />
-    if (activeTab === 'servicios') return <Services currentUser={user} onNavigate={onNavigate} onCrear={onCrear} />
+    if (activeTab === 'mercado') {
+      return (
+        <Marketplace
+          currentUser={{
+            ...user,
+            profileId: profile?.id,
+            neighborhoodId: profile?.neighborhood_id,
+          }}
+          onNavigate={onNavigate}
+          onCrear={onCrear}
+        />
+      )
+    }
+    if (activeTab === 'servicios') {
+      return (
+        <Services
+          currentUser={{
+            ...user,
+            profileId: profile?.id,
+            neighborhoodId: profile?.neighborhood_id,
+          }}
+          onNavigate={onNavigate}
+          onCrear={onCrear}
+        />
+      )
+    }
     if (activeTab === 'eventos') return <Events key={`events-${eventsRevision}`} currentUser={user} onNavigate={onNavigate} onCrear={onCrear} />
     if (activeTab === 'chat') return <ChatList currentUser={{ ...user, profileId: profile?.id }} onNavigate={onNavigate} />
     if (activeTab === 'comercios') return <Comercios currentUser={user} onNavigate={onNavigate} onCrear={onCrear} />

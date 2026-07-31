@@ -19,6 +19,8 @@ const ACTION_LABELS = {
   revoke_actor: 'Retiró la autorización de actor',
   assign_admin: 'Asignó rol de administrador',
   remove_admin: 'Retiró el rol de administrador',
+  assign_superadmin: 'Asignó nivel de superadministrador',
+  remove_superadmin: 'Retiró el nivel de superadministrador',
   suspend: 'Suspendió la cuenta',
   reactivate: 'Reactivó la cuenta',
 }
@@ -62,7 +64,9 @@ function profileCoordinates(user) {
 function UserBadges({ user }) {
   return <div className="user-badges">
     {isSuspended(user) && <span className="user-badge suspended">Suspendido</span>}
-    {user.role === 'admin' && <span className="user-badge admin">Administrador</span>}
+    {user.is_superadmin
+      ? <span className="user-badge admin">Superadministrador</span>
+      : user.role === 'admin' && <span className="user-badge admin">Administrador</span>}
     {user.can_publish_events && <span className="user-badge actor">Actor autorizado</span>}
     {isVerified(user) ? <span className="user-badge verified">✓ Verificado</span> : <span className="user-badge pending">Por verificar</span>}
   </div>
@@ -79,6 +83,8 @@ function ProfileMap({ user }) {
 }
 
 export default function UserManager({ profile }) {
+  const isSuperadmin = profile?.is_superadmin === true
+  const neighborhoodId = profile?.neighborhood_id
   const [users, setUsers] = useState([])
   const [selectedId, setSelectedId] = useState(null)
   const [history, setHistory] = useState([])
@@ -103,7 +109,16 @@ export default function UserManager({ profile }) {
   const loadUsers = useCallback(async preferredId => {
     setLoading(true)
     setError('')
-    const { data, error: loadError } = await supabase.from('profiles').select('*').order('created_at', { ascending: false }).limit(1000)
+    if (!isSuperadmin && !neighborhoodId) {
+      setUsers([])
+      setSelectedId(null)
+      setError('Tu cuenta administrativa no tiene un barrio asignado.')
+      setLoading(false)
+      return
+    }
+    let request = supabase.from('profiles').select('*').order('created_at', { ascending: false }).limit(1000)
+    if (!isSuperadmin) request = request.eq('neighborhood_id', neighborhoodId)
+    const { data, error: loadError } = await request
     if (loadError) {
       setUsers([])
       setError(`No fue posible cargar los usuarios: ${loadError.message}`)
@@ -116,7 +131,7 @@ export default function UserManager({ profile }) {
       })
     }
     setLoading(false)
-  }, [])
+  }, [isSuperadmin, neighborhoodId])
 
   useEffect(() => { loadUsers() }, [loadUsers])
 
@@ -189,7 +204,7 @@ export default function UserManager({ profile }) {
 
   const manage = async action => {
     if (!selected) return
-    const destructive = ['remove_admin', 'revoke_actor', 'suspend'].includes(action)
+    const destructive = ['remove_admin', 'remove_superadmin', 'revoke_actor', 'suspend'].includes(action)
     if (destructive && !window.confirm(`¿Confirmas esta acción para ${selected.full_name || 'este usuario'}?`)) return
     setChanging(action)
     setError('')
@@ -261,7 +276,7 @@ export default function UserManager({ profile }) {
 
             <section className="user-info-card user-location-card"><h3>Ubicación registrada</h3><div className="user-location-status"><span>{isVerified(selected) && selected.neighborhood_id ? '✓' : '!'}</span><div><strong>{isVerified(selected) && selected.neighborhood_id ? 'GPS verificado en el barrio' : 'Ubicación todavía no verificada'}</strong><small>{neighborhood ? `${neighborhood.name}${neighborhood.uv_code ? ` · Unidad Vecinal ${neighborhood.uv_code}` : ''}` : selected.address || 'Sin dirección registrada'}</small></div></div><ProfileMap user={selected} />{selectedCoordinates && <p className="user-map-coordinates">{selectedCoordinates.source}: {selectedCoordinates.lat.toFixed(6)}, {selectedCoordinates.lng.toFixed(6)}</p>}</section>
 
-            <section className="user-info-card user-permissions-card"><h3>Permisos</h3><div className="permission-row"><span>📅</span><div><strong>Publicación de eventos</strong><small>Para juntas de vecinos, municipalidades y actores autorizados.</small></div>{selected.can_publish_events ? <button type="button" disabled={!!changing} onClick={() => manage('revoke_actor')}>Retirar</button> : <button className="positive" type="button" disabled={!!changing || !isVerified(selected) || isSuspended(selected)} onClick={() => manage('approve_actor')}>Autorizar</button>}</div><div className="permission-row"><span>🛡️</span><div><strong>Administración</strong><small>Entrega acceso completo al panel administrativo.</small></div>{selected.role === 'admin' ? <button type="button" disabled={!!changing || isSelf} onClick={() => manage('remove_admin')}>{isSelf ? 'Tu cuenta' : 'Retirar'}</button> : <button className="positive" type="button" disabled={!!changing || isSuspended(selected)} onClick={() => manage('assign_admin')}>Hacer admin</button>}</div></section>
+            <section className="user-info-card user-permissions-card"><h3>Permisos</h3><div className="permission-row"><span>📅</span><div><strong>Publicación de eventos</strong><small>Para juntas de vecinos, municipalidades y actores autorizados.</small></div>{selected.can_publish_events ? <button type="button" disabled={!!changing} onClick={() => manage('revoke_actor')}>Retirar</button> : <button className="positive" type="button" disabled={!!changing || !isVerified(selected) || isSuspended(selected)} onClick={() => manage('approve_actor')}>Autorizar</button>}</div>{isSuperadmin && <><div className="permission-row"><span>🛡️</span><div><strong>Administración territorial</strong><small>Permite administrar únicamente el barrio asignado.</small></div>{selected.role === 'admin' ? <button type="button" disabled={!!changing || isSelf || selected.is_superadmin} onClick={() => manage('remove_admin')}>{isSelf ? 'Tu cuenta' : selected.is_superadmin ? 'Nivel supremo activo' : 'Retirar'}</button> : <button className="positive" type="button" disabled={!!changing || isSuspended(selected)} onClick={() => manage('assign_admin')}>Hacer admin</button>}</div><div className="permission-row"><span>👑</span><div><strong>Superadministración</strong><small>Entrega alcance global y control sobre otros administradores.</small></div>{selected.is_superadmin ? <button type="button" disabled={!!changing || isSelf} onClick={() => manage('remove_superadmin')}>{isSelf ? 'Tu cuenta' : 'Retirar nivel'}</button> : <button className="positive" type="button" disabled={!!changing || isSuspended(selected)} onClick={() => manage('assign_superadmin')}>Hacer supremo</button>}</div></>}</section>
 
             <section className="user-info-card user-account-card"><h3>Estado de la cuenta</h3>{isSuspended(selected) ? <div className="account-state suspended"><strong>Cuenta suspendida</strong><p>El usuario no puede utilizar la aplicación.</p>{selected.suspended_at && <small>Desde {dateLabel(selected.suspended_at)}</small>}<button type="button" disabled={!!changing} onClick={() => manage('reactivate')}>Reactivar usuario</button></div> : <div className="account-state active"><strong>Cuenta activa</strong><p>El usuario puede ingresar y usar las funciones habilitadas.</p><button type="button" disabled={!!changing || isSelf} onClick={() => manage('suspend')}>{isSelf ? 'No puedes suspenderte' : 'Suspender usuario'}</button></div>}</section>
 
