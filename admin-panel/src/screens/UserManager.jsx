@@ -19,6 +19,8 @@ const ACTION_LABELS = {
   revoke_actor: 'Retiró la autorización de actor',
   assign_admin: 'Asignó rol de administrador',
   remove_admin: 'Retiró el rol de administrador',
+  assign_superadmin: 'Asignó nivel de superadministrador',
+  remove_superadmin: 'Retiró el nivel de superadministrador',
   suspend: 'Suspendió la cuenta',
   reactivate: 'Reactivó la cuenta',
 }
@@ -41,26 +43,48 @@ function initials(name = '') {
   return name.split(' ').filter(Boolean).slice(0, 2).map(part => part[0]).join('').toUpperCase() || 'V'
 }
 
+function profileCoordinates(user) {
+  const candidates = [
+    { lat: user?.lat, lng: user?.lng, source: 'GPS registrado' },
+    { lat: user?.address_lat, lng: user?.address_lng, source: 'Dirección verificada' },
+  ]
+
+  return candidates.map(candidate => ({
+    ...candidate,
+    lat: Number(candidate.lat),
+    lng: Number(candidate.lng),
+    hasValues: candidate.lat != null && candidate.lat !== '' && candidate.lng != null && candidate.lng !== '',
+  })).find(candidate => candidate.hasValues
+    && Number.isFinite(candidate.lat)
+    && Number.isFinite(candidate.lng)
+    && Math.abs(candidate.lat) <= 90
+    && Math.abs(candidate.lng) <= 180) || null
+}
+
 function UserBadges({ user }) {
   return <div className="user-badges">
     {isSuspended(user) && <span className="user-badge suspended">Suspendido</span>}
-    {user.role === 'admin' && <span className="user-badge admin">Administrador</span>}
+    {user.is_superadmin
+      ? <span className="user-badge admin">Superadministrador</span>
+      : user.role === 'admin' && <span className="user-badge admin">Administrador</span>}
     {user.can_publish_events && <span className="user-badge actor">Actor autorizado</span>}
     {isVerified(user) ? <span className="user-badge verified">✓ Verificado</span> : <span className="user-badge pending">Por verificar</span>}
   </div>
 }
 
 function ProfileMap({ user }) {
-  const lat = Number(user.lat)
-  const lng = Number(user.lng)
-  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return <div className="user-map-empty">Este perfil todavía no registró una ubicación GPS.</div>
-  return <MapContainer className="user-profile-map" center={[lat, lng]} zoom={16} dragging={false} doubleClickZoom={false} scrollWheelZoom={false} zoomControl={false} attributionControl={false}>
+  const coordinates = profileCoordinates(user)
+  if (!coordinates) return <div className="user-map-empty">Este perfil todavía no registró coordenadas de su ubicación.</div>
+  const { lat, lng } = coordinates
+  return <MapContainer key={`${user.id}-${lat}-${lng}`} className="user-profile-map" center={[lat, lng]} zoom={16} dragging={false} doubleClickZoom={false} scrollWheelZoom={false} zoomControl={false} attributionControl={false}>
     <TileLayer url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png" subdomains="abcd" maxZoom={20} />
     <Marker position={[lat, lng]} icon={profileMarker} />
   </MapContainer>
 }
 
 export default function UserManager({ profile }) {
+  const isSuperadmin = profile?.is_superadmin === true
+  const neighborhoodId = profile?.neighborhood_id
   const [users, setUsers] = useState([])
   const [selectedId, setSelectedId] = useState(null)
   const [history, setHistory] = useState([])
@@ -75,14 +99,26 @@ export default function UserManager({ profile }) {
   const [changing, setChanging] = useState('')
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
+  const [notificationDraft, setNotificationDraft] = useState({ title: '', body: '' })
+  const [notificationSaving, setNotificationSaving] = useState(false)
 
   const selected = users.find(user => user.id === selectedId) || null
+  const selectedCoordinates = profileCoordinates(selected)
   const isSelf = selected?.id === profile?.id
 
   const loadUsers = useCallback(async preferredId => {
     setLoading(true)
     setError('')
-    const { data, error: loadError } = await supabase.from('profiles').select('*').order('created_at', { ascending: false }).limit(1000)
+    if (!isSuperadmin && !neighborhoodId) {
+      setUsers([])
+      setSelectedId(null)
+      setError('Tu cuenta administrativa no tiene un barrio asignado.')
+      setLoading(false)
+      return
+    }
+    let request = supabase.from('profiles').select('*').order('created_at', { ascending: false }).limit(1000)
+    if (!isSuperadmin) request = request.eq('neighborhood_id', neighborhoodId)
+    const { data, error: loadError } = await request
     if (loadError) {
       setUsers([])
       setError(`No fue posible cargar los usuarios: ${loadError.message}`)
@@ -95,7 +131,7 @@ export default function UserManager({ profile }) {
       })
     }
     setLoading(false)
-  }, [])
+  }, [isSuperadmin, neighborhoodId])
 
   useEffect(() => { loadUsers() }, [loadUsers])
 
@@ -168,7 +204,7 @@ export default function UserManager({ profile }) {
 
   const manage = async action => {
     if (!selected) return
-    const destructive = ['remove_admin', 'revoke_actor', 'suspend'].includes(action)
+    const destructive = ['remove_admin', 'remove_superadmin', 'revoke_actor', 'suspend'].includes(action)
     if (destructive && !window.confirm(`¿Confirmas esta acción para ${selected.full_name || 'este usuario'}?`)) return
     setChanging(action)
     setError('')
@@ -185,6 +221,26 @@ export default function UserManager({ profile }) {
     window.setTimeout(() => setNotice(''), 2600)
     await loadUsers(selected.id)
     await loadHistory(selected.id)
+  }
+
+  const sendNotification = async event => {
+    event.preventDefault()
+    if (!selected || notificationSaving) return
+    const title = notificationDraft.title.trim()
+    const body = notificationDraft.body.trim()
+    if (!title || !body) return setError('Completa el título y el mensaje de la notificación.')
+    setNotificationSaving(true)
+    setError('')
+    const { error: sendError } = await supabase.rpc('admin_send_notification', {
+      p_target_profile_id: selected.id,
+      p_title: title,
+      p_body: body,
+    })
+    setNotificationSaving(false)
+    if (sendError) return setError(`No fue posible enviar la notificación: ${sendError.message}`)
+    setNotificationDraft({ title: '', body: '' })
+    setNotice(`Notificación enviada a ${selected.full_name || 'el vecino'}`)
+    window.setTimeout(() => setNotice(''), 2600)
   }
 
   return <div className="user-manager">
@@ -218,11 +274,13 @@ export default function UserManager({ profile }) {
           <div className="user-detail-grid">
             <section className="user-info-card"><h3>Identidad y verificación</h3><dl><div><dt>RUT</dt><dd>{selected.rut || 'No informado'}</dd></div><div><dt>Correo</dt><dd>{selected.email || 'No informado'}</dd></div><div><dt>Dirección</dt><dd>{selected.address || 'No informada'}</dd></div><div><dt>Comuna / barrio</dt><dd>{[selected.barrio, selected.comuna].filter(Boolean).join(', ') || 'No informado'}</dd></div><div><dt>Estado de verificación</dt><dd>{isVerified(selected) ? `Verificado · ${dateLabel(selected.verified_at)}` : selected.verification_status || 'Pendiente'}</dd></div><div><dt>Tipo de perfil</dt><dd>{selected.user_type || 'Vecino'}</dd></div></dl>{!isVerified(selected) && <button className="user-primary-action" type="button" disabled={!!changing} onClick={() => manage('verify')}>{changing === 'verify' ? 'Guardando…' : '✓ Aprobar verificación'}</button>}</section>
 
-            <section className="user-info-card user-location-card"><h3>Ubicación registrada</h3><div className="user-location-status"><span>{isVerified(selected) && selected.neighborhood_id ? '✓' : '!'}</span><div><strong>{isVerified(selected) && selected.neighborhood_id ? 'GPS verificado en el barrio' : 'Ubicación todavía no verificada'}</strong><small>{neighborhood ? `${neighborhood.name}${neighborhood.uv_code ? ` · Unidad Vecinal ${neighborhood.uv_code}` : ''}` : selected.address || 'Sin dirección registrada'}</small></div></div><ProfileMap user={selected} />{Number.isFinite(Number(selected.lat)) && Number.isFinite(Number(selected.lng)) && <p className="user-map-coordinates">GPS: {Number(selected.lat).toFixed(6)}, {Number(selected.lng).toFixed(6)}</p>}</section>
+            <section className="user-info-card user-location-card"><h3>Ubicación registrada</h3><div className="user-location-status"><span>{isVerified(selected) && selected.neighborhood_id ? '✓' : '!'}</span><div><strong>{isVerified(selected) && selected.neighborhood_id ? 'GPS verificado en el barrio' : 'Ubicación todavía no verificada'}</strong><small>{neighborhood ? `${neighborhood.name}${neighborhood.uv_code ? ` · Unidad Vecinal ${neighborhood.uv_code}` : ''}` : selected.address || 'Sin dirección registrada'}</small></div></div><ProfileMap user={selected} />{selectedCoordinates && <p className="user-map-coordinates">{selectedCoordinates.source}: {selectedCoordinates.lat.toFixed(6)}, {selectedCoordinates.lng.toFixed(6)}</p>}</section>
 
-            <section className="user-info-card user-permissions-card"><h3>Permisos</h3><div className="permission-row"><span>📅</span><div><strong>Publicación de eventos</strong><small>Para juntas de vecinos, municipalidades y actores autorizados.</small></div>{selected.can_publish_events ? <button type="button" disabled={!!changing} onClick={() => manage('revoke_actor')}>Retirar</button> : <button className="positive" type="button" disabled={!!changing || !isVerified(selected) || isSuspended(selected)} onClick={() => manage('approve_actor')}>Autorizar</button>}</div><div className="permission-row"><span>🛡️</span><div><strong>Administración</strong><small>Entrega acceso completo al panel administrativo.</small></div>{selected.role === 'admin' ? <button type="button" disabled={!!changing || isSelf} onClick={() => manage('remove_admin')}>{isSelf ? 'Tu cuenta' : 'Retirar'}</button> : <button className="positive" type="button" disabled={!!changing || isSuspended(selected)} onClick={() => manage('assign_admin')}>Hacer admin</button>}</div></section>
+            <section className="user-info-card user-permissions-card"><h3>Permisos</h3><div className="permission-row"><span>📅</span><div><strong>Publicación de eventos</strong><small>Para juntas de vecinos, municipalidades y actores autorizados.</small></div>{selected.can_publish_events ? <button type="button" disabled={!!changing} onClick={() => manage('revoke_actor')}>Retirar</button> : <button className="positive" type="button" disabled={!!changing || !isVerified(selected) || isSuspended(selected)} onClick={() => manage('approve_actor')}>Autorizar</button>}</div>{isSuperadmin && <><div className="permission-row"><span>🛡️</span><div><strong>Administración territorial</strong><small>Permite administrar únicamente el barrio asignado.</small></div>{selected.role === 'admin' ? <button type="button" disabled={!!changing || isSelf || selected.is_superadmin} onClick={() => manage('remove_admin')}>{isSelf ? 'Tu cuenta' : selected.is_superadmin ? 'Nivel supremo activo' : 'Retirar'}</button> : <button className="positive" type="button" disabled={!!changing || isSuspended(selected)} onClick={() => manage('assign_admin')}>Hacer admin</button>}</div><div className="permission-row"><span>👑</span><div><strong>Superadministración</strong><small>Entrega alcance global y control sobre otros administradores.</small></div>{selected.is_superadmin ? <button type="button" disabled={!!changing || isSelf} onClick={() => manage('remove_superadmin')}>{isSelf ? 'Tu cuenta' : 'Retirar nivel'}</button> : <button className="positive" type="button" disabled={!!changing || isSuspended(selected)} onClick={() => manage('assign_superadmin')}>Hacer supremo</button>}</div></>}</section>
 
             <section className="user-info-card user-account-card"><h3>Estado de la cuenta</h3>{isSuspended(selected) ? <div className="account-state suspended"><strong>Cuenta suspendida</strong><p>El usuario no puede utilizar la aplicación.</p>{selected.suspended_at && <small>Desde {dateLabel(selected.suspended_at)}</small>}<button type="button" disabled={!!changing} onClick={() => manage('reactivate')}>Reactivar usuario</button></div> : <div className="account-state active"><strong>Cuenta activa</strong><p>El usuario puede ingresar y usar las funciones habilitadas.</p><button type="button" disabled={!!changing || isSelf} onClick={() => manage('suspend')}>{isSelf ? 'No puedes suspenderte' : 'Suspender usuario'}</button></div>}</section>
+
+            <section className="user-info-card user-notification-card"><div className="user-card-heading"><h3>Enviar notificación</h3><span>🔔 Interna</span></div><p>Se mostrará inmediatamente en la campana de {selected.full_name || 'este vecino'}.</p><form onSubmit={sendNotification}><label>Título<input maxLength="90" value={notificationDraft.title} onChange={event => setNotificationDraft(current => ({ ...current, title: event.target.value }))} placeholder="Ej: Información importante" /></label><label>Mensaje<textarea rows="4" maxLength="300" value={notificationDraft.body} onChange={event => setNotificationDraft(current => ({ ...current, body: event.target.value }))} placeholder="Escribe un mensaje claro y breve…" /></label><button type="submit" disabled={notificationSaving}>{notificationSaving ? 'Enviando…' : 'Enviar notificación'}</button></form></section>
 
             <section className="user-info-card user-history-card"><h3>Historial administrativo</h3>{historyLoading && <p className="user-muted">Cargando historial…</p>}{!historyLoading && history.length === 0 && <p className="user-muted">Aún no hay acciones administrativas.</p>}{!historyLoading && history.length > 0 && <ol>{history.map(item => <li key={item.id}><span>✓</span><div><strong>{ACTION_LABELS[item.action] || item.action}</strong><p>{adminNames[item.admin_profile_id] || 'Administrador'} · {dateLabel(item.created_at)}</p></div></li>)}</ol>}</section>
 

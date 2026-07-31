@@ -2,9 +2,9 @@ import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase.js'
 
 const METRICS = [
-  { key: 'comercios', table: 'commerces', label: 'Comercios', icon: '🏪', tone: 'green' },
-  { key: 'usuarios', table: 'profiles', label: 'Vecinos registrados', icon: '👥', tone: 'blue' },
-  { key: 'incidentes', table: 'incident_reports', label: 'Incidentes', icon: '🚨', tone: 'red' },
+  { key: 'comercios', table: 'commerces', label: 'Comercios', icon: '🏪', tone: 'green', territorial: true },
+  { key: 'usuarios', table: 'profiles', label: 'Vecinos registrados', icon: '👥', tone: 'blue', territorial: true },
+  { key: 'incidentes', table: 'incident_reports', label: 'Incidentes', icon: '🚨', tone: 'red', territorial: true },
   { key: 'farmacias', table: 'farmacias', label: 'Farmacias', icon: '💊', tone: 'orange' },
 ]
 
@@ -14,9 +14,18 @@ export default function Dashboard({ profile, onNavigate }) {
 
   useEffect(() => {
     let active = true
-    Promise.all(METRICS.map(metric => (
-      supabase.from(metric.table).select('id', { count: 'exact', head: true })
-    ))).then(results => {
+    if (!profile?.is_superadmin && !profile?.neighborhood_id) {
+      setCounts({})
+      setLoading(false)
+      return () => { active = false }
+    }
+    Promise.all(METRICS.map(metric => {
+      let request = supabase.from(metric.table).select('id', { count: 'exact', head: true })
+      if (metric.territorial && !profile?.is_superadmin) {
+        request = request.eq('neighborhood_id', profile.neighborhood_id)
+      }
+      return request
+    })).then(results => {
       if (!active) return
       const next = {}
       results.forEach((result, index) => {
@@ -26,7 +35,7 @@ export default function Dashboard({ profile, onNavigate }) {
       setLoading(false)
     })
     return () => { active = false }
-  }, [])
+  }, [profile?.is_superadmin, profile?.neighborhood_id])
 
   const name = (profile?.full_name || 'Administrador').split(' ')[0]
 

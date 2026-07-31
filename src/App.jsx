@@ -27,6 +27,7 @@ import CommerceForm from './components/CommerceForm'
 
 /* ── TASK 59: pantallas nuevas (Services, Events, Notifications, AlertaDetail) ── */
 import Services from './screens/Services'
+import ServiceDetail from './screens/ServiceDetail'
 import Events from './screens/Events'
 import EventDetail from './screens/EventDetail'
 import Notifications from './screens/Notifications'
@@ -44,24 +45,7 @@ import AdminUsuarios from './screens/AdminUsuarios'
 import AdminIncidentes from './screens/AdminIncidentes'
 import { AboutUs, Terms, ProhibitedProducts, InviteNeighbors, ContactUs, SettingsHub } from './screens/CommunityPagesV2'
 
-function Placeholder({ titulo, onBack, mensaje }) {
-  return (
-    <div style={s.placeholderWrap}>
-      <div style={s.placeholderHeader}>
-        <button style={s.placeholderBack} onClick={() => onBack && onBack('back')}>←</button>
-        <div style={s.placeholderTit}>{titulo}</div>
-        <div style={{ width: 40 }} />
-      </div>
-      <div style={s.placeholderBody}>
-        <div style={s.placeholderEmoji}>🚧</div>
-        <div style={s.placeholderTit2}>{titulo}</div>
-        <div style={s.placeholderTxt}>
-          {mensaje || 'Esta pantalla todavía no está integrada.'}
-        </div>
-      </div>
-    </div>
-  )
-}
+const ACCESSIBLE_MODE_KEY = 'elbarrio:accessible-mode'
 
 export default function App() {
   /* ── LOGIN FLOW STATE ── */
@@ -76,9 +60,14 @@ export default function App() {
   const [createOpen, setCreateOpen] = useState(false)
   const [createType, setCreateType] = useState(null)
   const [editingPost, setEditingPost] = useState(null)
+  const [homeRevision, setHomeRevision] = useState(0)
   const [eventsRevision, setEventsRevision] = useState(0)
+  const [detailRevision, setDetailRevision] = useState(0)
   const [noLeidos, setNoLeidos] = useState(0)
   const [navigationMotion, setNavigationMotion] = useState('forward')
+  const [accessibleMode, setAccessibleMode] = useState(() => {
+    try { return localStorage.getItem(ACCESSIBLE_MODE_KEY) === 'true' } catch { return false }
+  })
   const historyRef = useRef([])
   // Track del tab previo para que el back desde tabs con flecha (ej: perfil) funcione.
   // El perfil es un tab, no una sub-pantalla, así que no entra en historyRef.
@@ -89,6 +78,11 @@ export default function App() {
   // Mantiene activeTabRef sincronizado con activeTab para poder leerlo
   // dentro de useCallback sin agregarlo a las dependencias.
   useEffect(() => { activeTabRef.current = activeTab }, [activeTab])
+
+  useEffect(() => {
+    document.documentElement.classList.toggle('accessible-mode', accessibleMode)
+    try { localStorage.setItem(ACCESSIBLE_MODE_KEY, String(accessibleMode)) } catch { /* almacenamiento no disponible */ }
+  }, [accessibleMode])
 
   /* ── AUTH + checkSession (decide pantalla inicial según perfil) ── */
   const checkSession = useCallback(async () => {
@@ -120,7 +114,7 @@ export default function App() {
   }, [])
 
   useEffect(() => {
-    checkSession()
+    const sessionTimer = window.setTimeout(checkSession, 0)
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_e, session) => {
       if (session?.user) {
         setUser({ id: session.user.id, email: session.user.email })
@@ -129,19 +123,23 @@ export default function App() {
         setProfile(null)
       }
     })
-    return () => subscription.unsubscribe()
+    return () => {
+      window.clearTimeout(sessionTimer)
+      subscription.unsubscribe()
+    }
   }, [checkSession])
 
+  const userId = user?.id
   const recargarPerfil = useCallback(async () => {
-    if (!user?.id) return null
+    if (!userId) return null
     const { data: p } = await supabase
       .from('profiles')
       .select('*')
-      .eq('user_id', user.id)
+      .eq('user_id', userId)
       .maybeSingle()
     setProfile(p || null)
     return p
-  }, [user?.id])
+  }, [userId])
 
   useEffect(() => {
     if (!user?.id) return undefined
@@ -182,7 +180,9 @@ export default function App() {
           .select('id', { count: 'exact', head: true })
           .eq('receiver_id', prof.id).eq('read', false)
         if (active) setNoLeidos(count || 0)
-      } catch {}
+      } catch {
+        // El contador se recupera en el próximo evento o al volver a montar.
+      }
     }
     cargarNoLeidos()
     const canal = supabase
@@ -236,7 +236,7 @@ export default function App() {
       return
     }
 
-    const subScreens = ['post', 'productdetail', 'eventdetail', 'chatconversation', 'dealdone', 'alerta', 'notificaciones', 'sellerprofile', 'noticias', 'admin', 'adminfarmacias', 'admincomercios', 'adminusuarios', 'adminincidentes', 'settings', 'about', 'terms', 'prohibited', 'invite', 'contact']
+    const subScreens = ['post', 'productdetail', 'servicedetail', 'eventdetail', 'chatconversation', 'dealdone', 'alerta', 'notificaciones', 'sellerprofile', 'noticias', 'admin', 'adminfarmacias', 'admincomercios', 'adminusuarios', 'adminincidentes', 'settings', 'about', 'terms', 'prohibited', 'invite', 'contact']
     if (subScreens.includes(lower)) {
       setNavigationMotion('forward')
       historyRef.current.push({ screen: currentScreen, params })
@@ -252,6 +252,8 @@ export default function App() {
 
     if (lower === 'post' || lower === 'productdetail') {
       setCurrentScreen('productDetail')
+    } else if (lower === 'servicedetail') {
+      setCurrentScreen('serviceDetail')
     } else if (lower === 'eventdetail') {
       setCurrentScreen('eventDetail')
     } else if (lower === 'chatconversation') {
@@ -345,13 +347,17 @@ export default function App() {
     }
     else if (publishedType === 'service') setActiveTab('servicios')
     else if (['sell', 'gift', 'trade'].includes(publishedType)) setActiveTab('mercado')
-    else setActiveTab('inicio')
+    else {
+      setHomeRevision(value => value + 1)
+      setActiveTab('inicio')
+    }
   }, [])
 
   const onActualizado = useCallback(() => {
     setCreateOpen(false)
     setCreateType(null)
     setEditingPost(null)
+    setDetailRevision(value => value + 1)
   }, [])
 
   const onChangeTab = useCallback((tabId) => {
@@ -369,13 +375,13 @@ export default function App() {
 
   /* ── SCREEN RENDER ── */
   const flowScreens = ['splash', 'onboarding', 'register', 'profile', 'verification', 'complete']
-  const modalScreens = ['productDetail', 'chatConversation', 'dealDone', 'alertaDetail', 'notificaciones', 'sellerProfile', 'noticiasScreen', 'admin', 'adminFarmacias', 'adminComercios', 'adminUsuarios', 'adminIncidentes', 'settings', 'about', 'terms', 'prohibited', 'invite', 'contact']
+  const modalScreens = ['productDetail', 'serviceDetail', 'chatConversation', 'dealDone', 'alertaDetail', 'notificaciones', 'sellerProfile', 'noticiasScreen', 'admin', 'adminFarmacias', 'adminComercios', 'adminUsuarios', 'adminIncidentes', 'settings', 'about', 'terms', 'prohibited', 'invite', 'contact']
   const isModalScreen = modalScreens.includes(currentScreen)
   const isCommunityScreen = ['settings', 'about', 'terms', 'prohibited', 'invite', 'contact'].includes(currentScreen)
   const isMainApp = !flowScreens.includes(currentScreen) && !isModalScreen
   const screenIdentity = currentScreen === 'main'
     ? `main-${activeTab}`
-    : `${currentScreen}-${params?.postId || params?.id || params?.sellerId || ''}`
+    : `${currentScreen}-${params?.postId || params?.id || params?.sellerId || ''}-${detailRevision}`
 
   const renderScreen = () => {
     if (loading) {
@@ -420,8 +426,8 @@ export default function App() {
       return (
         <Profile
           onFinish={async () => {
-            await recargarPerfil()
-            setCurrentScreen('verification')
+            const updatedProfile = await recargarPerfil()
+            setCurrentScreen(updatedProfile?.verification_status === 'verified' ? 'main' : 'verification')
           }}
           onBack={handleLogout}
         />
@@ -450,10 +456,43 @@ export default function App() {
 
     /* ── SUB-SCREENS DEL MERCADO ── */
     if (currentScreen === 'productDetail') {
-      return <ProductDetail postId={params?.postId} currentUser={user} onNavigate={onNavigate} onEdit={onEditarPost} />
+      return (
+        <ProductDetail
+          postId={params?.postId}
+          currentUser={{
+            ...user,
+            profileId: profile?.id,
+            neighborhoodId: profile?.neighborhood_id,
+            full_name: profile?.full_name,
+            avatar_url: profile?.avatar_url,
+          }}
+          onNavigate={onNavigate}
+          onEdit={onEditarPost}
+        />
+      )
+    }
+    if (currentScreen === 'serviceDetail') {
+      return (
+        <ServiceDetail
+          postId={params?.postId}
+          currentUser={{
+            ...user,
+            profileId: profile?.id,
+            neighborhoodId: profile?.neighborhood_id,
+          }}
+          onNavigate={onNavigate}
+          onEdit={onEditarPost}
+        />
+      )
     }
     if (currentScreen === 'eventDetail') {
-      return <EventDetail postId={params?.postId} onNavigate={onNavigate} />
+      return (
+        <EventDetail
+          postId={params?.postId}
+          neighborhoodId={profile?.neighborhood_id}
+          onNavigate={onNavigate}
+        />
+      )
     }
     if (currentScreen === 'chatConversation') {
       return (
@@ -475,25 +514,31 @@ export default function App() {
       return (
         <AlertaDetail
           alertId={params?.id}
-          currentUser={user}
+          currentUser={{ ...user, neighborhoodId: profile?.neighborhood_id }}
           onNavigate={onNavigate}
+          onEdit={onEditarPost}
         />
       )
     }
     if (currentScreen === 'notificaciones') {
-      return <Notifications currentUser={user} onNavigate={onNavigate} />
+      return <Notifications currentUser={{ ...user, profileId: profile?.id }} onNavigate={onNavigate} />
     }
     if (currentScreen === 'sellerProfile') {
       return (
         <SellerProfile
           sellerId={params?.sellerId}
-          currentUser={user}
+          currentUser={{ ...user, neighborhoodId: profile?.neighborhood_id }}
           onNavigate={onNavigate}
         />
       )
     }
     if (currentScreen === 'noticiasScreen') {
-      return <Noticias currentUser={user} onNavigate={onNavigate} />
+      return (
+        <Noticias
+          currentUser={{ ...user, neighborhoodId: profile?.neighborhood_id }}
+          onNavigate={onNavigate}
+        />
+      )
     }
 
     /* ── ADMIN PANEL: pantallas de administracion ── */
@@ -512,7 +557,7 @@ export default function App() {
     if (currentScreen === 'adminIncidentes') {
       return <AdminIncidentes currentUser={user} profile={profile} onNavigate={onNavigate} />
     }
-    if (currentScreen === 'settings') return <SettingsHub onNavigate={onNavigate} />
+    if (currentScreen === 'settings') return <SettingsHub onNavigate={onNavigate} accessibleMode={accessibleMode} onAccessibleModeChange={setAccessibleMode} />
     if (currentScreen === 'about') return <AboutUs onNavigate={onNavigate} />
     if (currentScreen === 'terms') return <Terms onNavigate={onNavigate} />
     if (currentScreen === 'prohibited') return <ProhibitedProducts onNavigate={onNavigate} />
@@ -525,16 +570,58 @@ export default function App() {
     }
 
     /* ── MAIN APP (TABS) ── */
-    if (activeTab === 'inicio') return <Home currentUser={user} onNavigate={onNavigate} onCrear={onCrear} />
-    if (activeTab === 'mercado') return <Marketplace currentUser={user} onNavigate={onNavigate} onCrear={onCrear} />
-    if (activeTab === 'servicios') return <Services currentUser={user} onNavigate={onNavigate} onCrear={onCrear} />
+    if (activeTab === 'inicio') return <Home key={`home-${homeRevision}`} currentUser={user} onNavigate={onNavigate} onCrear={onCrear} />
+    if (activeTab === 'mercado') {
+      return (
+        <Marketplace
+          currentUser={{
+            ...user,
+            profileId: profile?.id,
+            neighborhoodId: profile?.neighborhood_id,
+          }}
+          onNavigate={onNavigate}
+          onCrear={onCrear}
+        />
+      )
+    }
+    if (activeTab === 'servicios') {
+      return (
+        <Services
+          currentUser={{
+            ...user,
+            profileId: profile?.id,
+            neighborhoodId: profile?.neighborhood_id,
+          }}
+          onNavigate={onNavigate}
+          onCrear={onCrear}
+        />
+      )
+    }
     if (activeTab === 'eventos') return <Events key={`events-${eventsRevision}`} currentUser={user} onNavigate={onNavigate} onCrear={onCrear} />
     if (activeTab === 'chat') return <ChatList currentUser={{ ...user, profileId: profile?.id }} onNavigate={onNavigate} />
-    if (activeTab === 'comercios') return <Comercios currentUser={user} onNavigate={onNavigate} onCrear={onCrear} />
+    if (activeTab === 'comercios') {
+      return (
+        <Comercios
+          currentUser={user}
+          onNavigate={onNavigate}
+          onCrear={onCrear}
+          initialCommerceId={params?.commerceId}
+        />
+      )
+    }
     if (activeTab === 'alertas') return <Alertas currentUser={user} onNavigate={onNavigate} onCrear={onCrear} />
-    if (activeTab === 'perfil') return <MyProfile currentUser={user} onNavigate={onNavigate} onLogout={handleLogout} />
+    if (activeTab === 'perfil') return (
+      <MyProfile
+        currentUser={user}
+        profile={profile}
+        onNavigate={onNavigate}
+        onLogout={handleLogout}
+        accessibleMode={accessibleMode}
+        onAccessibleModeChange={setAccessibleMode}
+      />
+    )
     
-    return <Home currentUser={user} onNavigate={onNavigate} onCrear={onCrear} />
+    return <Home key={`home-${homeRevision}`} currentUser={user} onNavigate={onNavigate} onCrear={onCrear} />
   }
 
   return (
@@ -590,7 +677,7 @@ export default function App() {
 
 /* ── ESTILOS ── */
 const s = {
-  contentPad: { paddingTop: 30, paddingBottom: 0 },
+  contentPad: { paddingTop: 0, paddingBottom: 0 },
   /* modalScreens (chat, noticias, sellerprofile, productDetail, alertaDetail)
      controlan su propio safe-area-top dentro de su header. Acá NO agregamos
      padding superior, para que la pantalla llegue hasta el borde superior del

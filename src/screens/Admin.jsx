@@ -86,6 +86,13 @@ export default function Admin({ currentUser, onNavigate }) {
         setLoading(false)
         return
       }
+      if (!prof.is_superadmin && !prof.neighborhood_id) {
+        throw new Error('La cuenta administrativa no tiene un barrio asignado.')
+      }
+
+      const scope = query => prof.is_superadmin
+        ? query
+        : query.eq('neighborhood_id', prof.neighborhood_id)
 
       // Cargar counts en paralelo (head:true = sin body, solo count)
       const [
@@ -93,12 +100,14 @@ export default function Admin({ currentUser, onNavigate }) {
         incidentes, posts, barrios
       ] = await Promise.all([
         supabase.from('farmacias').select('*', { count: 'exact', head: true }),
-        supabase.from('commerces').select('*', { count: 'exact', head: true }),
+        scope(supabase.from('commerces').select('*', { count: 'exact', head: true })),
         supabase.from('commerce_promos').select('*', { count: 'exact', head: true }),
-        supabase.from('profiles').select('*', { count: 'exact', head: true }),
-        supabase.from('incident_reports').select('*', { count: 'exact', head: true }).eq('status', 'pendiente'),
-        supabase.from('posts').select('*', { count: 'exact', head: true }),
-        supabase.from('neighborhoods').select('*', { count: 'exact', head: true }),
+        scope(supabase.from('profiles').select('*', { count: 'exact', head: true })),
+        scope(supabase.from('incident_reports').select('*', { count: 'exact', head: true }).eq('status', 'pendiente')),
+        scope(supabase.from('posts').select('*', { count: 'exact', head: true })),
+        prof.is_superadmin
+          ? supabase.from('neighborhoods').select('*', { count: 'exact', head: true })
+          : Promise.resolve({ count: 1 }),
       ])
 
       setCounts({

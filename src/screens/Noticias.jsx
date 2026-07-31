@@ -3,16 +3,15 @@ import { supabase } from '../lib/supabase'
 import { C, T, iniciales, hace } from '../lib/design'
 
 /* ============================================================
-   Noticias.jsx — Pantalla "Noticias del barrio" para El Barrio.
+   Noticias.jsx — Pantalla "Noticias del barrio".
 
    Recibe props: { currentUser, onNavigate }.
    Lista posts de Supabase con type='news' y status='active'.
    Filtros horizontales (Todas / Oficiales / Asambleas / Obras /
    Servicios / Seguridad) + feed vertical de cards con imagen,
    título, extracto, autor + timestamp, badges de categoría y
-   badge OFICIAL dorado si el perfil del autor es oficial/admin.
-   Click en card → onNavigate('productdetail', { postId }) —
-   reusa ProductDetail existente.
+   badge OFICIAL dorado cuando la publicación fue marcada como
+   comunicación oficial. La tarjeta expande su contenido en el feed.
    ============================================================ */
 
 /* CSS mínimo inyectado una sola vez: fade-in al montar cards,
@@ -41,6 +40,15 @@ const NEWS_CSS = `
   0%, 100% { box-shadow: 0 0 0 0 rgba(217, 119, 6, 0.45); }
   50%      { box-shadow: 0 0 0 5px rgba(217, 119, 6, 0); }
 }
+.noticias-modal-sheet {
+  animation: noticiasModalIn 0.28s cubic-bezier(.22,.8,.3,1) both;
+}
+@keyframes noticiasModalIn {
+  from { opacity: 0; transform: translateY(28px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.noticias-modal-image { animation: noticiasImageFade .38s ease both; }
+@keyframes noticiasImageFade { from { opacity: .35; } to { opacity: 1; } }
 .noticias-oficial-badge {
   animation: noticiasPulseDorado 2s ease-in-out infinite;
 }
@@ -105,16 +113,6 @@ const IcoAlert = (p) => (
   </Ico>
 )
 
-/* ─── FILTROS HORIENTONTALES ─── */
-const FILTROS = [
-  { key: 'Todas',     emoji: '📰' },
-  { key: 'Oficiales', emoji: '📢' },
-  { key: 'Asambleas', emoji: '🗳️' },
-  { key: 'Obras',     emoji: '🚧' },
-  { key: 'Servicios', emoji: '💧' },
-  { key: 'Seguridad', emoji: '🚨' },
-]
-
 /* ─── MAPA DE CATEGORÍA → COLOR + EMOJI ───
    Especificación:
    · Oficial   → dorado #fef3c7 / icono #d97706
@@ -133,78 +131,6 @@ const NEWS_CATS = {
 }
 const DEFAULT_CAT = { label: 'Noticia', bg: C.verdeSuave, color: C.verdeOsc, emoji: '📰' }
 
-/* Lista de keys válidas para hacer lookup case-insensitive. */
-const CAT_KEYS = Object.keys(NEWS_CATS)
-
-/* ─── DATOS DEMO ───
-   Se usan cuando la tabla posts no tiene type='news' todavía (barrio
-   nuevo) o cuando la query falla. Así la pantalla nunca queda vacía
-   y el usuario puede ver cómo se ve el feed de noticias. */
-const ahora = Date.now()
-const haceHoras = (h) => new Date(ahora - h * 3600_000).toISOString()
-const DEMO_NEWS = [
-  {
-    id: 'demo-1',
-    title: 'Corte de agua programado para este viernes',
-    description: 'La empresa sanitaria informó que el suministro se suspenderá entre las 9:00 y las 14:00 horas en los pasajes cercanos a la plaza. Se recomienda almacenar agua con anticipación.',
-    news_type: 'oficial',
-    source: 'Municipalidad',
-    image_url: null,
-    created_at: haceHoras(2),
-    profiles: { full_name: 'Municipalidad de Ñuñoa', role: 'Oficial', is_official: true, is_admin: true, avatar_url: null },
-  },
-  {
-    id: 'demo-2',
-    title: 'Asamblea vecinal: presupuesto 2026',
-    description: 'Este sábado a las 11:00 en la sede de la junta de vecinos. Votaremos el destino de los fondos recaudados este año: iluminación plazuela, reparación de juegos infantiles y apoyo a vecinos afectados por el incendio.',
-    news_type: 'asamblea',
-    source: 'Junta de Vecinos',
-    image_url: null,
-    created_at: haceHoras(6),
-    profiles: { full_name: 'Junta de Vecinos Villa Esperanza', role: 'Presidente', is_official: true, avatar_url: null },
-  },
-  {
-    id: 'demo-3',
-    title: 'Comienzan obras de repavimentación en Pasaje Los Aromos',
-    description: 'Desde el lunes habrá desvíos por la maquinaria. Se estima una duración de 3 semanas. Los vecinos con estacionamiento en la cuadra deberán usar la calle paralela durante los trabajos.',
-    news_type: 'obras',
-    source: 'DOM',
-    image_url: null,
-    created_at: haceHoras(20),
-    profiles: { full_name: 'Dirección de Obras Municipales', role: 'Inspector', is_official: true, avatar_url: null },
-  },
-  {
-    id: 'demo-4',
-    title: 'Atención: robo de bicicletas en los últimos días',
-    description: 'Vecinos reportaron que les cortaron los candados durante la madrugada. Se recomienda usar doble seguro y, si es posible, guardar las bicis dentro de casa. Compartimos foto del sospechoso captada por una cámara de seguridad.',
-    news_type: 'seguridad',
-    source: 'Comité de Seguridad',
-    image_url: null,
-    created_at: haceHoras(30),
-    profiles: { full_name: 'Comité de Seguridad Vecinal', role: 'Coordinador', is_official: false, avatar_url: null },
-  },
-  {
-    id: 'demo-5',
-    title: 'Taller gratuito de compostaje doméstico este domingo',
-    description: 'La municipalidad y un grupo de vecinos organizan un taller práctico para aprender a hacer compost con residuos orgánicos. Inscripciones en la sede o por este chat. ¡Cupos limitados!',
-    news_type: 'servicios',
-    source: 'Vecinos por el Medio Ambiente',
-    image_url: null,
-    created_at: haceHoras(48),
-    profiles: { full_name: 'Vecinos por el Medio Ambiente', role: 'Voluntaria', avatar_url: null },
-  },
-  {
-    id: 'demo-6',
-    title: 'Se inauguró la nueva ciclovía por Avenida Las Torres',
-    description: 'Ya está habilitada la ciclovía bidireccional que conecta nuestra villa con el metro. Los vecinos que van al centro ahora tienen un trayecto seguro. ¡Felicitaciones a quienes gestionaron este proyecto por años!',
-    news_type: 'obras',
-    source: null,
-    image_url: null,
-    created_at: haceHoras(72),
-    profiles: { full_name: 'Colectivo Ciclista Villa Esperanza', role: 'Vecino', avatar_url: null },
-  },
-]
-
 /* Normaliza el tipo de noticia: prioriza post.news_type, después
    post.category, y normaliza a minúsculas sin acentos. */
 const normalizarTipo = (post) => {
@@ -219,7 +145,7 @@ const normalizarTipo = (post) => {
   // Singularizar Asambleas/Obras (los filtros vienen en plural).
   if (norm === 'asambleas') return 'asamblea'
   if (norm === 'obras') return 'obras' // ya está en key
-  return CAT_KEYS.includes(norm) ? norm : ''
+  return norm
 }
 
 /* ============================================================
@@ -229,8 +155,11 @@ export default function Noticias({ currentUser, onNavigate }) {
   const [news, setNews] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
-  const [filtro, setFiltro] = useState('Todas')
-  const [usandoDemo, setUsandoDemo] = useState(false)
+  const [filtro, setFiltro] = useState('all')
+  const [selectedNews, setSelectedNews] = useState(null)
+  const [modalImageIndex, setModalImageIndex] = useState(0)
+  const modalTouchStartX = useRef(null)
+  const [categories, setCategories] = useState(Object.entries(NEWS_CATS).filter(([key]) => key !== 'oficial').map(([key, value]) => ({ key, name: value.label, icon: value.emoji })))
 
   // Pull-to-refresh
   const scrollRef = useRef(null)
@@ -240,58 +169,90 @@ export default function Noticias({ currentUser, onNavigate }) {
   const [refreshing, setRefreshing] = useState(false)
 
   const nav = onNavigate || (() => {})
+  const neighborhoodId = currentUser?.neighborhoodId
 
   const fetchNews = useCallback(async () => {
     setLoading(true)
     setError(null)
-    setUsandoDemo(false)
+    if (!neighborhoodId) {
+      setNews([])
+      setError('No pudimos confirmar tu barrio. Vuelve a intentarlo cuando tu perfil esté disponible.')
+      setLoading(false)
+      return
+    }
     try {
       const { data, error: e } = await supabase
         .from('posts')
-        .select('*, profiles!posts_user_id_fkey(*)')
+        .select('*, author:profiles!author_id (id, full_name, avatar_url, role, verified, badge_founder, badge_trusted_seller)')
         .eq('type', 'news')
         .eq('status', 'active')
+        .eq('neighborhood_id', neighborhoodId)
         .order('created_at', { ascending: false })
         .limit(50)
       if (e) throw e
-      // FIX: si la BD no tiene noticias reales, mostramos datos demo para
-      // que la pantalla no quede vacía mientras el barrio empieza a usarla.
-      if (!data || data.length === 0) {
-        setNews(DEMO_NEWS)
-        setUsandoDemo(true)
-      } else {
-        setNews(data)
-      }
+      setNews(data || [])
     } catch (err) {
       console.error('Noticias fetch error:', err)
-      // FIX: en vez de romper con error, caemos a demo para que la pantalla
-      // se vea usable incluso si la tabla/RPC todavía no está lista.
-      setNews(DEMO_NEWS)
-      setUsandoDemo(true)
+      setNews([])
+      setError(err?.message || 'No pudimos cargar las noticias.')
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [neighborhoodId])
 
   useEffect(() => {
     fetchNews()
   }, [fetchNews])
 
+  useEffect(() => {
+    supabase.from('news_categories').select('key, name, icon').eq('is_active', true).order('sort_order').then(({ data }) => {
+      if (data?.length) setCategories(data)
+    })
+  }, [])
+
+  useEffect(() => {
+    setModalImageIndex(0)
+    const images = Array.isArray(selectedNews?.images) && selectedNews.images.some(Boolean)
+      ? selectedNews.images.filter(Boolean)
+      : (selectedNews?.image_url ? [selectedNews.image_url] : [])
+    if (images.length < 2) return undefined
+    const timer = window.setInterval(() => setModalImageIndex(current => (current + 1) % images.length), 3500)
+    return () => window.clearInterval(timer)
+  }, [selectedNews])
+
+  const onModalImageTouchStart = event => {
+    modalTouchStartX.current = event.touches?.[0]?.clientX ?? null
+  }
+
+  const onModalImageTouchEnd = (event, imageCount) => {
+    if (modalTouchStartX.current == null || imageCount < 2) return
+    const endX = event.changedTouches?.[0]?.clientX
+    const distance = endX == null ? 0 : endX - modalTouchStartX.current
+    modalTouchStartX.current = null
+    if (Math.abs(distance) < 35) return
+    setModalImageIndex(current => distance < 0
+      ? (current + 1) % imageCount
+      : (current - 1 + imageCount) % imageCount)
+  }
+
+  const categoryMap = Object.fromEntries(categories.map(category => [category.key, {
+    ...(NEWS_CATS[category.key] || DEFAULT_CAT),
+    label: category.name,
+    emoji: category.icon,
+  }]))
+  const getCategory = post => categoryMap[normalizarTipo(post)] || DEFAULT_CAT
+  const filters = [{ key: 'all', name: 'Todas', icon: '📰' }, { key: 'official', name: 'Oficiales', icon: '📢' }, ...categories]
+
   /* Filtrado en cliente (más robusto que .eq() porque post puede
      tener news_type O category, y "Oficiales" depende del perfil
      del autor, no solo del post). */
   const filtered = news.filter((n) => {
-    if (filtro === 'Todas') return true
+    if (filtro === 'all') return true
     const tipo = normalizarTipo(n)
-    const autor = n.profiles || n.profile || {}
-    if (filtro === 'Oficiales') {
-      return tipo === 'oficial' || autor.is_official || autor.is_admin
+    if (filtro === 'official') {
+      return n.news_is_official === true || tipo === 'oficial'
     }
-    if (filtro === 'Asambleas') return tipo === 'asamblea'
-    if (filtro === 'Obras')     return tipo === 'obras'
-    if (filtro === 'Servicios') return tipo === 'servicios'
-    if (filtro === 'Seguridad') return tipo === 'seguridad'
-    return true
+    return tipo === filtro
   })
 
   /* ── Pull-to-refresh visual ── */
@@ -329,15 +290,16 @@ export default function Noticias({ currentUser, onNavigate }) {
   }
 
   /* ── Helper: ¿es autor oficial? ── */
-  const esAutorOficial = (autor) =>
-    !!(autor?.is_official || autor?.is_admin ||
-       autor?.badge_founder || autor?.badge_trusted_seller)
+  const esNoticiaOficial = noticia => noticia?.news_is_official === true || normalizarTipo(noticia) === 'oficial'
 
-  /* ── Helper: imagen del post (image_url o images[0]) ── */
-  const getImagen = (n) => n?.image_url || n?.images?.[0] || null
+  /* ── Helper: imágenes nuevas y portada histórica ── */
+  const getImages = n => Array.isArray(n?.images) && n.images.some(Boolean)
+    ? n.images.filter(Boolean)
+    : (n?.image_url ? [n.image_url] : [])
+  const getImagen = n => getImages(n)[0] || null
 
   /* ── Helper: source (badge chiquito) ── */
-  const getSource = (n) => n?.source || null
+  const getSource = (n) => n?.news_source || n?.source || null
 
   /* ── Helper: extracto / descripción ── */
   const getExtracto = (n) => n?.description || n?.excerpt || n?.content || ''
@@ -407,12 +369,12 @@ export default function Noticias({ currentUser, onNavigate }) {
   )
 
   const renderCard = (n, idx) => {
-    const autor = n.profiles || n.profile || {}
+    const autor = n.author || n.profiles || n.profile || {}
     const name = autor.full_name || 'Perfil oficial'
     const initials = iniciales(name)
     const tipo = normalizarTipo(n)
-    const cat = (tipo && NEWS_CATS[tipo]) || DEFAULT_CAT
-    const oficial = esAutorOficial(autor)
+    const cat = getCategory(n)
+    const oficial = esNoticiaOficial(n)
     const img = getImagen(n)
     const source = getSource(n)
     const extracto = getExtracto(n)
@@ -423,7 +385,7 @@ export default function Noticias({ currentUser, onNavigate }) {
         key={n.id}
         className="noticias-card"
         style={{ ...s.card, animationDelay: `${idx * 60}ms` }}
-        onClick={() => nav('productdetail', { postId: n.id })}
+        onClick={() => setSelectedNews(n)}
       >
         {/* Badges superiores */}
         <div style={s.badgesRow}>
@@ -457,6 +419,7 @@ export default function Noticias({ currentUser, onNavigate }) {
 
         {/* Extracto (3 líneas clamp) */}
         {extracto && <div style={s.cardDesc}>{extracto}</div>}
+        <button type="button" style={s.readMore} onClick={event => { event.stopPropagation(); setSelectedNews(n) }}>Leer noticia completa</button>
 
         {/* Footer: autor + timestamp */}
         <div style={s.cardFooter}>
@@ -509,17 +472,9 @@ export default function Noticias({ currentUser, onNavigate }) {
           </div>
         </div>
 
-        {/* Banner de demo: avisa que las noticias son ejemplos */}
-        {usandoDemo && (
-          <div style={s.demoBanner}>
-            <span style={s.demoDot} />
-            <span style={s.demoText}>Mostrando ejemplos — cuando tu barrio publique noticias reales, aparecerán acá</span>
-          </div>
-        )}
-
         {/* Chips de filtro horizontales scrollables */}
         <div style={s.chipsScroll}>
-          {FILTROS.map((f) => {
+          {filters.map((f) => {
             const active = filtro === f.key
             return (
               <button
@@ -532,8 +487,8 @@ export default function Noticias({ currentUser, onNavigate }) {
                 }}
                 onClick={() => setFiltro(f.key)}
               >
-                <span style={s.chipEmoji}>{f.emoji}</span>
-                <span>{f.key}</span>
+                <span style={s.chipEmoji}>{f.icon}</span>
+                <span>{f.name}</span>
               </button>
             )
           })}
@@ -584,6 +539,27 @@ export default function Noticias({ currentUser, onNavigate }) {
           )}
         </div>
       </div>
+
+      {selectedNews && (() => {
+        const cat = getCategory(selectedNews)
+        const official = esNoticiaOficial(selectedNews)
+        const images = getImages(selectedNews)
+        const source = getSource(selectedNews)
+        return <div style={s.modalOverlay} role="dialog" aria-modal="true" aria-label={selectedNews.title || 'Noticia completa'} onClick={() => setSelectedNews(null)}>
+          <article className="noticias-modal-sheet" style={s.modalSheet} onClick={event => event.stopPropagation()}>
+            <header style={s.modalHeader}><button type="button" style={s.modalClose} onClick={() => setSelectedNews(null)} aria-label="Cerrar">×</button><span>Noticia completa</span><i /></header>
+            <div style={s.modalScroll}>
+              {images.length > 0 && <div style={s.modalCarousel} onTouchStart={onModalImageTouchStart} onTouchEnd={event => onModalImageTouchEnd(event, images.length)}><img key={`${images[modalImageIndex]}-${modalImageIndex}`} className="noticias-modal-image" src={images[modalImageIndex]} alt="" style={s.modalCover} draggable="false" />{images.length > 1 && <div style={s.modalDots}>{images.map((_, index) => <button key={index} type="button" aria-label={`Ver imagen ${index + 1}`} style={{ ...s.modalDot, ...(index === modalImageIndex ? s.modalDotActive : {}) }} onClick={() => setModalImageIndex(index)} />)}</div>}</div>}
+              <div style={s.modalBody}>
+                <div style={s.badgesRow}><span style={{ ...s.catBadge, background: cat.bg, color: cat.color }}>{cat.emoji} {cat.label}</span>{official && <span style={s.oficialBadge}><IcoShield size={11} /> OFICIAL</span>}</div>
+                <h2 style={s.modalTitle}>{selectedNews.title || 'Noticia del barrio'}</h2>
+                <div style={s.modalMeta}>{source && <span>{source}</span>}<span>{hace(selectedNews.created_at)}</span></div>
+                <div style={s.modalContent}>{getExtracto(selectedNews)}</div>
+              </div>
+            </div>
+          </article>
+        </div>
+      })()}
     </div>
   )
 }
@@ -668,30 +644,6 @@ const s = {
     background: C.rojo,
     border: `2px solid ${C.card}`,
     boxSizing: 'content-box',
-  },
-
-  /* ── BANNER DEMO ── */
-  demoBanner: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: 8,
-    marginTop: 10,
-    padding: '8px 12px',
-    borderRadius: 10,
-    background: '#fef3c7',
-    border: '1px solid #fde68a',
-  },
-  demoDot: {
-    width: 8, height: 8,
-    borderRadius: '50%',
-    background: '#d97706',
-    flexShrink: 0,
-  },
-  demoText: {
-    fontSize: 12,
-    color: '#92400e',
-    fontWeight: 600,
-    lineHeight: 1.35,
   },
 
   /* ── CHIPS DE FILTRO ── */
@@ -843,6 +795,22 @@ const s = {
     WebkitBoxOrient: 'vertical',
     textOverflow: 'ellipsis',
   },
+  readMore: { marginTop: 9, padding: 0, border: 0, color: C.verdeOsc, background: 'transparent', fontSize: 11.5, fontWeight: 800 },
+
+  modalOverlay: { position: 'absolute', inset: 0, zIndex: 80, display: 'flex', alignItems: 'flex-end', background: 'rgba(17, 24, 20, 0.46)', backdropFilter: 'blur(2px)' },
+  modalSheet: { width: '100%', maxHeight: '94%', overflow: 'hidden', display: 'flex', flexDirection: 'column', background: C.fondo, borderRadius: '24px 24px 0 0', boxShadow: '0 -14px 40px rgba(0,0,0,.18)' },
+  modalHeader: { height: 54, flexShrink: 0, display: 'grid', gridTemplateColumns: '40px 1fr 40px', alignItems: 'center', padding: '0 14px', background: C.card, borderBottom: `1px solid ${C.borde}` },
+  modalClose: { width: 36, height: 36, borderRadius: '50%', border: `1px solid ${C.borde}`, background: C.fondo, color: C.texto, fontSize: 24, lineHeight: 1, cursor: 'pointer' },
+  modalScroll: { minHeight: 0, overflowY: 'auto', WebkitOverflowScrolling: 'touch' },
+  modalCarousel: { position: 'relative', flexShrink: 0, background: '#e9efeb', touchAction: 'pan-y', userSelect: 'none' },
+  modalCover: { width: '100%', aspectRatio: '16 / 9', display: 'block', objectFit: 'cover' },
+  modalDots: { position: 'absolute', left: 0, right: 0, bottom: 10, display: 'flex', justifyContent: 'center', gap: 5 },
+  modalDot: { width: 7, height: 7, padding: 0, border: '1px solid rgba(255,255,255,.9)', borderRadius: '50%', background: 'rgba(255,255,255,.5)', boxShadow: '0 1px 4px rgba(0,0,0,.25)' },
+  modalDotActive: { width: 18, borderRadius: 999, background: '#fff' },
+  modalBody: { padding: '18px 18px 34px' },
+  modalTitle: { margin: '4px 0 8px', color: C.texto, fontSize: 24, lineHeight: 1.18, letterSpacing: '-.5px' },
+  modalMeta: { display: 'flex', justifyContent: 'space-between', gap: 12, color: C.textoTenue, fontSize: 11.5, paddingBottom: 15, borderBottom: `1px solid ${C.borde}` },
+  modalContent: { paddingTop: 17, color: C.textoSuave, fontSize: 15, lineHeight: 1.72, whiteSpace: 'pre-wrap' },
 
   /* ── FOOTER AUTOR + TIMESTAMP ── */
   cardFooter: {

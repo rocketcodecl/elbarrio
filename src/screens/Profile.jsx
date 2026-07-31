@@ -1,19 +1,17 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import Stepper from '../components/Stepper'
 
 // ============================================================
-// MODO DESARROLLO: este Profile.jsx NO bloquea al usuario por
-// RUT. Saca la llamada RPC is_rut_allowed (no existe en el
-// schema) y relaja la validacion a solo formato (no Módulo 11).
-// Tampoco bloquea RUTs duplicados: solo avisa por consola.
-// Cuando el producto decida activar la whitelist de RUTs, hay
-// que crear la funcion RPC is_rut_allowed en Supabase y volver
-// a poner el bloqueo aca.
+// MODO DESARROLLO: no se consulta una whitelist de RUTs porque
+// la RPC is_rut_allowed no existe en el schema actual. El formulario
+// sí valida Módulo 11 y bloquea los RUTs duplicados informados por
+// la restricción única de la base de datos.
 // ============================================================
 
 function Profile({ onFinish, onBack }) {
-  const [fullName, setFullName] = useState('')
+  const [firstName, setFirstName] = useState('')
+  const [lastName, setLastName] = useState('')
   const [rut, setRut] = useState('')
   const [rutValid, setRutValid] = useState(null)
   const [phone, setPhone] = useState('')
@@ -67,6 +65,45 @@ function Profile({ onFinish, onBack }) {
     return calculatedDv === dv
   }
 
+  useEffect(() => {
+    let active = true
+
+    const loadExistingProfile = async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user || !active) return
+
+      const { data: existingProfile, error: profileError } = await supabase
+        .from('profiles')
+        .select('full_name, rut, phone, avatar_url')
+        .eq('user_id', user.id)
+        .maybeSingle()
+
+      if (!active) return
+      if (profileError) {
+        setError('No pudimos recuperar tus datos. Inténtalo nuevamente.')
+        return
+      }
+
+      if (existingProfile?.full_name) {
+        const nameParts = existingProfile.full_name.trim().split(/\s+/).filter(Boolean)
+        setFirstName(nameParts[0] || '')
+        setLastName(nameParts.slice(1).join(' '))
+      }
+      if (existingProfile?.rut) {
+        const formattedRut = formatRut(existingProfile.rut)
+        setRut(formattedRut)
+        setRutValid(validateRut(formattedRut))
+      }
+      if (existingProfile?.phone) {
+        setPhone(existingProfile.phone.replace(/\D/g, '').slice(-9))
+      }
+      if (existingProfile?.avatar_url) setAvatarPreview(existingProfile.avatar_url)
+    }
+
+    loadExistingProfile()
+    return () => { active = false }
+  }, [])
+
   const handleRutChange = (e) => {
     const formatted = formatRut(e.target.value)
     setRut(formatted)
@@ -104,7 +141,7 @@ function Profile({ onFinish, onBack }) {
   const handleContinue = async () => {
     setError('')
 
-    if (!fullName.trim() || fullName.trim().split(' ').length < 2) {
+    if (!firstName.trim() || !lastName.trim()) {
       setError('Ingresa tu nombre y apellido')
       return
     }
@@ -159,31 +196,32 @@ function Profile({ onFinish, onBack }) {
       }
 
       // Actualizar profile
+      const fullName = [firstName, lastName]
+        .map(value => value.trim())
+        .filter(Boolean)
+        .join(' ')
       const updateData = {
-        full_name: fullName.trim(),
+        full_name: fullName,
         rut: rut,
         phone: phone || null,
         email: user.email || null,
       }
       if (avatarUrl) updateData.avatar_url = avatarUrl
 
-      const { error: updateError } = await supabase
+      const { data: updatedProfile, error: updateError } = await supabase
         .from('profiles')
         .update(updateData)
         .eq('user_id', user.id)
+        .select('id')
+        .maybeSingle()
 
       if (updateError) throw updateError
+      if (!updatedProfile) throw new Error('No encontramos el perfil asociado a tu cuenta.')
 
       onFinish()
     } catch (err) {
-      // ============================================================
-      // MODO DEV: si el error es de RUT duplicado (codigo 23505),
-      // NO bloqueamos al usuario. Solo avisamos por consola y
-      // dejamos que siga. En produccion, volver a mostrar el error.
-      // ============================================================
-      if (err.code === '23505' && err.message?.toLowerCase().includes('rut')) {
-        console.warn('[Profile] RUT ya existe en la base (modo dev: no bloqueamos):', err.message)
-        onFinish()
+      if (err.code === '23505') {
+        setError('Este RUT ya está asociado a otra cuenta. Usa la cuenta anterior o ingresa un RUT diferente.')
         return
       }
       setError(err.message || 'Ocurrio un error al guardar')
@@ -192,10 +230,8 @@ function Profile({ onFinish, onBack }) {
     }
   }
 
-  const initials = fullName
-    .split(' ')
-    .filter(n => n.length > 0)
-    .slice(0, 2)
+  const initials = [firstName, lastName]
+    .filter(n => n.trim().length > 0)
     .map(n => n[0])
     .join('')
     .toUpperCase() || '?'
@@ -204,7 +240,7 @@ function Profile({ onFinish, onBack }) {
     <div style={styles.container}>
       {/* HEADER */}
       <div style={styles.header}>
-        <button style={styles.backButton} onClick={onBack}>
+        <button style={styles.backButton} onClick={onBack} aria-label="Volver">
           <span style={{ fontSize: 18 }}>←</span>
         </button>
         <div style={{ flex: 1, marginLeft: 12 }}>
@@ -227,7 +263,7 @@ function Profile({ onFinish, onBack }) {
             <img src={avatarPreview} alt="Avatar" style={styles.avatarImg} />
           ) : (
             <div style={styles.avatarPlaceholder}>
-              {fullName ? (
+              {firstName ? (
                 <span style={styles.avatarInitials}>{initials}</span>
               ) : (
                 <span style={{ fontSize: 36, opacity: 0.4 }}>👤</span>
@@ -261,19 +297,28 @@ function Profile({ onFinish, onBack }) {
       {/* FORMULARIO */}
       <div style={styles.form}>
         <div style={styles.inputGroup}>
-          <label style={styles.label}>Escribe tu nombre y tu apellido</label>
+          <label style={styles.label}>Nombre</label>
           <div style={styles.inputWrapper}>
-            <span style={styles.inputIcon}>
-  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-    <circle cx="12" cy="7" r="4" />
-  </svg>
-</span>
             <input
               type="text"
-              placeholder="Ej: Carlos Mendoza"
-              value={fullName}
-              onChange={(e) => setFullName(e.target.value)}
+              autoComplete="given-name"
+              placeholder="Ej: Carlos"
+              value={firstName}
+              onChange={(e) => setFirstName(e.target.value)}
+              style={styles.input}
+            />
+          </div>
+        </div>
+
+        <div style={styles.inputGroup}>
+          <label style={styles.label}>Apellido</label>
+          <div style={styles.inputWrapper}>
+            <input
+              type="text"
+              autoComplete="family-name"
+              placeholder="Ej: Mendoza"
+              value={lastName}
+              onChange={(e) => setLastName(e.target.value)}
               style={styles.input}
             />
           </div>
@@ -311,9 +356,6 @@ function Profile({ onFinish, onBack }) {
               maxLength={12}
             />
           </div>
-          <p style={styles.hintText}>
-            Solo lo usamos para verificar tu identidad. Nunca se comparte.
-          </p>
         </div>
 
        <div style={styles.inputGroup}>
@@ -337,6 +379,15 @@ function Profile({ onFinish, onBack }) {
               maxLength={9}
             />
           </div>
+        </div>
+
+        <div style={styles.privacyBox}>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+          </svg>
+          <span>
+            Tu nombre identifica tu perfil vecinal. El RUT se usa solo para verificar tu identidad y nunca se muestra.
+          </span>
         </div>
 
         {error && (
@@ -374,11 +425,14 @@ function Profile({ onFinish, onBack }) {
 
 const styles = {
   container: {
-    minHeight: '100%',
+    height: '100%',
+    minHeight: 0,
     background: '#FAFAF7',
-    padding: '0 24px 40px',
+    padding: '0 24px max(40px, env(safe-area-inset-bottom))',
     display: 'flex',
     flexDirection: 'column',
+    overflowY: 'auto',
+    overscrollBehavior: 'contain',
   },
   header: {
     display: 'flex',
@@ -545,6 +599,18 @@ const styles = {
     color: '#6B7280',
     marginLeft: 4,
     marginTop: 2,
+  },
+  privacyBox: {
+    display: 'flex',
+    alignItems: 'flex-start',
+    gap: 9,
+    padding: 12,
+    color: '#0F5F48',
+    background: '#EDF8F3',
+    border: '1px solid #B8DFD0',
+    borderRadius: 12,
+    fontSize: 11,
+    lineHeight: 1.45,
   },
   errorBox: {
     padding: 12,

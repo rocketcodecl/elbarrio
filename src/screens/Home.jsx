@@ -1,10 +1,9 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import {
-  C, T, S, TIPOS, REPORTES, FARMACIAS,
-  iniciales, hace, plata, distancia, saludo,
+  C, T, TIPOS, REPORTES, FARMACIAS,
+  iniciales, hace, plata, saludo,
 } from '../lib/design'
-import PedidoCard from '../components/PedidoCard'
 
 /*
   INICIO — el Radar del barrio.
@@ -12,11 +11,11 @@ import PedidoCard from '../components/PedidoCard'
   Estructura del feed:
     1. Header
     2. Clima + Farmacia
-    3. Accesos: Pedidos · Comercios · Noticias · Alertas
+    3. Accesos: Eventos · Noticias · Alertas
     4. Pedidos vecinales (barra amarilla + cards full-width)
     5. Alertas (cards full-width, con distancia "Estás a xx m")
     6. Mercado (scroll lateral: ventas + regalos + trueques juntos)
-    7. Actividad de el barrio (vertical, 6 + pill "+ ver más")  ← feed principal
+    7. Actividad de el barrio (vertical, 10 + pill "+ ver más")  ← feed principal
     8. Eventos (scroll lateral, abajo del feed principal)
 
   "el barrio" siempre minúscula y en verde (C.verde).
@@ -54,10 +53,17 @@ const CLIMA_COLORS = {
 
 const CloudShape = ({ fill = CLIMA_COLORS.cloud }) => (
   <g>
-    <circle cx="11" cy="17" r="6" fill={fill}/>
-    <circle cx="17" cy="13" r="7.5" fill={fill}/>
-    <circle cx="23" cy="17" r="5.5" fill={fill}/>
-    <rect x="5" y="17" width="22" height="7" rx="3.5" fill={fill}/>
+    <path
+      d="M8.4 23.5h14.8c3.2 0 5.8-2.35 5.8-5.35 0-2.9-2.35-5.2-5.25-5.35C22.7 8.9 19.4 6.25 15.5 6.25c-4.65 0-8.4 3.5-8.65 8-2.25.55-3.85 2.4-3.85 4.55 0 2.65 2.35 4.7 5.4 4.7Z"
+      fill={fill}
+    />
+    <path
+      d="M8.2 15.1c.55-3.45 3.45-6.05 7-6.25"
+      fill="none"
+      stroke="rgba(255,255,255,0.42)"
+      strokeWidth="1.35"
+      strokeLinecap="round"
+    />
   </g>
 )
 
@@ -157,11 +163,44 @@ const ClimaIcon = ({ type, size = 34 }) => {
 }
 
 const ACCESOS_HOME = [
-  { id: 'pedidos',   emoji: '🙋', label: 'Pedidos' },
-  { id: 'comercios', emoji: '🏪', label: 'Comercios' },
+  { id: 'eventos',   emoji: '📅', label: 'Eventos' },
   { id: 'noticias',  emoji: '📰', label: 'Noticias' },
   { id: 'alertas',   emoji: '🚨', label: 'Alertas' },
 ]
+
+const ACTIVIDAD_VISIBLE_INICIAL = 10
+
+const fechaEventoPortada = (start, end) => {
+  if (!start) return 'Fecha por confirmar'
+  const startDate = new Date(start)
+  if (Number.isNaN(startDate.getTime())) return 'Fecha por confirmar'
+  const day = new Intl.DateTimeFormat('es-CL', {
+    weekday: 'short',
+    day: 'numeric',
+    month: 'short',
+  }).format(startDate)
+  const startTime = new Intl.DateTimeFormat('es-CL', {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  }).format(startDate)
+  if (!end) return `${day} · ${startTime}`
+  const endDate = new Date(end)
+  if (Number.isNaN(endDate.getTime())) return `${day} · ${startTime}`
+  const endTime = new Intl.DateTimeFormat('es-CL', {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  }).format(endDate)
+  return `${day} · ${startTime}–${endTime}`
+}
+
+const etiquetaEvento = (event) => {
+  const raw = event?.category || event?.event_type || 'Actividad'
+  return String(raw)
+    .replace(/[_-]+/g, ' ')
+    .replace(/\b\w/g, letter => letter.toUpperCase())
+}
 
 /* ── Íconos lineales (verde marca) para títulos de sección ──
    Mismo lenguaje visual que el TabBar: trazo 1.9, sin relleno,
@@ -257,34 +296,29 @@ const haversine = (lat1, lng1, lat2, lng2) => {
   return Math.round(R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)))
 }
 
-// Convierte un hex (#dc2626) a rgba con alpha. Se usa para que cada
-// tarjeta de alerta tenga su halo pulse del color de su categoría
-// (seguridad=rojo, salud=verde, infra=naranja, mascotas=violeta, otro=gris).
-// Si el hex viene mal, cae a rojo por defecto (color de seguridad).
-const hexToRgba = (hex, alpha) => {
-  if (!hex || typeof hex !== 'string') return `rgba(220,38,38,${alpha})`
-  const h = hex.replace('#', '').trim()
-  if (h.length !== 6) return `rgba(220,38,38,${alpha})`
-  const r = parseInt(h.substring(0, 2), 16)
-  const g = parseInt(h.substring(2, 4), 16)
-  const b = parseInt(h.substring(4, 6), 16)
-  return `rgba(${r},${g},${b},${alpha})`
-}
-
 function Home({ currentUser, onNavigate, onCrear }) {
   const [profile, setProfile] = useState(null)
   const [barrio, setBarrio] = useState(null)
   const [alertas, setAlertas] = useState([])
+  const [alertasVecinales, setAlertasVecinales] = useState([])
   const [pedidos, setPedidos] = useState([])
   const [ventas, setVentas] = useState([])
   const [regalos, setRegalos] = useState([])
   const [eventos, setEventos] = useState([])
+  const [eventoPortada, setEventoPortada] = useState(null)
   const [actividad, setActividad] = useState([])
   const [noLeidos, setNoLeidos] = useState(0)
   const [clima, setClima] = useState(null)
   const [verFarmacias, setVerFarmacias] = useState(false)
-  const [farmaciasLista, setFarmaciasLista] = useState(FARMACIAS)
+  const [farmaciasLista, setFarmaciasLista] = useState(() => FARMACIAS.map(farmacia => ({ ...farmacia, is_active: true, is_on_duty: true })))
+  const farmaciasTurno = farmaciasLista.filter(farmacia => farmacia.is_on_duty === true)
+  const farmaciasOtras = farmaciasLista.filter(farmacia => farmacia.is_on_duty !== true)
   const [cargando, setCargando] = useState(true)
+  const [feedError, setFeedError] = useState('')
+  const [refrescando, setRefrescando] = useState(false)
+  const [pullDistance, setPullDistance] = useState(0)
+  const pullStartY = useRef(null)
+  const pullDistanceRef = useRef(0)
 
   // ── Cargar farmacias desde Supabase ──
   // Si la query ERROR (tabla no existe, RLS cae): usamos fallback硬code.
@@ -306,7 +340,7 @@ function Home({ currentUser, onNavigate, onCrear }) {
       } catch (e) {
         // Solo acá (tabla rota/no existe) caemos al fallback硬code.
         console.warn('[home] farmacias BD falló, uso fallback:', e?.message)
-        if (!cancelado) setFarmaciasLista(FARMACIAS)
+        if (!cancelado) setFarmaciasLista(FARMACIAS.map(farmacia => ({ ...farmacia, is_active: true, is_on_duty: true })))
       }
     })()
     return () => { cancelado = true }
@@ -315,6 +349,27 @@ function Home({ currentUser, onNavigate, onCrear }) {
   const [verBuscador, setVerBuscador] = useState(false)
   const [verMasActividad, setVerMasActividad] = useState(false)
   const [userCoords, setUserCoords] = useState(null)
+
+  // La campana representa notificaciones de la app, no mensajes del chat.
+  useEffect(() => {
+    if (!profile?.id) return undefined
+    let active = true
+    const cargarNotificacionesNoLeidas = async () => {
+      const { count, error } = await supabase
+        .from('notifications')
+        .select('id', { count: 'exact', head: true })
+        .eq('user_id', profile.id)
+        .is('read_at', null)
+        .or('read.is.null,read.eq.false')
+      if (!error && active) setNoLeidos(count || 0)
+    }
+    cargarNotificacionesNoLeidas()
+    const channel = supabase
+      .channel(`home-notifications-${profile.id}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'notifications', filter: `user_id=eq.${profile.id}` }, cargarNotificacionesNoLeidas)
+      .subscribe()
+    return () => { active = false; supabase.removeChannel(channel) }
+  }, [profile?.id])
 
   // ── CACHE LOCAL (stale-while-revalidate) ──
   // La primera vez que entra, baja todo y lo guarda en localStorage con
@@ -341,20 +396,26 @@ function Home({ currentUser, onNavigate, onCrear }) {
   const escribirCache = (data) => {
     try {
       localStorage.setItem(CACHE_KEY, JSON.stringify({ ...data, ts: Date.now() }))
-    } catch {}
+    } catch {
+      // El cache es una mejora de rendimiento; la app funciona sin él.
+    }
   }
 
   useEffect(() => {
     // 1) Pintar cache instantáneamente si existe (sin spinner).
     const cache = leerCache()
     if (cache) {
+      // Estado externo persistido: hidratarlo aquí evita un frame vacío.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setProfile(cache.profile)
       setBarrio(cache.barrio)
       setAlertas(cache.alertas || [])
+      setAlertasVecinales(cache.alertasVecinales || [])
       setPedidos(cache.pedidos || [])
       setVentas(cache.ventas || [])
       setRegalos(cache.regalos || [])
       setEventos(cache.eventos || [])
+      setEventoPortada(cache.eventoPortada || null)
       setActividad(cache.actividad || [])
       setNoLeidos(cache.noLeidos || 0)
       setClima(cache.clima || null)
@@ -368,7 +429,7 @@ function Home({ currentUser, onNavigate, onCrear }) {
     }
     // 2) Lanzar refresh en background (stale-while-revalidate).
     cargar(cache?.profile?.neighborhood_id)
-  }, [currentUser?.id])
+  }, [currentUser?.id]) // eslint-disable-line react-hooks/exhaustive-deps -- hidrata una vez por usuario
 
   // GPS del usuario: pedimos una vez al montar el Home.
   // Si lo acepta, guardamos las coords para (a) calcular distancia a cada
@@ -401,16 +462,17 @@ function Home({ currentUser, onNavigate, onCrear }) {
     if (!fresco) {
       cargarClima(userCoords.lat, userCoords.lng)
     }
-  }, [userCoords?.lat, userCoords?.lng])
+  }, [userCoords?.lat, userCoords?.lng]) // eslint-disable-line react-hooks/exhaustive-deps -- solo al cambiar la ubicación
 
   // neighborhoodIdOpt: si viene del cache, arrancamos las queries en paralelo
   // SIN esperar el profile del servidor (ya lo tenemos del cache). Eso
   // ahorra 200-400ms de query serial bloqueante.
-  const cargar = async (neighborhoodIdOpt) => {
+  async function cargar(neighborhoodIdOpt) {
     if (!currentUser?.id) return
     // Solo mostramos spinner si NO tenemos cache (primera vez).
     const cache = leerCache()
     if (!cache) setCargando(true)
+    setFeedError('')
     try {
       // ── Paso 1 (paralelo con todo): profile del usuario ──
       // Si tenemos neighborhood_id del cache, no necesitamos esperar el
@@ -424,7 +486,10 @@ function Home({ currentUser, onNavigate, onCrear }) {
         // Primera vez: esperamos el profile (no hay otra opción).
         const { data: pData } = await profilePromise
         p = pData
-        if (!p) return
+        if (!p) {
+          setFeedError('No pudimos encontrar tu perfil vecinal.')
+          return
+        }
         setProfile(p)
       }
 
@@ -433,10 +498,10 @@ function Home({ currentUser, onNavigate, onCrear }) {
       // ── Paso 2: 4 queries en paralelo (antes eran 9) ──
       // Unificamos pedidos/ventas/regalos/eventos/actividad en UNA sola
       // query a posts con type IN (...) y limit alto. Particionamos en JS.
-      const TIPOS_FEED = ['request', 'sell', 'gift', 'trade', 'event', 'general']
+      const TIPOS_FEED = ['request', 'sell', 'gift', 'trade', 'event', 'news', 'general']
       const selectPost = '*, author:profiles!author_id (full_name, avatar_url, badge_founder, verified)'
 
-      const [profileRes, hoodRes, alertRes, postsRes, msgRes] = await Promise.all([
+      const [profileRes, hoodRes, alertRes, postsRes, msgRes, spotlightRes] = await Promise.all([
         // Refresca el profile en background si lo teníamos del cache.
         cache ? profilePromise : Promise.resolve({ data: p }),
         supabase.from('neighborhoods').select('*')
@@ -459,10 +524,31 @@ function Home({ currentUser, onNavigate, onCrear }) {
           .order('created_at', { ascending: false })
           .limit(60),
 
-        supabase.from('messages')
+        supabase.from('notifications')
           .select('id', { count: 'exact', head: true })
-          .eq('receiver_id', p.id).eq('read', false),
+          .eq('user_id', p.id).is('read_at', null)
+          .or('read.is.null,read.eq.false'),
+
+        supabase.from('posts')
+          .select(selectPost)
+          .eq('neighborhood_id', neighborhoodId)
+          .eq('type', 'event')
+          .eq('status', 'active')
+          .eq('show_on_home', true)
+          .gte('starts_at', new Date().toISOString())
+          .order('starts_at', { ascending: true })
+          .limit(1)
+          .maybeSingle(),
       ])
+
+      if (hoodRes.error) throw hoodRes.error
+      if (postsRes.error) throw postsRes.error
+      if (spotlightRes.error) {
+        // La portada editorial falla cerrada: si la migración aún no existe o
+        // la consulta falla, Inicio sigue funcionando y no muestra el bloque.
+        console.warn('[home] portada editorial no disponible:', spotlightRes.error.message)
+      }
+      const spotlightEvent = spotlightRes.error ? null : spotlightRes.data
 
       // Si el profile refrescado trae datos nuevos, los usamos.
       const profileFresco = profileRes?.data || p
@@ -470,27 +556,24 @@ function Home({ currentUser, onNavigate, onCrear }) {
 
       setBarrio(hoodRes.data)
 
-      // Alertas: SOLO aparecen en la sección "Alertas" del feed las
-      // alertas OFICIALES (is_official = true), que las sube el admin
-      // (tú) desde el panel de administración o directo en Supabase.
-      // Las alertas que publican vecinos comunes (is_official != true)
-      // se consultan desde el centro de alertas, pero no se mezclan con
-      // la portada ni con el feed social de Actividad.
+      // Las alertas oficiales usan la huincha destacada de portada. Las
+      // alertas vecinales activas se incorporan inmediatamente a Actividad.
       // Filtramos expiradas en JS (no en el servidor) para no romper si
       // la columna expires_at no existe en el schema.
       if (alertRes.error) {
         console.error('[el barrio] Error cargando alertas:', alertRes.error)
+        setFeedError('La actividad cargó, pero no pudimos actualizar las alertas.')
       }
       const ahoraMs = Date.now()
       const todasLasAlertas = (alertRes.data || []).filter((a) => {
         if (!a.expires_at) return true
         return new Date(a.expires_at).getTime() > ahoraMs
       })
-      // Oficiales → sección "Alertas" (arriba)
-      const alertasActivas = todasLasAlertas.filter((a) => {
-        return a.is_official === true || a.is_official === 'true'
-      })
+      // Solo las marcadas oficialmente usan la huincha destacada del Home.
+      const alertasActivas = todasLasAlertas.filter((a) => a.is_official === true)
+      const alertasVecinalesActivas = todasLasAlertas.filter((a) => a.is_official !== true)
       setAlertas(alertasActivas)
+      setAlertasVecinales(alertasVecinalesActivas)
 
       // ── Particionar posts por type (en vez de 6 queries) ──
       const todos = postsRes.data || []
@@ -507,14 +590,15 @@ function Home({ currentUser, onNavigate, onCrear }) {
       const ventas = todos.filter((x) => x.type === 'sell').slice(0, 10)
       const regalos = todos.filter((x) => x.type === 'gift' || x.type === 'trade').slice(0, 10)
       const eventos = todos.filter((x) => x.type === 'event').slice(0, 10)
-      // Actividad es el feed social: solo publicaciones generales.
-      // Pedidos, alertas, mercado y eventos ya tienen su propia sección.
-      const actividad = todos.filter((x) => x.type === 'general').slice(0, 20)
+      // Las publicaciones generales y noticias editoriales forman la base de
+      // Actividad; las alertas vecinales activas se incorporan más abajo.
+      const actividad = todos.filter((x) => x.type === 'general' || (x.type === 'news' && x.show_in_activity === true)).slice(0, 20)
 
       setPedidos(pedidosActivos)
       setVentas(ventas)
       setRegalos(regalos)
       setEventos(eventos)
+      setEventoPortada(spotlightEvent || null)
       setActividad(actividad)
       setNoLeidos(msgRes.count || 0)
 
@@ -523,8 +607,9 @@ function Home({ currentUser, onNavigate, onCrear }) {
         profile: profileFresco,
         barrio: hoodRes.data,
         alertas: alertasActivas,
+        alertasVecinales: alertasVecinalesActivas,
         pedidos: pedidosActivos,
-        ventas, regalos, eventos, actividad,
+        ventas, regalos, eventos, eventoPortada: spotlightEvent || null, actividad,
         noLeidos: msgRes.count || 0,
         clima: cache?.clima || null,
       })
@@ -549,12 +634,15 @@ function Home({ currentUser, onNavigate, onCrear }) {
       }
     } catch (err) {
       console.error('Error cargando el radar:', err)
+      setFeedError(cache
+        ? 'No pudimos actualizar el Inicio. Sigues viendo la última información disponible.'
+        : 'No pudimos cargar la actividad de tu barrio. Revisa tu conexión e inténtalo nuevamente.')
     } finally {
       setCargando(false)
     }
   }
 
-  const cargarClima = async (lat, lng) => {
+  async function cargarClima(lat, lng) {
     if (!lat || !lng) return
     try {
       const r = await fetch(
@@ -579,23 +667,84 @@ function Home({ currentUser, onNavigate, onCrear }) {
           escribirCache({ ...cache, clima: nuevoClima })
         }
       }
-    } catch {}
+    } catch {
+      // El bloque de clima se omite si el proveedor temporalmente no responde.
+    }
+  }
+
+  const actualizarPullDistance = (value) => {
+    const next = Math.max(0, Math.min(value, 68))
+    pullDistanceRef.current = next
+    setPullDistance(next)
+  }
+
+  const onPullStart = (event) => {
+    if (event.currentTarget.scrollTop > 0 || refrescando) return
+    pullStartY.current = event.touches?.[0]?.clientY ?? null
+  }
+
+  const onPullMove = (event) => {
+    if (pullStartY.current == null || event.currentTarget.scrollTop > 0) return
+    const currentY = event.touches?.[0]?.clientY
+    if (currentY == null) return
+    actualizarPullDistance((currentY - pullStartY.current) * 0.42)
+  }
+
+  const onPullEnd = async () => {
+    const shouldRefresh = pullDistanceRef.current >= 44
+    pullStartY.current = null
+    actualizarPullDistance(0)
+    if (!shouldRefresh || refrescando) return
+
+    setRefrescando(true)
+    const startedAt = Date.now()
+    await cargar(profile?.neighborhood_id)
+    const elapsed = Date.now() - startedAt
+    if (elapsed < 450) {
+      await new Promise((resolve) => setTimeout(resolve, 450 - elapsed))
+    }
+    setRefrescando(false)
   }
 
   const nav = onNavigate || (() => {})
   const crear = onCrear || (() => {})
 
-  // Buscador filtra sobre TODOS los posts visibles (actividad + ventas + regalos + eventos)
-  const todosLosPosts = [...actividad, ...ventas, ...regalos, ...eventos]
+  // Pedidos y alertas de vecinos son actividad del barrio. Las alertas
+  // conservan su id real para abrir su detalle, pero adoptan el formato del feed.
+  const alertasActividad = alertasVecinales.map((alerta) => ({
+    ...alerta,
+    id: `incident-${alerta.id}`,
+    incidentId: alerta.id,
+    type: 'alert',
+    title: alerta.title || alerta.description?.slice(0, 60) || 'Alerta vecinal',
+    content: alerta.description || null,
+    author: alerta.reporter || null,
+    __incident: true,
+  }))
+  const eventosActividad = eventos.filter((evento) => evento.show_in_activity === true)
+  const eventoDestacado = eventoPortada
+  const eventosActividadSecundarios = eventoDestacado
+    ? eventosActividad.filter(evento => evento.id !== eventoDestacado.id)
+    : eventosActividad
+  const actividadBarrio = [...pedidos, ...alertasActividad, ...eventosActividadSecundarios, ...actividad].sort((a, b) =>
+    new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+  )
+
+  // Buscador filtra sobre TODOS los posts visibles.
+  const todosLosPosts = [
+    ...actividadBarrio,
+    ...ventas,
+    ...regalos,
+    ...eventos.filter((evento) => evento.show_in_activity !== true),
+  ]
   const filtrados = busqueda.trim()
     ? todosLosPosts.filter((p) =>
         (p.title || '').toLowerCase().includes(busqueda.toLowerCase()) ||
         (p.content || '').toLowerCase().includes(busqueda.toLowerCase()))
-    : actividad
+    : actividadBarrio
 
   const onAcceso = (id) => {
     if (id === 'pedidos') crear('request')
-    else if (id === 'comercios') nav('comercios')
     else if (id === 'noticias') nav('noticias')
     else if (id === 'alertas') nav('alertas')
     else nav(id)
@@ -624,62 +773,32 @@ function Home({ currentUser, onNavigate, onCrear }) {
   return (
     <div style={s.wrap}>
 
-      {/* ══════ Keyframes inyectados: pulse radial para tarjetas de alerta ══════
-          El color del halo lo define cada tarjeta vía --pulse-color (CSS var),
-          así cada alerta pulsea con el color de su categoría (seguridad=rojo,
-          salud=verde, infra=naranja, mascotas=violeta, otro=gris). */}
+      {/* ══════ Animaciones del clima ══════ */}
       <style>{`
-        @keyframes elBarrioPulse {
-          0%   { box-shadow: 0 0 0 0 var(--pulse-color, rgba(220,38,38,0.35)); }
-          70%  { box-shadow: 0 0 0 10px transparent; }
-          100% { box-shadow: 0 0 0 0 transparent; }
-        }
-        .alerta-pulse { animation: elBarrioPulse 2.4s ease-out infinite; }
-
-        @keyframes climaFlotar {
-          0%, 100% { transform: translateY(1px) scale(1); }
-          50% { transform: translateY(-4px) scale(1.04); }
-        }
-        @keyframes climaGirar {
-          0% { transform: rotate(-8deg) scale(1); }
-          50% { transform: rotate(8deg) scale(1.06); }
-          100% { transform: rotate(-8deg) scale(1); }
-        }
         @keyframes climaLlover {
-          0% { transform: translateY(-1px); opacity: 0.25; }
-          45% { opacity: 1; }
-          100% { transform: translateY(3px); opacity: 0.2; }
+          0% { transform: translateY(-0.5px); opacity: 0.35; }
+          50% { opacity: 0.9; }
+          100% { transform: translateY(2px); opacity: 0.25; }
         }
-        .clima-svg { transform-origin: center; }
-        .clima-sun { animation: climaGirar 3.2s ease-in-out infinite; }
-        .clima-parcial,
-        .clima-nublado,
-        .clima-neblina,
-        .clima-lluvia,
-        .clima-nieve,
-        .clima-chubascos,
-        .clima-tormenta { animation: climaFlotar 2.8s ease-in-out infinite; }
         .clima-gota {
-          animation: climaLlover 1.25s ease-in infinite;
+          animation: climaLlover 1.55s ease-in-out infinite;
           transform-box: fill-box;
           transform-origin: center;
         }
         .clima-gota-2 { animation-delay: 0.35s; }
         .clima-gota-3 { animation-delay: 0.7s; }
         .clima-precipitacion {
-          animation: climaLlover 0.95s linear infinite;
-          transform-box: fill-box;
-          transform-origin: center;
+          transform: none;
         }
         .clima-nieve-copos {
-          animation: climaLlover 1.6s ease-in-out infinite;
+          animation: climaLlover 2.1s ease-in-out infinite;
           transform-box: fill-box;
           transform-origin: center;
         }
-
-        @media (prefers-reduced-motion: reduce) {
-          .alerta-pulse { animation: none !important; }
+        @keyframes homeRefreshSpin {
+          to { transform: rotate(360deg); }
         }
+
       `}</style>
 
       {/* ══════ CABECERA ══════ */}
@@ -724,7 +843,34 @@ function Home({ currentUser, onNavigate, onCrear }) {
         )}
       </div>
 
-      <div style={s.scroll}>
+      <div
+        style={s.scroll}
+        onTouchStart={onPullStart}
+        onTouchMove={onPullMove}
+        onTouchEnd={onPullEnd}
+        onTouchCancel={onPullEnd}
+      >
+        <div
+          style={{
+            ...s.pullRefresh,
+            height: refrescando ? 38 : pullDistance,
+            opacity: refrescando ? 1 : Math.min(pullDistance / 44, 1),
+          }}
+        >
+          <span style={{
+            ...s.pullRefreshIcon,
+            transform: refrescando ? undefined : `rotate(${Math.min(pullDistance * 4, 180)}deg)`,
+            animation: refrescando ? 'homeRefreshSpin 750ms linear infinite' : 'none',
+          }}>↻</span>
+          <span>{refrescando ? 'Actualizando' : 'Suelta para actualizar'}</span>
+        </div>
+
+        {feedError && (
+          <div style={s.feedError} role="alert">
+            <span>{feedError}</span>
+            <button type="button" style={s.feedErrorButton} onClick={() => cargar(profile?.neighborhood_id)}>Reintentar</button>
+          </div>
+        )}
 
         {/* ══════ CLIMA + FARMACIA ══════ */}
         {clima && (
@@ -740,20 +886,99 @@ function Home({ currentUser, onNavigate, onCrear }) {
 
             <div style={s.tiraDivisor} />
 
-            {farmaciasLista.length > 0 && (
+            {farmaciasTurno.length > 0 && (
               <button style={s.farmaciaBloque} onClick={() => setVerFarmacias(true)}>
                 <div style={s.farmaciaLabel}>
                   💊 Farmacia de turno
-                  {farmaciasLista.length > 1 && (
-                    <span style={s.farmaciaMas}> +{farmaciasLista.length - 1}</span>
+                  {farmaciasTurno.length > 1 && (
+                    <span style={s.farmaciaMas}> +{farmaciasTurno.length - 1}</span>
                   )}
                 </div>
-                <div style={s.farmaciaNombre}>{farmaciasLista[0].nombre}</div>
+                <div style={s.farmaciaNombre}>{farmaciasTurno[0].nombre}</div>
                 <div style={s.farmaciaDir}>
-                  {farmaciasLista[0].direccion} · {farmaciasLista[0].horario}
+                  {farmaciasTurno[0].direccion} · {farmaciasTurno[0].horario}
                 </div>
               </button>
             )}
+          </div>
+        )}
+
+        {/* ══════ HOY EN TU BARRIO — evento real elegido desde el panel ══════ */}
+        {!buscando && eventoDestacado && (
+          <section style={s.spotlightSection} aria-label="Hoy en tu barrio">
+            <div style={s.spotlightHeading}>
+              <span>Hoy en tu barrio</span>
+              <small style={s.spotlightHeadingMeta}>Actividad destacada</small>
+            </div>
+            <button
+              type="button"
+              style={s.spotlightCard}
+              onClick={() => nav('eventdetail', { postId: eventoDestacado.id })}
+            >
+              <span style={{
+                ...s.spotlightVisual,
+                ...(eventoDestacado.images?.[0]
+                  ? { backgroundImage: `linear-gradient(180deg, rgba(7,54,38,.03), rgba(7,54,38,.70)), url("${eventoDestacado.images[0]}")` }
+                  : {}),
+              }}>
+                <span style={s.spotlightOfficial}>EL BARRIO · ACTIVIDAD VECINAL</span>
+                {!eventoDestacado.images?.[0] && <span style={s.spotlightFallbackIcon}>🏘️</span>}
+              </span>
+              <span style={s.spotlightBody}>
+                <span style={s.spotlightBadges}>
+                  <span style={s.spotlightCategory}>{etiquetaEvento(eventoDestacado)}</span>
+                  <span style={s.spotlightSchedule}>{fechaEventoPortada(eventoDestacado.starts_at, eventoDestacado.ends_at)}</span>
+                </span>
+                <strong style={s.spotlightTitle}>{eventoDestacado.title || 'Actividad del barrio'}</strong>
+                {eventoDestacado.content && <span style={s.spotlightDescription}>{eventoDestacado.content}</span>}
+                <span style={s.spotlightFooter}>
+                  <span style={s.spotlightLocation}>
+                    <Ico.pin size={12} />
+                    {eventoDestacado.location_text || 'Lugar por confirmar'}
+                  </span>
+                  <span style={s.spotlightCta}>Ver detalles <b>→</b></span>
+                </span>
+              </span>
+            </button>
+          </section>
+        )}
+
+        {/* ══════ ALERTA OFICIAL (solo creada/marcada desde el panel) ══════ */}
+        {!buscando && alertas.length > 0 && (
+          <div style={{ ...s.seccion, marginBottom: 12 }}>
+            <div style={{ ...s.seccionTit, marginBottom: 7 }}>
+              <Ico.alerta color={C.rojo} />
+              <span style={s.seccionTxt}>Alerta oficial</span>
+              <button style={s.verTodasBtn} onClick={() => nav('alertas')}>
+                Ver alertas <span style={s.verTodasFlecha}>→</span>
+              </button>
+            </div>
+            {alertas.slice(0, 1).map((a) => {
+              const cat = REPORTES[a.category] || REPORTES.seguridad
+              const metros = (a.latitude && a.longitude && userCoords)
+                ? haversine(userCoords.lat, userCoords.lng, a.latitude, a.longitude)
+                : a.distance_meters
+              return (
+                <button
+                  key={a.id}
+                  style={s.alertaOficial}
+                  onClick={() => nav('alerta', { id: a.id })}
+                >
+                  <span style={{ ...s.alertaOficialIcono, color: cat.color }}>{cat.emoji}</span>
+                  <span style={s.alertaOficialContenido}>
+                    <span style={s.alertaOficialTitulo}>
+                      {(a.title && a.title.trim()) || a.description?.slice(0, 60) || 'Alerta del barrio'}
+                    </span>
+                    <span style={s.alertaOficialMeta}>
+                      <span style={s.alertaOficialBadge}>INFORMACIÓN OFICIAL</span>
+                      <span>· {hace(a.created_at)}</span>
+                      {metros != null && <span>· {metros} m</span>}
+                    </span>
+                  </span>
+                  <span style={s.alertaRowFlecha}>›</span>
+                </button>
+              )
+            })}
           </div>
         )}
 
@@ -783,88 +1008,6 @@ function Home({ currentUser, onNavigate, onCrear }) {
               <span style={s.pedirBarraCta}>¡Pídelo!</span>
             </button>
 
-            {pedidos.map((p) => (
-              <PedidoCard
-                key={p.id}
-                post={{ ...p, deadline: p.needed_by }}
-                onAyudar={(pedido) => nav('chat', {
-                  postId: pedido.id,
-                  mensajeInicial: '🙋 Me anoté para ayudarte con esto',
-                })}
-                onVerDetalle={(pedido) => nav('post', { postId: pedido.id })}
-              />
-            ))}
-          </div>
-        )}
-
-        {/* ══════ ALERTA OFICIAL (solo del panel admin, huincha full-width, máx 1) ══════
-            La portada muestra una sola alerta para mantener la jerarquía visual.
-            Layout: tarjetas horizontales delgadas (huincha), una arriba de
-            la otra, ocupando todo el ancho disponible. NO grilla de 2 columnas.
-            Pin: lineal verde marca, sin fondo blanco.
-            Texto: "Estás a xx m" (metros desde el user vía Haversine).
-            Radial: clase .alerta-pulse anima un halo suave del color de la cat. */}
-        {!buscando && alertas.length > 0 && (
-          <div style={{ ...s.seccion, marginBottom: 16 }}>
-            <div style={{ ...s.seccionTit, marginBottom: 7 }}>
-              <Ico.alerta />
-              <span style={s.seccionTxt}>Alerta oficial</span>
-              <button
-                style={s.verTodasBtn}
-                onClick={() => nav('alertas')}
-              >
-                Ver todas
-                <span style={s.verTodasFlecha}>→</span>
-              </button>
-            </div>
-
-            <div style={s.alertaLista}>
-              {alertas.slice(0, 1).map((a) => {
-                  const cat = REPORTES[a.category] || REPORTES.seguridad
-                  // Distancia: preferimos la calculada con Haversine desde
-                  // el GPS del user hasta la lat/lng de la alerta. Si no hay
-                  // GPS o la alerta no tiene coords, cae a distance_meters.
-                  const metros = (a.latitude && a.longitude && userCoords)
-                    ? haversine(userCoords.lat, userCoords.lng, a.latitude, a.longitude)
-                    : a.distance_meters
-                  return (
-                    <button
-                      key={a.id}
-                      className="alerta-pulse"
-                      style={{
-                        ...s.alertaRow,
-                        background: cat.bg,
-                        borderColor: cat.color,
-                        borderLeft: `3px solid ${cat.color}`,
-                        // El halo del pulse toma el color de la categoría.
-                        '--pulse-color': hexToRgba(cat.color, 0.35),
-                      }}
-                      onClick={() => nav('alerta', { id: a.id })}
-                    >
-                      <div style={{ ...s.alertaRowIcon, color: cat.color }}>
-                        <span style={{ fontSize: 14, lineHeight: 1 }}>{cat.emoji}</span>
-                      </div>
-                      <div style={s.alertaRowBody}>
-                        <div style={s.alertaRowTitle}>
-                          {(a.title && a.title.trim()) || a.description?.slice(0, 60) || 'Alerta'}
-                        </div>
-                        <div style={s.alertaRowPie}>
-                          <span style={s.alertaRowTime}>{hace(a.created_at)}</span>
-                          {metros != null && (
-                            <span style={s.alertaRowDist}>
-                              <Ico.pin size={10} color={C.verde} /> Estás a {metros} m
-                            </span>
-                          )}
-                          {a.confirms_count >= 3 && (
-                            <span style={s.alertaRowConf}>✅ {a.confirms_count}</span>
-                          )}
-                        </div>
-                      </div>
-                      <span style={s.alertaRowFlecha}>›</span>
-                    </button>
-                  )
-              })}
-            </div>
           </div>
         )}
 
@@ -897,7 +1040,7 @@ function Home({ currentUser, onNavigate, onCrear }) {
           </div>
         )}
 
-        {/* ══════ ACTIVIDAD DE EL BARRIO (vertical, 6 + "+ ver más") ══════
+        {/* ══════ ACTIVIDAD DE EL BARRIO (vertical, 10 + "+ ver más") ══════
             Feed principal — publicaciones generales de vecinos.
             Ahora queda ARRIBA de Eventos para que no se pierda. */}
         <div style={s.seccion}>
@@ -916,13 +1059,22 @@ function Home({ currentUser, onNavigate, onCrear }) {
             </div>
           ) : (
             <>
-              {filtrados.slice(0, verMasActividad ? filtrados.length : 6).map((p) => {
-                const t = TIPOS[p.type] || TIPOS.general
+              {filtrados.slice(0, verMasActividad ? filtrados.length : ACTIVIDAD_VISIBLE_INICIAL).map((p) => {
+                const reporte = p.__incident ? (REPORTES[p.category] || REPORTES.seguridad) : null
+                const t = reporte
+                  ? { ...reporte, corto: reporte.label }
+                  : (TIPOS[p.type] || TIPOS.general)
                 return (
                   <div
                     key={p.id}
                     style={s.postCard}
-                    onClick={() => nav('post', { postId: p.id })}
+                    onClick={() => p.__incident
+                      ? nav('alerta', { id: p.incidentId })
+                      : p.type === 'event'
+                        ? nav('eventdetail', { postId: p.id })
+                        : p.type === 'news'
+                          ? nav('noticias')
+                      : nav('post', { postId: p.id })}
                   >
                     <div style={{ ...s.postFoto, background: t.bg }}>
                       {p.images?.[0]
@@ -930,45 +1082,44 @@ function Home({ currentUser, onNavigate, onCrear }) {
                         : <span style={s.postEmoji}>{t.emoji}</span>}
                     </div>
 
-                    <div style={s.postInfo}>
-                      <div style={s.postChips}>
+                    <div style={{
+                      ...s.postInfo,
+                      ...(p.__incident ? s.alertActivityInfo : {}),
+                    }}>
+                      <div style={s.postTit}>{p.title}</div>
+                      {p.content && <div style={s.postTxt}>{p.content}</div>}
+
+                      <div style={s.postMetaRow}>
                         <span style={{ ...s.chip, background: t.bg, color: t.color }}>
                           {t.corto}
+                        </span>
+                        <span style={s.postAutorTop}>
+                          <span style={s.postAutorSep}>|</span>
+                          <span>Por {(p.author?.full_name || 'Vecino').split(' ')[0]}</span>
+                          {p.author?.verified && <span style={s.verificadoMini}>✓</span>}
+                          {p.author?.badge_founder && <span style={s.fundadorBadge} title="Vecino fundador" aria-label="Vecino fundador">🏅</span>}
+                          <span>· {hace(p.created_at)}</span>
                         </span>
                         {p.price > 0 && <span style={s.precio}>{plata(p.price)}</span>}
                         {p.is_negotiable && <span style={s.chipNeg}>Conversable</span>}
                       </div>
-
-                      <div style={s.postTit}>{p.title}</div>
-                      {p.content && <div style={s.postTxt}>{p.content}</div>}
-
-                      <div style={s.postPie}>
-                        <span style={s.autorAvatar}>
-                          {p.author?.avatar_url
-                            ? <img src={p.author.avatar_url} alt="" style={s.autorImg} />
-                            : iniciales(p.author?.full_name)}
-                        </span>
-                        <span style={s.autorNombre}>
-                          {(p.author?.full_name || 'Vecino').split(' ')[0]}
-                        </span>
-                        {p.author?.verified && <span style={s.badgeMini}>✅</span>}
-                        {p.author?.badge_founder && <span style={s.badgeMini}>⭐</span>}
-                        <span style={s.postMeta}>· {hace(p.created_at)}</span>
-                      </div>
                     </div>
+                    {p.__incident && (
+                      <span style={s.alertActivityBeacon} aria-label="Alerta vecinal">🚨</span>
+                    )}
                   </div>
                 )
               })}
 
-              {!verMasActividad && filtrados.length > 6 && (
+              {!verMasActividad && filtrados.length > ACTIVIDAD_VISIBLE_INICIAL && (
                 <button
                   style={s.verMasBtn}
                   onClick={() => setVerMasActividad(true)}
                 >
-                  + ver más ({filtrados.length - 6})
+                  + ver más ({filtrados.length - ACTIVIDAD_VISIBLE_INICIAL})
                 </button>
               )}
-              {verMasActividad && filtrados.length > 6 && (
+              {verMasActividad && filtrados.length > ACTIVIDAD_VISIBLE_INICIAL && (
                 <button
                   style={s.verMasBtn}
                   onClick={() => setVerMasActividad(false)}
@@ -1008,43 +1159,46 @@ function Home({ currentUser, onNavigate, onCrear }) {
       {verFarmacias && (
         <div style={s.modalFondo} onClick={() => setVerFarmacias(false)}>
           <div style={s.modalCaja} onClick={(e) => e.stopPropagation()}>
-            <div style={s.modalTit}>💊 Farmacias de turno hoy</div>
+            <div style={s.modalTit}>💊 Farmacias del barrio</div>
+            <div style={s.modalContenido}>
+              {[
+                { title: 'De turno ahora', items: farmaciasTurno, duty: true },
+                { title: 'Otras farmacias cercanas', items: farmaciasOtras, duty: false },
+              ].filter(group => group.items.length > 0).map(group => (
+                <section key={group.title} style={s.farmGrupo}>
+                  <div style={s.farmGrupoTit}>{group.title}<span>{group.items.length}</span></div>
+                  {group.items.map((f, i) => (
+                    <div key={f.id || `${group.title}-${i}`} style={{ ...s.farmCard, ...(group.duty ? s.farmCardDuty : {}) }}>
+                      <div style={s.farmCardTop}><div style={s.farmNombre}>{f.nombre}</div>{group.duty && <span style={s.farmDutyBadge}>De turno</span>}</div>
+                      <div style={s.farmDir}>📍 {f.direccion}{f.comuna ? ', ' + f.comuna : ''}</div>
+                      <div style={s.farmHora}>🕐 {f.horario || '24 horas'}</div>
 
-            {farmaciasLista.map((f, i) => (
-              <div key={f.id || i} style={s.farmCard}>
-                <div style={s.farmNombre}>{f.nombre}</div>
-                <div style={s.farmDir}>📍 {f.direccion}{f.comuna ? ', ' + f.comuna : ''}</div>
-                <div style={s.farmHora}>🕐 {f.horario || '24 horas'}</div>
-
-                <div style={s.farmBtns}>
-                  <button
-                    style={s.farmBtn}
-                    onClick={() => {
-                      // Google Maps "Cómo llegar" — igual que en ComercioDetalle.
-                      // Si hay lat/lng, usa coordenadas (más preciso).
-                      // Si no, usa la dirección textual.
-                      const dest = (f.lat != null && f.lng != null)
-                        ? `${f.lat},${f.lng}`
-                        : encodeURIComponent(`${f.direccion}${f.comuna ? ', ' + f.comuna : ', Santiago, Chile'}`)
-                      window.open(
-                        `https://www.google.com/maps/dir/?api=1&destination=${dest}`,
-                        '_blank'
-                      )
-                    }}
-                  >
-                    📍 Cómo llegar
-                  </button>
-                  {f.telefono && (
-                    <button
-                      style={{ ...s.farmBtn, background: C.verde, color: '#fff' }}
-                      onClick={() => window.open(`tel:${f.telefono}`)}
-                    >
-                      📞 Llamar
-                    </button>
-                  )}
-                </div>
-              </div>
-            ))}
+                      <div style={s.farmBtns}>
+                        <button
+                          style={s.farmBtn}
+                          onClick={() => {
+                            const lat = Number(f.lat)
+                            const lng = Number(f.lng)
+                            const hasCoordinates = f.lat !== null && f.lat !== undefined && f.lat !== '' && f.lng !== null && f.lng !== undefined && f.lng !== ''
+                            const validCoordinates = hasCoordinates && Number.isFinite(lat) && Number.isFinite(lng) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180
+                            const destination = validCoordinates
+                              ? `${lat},${lng}`
+                              : [f.direccion, f.comuna, 'Chile'].filter(Boolean).join(', ')
+                            const mapsUrl = new URL('https://www.google.com/maps/dir/')
+                            mapsUrl.searchParams.set('api', '1')
+                            mapsUrl.searchParams.set('destination', destination)
+                            window.open(mapsUrl.toString(), '_blank', 'noopener,noreferrer')
+                          }}
+                        >
+                          📍 Cómo llegar
+                        </button>
+                        {f.telefono && <button style={{ ...s.farmBtn, background: C.verde, color: '#fff' }} onClick={() => window.open(`tel:${f.telefono}`)}>📞 Llamar</button>}
+                      </div>
+                    </div>
+                  ))}
+                </section>
+              ))}
+            </div>
 
             <button style={s.modalCerrar} onClick={() => setVerFarmacias(false)}>
               Cerrar
@@ -1071,7 +1225,7 @@ const s = {
   /* ── cabecera ── */
   header: {
     background: C.card,
-    padding: '28px 18px 10px',
+    padding: 'var(--home-header-safe-top, 34px) 18px 10px',
     borderBottom: `1px solid ${C.borde}`,
     flexShrink: 0,
   },
@@ -1121,7 +1275,31 @@ const s = {
     boxSizing: 'border-box',
   },
 
-  scroll: { flex: 1, overflowY: 'auto', padding: '6px 16px 120px' },
+  scroll: {
+    flex: 1, overflowY: 'auto', padding: '6px 16px 120px',
+    overscrollBehaviorY: 'contain', WebkitOverflowScrolling: 'touch',
+  },
+  pullRefresh: {
+    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7,
+    overflow: 'hidden', color: C.verdeOsc,
+    fontSize: 10.5, fontWeight: 600,
+    transition: 'height 180ms ease, opacity 140ms ease',
+  },
+  pullRefreshIcon: {
+    width: 18, height: 18, borderRadius: '50%',
+    display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+    color: C.verde, fontSize: 18, lineHeight: 1,
+  },
+  feedError: {
+    minHeight: 46, margin: '0 0 12px', padding: '9px 10px 9px 12px',
+    display: 'flex', alignItems: 'center', gap: 9,
+    border: '1px solid #fed7aa', borderRadius: 12,
+    color: '#7c2d12', background: '#fff7ed', fontSize: 10.5, lineHeight: 1.4,
+  },
+  feedErrorButton: {
+    flex: '0 0 auto', minHeight: 30, padding: '0 9px', borderRadius: 9,
+    color: '#7c2d12', background: '#ffedd5', fontSize: 9.5, fontWeight: 800,
+  },
 
   /* ── clima + farmacia ── */
   tiraInfo: {
@@ -1158,6 +1336,141 @@ const s = {
   },
   farmaciaMas: { fontSize: 9, fontWeight: 700, color: C.verde },
 
+  /* ── actividad editorial destacada ── */
+  spotlightSection: { marginBottom: 15 },
+  spotlightHeading: {
+    minHeight: 30,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 10,
+    color: C.texto,
+    fontSize: 14,
+    fontWeight: 800,
+  },
+  spotlightHeadingMeta: {
+    color: C.textoTenue,
+    fontSize: 9.5,
+    fontWeight: 600,
+  },
+  spotlightCard: {
+    width: '100%',
+    padding: 0,
+    overflow: 'hidden',
+    display: 'block',
+    textAlign: 'left',
+    border: '1px solid #a7dbc4',
+    borderRadius: 18,
+    color: '#fff',
+    background: C.verdeOsc,
+    boxShadow: '0 8px 20px rgba(13,104,72,.13)',
+  },
+  spotlightVisual: {
+    position: 'relative',
+    minHeight: 104,
+    padding: 12,
+    display: 'flex',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    backgroundColor: '#d8efe5',
+    backgroundImage: 'linear-gradient(135deg,#d8efe5 0%,#f6d394 52%,#138864 100%)',
+    backgroundSize: 'cover',
+    backgroundPosition: 'center',
+  },
+  spotlightOfficial: {
+    padding: '5px 8px',
+    borderRadius: 7,
+    color: '#fff',
+    background: 'rgba(8,89,61,.88)',
+    boxShadow: '0 2px 8px rgba(0,0,0,.12)',
+    fontSize: 8.5,
+    fontWeight: 900,
+    letterSpacing: '.045em',
+  },
+  spotlightFallbackIcon: {
+    position: 'absolute',
+    right: 18,
+    bottom: 7,
+    fontSize: 48,
+    filter: 'drop-shadow(0 3px 6px rgba(0,0,0,.14))',
+  },
+  spotlightBody: {
+    padding: '12px 14px 13px',
+    display: 'block',
+    color: '#fff',
+    background: C.verdeOsc,
+  },
+  spotlightBadges: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 7,
+    minWidth: 0,
+  },
+  spotlightCategory: {
+    flex: '0 0 auto',
+    padding: '4px 7px',
+    borderRadius: 6,
+    color: '#07543a',
+    background: '#bde8d5',
+    fontSize: 8.5,
+    fontWeight: 900,
+    textTransform: 'uppercase',
+  },
+  spotlightSchedule: {
+    minWidth: 0,
+    overflow: 'hidden',
+    color: '#d7f2e7',
+    fontSize: 9.5,
+    fontWeight: 700,
+    whiteSpace: 'nowrap',
+    textOverflow: 'ellipsis',
+  },
+  spotlightTitle: {
+    marginTop: 8,
+    display: 'block',
+    fontSize: 16,
+    fontWeight: 800,
+    lineHeight: 1.25,
+    letterSpacing: '-.25px',
+  },
+  spotlightDescription: {
+    marginTop: 5,
+    display: '-webkit-box',
+    overflow: 'hidden',
+    color: '#e8f7f1',
+    fontSize: 11,
+    lineHeight: 1.42,
+    WebkitBoxOrient: 'vertical',
+    WebkitLineClamp: 2,
+  },
+  spotlightFooter: {
+    marginTop: 10,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 10,
+  },
+  spotlightLocation: {
+    minWidth: 0,
+    display: 'flex',
+    alignItems: 'center',
+    gap: 5,
+    overflow: 'hidden',
+    color: '#d7f2e7',
+    fontSize: 9.5,
+    whiteSpace: 'nowrap',
+    textOverflow: 'ellipsis',
+  },
+  spotlightCta: {
+    flex: '0 0 auto',
+    padding: '7px 9px',
+    borderRadius: 9,
+    color: C.verdeOsc,
+    background: '#fff',
+    fontSize: 9.5,
+    fontWeight: 800,
+  },
+
   modalFondo: {
     position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
     background: 'rgba(22,33,26,0.5)',
@@ -1168,13 +1481,20 @@ const s = {
     width: '100%', background: '#fff',
     borderRadius: 22, padding: 20,
     boxShadow: '0 20px 50px rgba(0,0,0,0.25)',
-    maxHeight: '80%', overflowY: 'auto',
+    maxHeight: '82%', overflow: 'hidden',
+    display: 'flex', flexDirection: 'column',
   },
-  modalTit: { fontSize: 18, fontWeight: 700, color: C.texto, marginBottom: 16 },
+  modalTit: { flexShrink: 0, fontSize: 18, fontWeight: 700, color: C.texto, marginBottom: 13 },
+  modalContenido: { minHeight: 0, flex: 1, overflowY: 'auto', paddingRight: 3, WebkitOverflowScrolling: 'touch' },
+  farmGrupo: { marginBottom: 14 },
+  farmGrupoTit: { marginBottom: 8, display: 'flex', alignItems: 'center', justifyContent: 'space-between', color: C.textoSuave, fontSize: 11, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '.04em' },
+  farmCardTop: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
   farmCard: {
     background: C.tira, border: `1px solid ${C.tiraBorde}`,
     borderRadius: 16, padding: 15, marginBottom: 11,
   },
+  farmCardDuty: { borderColor: '#8bd5a4', background: C.verdeBg },
+  farmDutyBadge: { flexShrink: 0, padding: '5px 8px', borderRadius: 999, color: '#fff', background: C.verde, fontSize: 9, fontWeight: 800 },
   farmNombre: { fontSize: 16, fontWeight: 700, color: C.texto },
   farmDir: { fontSize: 13.5, color: C.textoSuave, marginTop: 6, fontWeight: 500 },
   farmHora: { fontSize: 13.5, color: C.textoSuave, marginTop: 3, fontWeight: 500 },
@@ -1186,7 +1506,7 @@ const s = {
     cursor: 'pointer', fontFamily: 'inherit',
   },
   modalCerrar: {
-    width: '100%', padding: 14, marginTop: 4,
+    width: '100%', flexShrink: 0, padding: 14, marginTop: 8,
     background: C.fondo, border: `1px solid ${C.borde}`,
     borderRadius: 999, color: C.textoSuave,
     fontSize: 14.5, fontWeight: 700,
@@ -1195,8 +1515,8 @@ const s = {
 
   /* ── accesos ── */
   accesos: {
-    display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)',
-    gap: 9, marginBottom: 18,
+    display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)',
+    gap: 9, marginBottom: 10,
   },
   acceso: {
     display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6,
@@ -1337,6 +1657,35 @@ const s = {
   alertaLista: {
     display: 'flex', flexDirection: 'column', gap: 6,
     width: '100%',
+  },
+  alertaOficial: {
+    width: '100%', minHeight: 58,
+    display: 'flex', alignItems: 'center', gap: 10,
+    padding: '9px 11px', borderRadius: 11,
+    background: '#fff', border: 'none',
+    fontFamily: 'inherit', textAlign: 'left', cursor: 'pointer',
+    boxShadow: '0 2px 9px rgba(25, 38, 29, 0.09)',
+  },
+  alertaOficialIcono: {
+    width: 34, height: 34, borderRadius: 10,
+    background: '#fff5f5',
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    fontSize: 15, flexShrink: 0,
+  },
+  alertaOficialContenido: {
+    flex: 1, minWidth: 0,
+    display: 'flex', flexDirection: 'column', gap: 3,
+  },
+  alertaOficialMeta: {
+    display: 'flex', alignItems: 'center', gap: 5,
+    fontSize: 9, color: C.textoTenue, fontWeight: 500,
+  },
+  alertaOficialBadge: {
+    color: C.rojo, fontWeight: 800, letterSpacing: 0.45,
+  },
+  alertaOficialTitulo: {
+    fontSize: 13, fontWeight: 650, color: C.texto,
+    whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
   },
   alertaRow: {
     display: 'flex', alignItems: 'center', gap: 9,
@@ -1488,21 +1837,46 @@ const s = {
 
   /* ── posts verticales (Actividad, Option A) ── */
   postCard: {
+    position: 'relative',
     display: 'flex', gap: 12,
     background: C.card, borderRadius: 14, padding: 10,
     border: `1px solid ${C.borde}`,
     marginBottom: 9, cursor: 'pointer',
   },
+  alertActivityBeacon: {
+    position: 'absolute', top: 7, right: 8,
+    fontSize: 14, lineHeight: 1, pointerEvents: 'none',
+  },
+  alertActivityInfo: { paddingRight: 17 },
   postFoto: {
-    width: 56, height: 56, borderRadius: 11, flexShrink: 0, overflow: 'hidden',
+    width: 56, height: 'auto', minHeight: 56,
+    alignSelf: 'stretch', borderRadius: 11, flexShrink: 0, overflow: 'hidden',
     display: 'flex', alignItems: 'center', justifyContent: 'center',
   },
   postImg: { width: '100%', height: '100%', objectFit: 'cover' },
   postEmoji: { fontSize: 24 },
 
   postInfo: { flex: 1, minWidth: 0 },
-  postChips: { display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' },
-  chip: { fontSize: 10, fontWeight: 700, padding: '2px 6px', borderRadius: 5 },
+  postMetaRow: {
+    display: 'flex', alignItems: 'center', gap: 5, minWidth: 0,
+    marginTop: 6,
+  },
+  chip: {
+    fontSize: 10, fontWeight: 700, padding: '2px 6px', borderRadius: 5,
+    flexShrink: 0,
+  },
+  postAutorTop: {
+    minWidth: 0, display: 'flex', alignItems: 'center', gap: 3,
+    fontSize: 9.5, color: C.textoTenue, fontWeight: 500,
+    whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+  },
+  postAutorSep: { color: C.borde, marginRight: 1 },
+  verificadoMini: { color: C.verde, fontSize: 10, fontWeight: 800 },
+  fundadorBadge: {
+    flexShrink: 0,
+    display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+    fontSize: 12, lineHeight: 1,
+  },
   precio: { fontSize: 12.5, fontWeight: 800, color: C.texto },
   chipNeg: {
     fontSize: 10, fontWeight: 600, color: C.textoSuave,
@@ -1510,7 +1884,7 @@ const s = {
   },
   postTit: {
     fontSize: 13.5, fontWeight: 700, color: C.texto,
-    lineHeight: 1.3, marginTop: 4,
+    lineHeight: 1.3, marginTop: 0,
     display: '-webkit-box', WebkitLineClamp: 1,
     WebkitBoxOrient: 'vertical', overflow: 'hidden',
   },
@@ -1519,21 +1893,6 @@ const s = {
     display: '-webkit-box', WebkitLineClamp: 1,
     WebkitBoxOrient: 'vertical', overflow: 'hidden',
   },
-  postPie: {
-    display: 'flex', alignItems: 'center', gap: 4,
-    marginTop: 5, flexWrap: 'wrap',
-  },
-  autorAvatar: {
-    width: 17, height: 17, borderRadius: '50%',
-    background: C.verdeSuave, color: C.verde,
-    fontSize: 8, fontWeight: 800, overflow: 'hidden', flexShrink: 0,
-    display: 'flex', alignItems: 'center', justifyContent: 'center',
-  },
-  autorImg: { width: '100%', height: '100%', objectFit: 'cover' },
-  autorNombre: { fontSize: 11, fontWeight: 700, color: C.texto },
-  badgeMini: { fontSize: 9 },
-  postMeta: { fontSize: 10.5, color: C.textoTenue, fontWeight: 500 },
-
   /* ── vacío ── */
   vacio: {
     textAlign: 'center', padding: '46px 20px',

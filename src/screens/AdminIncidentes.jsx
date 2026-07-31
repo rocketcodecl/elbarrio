@@ -33,7 +33,6 @@ const FILTROS = [
 ]
 
 export default function AdminIncidentes({ currentUser, onNavigate }) {
-  const [profile, setProfile] = useState(null)
   const [incidentes, setIncidentes] = useState([])
   const [loading, setLoading] = useState(true)
   const [forbidden, setForbidden] = useState(false)
@@ -67,17 +66,21 @@ export default function AdminIncidentes({ currentUser, onNavigate }) {
           .eq('user_id', uid).maybeSingle()
         prof = data || prof
       }
-      setProfile(prof)
       if (!prof || prof.role !== 'admin') {
         setForbidden(true)
         setLoading(false)
         return
       }
-      const { data, error } = await supabase
+      if (!prof.is_superadmin && !prof.neighborhood_id) {
+        throw new Error('La cuenta administrativa no tiene un barrio asignado.')
+      }
+      let request = supabase
         .from('incident_reports')
         .select('id, reporter_id, neighborhood_id, category, description, photo_url, is_anonymous, lat, lng, location_text, status, confirms_count, flags_count, severity, title, images, created_at, expires_at, resolved_at, resolved_by')
         .order('created_at', { ascending: false })
         .limit(200)
+      if (!prof.is_superadmin) request = request.eq('neighborhood_id', prof.neighborhood_id)
+      const { data, error } = await request
       if (error) throw error
       // Normalizamos status: históricamente era 'active' en vez de 'pendiente'.
       const norm = (data || []).map((x) => ({
@@ -96,35 +99,21 @@ export default function AdminIncidentes({ currentUser, onNavigate }) {
   // ── CAMBIAR STATUS ──
   const cambiarStatus = async (inc, nuevoStatus) => {
     setCambiandoId(inc.id)
-    const prevStatus = inc.status
-    setIncidentes(prev => prev.map(x => x.id === inc.id
-      ? {
-          ...x,
-          status: nuevoStatus,
-          resolved_at: nuevoStatus === 'resuelto' ? new Date().toISOString() : null,
-          resolved_by: nuevoStatus === 'resuelto' ? (profile?.id || null) : null,
-        }
-      : x))
     try {
-      const payload = { status: nuevoStatus }
-      if (nuevoStatus === 'resuelto') {
-        payload.resolved_at = new Date().toISOString()
-        payload.resolved_by = profile?.id || null
-      } else {
-        payload.resolved_at = null
-        payload.resolved_by = null
-      }
-      const { error } = await supabase
-        .from('incident_reports')
-        .update(payload)
-        .eq('id', inc.id)
+      const action = nuevoStatus === 'resuelto' ? 'resolve' : 'approve'
+      const { data, error } = await supabase.rpc('admin_moderate_incident', {
+        p_incident_id: inc.id,
+        p_action: action,
+      })
       if (error) throw error
+      setIncidentes(prev => prev.map(item => item.id === inc.id
+        ? { ...item, ...(data || {}), status: data?.status === 'active' ? 'pendiente' : (data?.status || nuevoStatus) }
+        : item))
       showToast(nuevoStatus === 'resuelto'
         ? 'Incidente marcado como resuelto ✅'
         : 'Incidente reabierto 🟡')
     } catch (e) {
       console.error('[admin incidentes] cambiarStatus:', e)
-      setIncidentes(prev => prev.map(x => x.id === inc.id ? { ...x, status: prevStatus } : x))
       showToast('No pudimos actualizar el incidente.')
     } finally {
       setCambiandoId(null)

@@ -97,14 +97,11 @@ const haversine = (lat1, lng1, lat2, lng2) => {
 }
 
 function Alertas({ currentUser, onNavigate, onCrear }) {
-  const [profile, setProfile] = useState(null)
   const [alertas, setAlertas] = useState([])
   const [filtro, setFiltro] = useState('todas')
   const [cargando, setCargando] = useState(true)
   const [error, setError] = useState('')
   const [userCoords, setUserCoords] = useState(null)
-
-  useEffect(() => { cargar() }, [currentUser?.id])
 
   // GPS del usuario para calcular distancia a cada alerta.
   useEffect(() => {
@@ -117,36 +114,34 @@ function Alertas({ currentUser, onNavigate, onCrear }) {
   }, [])
 
   const cargar = async () => {
-    if (!currentUser?.id) return
+    if (!currentUser?.id) {
+      setAlertas([])
+      setError('No pudimos identificar tu sesión.')
+      setCargando(false)
+      return
+    }
     setCargando(true)
     setError('')
     try {
-      const { data: p } = await supabase
+      const { data: p, error: profileError } = await supabase
         .from('profiles')
         .select('*')
         .eq('user_id', currentUser.id)
         .maybeSingle()
-      if (!p) return
-      setProfile(p)
-
-      // Query robusto:
-      // · Si el user tiene neighborhood_id, mostramos incidentes de SU barrio
-      //   + los que no tengan neighborhood asignado (is.null).
-      //   Uso .or() porque .eq('col', null) en Postgres devuelve 0 rows.
-      // · Si el user NO tiene neighborhood_id, no filtramos por barrio y
-      //   mostramos TODOS los incidentes (para que la lista no quede vacía).
-      // Solo las alertas aprobadas por administración quedan en `active`.
-      // Los reportes `pendiente` no son visibles para los vecinos.
-      let q = supabase
-        .from('incident_reports')
-        .select('*, reporter:profiles!reporter_id (full_name, avatar_url, badge_founder, verified)')
-        .eq('status', 'active')
-
-      if (p.neighborhood_id) {
-        q = q.or(`neighborhood_id.eq.${p.neighborhood_id},neighborhood_id.is.null`)
+      if (profileError || !p?.neighborhood_id) {
+        setAlertas([])
+        setError('No pudimos confirmar tu barrio. Intenta nuevamente.')
+        return
       }
 
-      const res = await q
+      // Las alertas `active` son visibles para todo el barrio. Cada autor
+      // también puede ver sus propios reportes `pendiente`, claramente
+      // identificados, mientras espera la revisión administrativa.
+      const res = await supabase
+        .from('incident_reports')
+        .select('*, reporter:profiles!reporter_id (full_name, avatar_url, badge_founder, verified)')
+        .eq('neighborhood_id', p.neighborhood_id)
+        .or(`status.eq.active,and(status.eq.pendiente,reporter_id.eq.${p.id})`)
         .order('confirms_count', { ascending: false })
         .order('created_at', { ascending: false })
         .limit(100)
@@ -174,8 +169,13 @@ function Alertas({ currentUser, onNavigate, onCrear }) {
     }
   }
 
+  useEffect(() => { cargar() }, [currentUser?.id])
+
   const nav = onNavigate || (() => {})
   const crear = onCrear || (() => {})
+
+  const alertasActivas = alertas.filter((a) => a.status === 'active')
+  const pendientesPropias = alertas.filter((a) => a.status === 'pendiente')
 
   // Conteos por categoría para los chips
   const conteos = alertas.reduce((acc, a) => {
@@ -229,10 +229,15 @@ function Alertas({ currentUser, onNavigate, onCrear }) {
 
         {/* ══════ RESUMEN ══════ */}
         <div style={s.resumen}>
-          <span style={s.resumenNum}>{alertas.length}</span>
+          <span style={s.resumenNum}>{alertasActivas.length}</span>
           <span style={s.resumenTxt}>
-            alerta{alertas.length === 1 ? '' : 's'} activa{alertas.length === 1 ? '' : 's'} en{' '}
+            alerta{alertasActivas.length === 1 ? '' : 's'} activa{alertasActivas.length === 1 ? '' : 's'} en{' '}
             <span style={s.marca}>el barrio</span>
+            {pendientesPropias.length > 0 && (
+              <span style={s.pendingSummary}>
+                {' '}· {pendientesPropias.length} tuya{pendientesPropias.length === 1 ? '' : 's'} en revisión
+              </span>
+            )}
           </span>
         </div>
 
@@ -298,6 +303,7 @@ function Alertas({ currentUser, onNavigate, onCrear }) {
           <div style={s.lista}>
             {filtradas.map((a) => {
               const cat = REPORTES[a.category] || REPORTES.seguridad
+              const pendiente = a.status === 'pendiente'
               const urgente = a.category === 'seguridad' || a.category === 'salud'
               const confirmado = a.confirms_count >= 3
               // Distancia Haversine desde el GPS del user hasta la alerta.
@@ -327,6 +333,11 @@ function Alertas({ currentUser, onNavigate, onCrear }) {
                       <span style={{ ...s.alertaCat, color: cat.color }}>
                         {cat.label}
                       </span>
+                      {pendiente && (
+                        <span style={s.pendientePill}>
+                          EN REVISIÓN
+                        </span>
+                      )}
                       {dist && (
                         <span style={s.distPill}>
                           <IcoUbicacion size={11} />
@@ -403,6 +414,7 @@ const s = {
   cargando: { flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' },
 
   marca: { color: C.verde, fontWeight: 600 },
+  pendingSummary: { color: '#9a6700', fontWeight: 600 },
 
   /* ── header ── */
   header: {
@@ -529,6 +541,12 @@ const s = {
     fontSize: 10.5, fontWeight: 700, color: C.verdeOsc,
     background: '#fff', padding: '3px 8px', borderRadius: 999,
     flexShrink: 0,
+  },
+  pendientePill: {
+    fontSize: 8.5, fontWeight: 700, letterSpacing: '0.05em',
+    color: '#7c5b00', background: '#fff7d6',
+    border: '1px solid #ead58b', borderRadius: 999,
+    padding: '3px 7px', whiteSpace: 'nowrap',
   },
 
   alertaDesc: {

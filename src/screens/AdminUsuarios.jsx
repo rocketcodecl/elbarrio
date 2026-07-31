@@ -11,8 +11,6 @@ import { C, T, S, iniciales, hace } from '../lib/design'
     · Lista todos los perfiles (tabla `profiles`).
     · Cada perfil: avatar (o iniciales), nombre, RUT, email, role, barrio.
     · Cambiar role vecino ↔ admin (botón directo).
-    · Botón "Banear" → muestra confirmación; como la tabla no tiene columna
-      `banned`, dejamos el botón pero marca con toast "Próximamente".
     · Buscador por nombre, email o RUT.
 
   "el barrio" siempre minúscula y verde.
@@ -58,15 +56,20 @@ export default function AdminUsuarios({ currentUser, onNavigate }) {
         setLoading(false)
         return
       }
+      if (!prof.is_superadmin && !prof.neighborhood_id) {
+        throw new Error('La cuenta administrativa no tiene un barrio asignado.')
+      }
       // select('*') trae TODAS las columnas que existan en profiles.
       // No lista columnas específicas, así que NUNCA falla con
       // "column X does not exist" aunque falten barrio/comuna/verified/etc.
       // Accedemos a cada columna defensivamente en la UI (|| '' o condicionales).
-      const { data, error } = await supabase
+      let request = supabase
         .from('profiles')
         .select('*')
         .order('created_at', { ascending: false })
         .limit(500)
+      if (!prof.is_superadmin) request = request.eq('neighborhood_id', prof.neighborhood_id)
+      const { data, error } = await request
 
       if (error) throw error
       setUsuarios(data || [])
@@ -81,14 +84,19 @@ export default function AdminUsuarios({ currentUser, onNavigate }) {
 
   // ── CAMBIAR ROLE (vecino ↔ admin) ──
   const cambiarRole = async (u) => {
+    if (!profile?.is_superadmin) {
+      showToast('Solo un superadministrador puede cambiar permisos administrativos.')
+      return
+    }
     const nuevo = u.role === 'admin' ? 'vecino' : 'admin'
+    const action = u.role === 'admin' ? 'remove_admin' : 'assign_admin'
     setCambiandoId(u.id)
     setUsuarios(prev => prev.map(x => x.id === u.id ? { ...x, role: nuevo } : x))
     try {
-      const { error } = await supabase
-        .from('profiles')
-        .update({ role: nuevo })
-        .eq('id', u.id)
+      const { error } = await supabase.rpc('admin_manage_profile', {
+        p_target_profile_id: u.id,
+        p_action: action,
+      })
       if (error) throw error
       showToast(nuevo === 'admin'
         ? `${u.full_name?.split(' ')[0] || 'Usuario'} ahora es admin ✅`
@@ -102,11 +110,6 @@ export default function AdminUsuarios({ currentUser, onNavigate }) {
     } finally {
       setCambiandoId(null)
     }
-  }
-
-  // ── BANEAR (placeholder) ──
-  const banear = (u) => {
-    showToast(`Banear a ${u.full_name?.split(' ')[0] || 'usuario'} — próximamente 🚧`)
   }
 
   // ── FILTRO POR BÚSQUEDA ──
@@ -220,8 +223,8 @@ export default function AdminUsuarios({ currentUser, onNavigate }) {
                 u={u}
                 esYo={!!(profile && (u.id === profile.id || u.user_id === profile.user_id))}
                 onToggleRole={() => cambiarRole(u)}
-                onBan={() => banear(u)}
                 cambiando={cambiandoId === u.id}
+                canManageAdmins={profile?.is_superadmin === true}
               />
             ))}
           </div>
@@ -242,7 +245,7 @@ export default function AdminUsuarios({ currentUser, onNavigate }) {
 // ──────────────────────────────────────────────────────────────
 // CARD DE USUARIO
 // ──────────────────────────────────────────────────────────────
-function UsuarioCard({ u, esYo, onToggleRole, onBan, cambiando }) {
+function UsuarioCard({ u, esYo, onToggleRole, cambiando, canManageAdmins }) {
   const esAdmin = u.role === 'admin'
   return (
     <div style={{
@@ -296,22 +299,17 @@ function UsuarioCard({ u, esYo, onToggleRole, onBan, cambiando }) {
             border: esAdmin ? `1px solid ${C.morado}` : `1px solid ${C.borde}`,
           }}
           onClick={onToggleRole}
-          disabled={esYo || cambiando}
+          disabled={esYo || cambiando || !canManageAdmins}
         >
-          {cambiando
+          {!canManageAdmins
+            ? 'Solo superadministrador'
+            : cambiando
             ? 'Guardando…'
             : esYo
               ? '🛡️ Vos sos admin'
               : esAdmin
                 ? '⬇️ Quitar admin'
                 : '⬆️ Hacer admin'}
-        </button>
-        <button
-          style={s.btnBan}
-          onClick={onBan}
-          disabled={esYo}
-        >
-          🚫 Banear
         </button>
       </div>
     </div>
@@ -495,15 +493,6 @@ const s = {
   btnRole: {
     flex: 1, minWidth: 130,
     padding: '9px 12px', borderRadius: 10,
-    fontSize: 13, fontWeight: 700,
-    cursor: 'pointer', fontFamily: 'inherit',
-  },
-  btnBan: {
-    flexShrink: 0,
-    background: C.rojoBg,
-    border: `1px solid ${C.rojoSuave}`,
-    color: C.rojo,
-    padding: '9px 14px', borderRadius: 10,
     fontSize: 13, fontWeight: 700,
     cursor: 'pointer', fontFamily: 'inherit',
   },

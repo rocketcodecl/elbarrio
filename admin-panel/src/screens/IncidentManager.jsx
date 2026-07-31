@@ -68,6 +68,8 @@ function StatusBadge({ incident }) {
 }
 
 export default function IncidentManager({ profile }) {
+  const isSuperadmin = profile?.is_superadmin === true
+  const neighborhoodId = profile?.neighborhood_id
   const [incidents, setIncidents] = useState([])
   const [selectedId, setSelectedId] = useState(null)
   const [actions, setActions] = useState([])
@@ -85,8 +87,15 @@ export default function IncidentManager({ profile }) {
   const loadIncidents = useCallback(async (preferredId = null) => {
     setLoading(true)
     setError('')
+    if (!isSuperadmin && !neighborhoodId) {
+      setIncidents([])
+      setSelectedId(null)
+      setError('Tu cuenta administrativa no tiene un barrio asignado.')
+      setLoading(false)
+      return
+    }
     let request = supabase.from('incident_reports').select('*').order('created_at', { ascending: false }).limit(300)
-    if (profile?.neighborhood_id) request = request.eq('neighborhood_id', profile.neighborhood_id)
+    if (!isSuperadmin) request = request.eq('neighborhood_id', neighborhoodId)
     const { data, error: loadError } = await request
     if (loadError) {
       setError(`No fue posible cargar las alertas: ${loadError.message}`)
@@ -100,7 +109,7 @@ export default function IncidentManager({ profile }) {
       })
     }
     setLoading(false)
-  }, [profile?.neighborhood_id])
+  }, [isSuperadmin, neighborhoodId])
 
   useEffect(() => { loadIncidents() }, [loadIncidents])
 

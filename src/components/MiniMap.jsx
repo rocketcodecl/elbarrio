@@ -49,15 +49,20 @@ function MiniMap({
   height = 170,
   zoom = 16,
   color = VERDE,
+  boundary = null,
+  boundaryLabel = 'Zona activa',
   onPick,
 }) {
   const boxRef = useRef(null)
   const mapRef = useRef(null)
   const markerRef = useRef(null)
+  const boundaryRef = useRef(null)
   const onPickRef = useRef(null)
 
-  // Guardamos el callback en una ref para no re-crear el mapa en cada render
-  onPickRef.current = onPick
+  // Guardamos el callback en una ref para no re-crear el mapa en cada render.
+  useEffect(() => {
+    onPickRef.current = onPick
+  }, [onPick])
 
   useEffect(() => {
     if (!boxRef.current || mapRef.current) return
@@ -80,6 +85,20 @@ function MiniMap({
       maxZoom: 20,
       subdomains: 'abcd',
     }).addTo(map)
+
+    if (boundary) {
+      boundaryRef.current = L.geoJSON(boundary, {
+        style: {
+          color,
+          weight: 2.5,
+          opacity: 0.95,
+          fillColor: color,
+          fillOpacity: 0.12,
+        },
+      }).bindTooltip(boundaryLabel, { sticky: true }).addTo(map)
+      const bounds = boundaryRef.current.getBounds()
+      if (bounds.isValid()) map.fitBounds(bounds, { padding: [14, 14] })
+    }
 
     if (lat && lng) {
       markerRef.current = L.marker([lat, lng], { icon: pinIcon(color) }).addTo(map)
@@ -106,9 +125,35 @@ function MiniMap({
       map.remove()
       mapRef.current = null
       markerRef.current = null
+      boundaryRef.current = null
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map) return
+    if (boundaryRef.current) {
+      map.removeLayer(boundaryRef.current)
+      boundaryRef.current = null
+    }
+    if (!boundary) return
+
+    boundaryRef.current = L.geoJSON(boundary, {
+      style: {
+        color,
+        weight: 2.5,
+        opacity: 0.95,
+        fillColor: color,
+        fillOpacity: 0.12,
+      },
+    }).bindTooltip(boundaryLabel, { sticky: true }).addTo(map)
+
+    if (lat == null || lng == null) {
+      const bounds = boundaryRef.current.getBounds()
+      if (bounds.isValid()) map.fitBounds(bounds, { padding: [14, 14] })
+    }
+  }, [boundary, boundaryLabel, color, lat, lng])
 
   // Si el punto cambia desde fuera (ej: botón "usar mi ubicación"), mover el marcador
   useEffect(() => {
@@ -121,7 +166,13 @@ function MiniMap({
       } else {
         markerRef.current = L.marker([lat, lng], { icon: pinIcon(color) }).addTo(map)
       }
-      map.setView([lat, lng], zoom)
+      if (boundaryRef.current) {
+        const bounds = boundaryRef.current.getBounds()
+        bounds.extend([lat, lng])
+        if (bounds.isValid()) map.fitBounds(bounds, { padding: [18, 18] })
+      } else {
+        map.setView([lat, lng], zoom)
+      }
     } else if (markerRef.current) {
       map.removeLayer(markerRef.current)
       markerRef.current = null

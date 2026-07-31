@@ -11,6 +11,7 @@ html, body {
   color: #1A1A1A;
   height: 100%;
   overflow: hidden;
+  overscroll-behavior: none;
 }
 
 button, input, textarea, select {
@@ -19,6 +20,7 @@ button, input, textarea, select {
 
 #root {
   height: 100vh;
+  height: 100dvh;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -27,6 +29,7 @@ button, input, textarea, select {
 
 /* Frame de iPhone para simular mobile */
 .phone-frame {
+  --home-header-safe-top: 34px;
   width: 393px;
   height: 852px;
   background: #FAFAF7;
@@ -86,10 +89,15 @@ button, input, textarea, select {
     background: #FAFAF7;
   }
   .phone-frame {
+    --home-header-safe-top: max(env(safe-area-inset-top, 0px), 12px);
     width: 100%;
     height: 100vh;
+    height: 100dvh;
     border-radius: 0;
     box-shadow: none;
+  }
+  .phone-content {
+    padding-top: 0 !important;
   }
   .phone-notch,
   .phone-home-indicator {
@@ -114,6 +122,67 @@ input, textarea {
   font-family: inherit;
   outline: none;
   border: none;
+}
+
+/* Modo accesible: mejora lectura y operación sin afirmar cumplimiento WCAG. */
+.accessible-mode .phone-content {
+  background: #fff;
+  color: #111814;
+}
+
+.accessible-mode .phone-content button,
+.accessible-mode .phone-content input,
+.accessible-mode .phone-content textarea,
+.accessible-mode .phone-content select {
+  min-height: 48px;
+  font-size: 16px !important;
+  line-height: 1.4 !important;
+}
+
+/* Los controles iconográficos conservan su geometría circular en Modo accesible.
+   El área táctil ya está dada por su ancho/alto explícito; agrandar solo el alto
+   los convertía en óvalos en cabeceras y fichas. */
+.accessible-mode .phone-content button[style*="border-radius: 50%"],
+.accessible-mode .phone-content button[style*="border-radius:50%"],
+.accessible-mode .profile-header button,
+.accessible-mode .profile-sheet header button {
+  min-height: unset !important;
+  aspect-ratio: 1 / 1;
+  line-height: 1 !important;
+}
+
+.accessible-mode .phone-content p,
+.accessible-mode .phone-content label,
+.accessible-mode .phone-content small {
+  font-size: 15px !important;
+  line-height: 1.55 !important;
+}
+
+.accessible-mode .phone-content button:focus-visible,
+.accessible-mode .phone-content a:focus-visible,
+.accessible-mode .phone-content input:focus-visible,
+.accessible-mode .phone-content textarea:focus-visible,
+.accessible-mode .phone-content select:focus-visible {
+  outline: 3px solid #0b7a4b !important;
+  outline-offset: 3px;
+}
+
+.accessible-mode .profile-scroll {
+  padding-left: 14px;
+  padding-right: 14px;
+}
+
+.accessible-mode .profile-menu-row {
+  min-height: 76px;
+}
+
+.accessible-mode *,
+.accessible-mode *::before,
+.accessible-mode *::after {
+  animation-duration: 0.001ms !important;
+  animation-iteration-count: 1 !important;
+  scroll-behavior: auto !important;
+  transition-duration: 0.001ms !important;
 }
 
 /* Animaciones */

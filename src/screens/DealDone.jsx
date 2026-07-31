@@ -174,9 +174,9 @@ export default function DealDone({ postId, sellerId, currentUser, onNavigate }) 
           <img src="/isotipo.png" alt="" style={s.isoImg} />
         </div>
 
-        <h1 style={s.title}>¡Trato hecho!</h1>
+        <h1 style={s.title}>¡Trato cerrado!</h1>
         <div style={s.subtitle}>
-          Has acordado la compra con <b>&nbsp;{firstName}</b>
+          Has cerrado el trato con <b>&nbsp;{firstName}</b>
           {seller?.badge_founder && <span style={{marginLeft: 4}}><Icon.Verified /></span>}
         </div>
 

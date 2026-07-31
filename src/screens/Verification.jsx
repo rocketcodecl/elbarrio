@@ -1,6 +1,8 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import Stepper from '../components/Stepper'
+import MiniMap from '../components/MiniMap'
+import { BARRIO_BETA_BOUNDARY } from '../data/barrioBetaBoundary'
 
 const VERDE = '#16a34a'
 const VERDE_OSC = '#0f5f36'
@@ -66,6 +68,7 @@ function Verification({ profile, isPending, onFinish, onBack, onLogout }) {
   const [addressCoords, setAddressCoords] = useState(null)
   const [addressDistance, setAddressDistance] = useState(null)
   const [neighborhood, setNeighborhood] = useState(null)
+  const [addressLookupState, setAddressLookupState] = useState('idle')
 
   const [loading, setLoading] = useState(false)
   const [savingLater, setSavingLater] = useState(false)
@@ -81,10 +84,33 @@ function Verification({ profile, isPending, onFinish, onBack, onLogout }) {
     c.toLowerCase().includes(comuna.toLowerCase())
   )
 
+  useEffect(() => {
+    if (address.trim().length < 6 || !COMUNAS.includes(comuna.trim())) {
+      return undefined
+    }
+
+    let active = true
+    const timer = window.setTimeout(async () => {
+      setAddressLookupState('loading')
+      try {
+        const locatedAddress = await findAddressCoordinates(address.trim(), comuna.trim())
+        if (!active) return
+        setAddressCoords(locatedAddress)
+        setAddressLookupState(locatedAddress ? 'success' : 'not_found')
+      } catch {
+        if (active) setAddressLookupState('unavailable')
+      }
+    }, 900)
+
+    return () => {
+      active = false
+      window.clearTimeout(timer)
+    }
+  }, [address, comuna])
+
   const resetGps = () => {
     setGpsState('idle')
     setCoords(null)
-    setAddressCoords(null)
     setAddressDistance(null)
     setNeighborhood(null)
   }
@@ -259,7 +285,7 @@ function Verification({ profile, isPending, onFinish, onBack, onLogout }) {
     <div style={s.container}>
       {/* HEADER */}
       <div style={s.header}>
-        <button style={s.backBtn} onClick={onBack}>
+        <button style={s.backBtn} onClick={onBack} aria-label="Volver">
           <IcoAtras />
         </button>
         <div style={{ flex: 1, marginLeft: 12 }}>
@@ -289,7 +315,12 @@ function Verification({ profile, isPending, onFinish, onBack, onLogout }) {
               type="text"
               placeholder="Ej: Av. Italia 1234, Depto 5B"
               value={address}
-              onChange={(e) => { setAddress(e.target.value); resetGps() }}
+              onChange={(e) => {
+                setAddress(e.target.value)
+                setAddressCoords(null)
+                setAddressLookupState('idle')
+                resetGps()
+              }}
               style={s.input}
             />
           </div>
@@ -306,6 +337,8 @@ function Verification({ profile, isPending, onFinish, onBack, onLogout }) {
               value={comuna}
               onChange={(e) => {
                 setComuna(e.target.value)
+                setAddressCoords(null)
+                setAddressLookupState('idle')
                 setShowComunaList(true)
                 resetGps()
               }}
@@ -319,7 +352,13 @@ function Verification({ profile, isPending, onFinish, onBack, onLogout }) {
               {comunasFiltradas.slice(0, 5).map((c) => (
                 <button
                   key={c}
-                  onClick={() => { setComuna(c); setShowComunaList(false) }}
+                  onClick={() => {
+                    setComuna(c)
+                    setAddressCoords(null)
+                    setAddressLookupState('idle')
+                    setShowComunaList(false)
+                    resetGps()
+                  }}
                   style={s.comunaItem}
                 >
                   <span style={{ color: VERDE, display: 'flex' }}><IcoPin size={14} /></span>
@@ -329,6 +368,38 @@ function Verification({ profile, isPending, onFinish, onBack, onLogout }) {
             </div>
           )}
         </div>
+
+        <section style={s.zoneMapCard} aria-label="Mapa de cobertura del barrio">
+          <div style={s.zoneMapHeader}>
+            <div>
+              <div style={s.zoneMapEyebrow}>Zona disponible</div>
+              <div style={s.zoneMapTitle}>Mira el territorio de tu barrio</div>
+            </div>
+            <span style={s.zoneMapBadge}>Área verde</span>
+          </div>
+          <MiniMap
+            lat={coords?.lat ?? addressCoords?.lat}
+            lng={coords?.lng ?? addressCoords?.lng}
+            boundary={BARRIO_BETA_BOUNDARY}
+            boundaryLabel="Zona activa de El Barrio"
+            height={176}
+            zoom={16}
+          />
+          <div style={s.zoneMapCaption}>
+            <span style={s.zoneMapDot} />
+            {coords
+              ? 'El marcador muestra tu ubicación actual dentro de la zona.'
+              : addressLookupState === 'loading'
+              ? 'Buscando tu dirección en el mapa…'
+              : addressLookupState === 'success'
+                ? 'El marcador muestra la dirección que escribiste.'
+                : addressLookupState === 'not_found'
+                  ? 'No encontramos aún esa dirección. Revisa calle, número y comuna.'
+                  : addressLookupState === 'unavailable'
+                    ? 'No pudimos ubicar la dirección ahora. Puedes continuar con la confirmación GPS.'
+                    : 'Completa dirección y comuna para ubicarla dentro de la zona.'}
+          </div>
+        </section>
 
         {/* ===== GPS ===== */}
         <div style={{ marginTop: 8 }}>
@@ -573,6 +644,59 @@ const s = {
     background: 'transparent', width: '100%', textAlign: 'left',
     borderBottom: '1px solid #f3f4f6',
     border: 'none', cursor: 'pointer', fontFamily: 'inherit',
+  },
+  zoneMapCard: {
+    padding: 12,
+    background: '#fff',
+    border: '1px solid #dfe7e1',
+    borderRadius: 16,
+    boxShadow: '0 4px 16px rgba(15,95,54,.06)',
+  },
+  zoneMapHeader: {
+    display: 'flex',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: 12,
+    marginBottom: 10,
+  },
+  zoneMapEyebrow: {
+    color: VERDE,
+    fontSize: 9.5,
+    fontWeight: 800,
+    letterSpacing: '.05em',
+    textTransform: 'uppercase',
+  },
+  zoneMapTitle: {
+    marginTop: 2,
+    color: '#111827',
+    fontSize: 13.5,
+    fontWeight: 800,
+  },
+  zoneMapBadge: {
+    flexShrink: 0,
+    padding: '5px 8px',
+    borderRadius: 999,
+    color: VERDE_OSC,
+    background: '#dcfce7',
+    fontSize: 9.5,
+    fontWeight: 800,
+  },
+  zoneMapCaption: {
+    display: 'flex',
+    alignItems: 'flex-start',
+    gap: 7,
+    marginTop: 9,
+    color: '#647067',
+    fontSize: 10.5,
+    lineHeight: 1.45,
+  },
+  zoneMapDot: {
+    width: 8,
+    height: 8,
+    marginTop: 3,
+    flex: '0 0 auto',
+    borderRadius: '50%',
+    background: VERDE,
   },
 
   gpsBtn: {

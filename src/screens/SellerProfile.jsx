@@ -11,8 +11,8 @@ import { C, T, S, TIPOS, iniciales, hace } from '../lib/design'
   Carga:
     - El perfil del vendedor desde `profiles` por id.
     - Sus publicaciones activas desde `posts` (cualquier type: sell/gift/trade/service/need).
-    - Stats: total publicaciones, total ventas/compras completadas (status sold/closed),
-      rating mock si no hay campo (4.8 stars, 12 rese~nas).
+    - Stats: total publicaciones, total ventas/compras completadas (status sold/closed)
+      y reputación real cuando existe.
     - Rese~nas desde `reviews` (con join a profiles del reviewer). Si la tabla
       no existe o RLS bloquea, se muestra estado vacio amable — no rompe la pantalla.
 
@@ -20,9 +20,6 @@ import { C, T, S, TIPOS, iniciales, hace } from '../lib/design'
     - Enviar mensaje -> onNavigate('chatconversation', { sellerId })
       Si es tu propio perfil, NO se muestra. En cambio: Editar perfil -> onNavigate('perfil').
     - Compartir perfil -> navigator.share o clipboard.
-
-  Reportar perfil: modal bottom-sheet con 4 opciones (Spam/Estafa/Perfil falso/Otro).
-  Mock con toast "Reporte enviado, gracias".
 
   Estados: loading (skeleton), error (caja roja + reintentar), 404 ("perfil ya no disponible").
 */
@@ -53,9 +50,6 @@ const IcoMedalla = (p) => (
     <polyline points="8.5 13.5 7 22 12 19 17 22 15.5 13.5" />
   </Ico>
 )
-const IcoChevronDer = (p) => (
-  <Ico {...p}><polyline points="9 18 15 12 9 6" /></Ico>
-)
 const IcoShare = (p) => (
   <Ico {...p}>
     <circle cx="18" cy="5" r="3" /><circle cx="6" cy="12" r="3" /><circle cx="18" cy="19" r="3" />
@@ -74,12 +68,6 @@ const IcoEstrella = (p) => (
 const IcoEstrellaOutline = (p) => (
   <Ico {...p}>
     <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
-  </Ico>
-)
-const IcoFlag = (p) => (
-  <Ico {...p}>
-    <path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z" />
-    <line x1="4" y1="22" x2="4" y2="15" />
   </Ico>
 )
 const IcoCasa = (p) => (
@@ -125,16 +113,6 @@ const IcoFoto = (p) => (
     <polyline points="21 15 16 10 5 21" />
   </Ico>
 )
-
-// ──────────────────────────────────────────────────────────────
-// RAZONES DE REPORTE
-// ──────────────────────────────────────────────────────────────
-const REPORT_REASONS = [
-  { id: 'spam',    emoji: '📢', label: 'Spam',                 sub: 'Publica lo mismo muchas veces' },
-  { id: 'estafa',  emoji: '⚠️', label: 'Estafa',               sub: 'Pidió dinero y no entregó' },
-  { id: 'falso',   emoji: '🎭', label: 'Perfil falso',         sub: 'No es quien dice ser' },
-  { id: 'otro',    emoji: '📝', label: 'Otro',                 sub: 'Algo más que debamos revisar' },
-]
 
 // ──────────────────────────────────────────────────────────────
 // TIPO DE POST -> { emoji, label, color, bg }
@@ -211,16 +189,16 @@ export default function SellerProfile({ sellerId, currentUser, onNavigate }) {
   const [posts, setPosts] = useState([])
   const [reviews, setReviews] = useState([])
   const [promos, setPromos] = useState([])
-  const [stats, setStats] = useState({ publicaciones: 0, ventas: 0, rating: 4.8, reviewsCount: 12 })
+  const [stats, setStats] = useState({ publicaciones: 0, ventas: 0, rating: null, reviewsCount: 0 })
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState('')
   const [notFound, setNotFound] = useState(false)
 
   const [toast, setToast] = useState('')
-  const [showReportModal, setShowReportModal] = useState(false)
 
   const toastTimer = useRef(null)
   const nav = onNavigate || (() => {})
+  const neighborhoodId = currentUser?.neighborhoodId
 
   // Es el perfil propio? Comparamos por id (perfil.row id) y por user_id (auth uid),
   // porque en App.jsx currentUser.id es el auth uid y sellerId es el profile.row id.
@@ -238,7 +216,7 @@ export default function SellerProfile({ sellerId, currentUser, onNavigate }) {
 
   /* ─────── CARGA PRINCIPAL ─────── */
   const cargarTodo = async () => {
-    if (!sellerId) {
+    if (!sellerId || !neighborhoodId) {
       setNotFound(true)
       setLoading(false)
       return
@@ -258,6 +236,7 @@ export default function SellerProfile({ sellerId, currentUser, onNavigate }) {
         .from('profiles')
         .select('*')
         .or(`id.eq.${sellerId},user_id.eq.${sellerId}`)
+        .eq('neighborhood_id', neighborhoodId)
         .maybeSingle()
 
       if (profileErr) {
@@ -274,11 +253,14 @@ export default function SellerProfile({ sellerId, currentUser, onNavigate }) {
 
       setSeller(profile)
 
-      // Cargar posts activos + stats + reviews + promos en paralelo (no bloquean al perfil)
-      cargarPosts(profile)
-      cargarStats(profile)
-      cargarReviews(profile)
-      cargarPromos(profile)
+      // Cargar posts activos + stats + reviews + promos en paralelo.
+      await Promise.all([
+        cargarPosts(profile),
+        cargarStats(profile),
+        cargarReviews(profile),
+        cargarPromos(profile),
+      ])
+      setLoading(false)
     } catch (err) {
       setLoadError(err?.message || 'Error inesperado')
       setLoading(false)
@@ -288,16 +270,10 @@ export default function SellerProfile({ sellerId, currentUser, onNavigate }) {
   /* ─────── POSTS ACTIVOS ─────── */
   const cargarPosts = async (profile) => {
     try {
-      // FIX: sellerId puede ser el auth-uid o el row id. Usamos profile
-      // (ya cargado) para buscar posts por user_id (auth uid) o por
-      // user_id (row id) según corresponda. El OR cubre ambos schemas.
-      const uid = profile?.user_id || profile?.id || sellerId
-      const rid = profile?.id || sellerId
-      const filtro = uid === rid ? `user_id.eq.${uid}` : `user_id.eq.${uid},user_id.eq.${rid}`
       const { data, error } = await supabase
         .from('posts')
         .select('*')
-        .or(filtro)
+        .eq('author_id', profile.id)
         .eq('status', 'active')
         .order('created_at', { ascending: false })
         .limit(20)
@@ -313,36 +289,31 @@ export default function SellerProfile({ sellerId, currentUser, onNavigate }) {
   /* ─────── STATS ─────── */
   const cargarStats = async (profile) => {
     try {
-      const uid = profile?.user_id || profile?.id || sellerId
-      const rid = profile?.id || sellerId
-      const filtro = uid === rid ? `user_id.eq.${uid}` : `user_id.eq.${uid},user_id.eq.${rid}`
-
       // Total publicaciones activas (count exacto)
       const { count: totalPosts } = await supabase
         .from('posts')
         .select('id', { count: 'exact', head: true })
-        .or(filtro)
+        .eq('author_id', profile.id)
         .eq('status', 'active')
 
       // Ventas/compras completadas: posts con status sold o closed
       const { count: ventasCount } = await supabase
         .from('posts')
         .select('id', { count: 'exact', head: true })
-        .or(filtro)
+        .eq('author_id', profile.id)
         .in('status', ['sold', 'closed'])
 
-      // Rating: si el perfil tiene rating explicito lo usamos, si no mock 4.8
-      const rating = Number(profile?.rating) || 4.8
-      const reviewsCount = Number(profile?.reviews_count) || 12
+      const rating = Number(profile?.rating)
+      const reviewsCount = Number(profile?.reviews_count)
 
       setStats({
         publicaciones: totalPosts || 0,
         ventas: ventasCount || 0,
-        rating: Number.isFinite(rating) ? rating : 4.8,
-        reviewsCount: Number.isFinite(reviewsCount) ? reviewsCount : 12,
+        rating: Number.isFinite(rating) && rating > 0 ? rating : null,
+        reviewsCount: Number.isFinite(reviewsCount) && reviewsCount > 0 ? reviewsCount : 0,
       })
     } catch {
-      // Si falla, dejamos los defaults mock
+      setStats({ publicaciones: 0, ventas: 0, rating: null, reviewsCount: 0 })
     }
   }
 
@@ -423,7 +394,7 @@ export default function SellerProfile({ sellerId, currentUser, onNavigate }) {
   useEffect(() => {
     cargarTodo()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sellerId])
+  }, [sellerId, neighborhoodId])
 
   /* ─────── COMPARTIR ─────── */
   const compartir = async () => {
@@ -448,13 +419,6 @@ export default function SellerProfile({ sellerId, currentUser, onNavigate }) {
     } catch {
       // El usuario canceló el share, no hacemos nada
     }
-  }
-
-  /* ─────── REPORTAR ─────── */
-  const reportar = (reason) => {
-    setShowReportModal(false)
-    showToast('Reporte enviado, gracias')
-    // Mock — no hacemos INSERT real. El usuario cablea luego la tabla reports.
   }
 
   /* ─────── RENDER: SKELETON ─────── */
@@ -597,9 +561,9 @@ export default function SellerProfile({ sellerId, currentUser, onNavigate }) {
             <Stat label="Ventas" value={stats.ventas} />
             <Stat
               label="Rating"
-              value={`${Number(stats.rating).toFixed(1)}`}
-              icon={<IcoEstrella size={13} />}
-              sub={`${stats.reviewsCount} reseñas`}
+              value={stats.rating == null ? '—' : Number(stats.rating).toFixed(1)}
+              icon={stats.rating == null ? null : <IcoEstrella size={13} />}
+              sub={stats.reviewsCount > 0 ? `${stats.reviewsCount} reseñas` : 'Sin reseñas'}
             />
           </div>
 
@@ -694,16 +658,6 @@ export default function SellerProfile({ sellerId, currentUser, onNavigate }) {
             </div>
           )}
 
-          {/* REPORTAR PERFIL */}
-          {!isOwnProfile && (
-            <div style={s.reportWrap}>
-              <button style={s.reportBtn} onClick={() => setShowReportModal(true)}>
-                <IcoFlag size={13} />
-                <span>Reportar perfil</span>
-              </button>
-            </div>
-          )}
-
           <div style={{ height: 40 }} />
         </div>
       </div>
@@ -713,39 +667,6 @@ export default function SellerProfile({ sellerId, currentUser, onNavigate }) {
         <div style={s.toast}>{toast}</div>
       )}
 
-      {/* MODAL REPORTE */}
-      {showReportModal && (
-        <div style={s.modalOverlay} onClick={() => setShowReportModal(false)}>
-          <div style={s.sheetCard} onClick={(e) => e.stopPropagation()}>
-            <div style={s.sheetHandle} />
-            <div style={s.sheetTitle}>¿Por qué reportás este perfil?</div>
-            <div style={s.sheetSub}>
-              Tu reporte es anónimo. Nuestro equipo lo revisa dentro de las 24 horas.
-            </div>
-            <div style={s.sheetList}>
-              {REPORT_REASONS.map((r) => (
-                <button
-                  key={r.id}
-                  style={s.sheetItem}
-                  onClick={() => reportar(r.id)}
-                >
-                  <span style={s.sheetItemEmoji}>{r.emoji}</span>
-                  <span style={{ flex: 1, minWidth: 0, textAlign: 'left' }}>
-                    <span style={s.sheetItemLabel}>{r.label}</span>
-                    <span style={s.sheetItemSub}>{r.sub}</span>
-                  </span>
-                  <span style={{ display: 'flex', color: C.textoTenue }}>
-                    <IcoChevronDer size={16} />
-                  </span>
-                </button>
-              ))}
-            </div>
-            <button style={s.sheetCancel} onClick={() => setShowReportModal(false)}>
-              Cancelar
-            </button>
-          </div>
-        </div>
-      )}
     </div>
   )
 }

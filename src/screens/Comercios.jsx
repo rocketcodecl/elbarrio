@@ -6,6 +6,7 @@ import {
 } from '../lib/design'
 import MiniMap from '../components/MiniMap'
 import { DIAS_SEMANA } from '../lib/horarios'
+import { moderatePublicContent } from '../lib/moderation'
 
 /*
   COMERCIOS — el directorio del barrio.
@@ -409,7 +410,7 @@ function CardCompacta({ c, userCoords, expanded, onToggle }) {
     : (c.address ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(c.address)}` : null)
 
   return (
-    <div style={{ ...s.cardCompacta, ...(expanded ? s.cardCompactaExpanded : {}) }} onClick={() => onToggle(c.id)}>
+    <div id={`commerce-card-${c.id}`} style={{ ...s.cardCompacta, ...(expanded ? s.cardCompactaExpanded : {}) }} onClick={() => onToggle(c.id)}>
       <div style={s.cardCompactaTopRow}>
         <div style={s.logoCuadrado}>
           {c.cover_url || c.logo_url
@@ -499,7 +500,6 @@ function CardCompacta({ c, userCoords, expanded, onToggle }) {
    ════════════════════════════════════════════════════════════ */
 function ComercioDetalle({ c, userCoords, profile, onClose, onEditar, esAdmin, closing = false }) {
   const [mapaOpen, setMapaOpen] = useState(false)
-  const [fotoIdx, setFotoIdx] = useState(0)
   const [lightbox, setLightbox] = useState(null)
   const [favorito, setFavorito] = useState(false)
   const [favoriteCount, setFavoriteCount] = useState(Number(c.favorites_count) || 0)
@@ -534,23 +534,28 @@ function ComercioDetalle({ c, userCoords, profile, onClose, onEditar, esAdmin, c
   }, [c.id])
 
   useEffect(() => {
-    setFavoriteCount(Number(c.favorites_count) || 0)
-    if (!profile?.id) {
-      setFavorito(false)
-      return
-    }
-
     let active = true
-    supabase
-      .from('commerce_favorites')
-      .select('id')
-      .eq('commerce_id', c.id)
-      .eq('profile_id', profile.id)
-      .maybeSingle()
-      .then(({ data }) => {
-        if (active) setFavorito(!!data)
-      })
-    return () => { active = false }
+    const timer = window.setTimeout(() => {
+      if (!active) return
+      setFavoriteCount(Number(c.favorites_count) || 0)
+      if (!profile?.id) {
+        setFavorito(false)
+        return
+      }
+      supabase
+        .from('commerce_favorites')
+        .select('id')
+        .eq('commerce_id', c.id)
+        .eq('profile_id', profile.id)
+        .maybeSingle()
+        .then(({ data }) => {
+          if (active) setFavorito(!!data)
+        })
+    }, 0)
+    return () => {
+      active = false
+      window.clearTimeout(timer)
+    }
   }, [c.id, c.favorites_count, profile?.id])
 
   const toggleFavorite = async () => {
@@ -604,6 +609,13 @@ function ComercioDetalle({ c, userCoords, profile, onClose, onEditar, esAdmin, c
 
     setReviewSaving(true)
     setReviewError('')
+    try {
+      await moderatePublicContent({ kind: 'commerce_review', text: comment })
+    } catch (moderationError) {
+      setReviewError(moderationError?.message || 'No pudimos revisar tu opinión.')
+      setReviewSaving(false)
+      return
+    }
     const payload = {
       commerce_id: c.id,
       author_id: profile.id,
@@ -669,7 +681,7 @@ function ComercioDetalle({ c, userCoords, profile, onClose, onEditar, esAdmin, c
   const horario = horarioFeed(c.opening_hours)
   const metros = haversine(userCoords?.lat, userCoords?.lng, c.lat, c.lng)
   const dist = distancia(metros)
-  const wa = waLink(c.phone)
+  const wa = waLink(c.whatsapp || c.phone)
   const catInfo = COMERCIOS[cats[0]] || COMERCIOS['Otro']
   const isPremium = !!c.is_premium
 
@@ -1172,10 +1184,11 @@ function ComercioDetalle({ c, userCoords, profile, onClose, onEditar, esAdmin, c
 /* ════════════════════════════════════════════════════════════
    COMERCIOS — componente principal
    ════════════════════════════════════════════════════════════ */
-function Comercios({ currentUser, onNavigate, onCrear, onEditar }) {
+function Comercios({ currentUser, onNavigate, onCrear, onEditar, initialCommerceId = null }) {
   const [profile, setProfile] = useState(null)
   const [comercios, setComercios] = useState([])
   const [cargando, setCargando] = useState(true)
+  const [loadError, setLoadError] = useState('')
   const [cat, setCat] = useState('Todas')
   const [userCoords, setUserCoords] = useState(null)
   const [seleccionado, setSeleccionado] = useState(null)
@@ -1185,11 +1198,18 @@ function Comercios({ currentUser, onNavigate, onCrear, onEditar }) {
   const [busqueda, setBusqueda] = useState('')
   const [featuredIndex, setFeaturedIndex] = useState(0)
   const [featuredOrder, setFeaturedOrder] = useState([])
+  const [refrescando, setRefrescando] = useState(false)
+  const [pullDistance, setPullDistance] = useState(0)
+  const pullStartYRef = useRef(null)
   const featuredScrollRef = useRef(null)
   const featuredPausedRef = useRef(false)
   const featuredResumeTimerRef = useRef(null)
+  const initialCommerceIdRef = useRef(initialCommerceId)
 
-  useEffect(() => { cargar() }, [currentUser?.id])
+  useEffect(() => {
+    const timer = window.setTimeout(cargar, 0)
+    return () => window.clearTimeout(timer)
+  }, [currentUser?.id]) // eslint-disable-line react-hooks/exhaustive-deps -- carga al cambiar de sesión
 
   useEffect(() => {
     if (!navigator.geolocation) return
@@ -1200,19 +1220,29 @@ function Comercios({ currentUser, onNavigate, onCrear, onEditar }) {
     )
   }, [])
 
-  const cargar = async () => {
+  async function cargar({ silencioso = false } = {}) {
     if (!currentUser?.id) {
+      setLoadError('Necesitas iniciar sesión para ver los comercios de tu barrio.')
       setCargando(false)
       return
     }
-    setCargando(true)
+    if (!silencioso) setCargando(true)
+    setLoadError('')
     try {
-      const { data: p } = await supabase
+      const { data: p, error: profileError } = await supabase
         .from('profiles').select('*')
         .eq('user_id', currentUser.id).maybeSingle()
+      if (profileError) throw profileError
       if (!p) {
         setProfile(null)
         setComercios([])
+        setLoadError('No pudimos encontrar tu perfil vecinal.')
+        return
+      }
+      if (!p.neighborhood_id) {
+        setProfile(p)
+        setComercios([])
+        setLoadError('Tu perfil todavía no tiene un barrio verificado.')
         return
       }
       setProfile(p)
@@ -1231,7 +1261,7 @@ function Comercios({ currentUser, onNavigate, onCrear, onEditar }) {
         .order('is_premium', { ascending: false })
         .order('name', { ascending: true })
 
-      if (error) console.error('[comercios] Error cargando:', error)
+      if (error) throw error
       const loadedCommerces = data || []
       const premiumIds = loadedCommerces.filter(commerce => commerce.is_premium).map(commerce => commerce.id)
       for (let index = premiumIds.length - 1; index > 0; index -= 1) {
@@ -1240,11 +1270,52 @@ function Comercios({ currentUser, onNavigate, onCrear, onEditar }) {
       }
       setFeaturedOrder(premiumIds)
       setComercios(loadedCommerces)
+      const requestedCommerceId = initialCommerceIdRef.current
+      if (requestedCommerceId) {
+        initialCommerceIdRef.current = null
+        const requestedCommerce = loadedCommerces.find(commerce => commerce.id === requestedCommerceId)
+        if (requestedCommerce) {
+          if (requestedCommerce.is_premium) {
+            setCerrandoDetalle(false)
+            setSeleccionado(requestedCommerce)
+          } else {
+            setCat('Todas')
+            setBusqueda('')
+            setExpandidoId(requestedCommerce.id)
+            window.setTimeout(() => {
+              document.getElementById(`commerce-card-${requestedCommerce.id}`)
+                ?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+            }, 80)
+          }
+        }
+      }
     } catch (err) {
       console.error('Error cargando comercios:', err)
+      setComercios([])
+      setLoadError('No pudimos cargar los comercios. Revisa tu conexión e inténtalo nuevamente.')
     } finally {
-      setCargando(false)
+      if (!silencioso) setCargando(false)
     }
+  }
+
+  const onPullStart = event => {
+    if (event.currentTarget.scrollTop > 0 || refrescando) return
+    pullStartYRef.current = event.touches?.[0]?.clientY ?? null
+  }
+  const onPullMove = event => {
+    if (pullStartYRef.current == null || event.currentTarget.scrollTop > 0) return
+    const currentY = event.touches?.[0]?.clientY
+    if (currentY == null) return
+    setPullDistance(Math.max(0, Math.min((currentY - pullStartYRef.current) * 0.42, 68)))
+  }
+  const onPullEnd = async () => {
+    const shouldRefresh = pullDistance >= 44
+    pullStartYRef.current = null
+    setPullDistance(0)
+    if (!shouldRefresh || refrescando) return
+    setRefrescando(true)
+    await cargar({ silencioso: true })
+    setRefrescando(false)
   }
 
   const filtrados = comercios.filter((c) => {
@@ -1307,8 +1378,8 @@ function Comercios({ currentUser, onNavigate, onCrear, onEditar }) {
 
   useEffect(() => {
     if (destacados.length <= 1) {
-      setFeaturedIndex(0)
-      return undefined
+      const resetTimer = window.setTimeout(() => setFeaturedIndex(0), 0)
+      return () => window.clearTimeout(resetTimer)
     }
     const interval = setInterval(() => {
       if (featuredPausedRef.current) return
@@ -1384,6 +1455,7 @@ function Comercios({ currentUser, onNavigate, onCrear, onEditar }) {
           from { opacity: 0.7; transform: translate3d(0, 100%, 0); }
           to { opacity: 1; transform: translate3d(0, 0, 0); }
         }
+        @keyframes commerceRefreshSpin { to { transform: rotate(360deg); } }
         @media (prefers-reduced-motion: reduce) {
           .commerce-feed-header { animation: none !important; }
           .commerce-basic-motion,
@@ -1458,10 +1530,20 @@ function Comercios({ currentUser, onNavigate, onCrear, onEditar }) {
       </div>
 
       {/* LISTADO — una sola lista, sin secciones */}
-      <div style={s.scroll}>
+      <div style={s.scroll} onTouchStart={onPullStart} onTouchMove={onPullMove} onTouchEnd={onPullEnd} onTouchCancel={onPullEnd}>
+        <div style={{ ...s.pullRefresh, height: refrescando ? 38 : pullDistance, opacity: refrescando ? 1 : Math.min(pullDistance / 44, 1) }}><span style={{ ...s.pullRefreshIcon, transform: refrescando ? undefined : `rotate(${Math.min(pullDistance * 4, 180)}deg)`, animation: refrescando ? 'commerceRefreshSpin 750ms linear infinite' : 'none' }}>↻</span><span>{refrescando ? 'Actualizando' : 'Suelta para actualizar'}</span></div>
         {cargando ? (
           <div style={s.cargando}>
             <img src="/isotipo.png" alt="" style={{ width: 58, opacity: 0.4 }} />
+          </div>
+        ) : loadError ? (
+          <div style={s.vacio} role="alert">
+            <div style={s.vacioEmoji}>⚠️</div>
+            <div style={s.vacioTit}>No pudimos mostrar los comercios</div>
+            <div style={s.vacioTxt}>{loadError}</div>
+            <button style={s.vacioBtn} type="button" onClick={() => cargar()}>
+              Reintentar
+            </button>
           </div>
         ) : filtrados.length === 0 ? (
           <div style={s.vacio}>
@@ -1688,6 +1770,8 @@ const s = {
     padding: '4px 16px 0',
     WebkitOverflowScrolling: 'touch',
   },
+  pullRefresh: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7, overflow: 'hidden', color: C.verdeOsc, fontSize: 10.5, fontWeight: 600, transition: 'height 180ms ease, opacity 140ms ease' },
+  pullRefreshIcon: { width: 18, height: 18, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', color: C.verde, fontSize: 18, lineHeight: 1 },
   feedSection: { marginBottom: 36 },
   feedHeading: {
     display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8,

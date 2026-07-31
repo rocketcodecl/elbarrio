@@ -42,6 +42,8 @@ const initialState = event => ({
   event_requires_registration: !!event?.event_requires_registration,
   event_registration_url: event?.event_registration_url || '',
   event_show_attendees: event?.event_show_attendees !== false,
+  show_in_activity: event?.show_in_activity === true,
+  show_on_home: event?.show_on_home === true,
   status: event?.status || 'active',
 })
 
@@ -51,6 +53,10 @@ export default function EventEditor({ event, profile, onBack, onSaved }) {
   const [uploading, setUploading] = useState(false)
   const [error, setError] = useState('')
   const [categories, setCategories] = useState(DEFAULT_EVENT_TYPES.map(([key, icon, name]) => ({ key, icon, name })))
+  const [neighborhoods, setNeighborhoods] = useState([])
+  const [targetNeighborhoodId, setTargetNeighborhoodId] = useState(() => (
+    event?.neighborhood_id || (profile?.is_superadmin ? '' : profile?.neighborhood_id || '')
+  ))
 
   const set = (field, value) => setDraft(current => ({ ...current, [field]: value }))
   const setTicket = (index, field, value) => setDraft(current => ({ ...current, ticket_prices: current.ticket_prices.map((ticket, ticketIndex) => ticketIndex === index ? { ...ticket, [field]: value } : ticket) }))
@@ -62,6 +68,14 @@ export default function EventEditor({ event, profile, onBack, onSaved }) {
       if (data?.length) setCategories(data)
     })
   }, [])
+
+  useEffect(() => {
+    if (!profile?.is_superadmin || event) return
+    supabase.from('neighborhoods').select('id, name, uv_code').order('name').then(({ data, error: loadError }) => {
+      if (loadError) setError(`No fue posible cargar los barrios: ${loadError.message}`)
+      setNeighborhoods(data || [])
+    })
+  }, [event, profile?.is_superadmin])
 
   const uploadCover = async input => {
     const file = input.target.files?.[0]
@@ -88,6 +102,11 @@ export default function EventEditor({ event, profile, onBack, onSaved }) {
     submitEvent.preventDefault()
     if (!draft.title.trim() || !draft.content.trim() || !draft.starts_at || !draft.location_text.trim()) {
       setError('Completa nombre, fecha, ubicación y descripción del evento.')
+      return
+    }
+    const neighborhoodId = event?.neighborhood_id || targetNeighborhoodId
+    if (!neighborhoodId) {
+      setError('Selecciona el barrio donde se publicará el evento.')
       return
     }
     if (draft.ends_at && new Date(draft.ends_at).getTime() <= new Date(draft.starts_at).getTime()) {
@@ -125,6 +144,7 @@ export default function EventEditor({ event, profile, onBack, onSaved }) {
       event_requires_registration: draft.event_requires_registration,
       event_registration_url: draft.event_requires_registration ? (draft.event_registration_url.trim() || null) : null,
       event_show_attendees: draft.event_show_attendees,
+      show_in_activity: draft.show_in_activity,
       status: draft.status,
     }
 
@@ -136,11 +156,24 @@ export default function EventEditor({ event, profile, onBack, onSaved }) {
 
     const request = event
       ? supabase.from('posts').update(payload).eq('id', event.id).select().single()
-      : supabase.from('posts').insert({ ...payload, author_id: profile?.id, neighborhood_id: profile?.neighborhood_id }).select().single()
-    const { error: saveError } = await request
-    setSaving(false)
+      : supabase.from('posts').insert({ ...payload, author_id: profile?.id, neighborhood_id: neighborhoodId }).select().single()
+    const { data: savedEvent, error: saveError } = await request
     if (saveError) {
+      setSaving(false)
       setError(saveError.message || 'No fue posible guardar el evento.')
+      return
+    }
+
+    const shouldUpdateSpotlight = draft.show_on_home || event?.show_on_home === true
+    const { error: spotlightError } = shouldUpdateSpotlight
+      ? await supabase.rpc('admin_set_home_event_spotlight', {
+          p_event_id: savedEvent.id,
+          p_show: draft.status === 'active' && draft.show_on_home,
+        })
+      : { error: null }
+    setSaving(false)
+    if (spotlightError) {
+      setError(`El evento se guardó, pero no pudimos actualizar la portada de Inicio: ${spotlightError.message}`)
       return
     }
     onSaved()
@@ -157,6 +190,12 @@ export default function EventEditor({ event, profile, onBack, onSaved }) {
       {error && <div className="admin-alert" role="alert"><span>⚠️</span><p>{error}</p><button type="button" onClick={() => setError('')}>×</button></div>}
 
       <form id="event-form" className="event-editor-form" onSubmit={save}>
+        {profile?.is_superadmin && !event && (
+          <section className="editor-section">
+            <div className="editor-section-title"><span>0</span><div><h2>Barrio de publicación</h2><p>El evento solo será visible para los vecinos del barrio seleccionado.</p></div></div>
+            <label className="field">Barrio<select value={targetNeighborhoodId} onChange={e => setTargetNeighborhoodId(e.target.value)} required><option value="">Selecciona un barrio</option>{neighborhoods.map(neighborhood => <option key={neighborhood.id} value={neighborhood.id}>{neighborhood.name}{neighborhood.uv_code ? ` · UV ${neighborhood.uv_code}` : ''}</option>)}</select></label>
+          </section>
+        )}
         <section className="editor-section">
           <div className="editor-section-title"><span>1</span><div><h2>Portada e información</h2><p>Lo primero que verán los vecinos en el feed.</p></div></div>
           <label className="event-cover-uploader">
@@ -204,7 +243,17 @@ export default function EventEditor({ event, profile, onBack, onSaved }) {
 
         <section className="editor-section">
           <div className="editor-section-title"><span>4</span><div><h2>Visibilidad</h2><p>Un evento pausado deja de aparecer en la aplicación.</p></div></div>
-          <div className="event-status-row"><button type="button" className={draft.status === 'active' ? 'is-selected' : ''} onClick={() => set('status', 'active')}>● Publicado</button><button type="button" className={draft.status !== 'active' ? 'is-selected' : ''} onClick={() => set('status', 'closed')}>○ Pausado</button></div>
+          <div className="event-status-row"><button type="button" className={draft.status === 'active' ? 'is-selected' : ''} onClick={() => set('status', 'active')}>● Publicado</button><button type="button" className={draft.status !== 'active' ? 'is-selected' : ''} onClick={() => setDraft(current => ({ ...current, status: 'closed', show_on_home: false }))}>○ Pausado</button></div>
+          <label className={`activity-feed-toggle ${draft.show_in_activity ? 'is-selected' : ''}`}>
+            <input type="checkbox" checked={draft.show_in_activity} onChange={e => set('show_in_activity', e.target.checked)} />
+            <span>📣</span>
+            <div><strong>Mostrar también en Actividad</strong><small>Aparecerá mezclado con la actividad vecinal, además del feed de Eventos.</small></div>
+          </label>
+          <label className={`activity-feed-toggle ${draft.show_on_home ? 'is-selected' : ''}`}>
+            <input type="checkbox" checked={draft.show_on_home} disabled={draft.status !== 'active'} onChange={e => set('show_on_home', e.target.checked)} />
+            <span>🏠</span>
+            <div><strong>Destacar en “Hoy en tu barrio”</strong><small>Ocupará la portada principal. Al activarlo, reemplazará al evento destacado actual de este barrio.</small></div>
+          </label>
         </section>
 
         <footer className="commerce-editor-footer"><button className="button button-secondary" type="button" onClick={onBack}>Cancelar</button><button className="button button-primary" type="submit" disabled={saving || uploading}>{saving ? 'Guardando…' : event ? 'Guardar cambios' : 'Publicar evento'}</button></footer>

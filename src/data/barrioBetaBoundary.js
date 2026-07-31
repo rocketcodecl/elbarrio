@@ -1,0 +1,33 @@
+// Copia cliente del polígono MVP versionado en
+// supabase/geo/barrio_beta_polygon.geojson.
+// Permite explicar visualmente la cobertura antes de confirmar el GPS,
+// sin depender del estado de una migración remota.
+export const BARRIO_BETA_BOUNDARY = {
+  type: 'Feature',
+  properties: {
+    name: 'Barrio Beta',
+  },
+  geometry: {
+    type: 'Polygon',
+    coordinates: [[
+      [-70.580331, -33.431425],
+      [-70.568429, -33.431037],
+      [-70.56504, -33.430922],
+      [-70.563475, -33.425209],
+      [-70.56418, -33.423802],
+      [-70.564215, -33.41806],
+      [-70.564696, -33.416552],
+      [-70.575309, -33.419825],
+      [-70.577407, -33.422567],
+      [-70.577923, -33.42317],
+      [-70.579354, -33.423545],
+      [-70.577094, -33.425933],
+      [-70.58087, -33.429323],
+      [-70.582672, -33.429801],
+      [-70.580956, -33.431472],
+      [-70.580355, -33.431424],
+      [-70.580355, -33.431377],
+      [-70.580331, -33.431425],
+    ]],
+  },
+}
