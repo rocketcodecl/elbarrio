@@ -262,7 +262,7 @@ El botón de creación abre `CreatePost.jsx`, salvo la creación de comercios, q
 
 ## Funcionalidades terminadas
 
-- Landing pública de El Barrio con navegación responsive, imágenes originales generadas para el proyecto, hero cinematográfico, demo ficticia de la aplicación, scrollytelling de cuatro etapas, propuesta para vecinos y comercios, comunidad y formulario de contacto por correo. No utiliza datos ni pantallas reales de la aplicación.
+- Landing pública de El Barrio con navegación responsive, imágenes originales, hero cinematográfico y un scrollytelling emocional continuo que sigue a Marta desde una necesidad cotidiana hasta la respuesta de un servicio cercano, el descubrimiento de un comercio local y un encuentro comunitario. La demo de la aplicación es ficticia y no utiliza datos ni pantallas reales. Incluye propuesta para vecinos y comercios y formulario de contacto por correo.
 - Alta y verificación territorial refinadas: Nombre y Apellido separados sin migración, copy de privacidad coherente, scroll interno, mapa del polígono MVP, geocodificación automática de dirección y marcador previo al GPS.
 - Inicio incorpora una portada editorial real para el próximo evento elegido desde el panel, sin datos simulados ni duplicación inmediata en Actividad. Mi perfil amplía las tarjetas de favoritos y el Modo accesible conserva cuadrados los controles circulares.
 - Pulido UX/UI final de la app vecinal: subpantallas superiores de Perfil, buscador permanente y jerarquía real en Servicios, detalle con métricas reales y CTA dominante, menú Crear adaptable, safe areas, reducción de movimiento, Chat con recuperación y Home con caché más aviso de actualización fallida.

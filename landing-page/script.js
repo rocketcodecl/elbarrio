@@ -4,6 +4,7 @@ const menuButton = document.querySelector('[data-menu-button]')
 const mobileNav = document.querySelector('[data-mobile-nav]')
 const steps = [...document.querySelectorAll('[data-scene]')]
 const panels = [...document.querySelectorAll('[data-scene-panel]')]
+const storyVisuals = [...document.querySelectorAll('[data-scene-visual]')]
 
 function updatePageChrome() {
   const scrollable = document.documentElement.scrollHeight - window.innerHeight
@@ -36,6 +37,7 @@ mobileNav?.querySelectorAll('a').forEach(link => {
 const setScene = scene => {
   steps.forEach(step => step.classList.toggle('active', step.dataset.scene === scene))
   panels.forEach(panel => panel.classList.toggle('active', panel.dataset.scenePanel === scene))
+  storyVisuals.forEach(visual => visual.classList.toggle('active', visual.dataset.sceneVisual === scene))
 }
 
 const storyObserver = new IntersectionObserver(entries => {
