@@ -2,6 +2,7 @@
 
 ## Estado actual
 
+- Eventos incorpora en código un control independiente para poner o quitar un evento en la portada “Hoy en tu barrio”. La migración `202607300005_home_event_spotlight.sql` y la RPC `admin_set_home_event_spotlight` están preparadas pero no deben asumirse aplicadas.
 - Fase larga autorizada completada: moderación pública con IA, cierre integral de Comercios y Productos, reemplazo de Perfil y Modo accesible. Bloque actual: `4/4 — verificación final aprobada por build`.
 
 - El superbloque posterior de pulido UX/UI de la aplicación vecinal también está completado. No modificó este panel; ambos proyectos siguen compilando para producción.
@@ -60,6 +61,7 @@
 - Servicios permite crear una publicación administrativa asociándola a un perfil del barrio, además de moderar y programar su visibilidad patrocinada.
 - No se incluirá ninguna llave privada o `service_role` en el navegador.
 - Los eventos usan la tabla `posts` con `type='event'`. El panel permite administrar su portada compacta 16:9, rango desde/hasta, tipo, ubicación, condiciones de entrada y visibilidad.
+- `posts.show_on_home` controla exclusivamente “Hoy en tu barrio” y no reemplaza `show_in_activity`. La RPC administrativa garantiza un máximo de un evento de portada por barrio y valida el alcance territorial o supremo. Pausar o cancelar un evento lo retira de Inicio.
 - En Eventos, `active` significa publicado, `closed` pausado y reactivable, y `cancelled` cancelado definitivamente dentro del panel. La eliminación es una acción separada, irreversible y confirmada.
 - Las categorías de Eventos son globales para El Barrio. El administrador puede crearlas, editarlas, asignar un ícono u ocultarlas desde el panel; los eventos existentes conservan su categoría aunque esta se oculte para futuras publicaciones.
 - Los eventos pagados pueden definir varias tarifas con etiqueta y valor; el primer valor sigue respaldando el campo histórico `event_price`.
@@ -84,6 +86,7 @@
 
 ## Pendiente inmediato
 
+- Ejecutar `supabase/migrations/202607300005_home_event_spotlight.sql` y validar poner, reemplazar y quitar el evento de portada.
 - Validar con una cuenta admin territorial la separación efectiva respecto del superadministrador.
 - Mantener deshabilitada la asistencia. No crear ni aplicar cambios de asistencia hasta definir y autorizar cómo alinear `event_attendees` con los eventos actuales de `posts`.
 - Ejecutar `supabase/migrations/202607290001_incident_moderation.sql` y validar el flujo completo del módulo Incidentes.

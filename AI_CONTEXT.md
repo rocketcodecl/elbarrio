@@ -5,6 +5,8 @@
 
 ## Estado de continuidad — 30 de julio de 2026
 
+- Cierre posterior implementado en código: los favoritos abren la ficha exacta del comercio y “Hoy en tu barrio” queda oculto por defecto, con selección independiente desde Eventos del panel. App y panel pasan build y ESLint focalizado.
+- La migración `202607300005_home_event_spotlight.sql` está preparada pero no debe asumirse aplicada. Hasta su confirmación, Inicio falla cerrado y omite la portada sin afectar el resto del feed; el control administrativo requiere la RPC nueva para funcionar.
 - Superbloque de adquisición y pulido visual implementado: alta con campos separados `Nombre` y `Apellido` sin alterar el schema, mapa territorial explicativo en la verificación, favoritos con mayor jerarquía, controles circulares protegidos en Modo accesible y portada editorial “Hoy en tu barrio” basada solo en eventos reales seleccionados.
 - La aplicación principal y el panel administrativo compilan después del superbloque. Los archivos focalizados de Perfil, Verificación, MiniMap y Mi perfil pasan ESLint. La revisión visual automatizada sigue pendiente porque no había ningún navegador conectado al entorno.
 - Este bloque no agrega ni ejecuta migraciones. La visualización territorial usa una copia cliente del GeoJSON versionado; la confirmación residencial continúa dependiendo de la RPC existente y su estado remoto no se presume.
@@ -135,7 +137,7 @@ El botón de creación abre `CreatePost.jsx`, salvo la creación de comercios, q
 ## Decisiones tomadas
 
 - `Home.jsx` es el feed principal y controla el tab Inicio.
-- Inicio puede mostrar una portada compacta “Hoy en tu barrio” con imagen, categoría, horario, lugar, resumen y acceso al detalle. Usa el próximo evento activo marcado `show_in_activity=true`, no inventa contenido y retira ese mismo evento de la lista inmediata de Actividad para evitar duplicación.
+- Inicio puede mostrar una portada compacta “Hoy en tu barrio” con imagen, categoría, horario, lugar, resumen y acceso al detalle. Usa exclusivamente el evento futuro activo marcado `show_on_home=true`; la selección de portada es independiente de `show_in_activity`, no inventa contenido y retira ese mismo evento de la lista inmediata de Actividad para evitar duplicación.
 - `Barrio.jsx` y `Feed.jsx` permanecen en el repositorio, pero no están conectados a la aplicación.
 - `Search.jsx` tampoco está conectado actualmente.
 - La navegación seguirá siendo por estado; no se incorporará otro router sin autorización.
@@ -184,7 +186,7 @@ El botón de creación abre `CreatePost.jsx`, salvo la creación de comercios, q
 - El feed de Comercios distingue un directorio realmente vacío de un error de sesión, perfil, barrio o consulta. Ante un fallo muestra el motivo seguro y permite reintentar; nunca consulta sin `neighborhood_id`. La ficha usa `whatsapp` como contacto prioritario y `phone` como respaldo.
 - Invitar vecinos debe permanecer pendiente de habilitación aunque exista una pantalla implementada.
 - Mi perfil usa una sola implementación basada en la referencia aprobada: identidad centrada, reputación, estadísticas reales, progreso, insignias y menú personal. “Mis publicaciones”, “Mis favoritos” y “Mis compras y ventas” abren hojas con datos reales; no muestran contadores simulados.
-- Los comercios favoritos se muestran en tarjetas de mayor tamaño dentro de Mi perfil, con fotografía, nombre y rubro reales.
+- Los comercios favoritos se muestran en tarjetas de mayor tamaño dentro de Mi perfil, con fotografía, nombre y rubro reales. La tarjeta completa abre directamente la ficha del comercio seleccionado.
 - Las secciones de actividad de Mi perfil se presentan como subpantallas completas y no como bottom sheets: la información empieza arriba, el contenido breve conserva jerarquía y la barra inferior queda cubierta mientras se revisa una sección.
 - El Modo accesible es una preferencia local persistente controlada por `App.jsx`. Aplica texto y controles más grandes, foco visible y movimiento reducido a toda la aplicación; puede alternarse desde Mi perfil y Configuración. Los controles iconográficos con forma circular conservan relación 1:1 y no reciben el alto textual de 48 px. Es una ayuda práctica para adultos mayores, no una declaración formal de cumplimiento WCAG.
 - La barra inferior y el menú Crear respetan el safe area del dispositivo. El menú universal usa una cuadrícula desplazable con título y cierre explícito; los tabs identifican semánticamente la sección activa y anuncian mensajes sin leer.
@@ -328,6 +330,7 @@ El botón de creación abre `CreatePost.jsx`, salvo la creación de comercios, q
 
 ## Funcionalidades pendientes
 
+- Ejecutar `202607300005_home_event_spotlight.sql` y validar desde el panel poner un evento en Inicio, reemplazarlo por otro y quitarlo.
 - Validar visualmente con una sesión real las subpantallas de Mi perfil, Servicios, su detalle, el menú Crear y el Modo accesible dentro del marco móvil; los builds y ESLint focalizado pasan, pero no hubo un navegador conectado para aprobar la captura final.
 - Validar una sugerencia de publicación con fotografía mediante `analyze-listing-image` usando una sesión real.
 - Validar con una sesión real un texto permitido y un texto bloqueable en publicación o comentario; el endpoint ya fue validado para CORS y rechazo sin sesión.
