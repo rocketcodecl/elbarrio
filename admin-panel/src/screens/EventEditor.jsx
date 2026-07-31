@@ -164,10 +164,13 @@ export default function EventEditor({ event, profile, onBack, onSaved }) {
       return
     }
 
-    const { error: spotlightError } = await supabase.rpc('admin_set_home_event_spotlight', {
-      p_event_id: savedEvent.id,
-      p_show: draft.status === 'active' && draft.show_on_home,
-    })
+    const shouldUpdateSpotlight = draft.show_on_home || event?.show_on_home === true
+    const { error: spotlightError } = shouldUpdateSpotlight
+      ? await supabase.rpc('admin_set_home_event_spotlight', {
+          p_event_id: savedEvent.id,
+          p_show: draft.status === 'active' && draft.show_on_home,
+        })
+      : { error: null }
     setSaving(false)
     if (spotlightError) {
       setError(`El evento se guardó, pero no pudimos actualizar la portada de Inicio: ${spotlightError.message}`)
