@@ -4,9 +4,9 @@
 
 - Fase larga autorizada completada: moderación pública con IA, cierre integral de Comercios y Productos, reemplazo de Perfil y Modo accesible. Bloque actual: `4/4 — verificación final aprobada por build`.
 
-- La aplicación principal y este panel compilan para producción. Las instrucciones de la única migración opcional nueva están en `../supabase/MVP_CIERRE_INSTRUCCIONES.md`; no se ejecutaron migraciones ni se cargaron datos simulados.
+- La aplicación principal y este panel compilan para producción. La migración de auditoría de moderación fue aplicada el 30 de julio de 2026; no se cargaron datos simulados.
 
-- La aplicación vecinal modera texto público antes de guardar publicaciones, comentarios y opiniones mediante la Edge Function autenticada `moderate-community-content`. Los chats privados quedan fuera. La migración opcional de auditoría administrativa `202607300004_content_moderation_events.sql` está preparada, pero no aplicada ni debe asumirse aplicada.
+- La aplicación vecinal modera texto público antes de guardar publicaciones, comentarios y opiniones mediante la Edge Function autenticada `moderate-community-content`. Los chats privados quedan fuera. La auditoría administrativa `content_moderation_events` está aplicada y rechaza acceso anónimo.
 
 - Existe un módulo independiente de Notificaciones para seleccionar audiencia, confirmar el número de destinatarios, enviar mensajes internos y consultar el historial. Usa RPC administrativas y la migración `202607290015_admin_broadcast_notifications.sql` está aplicada y validada según confirmación manual.
 
@@ -82,7 +82,6 @@
 
 ## Pendiente inmediato
 
-- Aplicar manualmente `supabase/migrations/202607300004_content_moderation_events.sql` solo si se desea conservar la auditoría administrativa de moderación y confirmar después su ejecución. No usar `supabase db push` mientras el historial remoto siga desalineado.
 - Validar con una cuenta admin territorial la separación efectiva respecto del superadministrador.
 - Mantener deshabilitada la asistencia. No crear ni aplicar cambios de asistencia hasta definir y autorizar cómo alinear `event_attendees` con los eventos actuales de `posts`.
 - Ejecutar `supabase/migrations/202607290001_incident_moderation.sql` y validar el flujo completo del módulo Incidentes.

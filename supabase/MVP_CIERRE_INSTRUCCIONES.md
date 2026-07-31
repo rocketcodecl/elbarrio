@@ -1,5 +1,11 @@
 # SQL preparado para el cierre del MVP
 
+## Estado
+
+`202607300004_content_moderation_events.sql` fue ejecutada con resultado `Success` el 30 de julio de 2026. La tabla fue reconocida posteriormente por PostgREST y rechazó una lectura anónima con HTTP 401, mientras el control sobre una tabla inexistente respondió HTTP 404.
+
+No volver a ejecutarla salvo que se esté reconstruyendo otro entorno.
+
 ## Qué hace falta cargar
 
 No hace falta cargar datos de demostración ni productos ficticios.
