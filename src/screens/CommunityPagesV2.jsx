@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { C, T } from '../lib/design'
 import { supabase } from '../lib/supabase'
 
-const ASSET = '/community-assets/'
+const ASSET = `${import.meta.env.BASE_URL}community-assets/`
 
 const ABOUT_DEFAULTS = {
   heroEyebrow: 'Nuestra historia',
