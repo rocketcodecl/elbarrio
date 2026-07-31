@@ -410,7 +410,7 @@ function CardCompacta({ c, userCoords, expanded, onToggle }) {
     : (c.address ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(c.address)}` : null)
 
   return (
-    <div style={{ ...s.cardCompacta, ...(expanded ? s.cardCompactaExpanded : {}) }} onClick={() => onToggle(c.id)}>
+    <div id={`commerce-card-${c.id}`} style={{ ...s.cardCompacta, ...(expanded ? s.cardCompactaExpanded : {}) }} onClick={() => onToggle(c.id)}>
       <div style={s.cardCompactaTopRow}>
         <div style={s.logoCuadrado}>
           {c.cover_url || c.logo_url
@@ -500,7 +500,6 @@ function CardCompacta({ c, userCoords, expanded, onToggle }) {
    ════════════════════════════════════════════════════════════ */
 function ComercioDetalle({ c, userCoords, profile, onClose, onEditar, esAdmin, closing = false }) {
   const [mapaOpen, setMapaOpen] = useState(false)
-  const [fotoIdx, setFotoIdx] = useState(0)
   const [lightbox, setLightbox] = useState(null)
   const [favorito, setFavorito] = useState(false)
   const [favoriteCount, setFavoriteCount] = useState(Number(c.favorites_count) || 0)
@@ -535,23 +534,28 @@ function ComercioDetalle({ c, userCoords, profile, onClose, onEditar, esAdmin, c
   }, [c.id])
 
   useEffect(() => {
-    setFavoriteCount(Number(c.favorites_count) || 0)
-    if (!profile?.id) {
-      setFavorito(false)
-      return
-    }
-
     let active = true
-    supabase
-      .from('commerce_favorites')
-      .select('id')
-      .eq('commerce_id', c.id)
-      .eq('profile_id', profile.id)
-      .maybeSingle()
-      .then(({ data }) => {
-        if (active) setFavorito(!!data)
-      })
-    return () => { active = false }
+    const timer = window.setTimeout(() => {
+      if (!active) return
+      setFavoriteCount(Number(c.favorites_count) || 0)
+      if (!profile?.id) {
+        setFavorito(false)
+        return
+      }
+      supabase
+        .from('commerce_favorites')
+        .select('id')
+        .eq('commerce_id', c.id)
+        .eq('profile_id', profile.id)
+        .maybeSingle()
+        .then(({ data }) => {
+          if (active) setFavorito(!!data)
+        })
+    }, 0)
+    return () => {
+      active = false
+      window.clearTimeout(timer)
+    }
   }, [c.id, c.favorites_count, profile?.id])
 
   const toggleFavorite = async () => {
@@ -1180,7 +1184,7 @@ function ComercioDetalle({ c, userCoords, profile, onClose, onEditar, esAdmin, c
 /* ════════════════════════════════════════════════════════════
    COMERCIOS — componente principal
    ════════════════════════════════════════════════════════════ */
-function Comercios({ currentUser, onNavigate, onCrear, onEditar }) {
+function Comercios({ currentUser, onNavigate, onCrear, onEditar, initialCommerceId = null }) {
   const [profile, setProfile] = useState(null)
   const [comercios, setComercios] = useState([])
   const [cargando, setCargando] = useState(true)
@@ -1200,8 +1204,12 @@ function Comercios({ currentUser, onNavigate, onCrear, onEditar }) {
   const featuredScrollRef = useRef(null)
   const featuredPausedRef = useRef(false)
   const featuredResumeTimerRef = useRef(null)
+  const initialCommerceIdRef = useRef(initialCommerceId)
 
-  useEffect(() => { cargar() }, [currentUser?.id])
+  useEffect(() => {
+    const timer = window.setTimeout(cargar, 0)
+    return () => window.clearTimeout(timer)
+  }, [currentUser?.id]) // eslint-disable-line react-hooks/exhaustive-deps -- carga al cambiar de sesión
 
   useEffect(() => {
     if (!navigator.geolocation) return
@@ -1212,7 +1220,7 @@ function Comercios({ currentUser, onNavigate, onCrear, onEditar }) {
     )
   }, [])
 
-  const cargar = async ({ silencioso = false } = {}) => {
+  async function cargar({ silencioso = false } = {}) {
     if (!currentUser?.id) {
       setLoadError('Necesitas iniciar sesión para ver los comercios de tu barrio.')
       setCargando(false)
@@ -1262,6 +1270,25 @@ function Comercios({ currentUser, onNavigate, onCrear, onEditar }) {
       }
       setFeaturedOrder(premiumIds)
       setComercios(loadedCommerces)
+      const requestedCommerceId = initialCommerceIdRef.current
+      if (requestedCommerceId) {
+        initialCommerceIdRef.current = null
+        const requestedCommerce = loadedCommerces.find(commerce => commerce.id === requestedCommerceId)
+        if (requestedCommerce) {
+          if (requestedCommerce.is_premium) {
+            setCerrandoDetalle(false)
+            setSeleccionado(requestedCommerce)
+          } else {
+            setCat('Todas')
+            setBusqueda('')
+            setExpandidoId(requestedCommerce.id)
+            window.setTimeout(() => {
+              document.getElementById(`commerce-card-${requestedCommerce.id}`)
+                ?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+            }, 80)
+          }
+        }
+      }
     } catch (err) {
       console.error('Error cargando comercios:', err)
       setComercios([])
@@ -1351,8 +1378,8 @@ function Comercios({ currentUser, onNavigate, onCrear, onEditar }) {
 
   useEffect(() => {
     if (destacados.length <= 1) {
-      setFeaturedIndex(0)
-      return undefined
+      const resetTimer = window.setTimeout(() => setFeaturedIndex(0), 0)
+      return () => window.clearTimeout(resetTimer)
     }
     const interval = setInterval(() => {
       if (featuredPausedRef.current) return

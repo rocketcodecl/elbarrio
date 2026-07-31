@@ -47,25 +47,6 @@ import { AboutUs, Terms, ProhibitedProducts, InviteNeighbors, ContactUs, Setting
 
 const ACCESSIBLE_MODE_KEY = 'elbarrio:accessible-mode'
 
-function Placeholder({ titulo, onBack, mensaje }) {
-  return (
-    <div style={s.placeholderWrap}>
-      <div style={s.placeholderHeader}>
-        <button style={s.placeholderBack} onClick={() => onBack && onBack('back')}>←</button>
-        <div style={s.placeholderTit}>{titulo}</div>
-        <div style={{ width: 40 }} />
-      </div>
-      <div style={s.placeholderBody}>
-        <div style={s.placeholderEmoji}>🚧</div>
-        <div style={s.placeholderTit2}>{titulo}</div>
-        <div style={s.placeholderTxt}>
-          {mensaje || 'Esta pantalla todavía no está integrada.'}
-        </div>
-      </div>
-    </div>
-  )
-}
-
 export default function App() {
   /* ── LOGIN FLOW STATE ── */
   const [currentScreen, setCurrentScreen] = useState('splash')
@@ -133,7 +114,7 @@ export default function App() {
   }, [])
 
   useEffect(() => {
-    checkSession()
+    const sessionTimer = window.setTimeout(checkSession, 0)
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_e, session) => {
       if (session?.user) {
         setUser({ id: session.user.id, email: session.user.email })
@@ -142,19 +123,23 @@ export default function App() {
         setProfile(null)
       }
     })
-    return () => subscription.unsubscribe()
+    return () => {
+      window.clearTimeout(sessionTimer)
+      subscription.unsubscribe()
+    }
   }, [checkSession])
 
+  const userId = user?.id
   const recargarPerfil = useCallback(async () => {
-    if (!user?.id) return null
+    if (!userId) return null
     const { data: p } = await supabase
       .from('profiles')
       .select('*')
-      .eq('user_id', user.id)
+      .eq('user_id', userId)
       .maybeSingle()
     setProfile(p || null)
     return p
-  }, [user?.id])
+  }, [userId])
 
   useEffect(() => {
     if (!user?.id) return undefined
@@ -195,7 +180,9 @@ export default function App() {
           .select('id', { count: 'exact', head: true })
           .eq('receiver_id', prof.id).eq('read', false)
         if (active) setNoLeidos(count || 0)
-      } catch {}
+      } catch {
+        // El contador se recupera en el próximo evento o al volver a montar.
+      }
     }
     cargarNoLeidos()
     const canal = supabase
@@ -612,7 +599,16 @@ export default function App() {
     }
     if (activeTab === 'eventos') return <Events key={`events-${eventsRevision}`} currentUser={user} onNavigate={onNavigate} onCrear={onCrear} />
     if (activeTab === 'chat') return <ChatList currentUser={{ ...user, profileId: profile?.id }} onNavigate={onNavigate} />
-    if (activeTab === 'comercios') return <Comercios currentUser={user} onNavigate={onNavigate} onCrear={onCrear} />
+    if (activeTab === 'comercios') {
+      return (
+        <Comercios
+          currentUser={user}
+          onNavigate={onNavigate}
+          onCrear={onCrear}
+          initialCommerceId={params?.commerceId}
+        />
+      )
+    }
     if (activeTab === 'alertas') return <Alertas currentUser={user} onNavigate={onNavigate} onCrear={onCrear} />
     if (activeTab === 'perfil') return (
       <MyProfile
