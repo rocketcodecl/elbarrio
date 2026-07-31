@@ -139,6 +139,18 @@ input, textarea {
   line-height: 1.4 !important;
 }
 
+/* Los controles iconográficos conservan su geometría circular en Modo accesible.
+   El área táctil ya está dada por su ancho/alto explícito; agrandar solo el alto
+   los convertía en óvalos en cabeceras y fichas. */
+.accessible-mode .phone-content button[style*="border-radius: 50%"],
+.accessible-mode .phone-content button[style*="border-radius:50%"],
+.accessible-mode .profile-header button,
+.accessible-mode .profile-sheet header button {
+  min-height: unset !important;
+  aspect-ratio: 1 / 1;
+  line-height: 1 !important;
+}
+
 .accessible-mode .phone-content p,
 .accessible-mode .phone-content label,
 .accessible-mode .phone-content small {

@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import {
-  C, T, S, TIPOS, REPORTES, FARMACIAS,
-  iniciales, hace, plata, distancia, saludo,
+  C, T, TIPOS, REPORTES, FARMACIAS,
+  iniciales, hace, plata, saludo,
 } from '../lib/design'
 
 /*
@@ -170,6 +170,38 @@ const ACCESOS_HOME = [
 
 const ACTIVIDAD_VISIBLE_INICIAL = 10
 
+const fechaEventoPortada = (start, end) => {
+  if (!start) return 'Fecha por confirmar'
+  const startDate = new Date(start)
+  if (Number.isNaN(startDate.getTime())) return 'Fecha por confirmar'
+  const day = new Intl.DateTimeFormat('es-CL', {
+    weekday: 'short',
+    day: 'numeric',
+    month: 'short',
+  }).format(startDate)
+  const startTime = new Intl.DateTimeFormat('es-CL', {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  }).format(startDate)
+  if (!end) return `${day} · ${startTime}`
+  const endDate = new Date(end)
+  if (Number.isNaN(endDate.getTime())) return `${day} · ${startTime}`
+  const endTime = new Intl.DateTimeFormat('es-CL', {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  }).format(endDate)
+  return `${day} · ${startTime}–${endTime}`
+}
+
+const etiquetaEvento = (event) => {
+  const raw = event?.category || event?.event_type || 'Actividad'
+  return String(raw)
+    .replace(/[_-]+/g, ' ')
+    .replace(/\b\w/g, letter => letter.toUpperCase())
+}
+
 /* ── Íconos lineales (verde marca) para títulos de sección ──
    Mismo lenguaje visual que el TabBar: trazo 1.9, sin relleno,
    extremos redondos. Heredan C.verde por defecto. ── */
@@ -265,6 +297,7 @@ const haversine = (lat1, lng1, lat2, lng2) => {
 }
 
 function Home({ currentUser, onNavigate, onCrear }) {
+  const [mountedAt] = useState(Date.now)
   const [profile, setProfile] = useState(null)
   const [barrio, setBarrio] = useState(null)
   const [alertas, setAlertas] = useState([])
@@ -363,13 +396,17 @@ function Home({ currentUser, onNavigate, onCrear }) {
   const escribirCache = (data) => {
     try {
       localStorage.setItem(CACHE_KEY, JSON.stringify({ ...data, ts: Date.now() }))
-    } catch {}
+    } catch {
+      // El cache es una mejora de rendimiento; la app funciona sin él.
+    }
   }
 
   useEffect(() => {
     // 1) Pintar cache instantáneamente si existe (sin spinner).
     const cache = leerCache()
     if (cache) {
+      // Estado externo persistido: hidratarlo aquí evita un frame vacío.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setProfile(cache.profile)
       setBarrio(cache.barrio)
       setAlertas(cache.alertas || [])
@@ -391,7 +428,7 @@ function Home({ currentUser, onNavigate, onCrear }) {
     }
     // 2) Lanzar refresh en background (stale-while-revalidate).
     cargar(cache?.profile?.neighborhood_id)
-  }, [currentUser?.id])
+  }, [currentUser?.id]) // eslint-disable-line react-hooks/exhaustive-deps -- hidrata una vez por usuario
 
   // GPS del usuario: pedimos una vez al montar el Home.
   // Si lo acepta, guardamos las coords para (a) calcular distancia a cada
@@ -424,12 +461,12 @@ function Home({ currentUser, onNavigate, onCrear }) {
     if (!fresco) {
       cargarClima(userCoords.lat, userCoords.lng)
     }
-  }, [userCoords?.lat, userCoords?.lng])
+  }, [userCoords?.lat, userCoords?.lng]) // eslint-disable-line react-hooks/exhaustive-deps -- solo al cambiar la ubicación
 
   // neighborhoodIdOpt: si viene del cache, arrancamos las queries en paralelo
   // SIN esperar el profile del servidor (ya lo tenemos del cache). Eso
   // ahorra 200-400ms de query serial bloqueante.
-  const cargar = async (neighborhoodIdOpt) => {
+  async function cargar(neighborhoodIdOpt) {
     if (!currentUser?.id) return
     // Solo mostramos spinner si NO tenemos cache (primera vez).
     const cache = leerCache()
@@ -586,7 +623,7 @@ function Home({ currentUser, onNavigate, onCrear }) {
     }
   }
 
-  const cargarClima = async (lat, lng) => {
+  async function cargarClima(lat, lng) {
     if (!lat || !lng) return
     try {
       const r = await fetch(
@@ -611,7 +648,9 @@ function Home({ currentUser, onNavigate, onCrear }) {
           escribirCache({ ...cache, clima: nuevoClima })
         }
       }
-    } catch {}
+    } catch {
+      // El bloque de clima se omite si el proveedor temporalmente no responde.
+    }
   }
 
   const actualizarPullDistance = (value) => {
@@ -664,7 +703,13 @@ function Home({ currentUser, onNavigate, onCrear }) {
     __incident: true,
   }))
   const eventosActividad = eventos.filter((evento) => evento.show_in_activity === true)
-  const actividadBarrio = [...pedidos, ...alertasActividad, ...eventosActividad, ...actividad].sort((a, b) =>
+  const eventoDestacado = eventosActividad
+    .filter(evento => evento.starts_at && new Date(evento.starts_at).getTime() >= mountedAt)
+    .sort((a, b) => new Date(a.starts_at).getTime() - new Date(b.starts_at).getTime())[0] || null
+  const eventosActividadSecundarios = eventoDestacado
+    ? eventosActividad.filter(evento => evento.id !== eventoDestacado.id)
+    : eventosActividad
+  const actividadBarrio = [...pedidos, ...alertasActividad, ...eventosActividadSecundarios, ...actividad].sort((a, b) =>
     new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
   )
 
@@ -839,6 +884,46 @@ function Home({ currentUser, onNavigate, onCrear }) {
               </button>
             )}
           </div>
+        )}
+
+        {/* ══════ HOY EN TU BARRIO — evento real elegido desde el panel ══════ */}
+        {!buscando && eventoDestacado && (
+          <section style={s.spotlightSection} aria-label="Hoy en tu barrio">
+            <div style={s.spotlightHeading}>
+              <span>Hoy en tu barrio</span>
+              <small style={s.spotlightHeadingMeta}>Actividad destacada</small>
+            </div>
+            <button
+              type="button"
+              style={s.spotlightCard}
+              onClick={() => nav('eventdetail', { postId: eventoDestacado.id })}
+            >
+              <span style={{
+                ...s.spotlightVisual,
+                ...(eventoDestacado.images?.[0]
+                  ? { backgroundImage: `linear-gradient(180deg, rgba(7,54,38,.03), rgba(7,54,38,.70)), url("${eventoDestacado.images[0]}")` }
+                  : {}),
+              }}>
+                <span style={s.spotlightOfficial}>EL BARRIO · ACTIVIDAD VECINAL</span>
+                {!eventoDestacado.images?.[0] && <span style={s.spotlightFallbackIcon}>🏘️</span>}
+              </span>
+              <span style={s.spotlightBody}>
+                <span style={s.spotlightBadges}>
+                  <span style={s.spotlightCategory}>{etiquetaEvento(eventoDestacado)}</span>
+                  <span style={s.spotlightSchedule}>{fechaEventoPortada(eventoDestacado.starts_at, eventoDestacado.ends_at)}</span>
+                </span>
+                <strong style={s.spotlightTitle}>{eventoDestacado.title || 'Actividad del barrio'}</strong>
+                {eventoDestacado.content && <span style={s.spotlightDescription}>{eventoDestacado.content}</span>}
+                <span style={s.spotlightFooter}>
+                  <span style={s.spotlightLocation}>
+                    <Ico.pin size={12} />
+                    {eventoDestacado.location_text || 'Lugar por confirmar'}
+                  </span>
+                  <span style={s.spotlightCta}>Ver detalles <b>→</b></span>
+                </span>
+              </span>
+            </button>
+          </section>
         )}
 
         {/* ══════ ALERTA OFICIAL (solo creada/marcada desde el panel) ══════ */}
@@ -1233,6 +1318,141 @@ const s = {
     maxWidth: '100%',
   },
   farmaciaMas: { fontSize: 9, fontWeight: 700, color: C.verde },
+
+  /* ── actividad editorial destacada ── */
+  spotlightSection: { marginBottom: 15 },
+  spotlightHeading: {
+    minHeight: 30,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 10,
+    color: C.texto,
+    fontSize: 14,
+    fontWeight: 800,
+  },
+  spotlightHeadingMeta: {
+    color: C.textoTenue,
+    fontSize: 9.5,
+    fontWeight: 600,
+  },
+  spotlightCard: {
+    width: '100%',
+    padding: 0,
+    overflow: 'hidden',
+    display: 'block',
+    textAlign: 'left',
+    border: '1px solid #a7dbc4',
+    borderRadius: 18,
+    color: '#fff',
+    background: C.verdeOsc,
+    boxShadow: '0 8px 20px rgba(13,104,72,.13)',
+  },
+  spotlightVisual: {
+    position: 'relative',
+    minHeight: 104,
+    padding: 12,
+    display: 'flex',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    backgroundColor: '#d8efe5',
+    backgroundImage: 'linear-gradient(135deg,#d8efe5 0%,#f6d394 52%,#138864 100%)',
+    backgroundSize: 'cover',
+    backgroundPosition: 'center',
+  },
+  spotlightOfficial: {
+    padding: '5px 8px',
+    borderRadius: 7,
+    color: '#fff',
+    background: 'rgba(8,89,61,.88)',
+    boxShadow: '0 2px 8px rgba(0,0,0,.12)',
+    fontSize: 8.5,
+    fontWeight: 900,
+    letterSpacing: '.045em',
+  },
+  spotlightFallbackIcon: {
+    position: 'absolute',
+    right: 18,
+    bottom: 7,
+    fontSize: 48,
+    filter: 'drop-shadow(0 3px 6px rgba(0,0,0,.14))',
+  },
+  spotlightBody: {
+    padding: '12px 14px 13px',
+    display: 'block',
+    color: '#fff',
+    background: C.verdeOsc,
+  },
+  spotlightBadges: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 7,
+    minWidth: 0,
+  },
+  spotlightCategory: {
+    flex: '0 0 auto',
+    padding: '4px 7px',
+    borderRadius: 6,
+    color: '#07543a',
+    background: '#bde8d5',
+    fontSize: 8.5,
+    fontWeight: 900,
+    textTransform: 'uppercase',
+  },
+  spotlightSchedule: {
+    minWidth: 0,
+    overflow: 'hidden',
+    color: '#d7f2e7',
+    fontSize: 9.5,
+    fontWeight: 700,
+    whiteSpace: 'nowrap',
+    textOverflow: 'ellipsis',
+  },
+  spotlightTitle: {
+    marginTop: 8,
+    display: 'block',
+    fontSize: 16,
+    fontWeight: 800,
+    lineHeight: 1.25,
+    letterSpacing: '-.25px',
+  },
+  spotlightDescription: {
+    marginTop: 5,
+    display: '-webkit-box',
+    overflow: 'hidden',
+    color: '#e8f7f1',
+    fontSize: 11,
+    lineHeight: 1.42,
+    WebkitBoxOrient: 'vertical',
+    WebkitLineClamp: 2,
+  },
+  spotlightFooter: {
+    marginTop: 10,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 10,
+  },
+  spotlightLocation: {
+    minWidth: 0,
+    display: 'flex',
+    alignItems: 'center',
+    gap: 5,
+    overflow: 'hidden',
+    color: '#d7f2e7',
+    fontSize: 9.5,
+    whiteSpace: 'nowrap',
+    textOverflow: 'ellipsis',
+  },
+  spotlightCta: {
+    flex: '0 0 auto',
+    padding: '7px 9px',
+    borderRadius: 9,
+    color: C.verdeOsc,
+    background: '#fff',
+    fontSize: 9.5,
+    fontWeight: 800,
+  },
 
   modalFondo: {
     position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
