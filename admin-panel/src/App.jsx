@@ -11,6 +11,9 @@ import EventManager from './screens/EventManager.jsx'
 import IncidentManager from './screens/IncidentManager.jsx'
 import UserManager from './screens/UserManager.jsx'
 import NotificationManager from './screens/NotificationManager.jsx'
+import WaitlistManager from './screens/WaitlistManager.jsx'
+import ContentManager from './screens/ContentManager.jsx'
+import InviteManager from './screens/InviteManager.jsx'
 
 const ADMIN_ROLE = 'admin'
 
@@ -129,8 +132,11 @@ export default function App() {
       {activeSection === 'eventos' && <EventManager profile={profile} />}
       {activeSection === 'incidentes' && <IncidentManager profile={profile} />}
       {activeSection === 'usuarios' && <UserManager profile={profile} />}
+      {activeSection === 'espera' && <WaitlistManager />}
+      {activeSection === 'invitaciones' && <InviteManager />}
+      {activeSection === 'contenido' && <ContentManager profile={profile} />}
       {activeSection === 'notificaciones' && <NotificationManager profile={profile} />}
-      {!['dashboard', 'comercios', 'servicios', 'eventos', 'farmacias', 'noticias', 'incidentes', 'usuarios', 'notificaciones'].includes(activeSection) && (
+      {!['dashboard', 'comercios', 'servicios', 'eventos', 'farmacias', 'noticias', 'incidentes', 'usuarios', 'espera', 'invitaciones', 'contenido', 'notificaciones'].includes(activeSection) && (
         <section className="placeholder-module"><span>🚧</span><h1>Módulo en preparación</h1><p>Lo construiremos en una siguiente fase.</p></section>
       )}
     </AdminShell>

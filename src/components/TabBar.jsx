@@ -111,6 +111,7 @@ function TabBar({ activeTab, onChangeTab, onCrear, noLeidos = 0, showCreateButto
       {showCreateButton && (
         <button
           type="button"
+          className={`create-fab ${abierto ? 'is-open' : ''}`}
           style={{
             ...s.fab,
             transform: abierto ? 'rotate(45deg)' : 'rotate(0deg)',
@@ -119,7 +120,9 @@ function TabBar({ activeTab, onChangeTab, onCrear, noLeidos = 0, showCreateButto
           onClick={() => setAbierto(!abierto)}
           aria-label="Crear"
         >
-          +
+          <svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
+            <path d="M12 5v14M5 12h14" />
+          </svg>
         </button>
       )}
 
@@ -171,7 +174,7 @@ const s = {
     display: 'flex', alignItems: 'flex-start',
     background: '#fff',
     borderTop: `1px solid ${C.borde}`,
-    padding: '9px 0 env(safe-area-inset-bottom, 0px)',
+    padding: '13px 0 env(safe-area-inset-bottom, 0px)',
     boxShadow: '0 -2px 16px rgba(0,0,0,0.05)',
     zIndex: 100,
     fontFamily: T.font,
@@ -203,15 +206,16 @@ const s = {
   /* ── FAB squircle (cuadrado con puntas redondeadas) ── */
   fab: {
     position: 'absolute',
-    bottom: 'calc(90px + env(safe-area-inset-bottom, 0px))', right: 18,
+    bottom: 'calc(82px + env(safe-area-inset-bottom, 0px))',
+    right: 18,
     width: 56, height: 56, borderRadius: 18,
-    color: '#fff', fontSize: 30, fontWeight: 300,
+    color: '#fff',
     border: 'none', cursor: 'pointer',
     display: 'flex', alignItems: 'center', justifyContent: 'center',
     boxShadow: '0 6px 22px rgba(22,163,74,0.4)',
     zIndex: 300,
     transition: 'transform .2s, background .2s',
-    lineHeight: 1,
+    lineHeight: 0,
     fontFamily: T.font,
   },
 

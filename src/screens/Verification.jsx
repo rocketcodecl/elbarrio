@@ -47,6 +47,22 @@ const distanceMeters = (first, second) => {
   return Math.round(earthRadius * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)))
 }
 
+const isPointInsideBoundary = (point, boundary) => {
+  const ring = boundary?.geometry?.coordinates?.[0]
+  if (!point || !Array.isArray(ring) || ring.length < 3) return false
+  const x = point.lng
+  const y = point.lat
+  let inside = false
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    const [xi, yi] = ring[i]
+    const [xj, yj] = ring[j]
+    const crosses = ((yi > y) !== (yj > y))
+      && (x < ((xj - xi) * (y - yi)) / (yj - yi) + xi)
+    if (crosses) inside = !inside
+  }
+  return inside
+}
+
 const findAddressCoordinates = async (address, comuna) => {
   const query = `${address}, ${comuna}, Chile`
   const url = `https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=cl&q=${encodeURIComponent(query)}`
@@ -57,9 +73,9 @@ const findAddressCoordinates = async (address, comuna) => {
   return { lat: Number(results[0].lat), lng: Number(results[0].lon) }
 }
 
-function Verification({ profile, isPending, onFinish, onBack, onLogout }) {
-  const [address, setAddress] = useState(profile?.address || '')
-  const [comuna, setComuna] = useState(profile?.comuna || '')
+function Verification({ profile, draft, onDraftChange, isPending, onFinish, onBack, onLogout }) {
+  const [address, setAddress] = useState(draft?.address ?? profile?.address ?? '')
+  const [comuna, setComuna] = useState(draft?.comuna ?? profile?.comuna ?? '')
   const [showComunaList, setShowComunaList] = useState(false)
 
   // idle | locating | success | denied | outside | mismatch | address_not_found | unavailable
@@ -74,6 +90,9 @@ function Verification({ profile, isPending, onFinish, onBack, onLogout }) {
   const [savingLater, setSavingLater] = useState(false)
   const [showSavedModal, setShowSavedModal] = useState(false)
   const [error, setError] = useState('')
+  const [waitlistEmail, setWaitlistEmail] = useState(profile?.email || '')
+  const [waitlistLoading, setWaitlistLoading] = useState(false)
+  const [waitlistSaved, setWaitlistSaved] = useState(false)
 
   // Atajos para el update (evita repetir coords.lat/coords.lng)
   // DECLARADOS ARRIBA para que los handlers de más abajo los vean siempre.
@@ -83,6 +102,13 @@ function Verification({ profile, isPending, onFinish, onBack, onLogout }) {
   const comunasFiltradas = COMUNAS.filter((c) =>
     c.toLowerCase().includes(comuna.toLowerCase())
   )
+  const addressOutsideActiveZone = addressCoords
+    ? !isPointInsideBoundary(addressCoords, BARRIO_BETA_BOUNDARY)
+    : false
+
+  useEffect(() => {
+    onDraftChange?.({ address, comuna })
+  }, [address, comuna, onDraftChange])
 
   useEffect(() => {
     if (address.trim().length < 6 || !COMUNAS.includes(comuna.trim())) {
@@ -223,6 +249,36 @@ function Verification({ profile, isPending, onFinish, onBack, onLogout }) {
     }
   }
 
+  const handleWaitlist = async () => {
+    const normalizedEmail = waitlistEmail.trim().toLowerCase()
+    if (!/^\S+@\S+\.\S+$/.test(normalizedEmail)) {
+      setError('Ingresa un email válido para poder avisarte.')
+      return
+    }
+    if (!addressCoords) {
+      setError('Espera a que podamos ubicar la dirección en el mapa.')
+      return
+    }
+
+    setWaitlistLoading(true)
+    setError('')
+    try {
+      const { error: waitlistError } = await supabase.rpc('join_neighborhood_waitlist', {
+        p_email: normalizedEmail,
+        p_address: address.trim(),
+        p_comuna: comuna.trim(),
+        p_lat: addressCoords.lat,
+        p_lng: addressCoords.lng,
+      })
+      if (waitlistError) throw waitlistError
+      setWaitlistSaved(true)
+    } catch (err) {
+      setError(err.message || 'No pudimos guardar tu solicitud. Intenta nuevamente.')
+    } finally {
+      setWaitlistLoading(false)
+    }
+  }
+
   /* ================= GUARDAR ================= */
   const handleContinue = async () => {
     if (gpsState !== 'success' || !neighborhood || !coords) return
@@ -280,6 +336,9 @@ function Verification({ profile, isPending, onFinish, onBack, onLogout }) {
   }
 
   const puedeContinuar = gpsState === 'success' && !loading
+  const puedeConfirmarDespues = !isPending
+    && !addressOutsideActiveZone
+    && ['mismatch', 'outside', 'denied', 'unavailable', 'address_not_found'].includes(gpsState)
 
   return (
     <div style={s.container}>
@@ -301,7 +360,7 @@ function Verification({ profile, isPending, onFinish, onBack, onLogout }) {
         <p style={s.subtitle}>
           {isPending
             ? 'Tus datos están guardados. Para entrar al barrio, confirma tu ubicación desde tu casa. Es un solo toque.'
-            : 'Confirmamos con tu GPS que vives dentro del barrio. Es lo que hace que tus vecinos puedan confiar en ti.'}
+            : 'Tu dirección y GPS confirman el barrio donde vives, generando confianza entre tus vecinos.'}
         </p>
       </div>
 
@@ -313,7 +372,7 @@ function Verification({ profile, isPending, onFinish, onBack, onLogout }) {
             <span style={s.inputIcon}><IcoCasa size={17} /></span>
             <input
               type="text"
-              placeholder="Ej: Av. Italia 1234, Depto 5B"
+              placeholder="Ej: Manquehue Sur 1201"
               value={address}
               onChange={(e) => {
                 setAddress(e.target.value)
@@ -333,7 +392,7 @@ function Verification({ profile, isPending, onFinish, onBack, onLogout }) {
             <span style={s.inputIcon}><IcoPin size={17} /></span>
             <input
               type="text"
-              placeholder="Ej: Providencia"
+              placeholder="Ej: Las Condes"
               value={comuna}
               onChange={(e) => {
                 setComuna(e.target.value)
@@ -348,10 +407,13 @@ function Verification({ profile, isPending, onFinish, onBack, onLogout }) {
           </div>
 
           {showComunaList && comuna.length > 0 && comunasFiltradas.length > 0 && (
-            <div style={s.comunaList}>
+            <div style={s.comunaList} role="listbox" aria-label="Comunas disponibles">
               {comunasFiltradas.slice(0, 5).map((c) => (
                 <button
                   key={c}
+                  type="button"
+                  role="option"
+                  aria-selected={comuna === c}
                   onClick={() => {
                     setComuna(c)
                     setAddressCoords(null)
@@ -369,6 +431,49 @@ function Verification({ profile, isPending, onFinish, onBack, onLogout }) {
           )}
         </div>
 
+        <div style={s.zoneMapCaption}>
+          <span style={{ ...s.zoneMapDot, ...(addressOutsideActiveZone ? s.zoneMapDotSoon : {}) }} />
+          {addressOutsideActiveZone
+            ? '¡Pronto llegaremos a tu barrio! Por ahora estamos activando solo algunos barrios.'
+            : coords
+            ? 'El marcador muestra tu ubicación actual dentro de la zona.'
+            : addressLookupState === 'loading'
+            ? 'Buscando tu dirección en el mapa…'
+            : addressLookupState === 'success'
+              ? 'El marcador muestra la dirección que escribiste.'
+              : addressLookupState === 'not_found'
+                ? 'No encontramos aún esa dirección. Revisa calle, número y comuna.'
+                : addressLookupState === 'unavailable'
+                  ? 'No pudimos ubicar la dirección ahora. Puedes continuar con la confirmación GPS.'
+                  : 'Completa dirección y comuna para ubicarla dentro de la zona.'}
+        </div>
+
+        {addressOutsideActiveZone && (
+          <section style={s.waitlistCard} aria-live="polite">
+            <div style={s.waitlistContent}>
+              <div style={s.waitlistText}>Déjanos tu email y te avisamos cuando lleguemos.</div>
+              {waitlistSaved ? (
+                <div style={s.waitlistSuccess}>✓ Listo, te avisaremos cuando lleguemos.</div>
+              ) : (
+                <div style={s.waitlistForm}>
+                  <input
+                    type="email"
+                    value={waitlistEmail}
+                    onChange={(event) => setWaitlistEmail(event.target.value)}
+                    placeholder="tu@email.com"
+                    aria-label="Email para aviso de nueva zona"
+                    className="waitlist-compact-control"
+                    style={s.waitlistInput}
+                  />
+                  <button type="button" onClick={handleWaitlist} disabled={waitlistLoading} className="waitlist-compact-control" style={s.waitlistButton}>
+                    {waitlistLoading ? 'Guardando…' : 'Avísenme'}
+                  </button>
+                </div>
+              )}
+            </div>
+          </section>
+        )}
+
         <section style={s.zoneMapCard} aria-label="Mapa de cobertura del barrio">
           <div style={s.zoneMapHeader}>
             <div>
@@ -377,33 +482,25 @@ function Verification({ profile, isPending, onFinish, onBack, onLogout }) {
             </div>
             <span style={s.zoneMapBadge}>Área verde</span>
           </div>
-          <MiniMap
-            lat={coords?.lat ?? addressCoords?.lat}
-            lng={coords?.lng ?? addressCoords?.lng}
-            boundary={BARRIO_BETA_BOUNDARY}
-            boundaryLabel="Zona activa de El Barrio"
-            height={176}
-            zoom={16}
-          />
-          <div style={s.zoneMapCaption}>
-            <span style={s.zoneMapDot} />
-            {coords
-              ? 'El marcador muestra tu ubicación actual dentro de la zona.'
-              : addressLookupState === 'loading'
-              ? 'Buscando tu dirección en el mapa…'
-              : addressLookupState === 'success'
-                ? 'El marcador muestra la dirección que escribiste.'
-                : addressLookupState === 'not_found'
-                  ? 'No encontramos aún esa dirección. Revisa calle, número y comuna.'
-                  : addressLookupState === 'unavailable'
-                    ? 'No pudimos ubicar la dirección ahora. Puedes continuar con la confirmación GPS.'
-                    : 'Completa dirección y comuna para ubicarla dentro de la zona.'}
+          <div style={s.mapStage}>
+            <MiniMap
+              lat={coords?.lat ?? addressCoords?.lat}
+              lng={coords?.lng ?? addressCoords?.lng}
+              boundary={BARRIO_BETA_BOUNDARY}
+              boundaryLabel="Zona activa de El Barrio"
+              height={addressOutsideActiveZone ? 240 : 320}
+              zoom={16}
+            />
+            {addressOutsideActiveZone && (
+              <div style={s.waitlistBackdrop} aria-hidden="true" />
+            )}
           </div>
+          <div style={s.zoneMapInstruction}>Acerca el mapa con dos dedos para ver las calles que delimitan tu zona.</div>
         </section>
 
         {/* ===== GPS ===== */}
         <div style={{ marginTop: 8 }}>
-          {gpsState === 'idle' && (
+          {gpsState === 'idle' && !addressOutsideActiveZone && (
             <button onClick={handleUseGPS} style={s.gpsBtn}>
               <IcoRadar size={19} />
               <span>Confirmar mi ubicación</span>
@@ -558,6 +655,16 @@ function Verification({ profile, isPending, onFinish, onBack, onLogout }) {
 
       {/* FOOTER */}
       <div style={s.footer}>
+        {puedeConfirmarDespues && (
+          <button
+            onClick={handleLater}
+            disabled={savingLater}
+            style={s.laterBtn}
+          >
+            {savingLater ? 'Guardando...' : 'No estoy en mi casa, lo confirmo después'}
+          </button>
+        )}
+
         <button
           onClick={handleContinue}
           disabled={!puedeContinuar}
@@ -570,21 +677,9 @@ function Verification({ profile, isPending, onFinish, onBack, onLogout }) {
           {loading ? 'Guardando...' : 'Continuar'}
         </button>
 
-        {!isPending && gpsState !== 'success' && (
-          <button
-            onClick={handleLater}
-            disabled={savingLater}
-            style={s.laterBtn}
-          >
-            {savingLater ? 'Guardando...' : 'No estoy en mi casa, lo confirmo después'}
-          </button>
-        )}
-
-        {isPending && (
-          <button onClick={onLogout} style={s.laterBtn}>
-            Cerrar sesión
-          </button>
-        )}
+        <button onClick={onLogout} style={s.logoutBtn}>
+          Cerrar sesión y usar otra cuenta
+        </button>
       </div>
     </div>
   )
@@ -592,14 +687,19 @@ function Verification({ profile, isPending, onFinish, onBack, onLogout }) {
 
 const s = {
   container: {
-    minHeight: '100%',
+    height: '100%',
+    minHeight: 0,
     background: '#f4f7f4',
     padding: '0 24px 40px',
     display: 'flex',
     flexDirection: 'column',
+    overflowY: 'auto',
+    overflowX: 'hidden',
+    WebkitOverflowScrolling: 'touch',
+    overscrollBehaviorY: 'contain',
     fontFamily: '"Plus Jakarta Sans", system-ui, -apple-system, sans-serif',
   },
-  header: { display: 'flex', alignItems: 'center', paddingTop: 50, paddingBottom: 20 },
+  header: { display: 'flex', alignItems: 'center', paddingTop: 34, paddingBottom: 12 },
   backBtn: {
     width: 40, height: 40, borderRadius: '50%',
     background: '#fff', color: '#374151',
@@ -608,15 +708,15 @@ const s = {
     border: 'none', cursor: 'pointer', flexShrink: 0,
   },
 
-  titleSection: { textAlign: 'center', marginBottom: 24 },
+  titleSection: { textAlign: 'center', marginBottom: 14 },
   title: {
     fontSize: 22, fontWeight: 800, color: '#111827',
-    marginBottom: 8, letterSpacing: '-0.4px',
+    marginBottom: 5, letterSpacing: '-0.4px',
   },
   subtitle: { fontSize: 13, color: '#6b7280', lineHeight: 1.5, padding: '0 8px' },
 
-  form: { display: 'flex', flexDirection: 'column', gap: 14, flex: 1 },
-  group: { display: 'flex', flexDirection: 'column', gap: 6, position: 'relative' },
+  form: { display: 'flex', flexDirection: 'column', gap: 10, flex: 1 },
+  group: { display: 'flex', flexDirection: 'column', gap: 5, position: 'relative' },
   label: { fontSize: 12, fontWeight: 700, color: '#374151', marginLeft: 2 },
 
   inputWrap: {
@@ -626,7 +726,7 @@ const s = {
   },
   inputIcon: { color: '#9ca3af', marginRight: 10, display: 'flex', flexShrink: 0 },
   input: {
-    flex: 1, padding: '14px 0', fontSize: 15,
+    flex: 1, padding: '12px 0', fontSize: 15,
     background: 'transparent', color: '#111827',
     border: 'none', outline: 'none', width: '100%', minWidth: 0,
     fontFamily: 'inherit',
@@ -685,10 +785,16 @@ const s = {
     display: 'flex',
     alignItems: 'flex-start',
     gap: 7,
-    marginTop: 9,
+    marginTop: -4,
     color: '#647067',
     fontSize: 10.5,
     lineHeight: 1.45,
+  },
+  zoneMapInstruction: {
+    marginTop: 9,
+    color: '#647067',
+    fontSize: 10.5,
+    lineHeight: 1.4,
   },
   zoneMapDot: {
     width: 8,
@@ -697,6 +803,51 @@ const s = {
     flex: '0 0 auto',
     borderRadius: '50%',
     background: VERDE,
+  },
+  zoneMapDotSoon: {
+    background: '#eab308',
+  },
+  mapStage: { position: 'relative' },
+  waitlistBackdrop: {
+    position: 'absolute',
+    inset: 0,
+    zIndex: 1200,
+    borderRadius: 12,
+    background: 'rgba(238, 243, 239, .34)',
+    backdropFilter: 'blur(7px) saturate(.75)',
+    WebkitBackdropFilter: 'blur(7px) saturate(.75)',
+    pointerEvents: 'auto',
+    touchAction: 'none',
+  },
+  waitlistCard: {
+    width: '100%',
+    padding: '7px 10px 8px',
+    border: '1px solid #d1fae5',
+    borderRadius: 10,
+    background: '#f0fdf4',
+    boxShadow: '0 3px 10px rgba(15, 95, 54, .05)',
+  },
+  waitlistContent: { minWidth: 0 },
+  waitlistText: { color: '#48725a', fontSize: 9.5, lineHeight: 1.35, textAlign: 'left' },
+  waitlistForm: { display: 'flex', alignItems: 'center', gap: 6, marginTop: 5 },
+  waitlistInput: {
+    flex: 1, minWidth: 0, height: 36, padding: '0 10px',
+    border: '1px solid #d1d5db', borderRadius: 9, outline: 'none',
+    background: '#f9fafb', color: '#111827', fontFamily: 'inherit', fontSize: 11,
+  },
+  waitlistButton: {
+    flex: '0 0 auto', height: 36, padding: '0 13px', border: 0, borderRadius: 9,
+    background: VERDE_OSC, color: '#fff', fontFamily: 'inherit',
+    fontSize: 11, fontWeight: 800, cursor: 'pointer', whiteSpace: 'nowrap',
+  },
+  waitlistSuccess: {
+    marginTop: 9, padding: '8px 10px', borderRadius: 9,
+    background: '#ecfdf5', color: '#047857', fontSize: 10.5, fontWeight: 700,
+  },
+  logoutBtn: {
+    width: '100%', marginTop: 4, padding: '9px 12px', border: 0,
+    color: '#6b7280', background: 'transparent', fontFamily: 'inherit',
+    fontSize: 11, fontWeight: 600, textDecoration: 'underline',
   },
 
   gpsBtn: {

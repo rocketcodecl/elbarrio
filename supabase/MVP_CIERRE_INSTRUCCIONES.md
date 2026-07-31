@@ -47,6 +47,34 @@ La ejecución ya fue confirmada y registrada en `AI_CONTEXT.md`.
 
 No ejecutar `supabase db push`. El historial remoto de migraciones está desalineado y la CLI intentaría aplicar archivos antiguos que en parte ya existen en producción.
 
+## Pendientes preparados — ejecutar manualmente en orden
+
+Estas migraciones todavía no deben considerarse aplicadas:
+
+1. `migrations/202607310002_editable_app_content.sql`
+2. `migrations/202607310003_neighbor_invites.sql`
+
+Ejecuta cada archivo completo por separado en el SQL Editor de Supabase y confirma `Success` antes de continuar con el siguiente. La segunda agrega enlaces personales, trazabilidad de invitados, la insignia Conector y las métricas del panel. No requiere cargar datos simulados.
+
+Después de aplicar la segunda, valida con esta consulta de solo lectura:
+
+```sql
+select
+  exists (
+    select 1 from information_schema.tables
+    where table_schema = 'public' and table_name = 'neighbor_invites'
+  ) as invite_table,
+  exists (
+    select 1 from information_schema.columns
+    where table_schema = 'public' and table_name = 'profiles' and column_name = 'invite_code'
+  ) as invite_code,
+  to_regprocedure('public.get_my_neighbor_invites()') as invite_dashboard_rpc,
+  to_regprocedure('public.accept_neighbor_invite(text)') as accept_invite_rpc,
+  to_regprocedure('public.admin_list_neighbor_invite_metrics()') as admin_invite_rpc;
+```
+
+Los cinco resultados deben existir o mostrarse como `true` en las dos primeras columnas.
+
 ## Datos de Comercios
 
 Los productos reales se cargan desde **Panel administrativo → Comercios → Productos**. Es preferible ese flujo a un `INSERT` manual porque asigna el `commerce_id`, valida permisos y sube fotografías al bucket correcto.

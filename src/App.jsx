@@ -46,6 +46,7 @@ import AdminIncidentes from './screens/AdminIncidentes'
 import { AboutUs, Terms, ProhibitedProducts, InviteNeighbors, ContactUs, SettingsHub } from './screens/CommunityPagesV2'
 
 const ACCESSIBLE_MODE_KEY = 'elbarrio:accessible-mode'
+const INVITE_CODE_KEY = 'elbarrio:pending-invite'
 
 export default function App() {
   /* ── LOGIN FLOW STATE ── */
@@ -53,6 +54,7 @@ export default function App() {
   const [loading, setLoading] = useState(true)
   const [user, setUser] = useState(null)
   const [profile, setProfile] = useState(null)
+  const [verificationDraft, setVerificationDraft] = useState(null)
 
   /* ── MAIN APP STATE ── */
   const [activeTab, setActiveTab] = useState('inicio')
@@ -83,6 +85,13 @@ export default function App() {
     document.documentElement.classList.toggle('accessible-mode', accessibleMode)
     try { localStorage.setItem(ACCESSIBLE_MODE_KEY, String(accessibleMode)) } catch { /* almacenamiento no disponible */ }
   }, [accessibleMode])
+
+  useEffect(() => {
+    const inviteCode = new URLSearchParams(window.location.search).get('invite')?.trim().toUpperCase()
+    if (inviteCode) {
+      try { localStorage.setItem(INVITE_CODE_KEY, inviteCode) } catch { /* el vínculo permanece en la URL */ }
+    }
+  }, [])
 
   /* ── AUTH + checkSession (decide pantalla inicial según perfil) ── */
   const checkSession = useCallback(async () => {
@@ -155,10 +164,30 @@ export default function App() {
     return () => { supabase.removeChannel(channel) }
   }, [user?.id])
 
+  useEffect(() => {
+    if (!user?.id || !profile?.id) return
+    let inviteCode = new URLSearchParams(window.location.search).get('invite')?.trim().toUpperCase() || ''
+    try { inviteCode = localStorage.getItem(INVITE_CODE_KEY) || inviteCode } catch { /* usa la URL */ }
+    if (!inviteCode) return
+    let active = true
+    supabase.rpc('accept_neighbor_invite', { p_invite_code: inviteCode }).then(({ error }) => {
+      if (!active) return
+      const terminalError = /no es válida|propia invitación/i.test(error?.message || '')
+      if (!error || terminalError) {
+        try { localStorage.removeItem(INVITE_CODE_KEY) } catch { /* almacenamiento no disponible */ }
+        const url = new URL(window.location.href)
+        url.searchParams.delete('invite')
+        window.history.replaceState({}, '', `${url.pathname}${url.search}${url.hash}`)
+      }
+    })
+    return () => { active = false }
+  }, [user?.id, profile?.id])
+
   const handleLogout = useCallback(async () => {
     await supabase.auth.signOut()
     setUser(null)
     setProfile(null)
+    setVerificationDraft(null)
     setActiveTab('inicio')
     setCurrentScreen('splash')
     historyRef.current = []
@@ -416,8 +445,11 @@ export default function App() {
     if (currentScreen === 'register') {
       return (
         <Register
+          existingAccount={!!user}
+          initialEmail={user?.email || ''}
           onFinish={async () => { await checkSession() }}
           onBack={() => setCurrentScreen('onboarding')}
+          onLogout={handleLogout}
         />
       )
     }
@@ -429,7 +461,7 @@ export default function App() {
             const updatedProfile = await recargarPerfil()
             setCurrentScreen(updatedProfile?.verification_status === 'verified' ? 'main' : 'verification')
           }}
-          onBack={handleLogout}
+          onBack={() => setCurrentScreen('register')}
         />
       )
     }
@@ -439,12 +471,18 @@ export default function App() {
       return (
         <Verification
           profile={profile}
+          draft={verificationDraft}
+          onDraftChange={setVerificationDraft}
           isPending={isPending}
           onFinish={async () => {
             await recargarPerfil()
+            setVerificationDraft(null)
             setCurrentScreen('complete')
           }}
-          onBack={handleLogout}
+          onBack={async () => {
+            await recargarPerfil()
+            setCurrentScreen('profile')
+          }}
           onLogout={handleLogout}
         />
       )
@@ -561,7 +599,7 @@ export default function App() {
     if (currentScreen === 'about') return <AboutUs onNavigate={onNavigate} />
     if (currentScreen === 'terms') return <Terms onNavigate={onNavigate} />
     if (currentScreen === 'prohibited') return <ProhibitedProducts onNavigate={onNavigate} />
-    if (currentScreen === 'invite') return <InviteNeighbors onNavigate={onNavigate} />
+    if (currentScreen === 'invite') return <InviteNeighbors onNavigate={onNavigate} profile={profile} />
     if (currentScreen === 'contact') return <ContactUs onNavigate={onNavigate} />
 
     /* ── No hay user → Register ── */

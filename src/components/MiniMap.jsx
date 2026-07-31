@@ -58,6 +58,7 @@ function MiniMap({
   const markerRef = useRef(null)
   const boundaryRef = useRef(null)
   const onPickRef = useRef(null)
+  const resizeObserverRef = useRef(null)
 
   // Guardamos el callback en una ref para no re-crear el mapa en cada render.
   useEffect(() => {
@@ -97,7 +98,7 @@ function MiniMap({
         },
       }).bindTooltip(boundaryLabel, { sticky: true }).addTo(map)
       const bounds = boundaryRef.current.getBounds()
-      if (bounds.isValid()) map.fitBounds(bounds, { padding: [14, 14] })
+      if (bounds.isValid()) map.fitBounds(bounds, { padding: [4, 4] })
     }
 
     if (lat && lng) {
@@ -118,10 +119,21 @@ function MiniMap({
 
     mapRef.current = map
 
-    // Leaflet necesita recalcular el tamaño si nace dentro de un modal
-    setTimeout(() => map.invalidateSize(), 120)
+    // Leaflet puede montarse mientras una pantalla cambia de paso o tamaño.
+    // Recalcular una sola vez deja ocasionalmente el lienzo vacío al volver.
+    const refreshSize = () => map.invalidateSize({ pan: false })
+    const firstFrame = requestAnimationFrame(refreshSize)
+    const sizeTimer = setTimeout(refreshSize, 180)
+    if (typeof ResizeObserver !== 'undefined') {
+      resizeObserverRef.current = new ResizeObserver(refreshSize)
+      resizeObserverRef.current.observe(boxRef.current)
+    }
 
     return () => {
+      cancelAnimationFrame(firstFrame)
+      clearTimeout(sizeTimer)
+      resizeObserverRef.current?.disconnect()
+      resizeObserverRef.current = null
       map.remove()
       mapRef.current = null
       markerRef.current = null
@@ -129,6 +141,13 @@ function MiniMap({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map) return undefined
+    const frame = requestAnimationFrame(() => map.invalidateSize({ pan: false }))
+    return () => cancelAnimationFrame(frame)
+  }, [height])
 
   useEffect(() => {
     const map = mapRef.current
@@ -151,7 +170,7 @@ function MiniMap({
 
     if (lat == null || lng == null) {
       const bounds = boundaryRef.current.getBounds()
-      if (bounds.isValid()) map.fitBounds(bounds, { padding: [14, 14] })
+      if (bounds.isValid()) map.fitBounds(bounds, { padding: [4, 4] })
     }
   }, [boundary, boundaryLabel, color, lat, lng])
 

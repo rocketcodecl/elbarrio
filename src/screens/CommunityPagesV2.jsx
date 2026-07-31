@@ -1,7 +1,50 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { C, T } from '../lib/design'
+import { supabase } from '../lib/supabase'
 
 const ASSET = '/community-assets/'
+
+const ABOUT_DEFAULTS = {
+  heroEyebrow: 'Nuestra historia',
+  heroTitle: 'Conectando corazones, fortaleciendo barrios.',
+  heroImage: `${ASSET}about-hero.jpg`,
+  missionTitle: 'Nuestra misión',
+  missionBody: 'Transformar vecindarios en comunidades vivas, seguras y prósperas, utilizando la tecnología como puente para el encuentro humano y el apoyo mutuo.',
+  economyTitle: 'Economía local',
+  economyBody: 'Impulsamos el comercio de proximidad para que cada vecino descubra y apoye el talento que vive a pocos pasos de su hogar.',
+  valuesTitle: 'Valores que nos mueven',
+  valuesSubtitle: 'La base de nuestra convivencia digital',
+  values: ['Confianza', 'Pertenencia', 'Transparencia', 'Solidaridad'],
+  facesTitle: 'El rostro de El Barrio',
+  faces: [
+    { label: 'Vecinos fundadores', image: `${ASSET}about-hero.jpg`, position: '20% 80%' },
+    { label: 'Comercio local', image: `${ASSET}about-hero.jpg`, position: '72% 68%' },
+    { label: 'Equipo El Barrio', image: `${ASSET}about-hero.jpg`, position: '45% 76%' },
+    { label: 'Comunidad viva', image: `${ASSET}about-hero.jpg`, position: '88% 74%' },
+  ],
+  ctaTitle: 'Tu barrio comienza contigo',
+  ctaBody: 'Conoce lo que ocurre cerca, apoya al comercio local y conecta con tus vecinos.',
+  ctaButton: 'Explorar mi barrio',
+}
+
+const PRIVACY_DEFAULTS = {
+  intro: 'Ajusta la experiencia y revisa la información importante de tu cuenta.',
+  termsTitle: 'Términos y condiciones',
+  prohibitedTitle: 'Productos prohibidos',
+  contactTitle: 'Contáctanos',
+}
+
+const useAppContent = (slug, defaults) => {
+  const [content, setContent] = useState(defaults)
+  useEffect(() => {
+    let active = true
+    supabase.from('app_content_pages').select('content').eq('slug', slug).maybeSingle().then(({ data }) => {
+      if (active && data?.content) setContent({ ...defaults, ...data.content })
+    })
+    return () => { active = false }
+  }, [slug, defaults])
+  return content
+}
 
 const Icon = ({ name, size = 22, color = C.verde }) => {
   const paths = {
@@ -34,19 +77,22 @@ function Screen({ title, onNavigate, children }) {
 const SectionTitle = ({ children, sub, centered = false }) => <div style={{...s.sectionHeading,textAlign:centered?'center':'left'}}><h2>{children}</h2>{sub&&<p>{sub}</p>}</div>
 
 export function AboutUs({ onNavigate }) {
+  const content = useAppContent('about', ABOUT_DEFAULTS)
+  const faces = Array.isArray(content.faces) && content.faces.length === 4 ? content.faces : ABOUT_DEFAULTS.faces
+  const values = Array.isArray(content.values) && content.values.length === 4 ? content.values : ABOUT_DEFAULTS.values
   return <Screen title="Nosotros" onNavigate={onNavigate}>
-    <section style={{...s.hero,backgroundImage:`linear-gradient(180deg,transparent 30%,rgba(5,20,12,.82)),url(${ASSET}about-hero.jpg)`}}><span>Nuestra historia</span><h2>Conectando corazones,<br/>fortaleciendo barrios.</h2></section>
-    <article style={s.featureCard}><div style={s.lineIcon}><Icon name="heart"/></div><h2>Nuestra misión</h2><p>Transformar vecindarios en comunidades vivas, seguras y prósperas, utilizando la tecnología como puente para el encuentro humano y el apoyo mutuo.</p></article>
-    <article style={{...s.featureCard,background:C.verdeBg}}><div style={s.lineIcon}><Icon name="store"/></div><h2>Economía local</h2><p>Impulsamos el comercio de proximidad para que cada vecino descubra y apoye el talento que vive a pocos pasos de su hogar.</p></article>
-    <SectionTitle centered sub="La base de nuestra convivencia digital">Valores que nos mueven</SectionTitle>
-    <div style={s.values}>{[['shield','Confianza'],['users','Pertenencia'],['file','Transparencia'],['heart','Solidaridad']].map(([icon,label])=><div key={label} style={s.valuePill}><Icon name={icon} size={19}/><span>{label}</span></div>)}</div>
-    <SectionTitle>El rostro de El Barrio</SectionTitle>
-    <div style={s.faces}>{['Vecinos fundadores','Comercio local','Equipo El Barrio','Comunidad viva'].map((label,i)=><div key={label} style={{...s.face,backgroundImage:`linear-gradient(transparent 50%,rgba(0,0,0,.72)),url(${ASSET}about-hero.jpg)`,backgroundPosition:["20% 80%","72% 68%","45% 76%","88% 74%"][i]}}><span>{label}</span></div>)}</div>
+    <section style={{...s.hero,backgroundImage:`linear-gradient(180deg,transparent 30%,rgba(5,20,12,.82)),url(${content.heroImage || ABOUT_DEFAULTS.heroImage})`}}><span>{content.heroEyebrow}</span><h2>{content.heroTitle}</h2></section>
+    <article style={s.featureCard}><div style={s.lineIcon}><Icon name="heart"/></div><h2>{content.missionTitle}</h2><p>{content.missionBody}</p></article>
+    <article style={{...s.featureCard,background:C.verdeBg}}><div style={s.lineIcon}><Icon name="store"/></div><h2>{content.economyTitle}</h2><p>{content.economyBody}</p></article>
+    <SectionTitle centered sub={content.valuesSubtitle}>{content.valuesTitle}</SectionTitle>
+    <div style={s.values}>{[['shield',values[0]],['users',values[1]],['file',values[2]],['heart',values[3]]].map(([icon,label])=><div key={`${icon}-${label}`} style={s.valuePill}><Icon name={icon} size={19}/><span>{label}</span></div>)}</div>
+    <SectionTitle>{content.facesTitle}</SectionTitle>
+    <div style={s.faces}>{faces.map((face,i)=><div key={`${face.label}-${i}`} style={{...s.face,backgroundImage:`linear-gradient(transparent 50%,rgba(0,0,0,.72)),url(${face.image || ABOUT_DEFAULTS.faces[i].image})`,backgroundPosition:face.position || ABOUT_DEFAULTS.faces[i].position}}><span>{face.label}</span></div>)}</div>
     <section className="cta" style={s.cta}>
       <div style={s.ctaIcon}><Icon name="users" size={25} color="#fff"/></div>
-      <h2 style={s.ctaTitle}>Tu barrio comienza contigo</h2>
-      <p style={s.ctaText}>Conoce lo que ocurre cerca, apoya al comercio local y conecta con tus vecinos.</p>
-      <button style={s.ctaButton} onClick={()=>onNavigate?.('inicio')}>Explorar mi barrio <Icon name="arrow" size={18} color={C.verdeOsc}/></button>
+      <h2 style={s.ctaTitle}>{content.ctaTitle}</h2>
+      <p style={s.ctaText}>{content.ctaBody}</p>
+      <button style={s.ctaButton} onClick={()=>onNavigate?.('inicio')}>{content.ctaButton} <Icon name="arrow" size={18} color={C.verdeOsc}/></button>
     </section>
   </Screen>
 }
@@ -97,17 +143,34 @@ export function ProhibitedProducts({ onNavigate }) {
   </Screen>
 }
 
-export function InviteNeighbors({ onNavigate }) {
-  const [copied,setCopied]=useState(false); const url=new URL(`${import.meta.env.BASE_URL}?invite=elbarrio-las-condes`,window.location.origin).toString()
-  const copy=async()=>{await navigator.clipboard?.writeText(url);setCopied(true);setTimeout(()=>setCopied(false),1800)}
-  const share=async()=>navigator.share?navigator.share({title:'El Barrio',text:'Únete a nuestro barrio',url}):copy()
+export function InviteNeighbors({ onNavigate, profile }) {
+  const [copied,setCopied]=useState(false)
+  const [data,setData]=useState(null)
+  const [loading,setLoading]=useState(true)
+  const [error,setError]=useState('')
+  useEffect(()=>{
+    let active=true
+    supabase.rpc('get_my_neighbor_invites').then(({data:result,error:loadError})=>{
+      if(!active)return
+      setData(result||null);setError(loadError?'Activa la migración de invitaciones para comenzar a compartir.':'');setLoading(false)
+    })
+    return()=>{active=false}
+  },[profile?.id])
+  const code=data?.invite_code||profile?.invite_code||''
+  const url=code?new URL(`${import.meta.env.BASE_URL}?invite=${encodeURIComponent(code)}`,window.location.origin).toString():''
+  const copy=async()=>{if(!url)return;await navigator.clipboard?.writeText(url);setCopied(true);setTimeout(()=>setCopied(false),1800)}
+  const message=`Hola, te invito a El Barrio, una red privada para conectar con quienes vivimos cerca. Tu dirección se verifica de forma segura y nunca se muestra públicamente.`
+  const share=async()=>navigator.share&&url?navigator.share({title:'El Barrio',text:message,url}):copy()
+  const verified=Number(data?.verified_count||0);const started=Number(data?.started_count||0);const target=5;const progress=Math.min(100,(verified/target)*100)
   return <Screen title="Invitar vecinos" onNavigate={onNavigate}>
     <section style={{...s.inviteHero,backgroundImage:`linear-gradient(transparent 45%,rgba(0,0,0,.68)),url(${ASSET}invite-hero.jpg)`}}><h2>Construye comunidad,<br/>un vecino a la vez.</h2></section>
-    <div style={s.centerIntro}><h2>Invita a tu barrio</h2><p>Comparte el acceso a nuestra red vecinal de Las Condes.</p></div>
-    <section className="inviteLink" style={s.inviteLink}><div style={s.lineIcon}><Icon name="link"/></div><div><strong>Enlace de invitación</strong><span>elbarrio.app/invitar</span></div><button onClick={copy}>{copied?'Copiado':'Copiar'}</button></section>
-    <div className="shareGrid" style={s.shareGrid}><button onClick={()=>window.open(`https://wa.me/?text=${encodeURIComponent(`Únete a El Barrio ${url}`)}`)}>WhatsApp</button><button onClick={share}>Compartir</button></div>
-    <section className="progress" style={s.progress}><strong>420 vecinos conectados</strong><div><span/></div><p>Estamos a 80 vecinos de nuestra próxima meta.</p></section>
-    <aside style={s.infoBox}><Icon name="users"/><p><strong>Vecino solidario</strong><br/>Invita a cinco vecinos y obtén una insignia especial en tu perfil.</p></aside>
+    <div style={s.centerIntro}><h2>Tu barrio crece contigo</h2><p>Invita a personas que realmente viven cerca. Cada una deberá verificar su residencia igual que tú.</p></div>
+    {error&&<aside style={{...s.infoBox,color:C.rojo}}><Icon name="alert" color={C.rojo}/><p>{error}</p></aside>}
+    <section className="inviteLink" style={s.inviteLink}><div style={s.lineIcon}><Icon name="link"/></div><div><strong>Tu enlace personal</strong><span>{loading?'Preparándolo…':code?`Código ${code}`:'No disponible'}</span></div><button disabled={!url} onClick={copy}>{copied?'Copiado':'Copiar'}</button></section>
+    <div className="shareGrid" style={s.shareGrid}><button disabled={!url} onClick={()=>window.open(`https://wa.me/?text=${encodeURIComponent(`${message} ${url}`)}`,'_blank','noopener,noreferrer')}>WhatsApp</button><button disabled={!url} onClick={share}>Compartir</button></div>
+    <section className="progress" style={s.progress}><div className="inviteProgressTop" style={s.inviteProgressTop}><strong>{data?.badge_connector?'Insignia Conector obtenida':'Camino a Conector del barrio'}</strong><b>{verified}/{target}</b></div><div className="inviteProgressBar"><span style={{width:`${progress}%`}}/></div><p>{verified?`${verified} ${verified===1?'vecino verificado':'vecinos verificados'} gracias a ti.`:'Tu progreso comienza cuando un invitado verifica su residencia.'}{started?` ${started} ${started===1?'registro está':'registros están'} en proceso.`:''}</p></section>
+    {(data?.invites||[]).length>0&&<section style={s.inviteList}><h3>Mis invitaciones</h3>{data.invites.map(item=><div key={item.id}><span>{item.status==='verified'?'✓':'…'}</span><p><strong>{item.name}</strong><small>{item.status==='verified'?'Residencia verificada':'Registro iniciado'}</small></p></div>)}</section>}
+    <aside style={s.infoBox}><Icon name="users"/><p><strong>Conector del barrio</strong><br/>La insignia se entrega automáticamente al sumar cinco vecinos con residencia verificada.</p></aside>
   </Screen>
 }
 
@@ -129,9 +192,10 @@ export function ContactUs({ onNavigate }) {
   </Screen>
 }
 
-export function SettingsHub({ onNavigate, accessibleMode = false, onAccessibleModeChange }) {
-  const links=[['about','heart','Nosotros'],['invite','users','Invitar vecinos',true],['terms','file','Términos y condiciones'],['prohibited','shield','Productos prohibidos'],['contact','mail','Contáctanos']]
-  return <Screen title="Configuración" onNavigate={onNavigate}><p style={s.settingsIntro}>Ajusta la experiencia y revisa la información importante de tu cuenta.</p><div className="settings" style={s.settings}><button type="button" onClick={()=>onAccessibleModeChange?.(!accessibleMode)}><Icon name="users"/><span>Modo accesible<small>Texto más grande, controles claros y menos movimiento</small></span><strong className={`settings-switch${accessibleMode?' is-on':''}`}><i/></strong></button>{links.map(([route,icon,label,pending])=><button key={route} disabled={pending} style={{opacity:pending ? 0.58 : 1}} onClick={()=>onNavigate?.(route)}><Icon name={icon}/><span>{label}{pending&&<small>Próximamente</small>}</span>{!pending&&<Icon name="arrow" size={18} color={C.textoTenue}/>}</button>)}</div></Screen>
+export function SettingsHub({ onNavigate }) {
+  const content = useAppContent('privacy_security', PRIVACY_DEFAULTS)
+  const links=[['terms','file',content.termsTitle],['prohibited','shield',content.prohibitedTitle],['contact','mail',content.contactTitle]]
+  return <Screen title="Privacidad y seguridad" onNavigate={onNavigate}><p style={s.settingsIntro}>{content.intro}</p><div className="settings" style={s.settings}>{links.map(([route,icon,label])=><button key={route} onClick={()=>onNavigate?.(route)}><Icon name={icon}/><span>{label}</span><Icon name="arrow" size={18} color={C.textoTenue}/></button>)}</div></Screen>
 }
 
 const s={
@@ -139,7 +203,7 @@ const s={
   hero:{height:290,borderRadius:16,backgroundSize:'cover',backgroundPosition:'center',padding:20,display:'flex',flexDirection:'column',justifyContent:'flex-end',color:'#fff',marginBottom:16},featureCard:{background:C.card,border:`1px solid ${C.borde}`,borderRadius:16,padding:18,marginBottom:12},lineIcon:{width:42,height:42,display:'grid',placeItems:'center',marginBottom:12},lineIconLarge:{width:56,height:56,display:'grid',placeItems:'center',margin:'0 auto 12px'},sectionHeading:{margin:'28px 0 12px'},values:{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10},valuePill:{minHeight:46,display:'flex',alignItems:'center',gap:8,padding:'0 13px',border:`1px solid ${C.borde}`,borderRadius:999,background:C.card,color:C.texto,fontSize:12.5,fontWeight:600},faces:{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10},face:{height:130,borderRadius:14,backgroundSize:'cover',display:'flex',alignItems:'flex-end',padding:12,color:'#fff',fontSize:11,fontWeight:700},cta:{position:'relative',overflow:'hidden',marginTop:24,padding:'26px 24px',borderRadius:18,background:`linear-gradient(135deg, ${C.verdeOsc} 0%, ${C.verde} 100%)`,textAlign:'left',boxShadow:'0 8px 22px rgba(15,95,54,.20)'},ctaIcon:{width:46,height:46,borderRadius:14,display:'grid',placeItems:'center',background:'rgba(255,255,255,.14)',marginBottom:18},ctaTitle:{fontSize:21,lineHeight:1.25,color:'#fff',margin:'0 0 8px'},ctaText:{maxWidth:290,fontSize:13,lineHeight:1.5,color:'rgba(255,255,255,.82)',margin:0},ctaButton:{minHeight:46,marginTop:20,padding:'0 18px',borderRadius:999,background:'#fff',color:C.verdeOsc,fontWeight:700,display:'flex',alignItems:'center',justifyContent:'center',gap:8},
   docIntro:{marginBottom:20},docBadge:{display:'inline-block',padding:'5px 9px',borderRadius:999,background:C.verde,color:'#fff',fontSize:9,fontWeight:700},docTitle:{fontSize:27,lineHeight:1.15,color:C.texto,margin:'9px 0 3px'},legalDocument:{background:C.card,border:`1px solid ${C.borde}`,borderRadius:16,padding:'22px 18px'},legalSection:{marginBottom:22},legalTitle:{display:'flex',alignItems:'flex-start',gap:9,color:C.verdeOsc,marginBottom:7},legalText:{fontSize:12.5,lineHeight:1.58,color:C.textoSuave},legalNote:{width:'calc(100% - 10px)',display:'grid',gridTemplateColumns:'34px 1fr',gap:11,alignItems:'start',margin:'15px 0 2px 10px',padding:'13px 14px',border:`1px solid ${C.borde}`,borderRadius:11,background:'#fafcf9',color:C.texto,lineHeight:1.45},legalNoteIcon:{width:34,height:34,borderRadius:9,display:'grid',placeItems:'center',background:C.verdeBg,color:C.verdeOsc},legalNoteTitle:{display:'block',fontSize:11.5,fontWeight:700,color:C.verdeOsc,marginBottom:3},legalNoteText:{display:'block',fontSize:11.5,color:C.textoSuave},legalFooter:{borderTop:`1px solid ${C.borde}`,paddingTop:20,textAlign:'center'},legalFooterTitle:{fontSize:15,color:C.texto,margin:'0 0 4px'},legalFooterText:{fontSize:12,color:C.textoSuave,margin:0},legalFooterButton:{marginTop:16,padding:'12px 22px',borderRadius:999,background:C.verdeOsc,color:'#fff',fontWeight:700},
   centerIntro:{textAlign:'center',margin:'8px auto 24px',maxWidth:330},warningIcon:{width:58,height:58,display:'grid',placeItems:'center',margin:'0 auto 12px'},prohibited:{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10},consequences:{marginTop:18,padding:18,borderRadius:16,background:C.card,border:`1px solid ${C.borde}`},reportBtn:{width:'100%',marginTop:14,padding:14,borderRadius:12,border:`1px solid ${C.rojoSuave}`,color:C.rojo,display:'flex',alignItems:'center',justifyContent:'center',gap:8,fontWeight:700},
-  inviteHero:{height:330,borderRadius:18,backgroundSize:'cover',backgroundPosition:'center',padding:22,display:'flex',alignItems:'flex-end',color:'#fff'},inviteLink:{display:'grid',gridTemplateColumns:'44px 1fr auto',alignItems:'center',gap:12,padding:16,borderRadius:16,background:C.card,border:`1px solid ${C.borde}`},shareGrid:{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginTop:10},progress:{marginTop:20,padding:18,borderRadius:16,background:C.verdeBg},support:{marginTop:16,padding:18,borderRadius:16,background:C.verde,color:'#fff',display:'flex',alignItems:'center',justifyContent:'space-between',gap:12},emergency:{display:'flex',gap:12,marginTop:16,padding:16,borderRadius:14,background:C.rojoBg,border:`1px solid ${C.rojoSuave}`},
+  inviteHero:{height:330,borderRadius:18,backgroundSize:'cover',backgroundPosition:'center',padding:22,display:'flex',alignItems:'flex-end',color:'#fff'},inviteLink:{display:'grid',gridTemplateColumns:'44px 1fr auto',alignItems:'center',gap:12,padding:16,borderRadius:16,background:C.card,border:`1px solid ${C.borde}`},shareGrid:{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginTop:10},progress:{marginTop:20,padding:18,borderRadius:16,background:C.verdeBg},inviteProgressTop:{display:'flex',justifyContent:'space-between',alignItems:'center',gap:10},inviteList:{marginTop:14,padding:'16px 18px',borderRadius:16,background:C.card,border:`1px solid ${C.borde}`},infoBox:{display:'flex',alignItems:'flex-start',gap:12,marginTop:14,padding:16,borderRadius:14,background:C.card,border:`1px solid ${C.borde}`},support:{marginTop:16,padding:18,borderRadius:16,background:C.verde,color:'#fff',display:'flex',alignItems:'center',justifyContent:'space-between',gap:12},emergency:{display:'flex',gap:12,marginTop:16,padding:16,borderRadius:14,background:C.rojoBg,border:`1px solid ${C.rojoSuave}`},
   form:{background:C.card,border:`1px solid ${C.borde}`,borderRadius:18,padding:18,display:'flex',flexDirection:'column',gap:16},success:{padding:12,borderRadius:10,background:C.verdeBg,color:C.verdeOsc},socials:{marginTop:16,padding:18,borderRadius:16,background:C.card,border:`1px solid ${C.borde}`},settingsIntro:{margin:'0 0 16px'},settings:{background:C.card,border:`1px solid ${C.borde}`,borderRadius:16,overflow:'hidden'},
 }
 
@@ -151,7 +215,7 @@ if(typeof document!=='undefined'&&!document.getElementById('community-v2-css')){
 .community-v2 .cta h2{color:${C.texto};font-size:21px;margin-bottom:8px}.community-v2 .cta p{color:#14532d;max-width:280px;margin:0 auto}.community-v2 .cta button{min-width:178px;border-radius:999px;background:#073d25;margin-top:18px}.community-v2 .values>div{min-height:48px;display:flex;align-items:center;justify-content:flex-start;gap:9px;padding:0 14px;border:1px solid #c8d5c9;border-radius:999px;background:${C.card};font-size:12.5px;color:${C.texto}}.community-v2 .docIntro>span{display:inline-block;padding:5px 9px;border-radius:999px;background:${C.verde};color:#fff;font-size:9px;font-weight:700}.community-v2 .docIntro h2{font-size:27px;margin:9px 0 2px}.community-v2 .legalDocument ul{margin:10px 0 0;padding-left:20px}.community-v2 .legalDocument li{margin-bottom:7px}.community-v2 .legalFooter h3{font-size:15px;margin-bottom:4px;color:${C.texto}}.community-v2 .legalFooter p{font-size:12px}.community-v2 .legalFooter button{margin-top:16px;padding:12px 22px;border-radius:999px;background:${C.verdeOsc};color:#fff;font-weight:700}.community-v2 .settings small{display:block;color:${C.textoTenue};font-size:9px;margin-top:2px}
 .community-v2 .prohibited article{min-height:158px;padding:16px;border-radius:15px;background:${C.card};border:1px solid ${C.borde}}.community-v2 .prohibited article svg{margin-bottom:13px}.community-v2 .consequences p{display:flex;gap:9px;margin-top:10px}.community-v2 .consequences p span{color:${C.verde};font-weight:800}
 .community-v2 .inviteLink strong,.community-v2 .inviteLink span{display:block}.community-v2 .inviteLink span{font-size:11px;color:${C.textoTenue};margin-top:2px}.community-v2 .inviteLink button{padding:9px 13px;border-radius:9px;background:${C.verde};color:#fff;font-weight:700}.community-v2 .shareGrid button{padding:14px;border-radius:12px;background:${C.card};border:1px solid ${C.borde};color:${C.verdeOsc};font-weight:700}
-.community-v2 .progress div{height:7px;border-radius:999px;background:${C.borde};margin:12px 0 8px;overflow:hidden}.community-v2 .progress div span{display:block;width:84%;height:100%;background:${C.verde};border-radius:inherit}.community-v2 .support p{color:rgba(255,255,255,.82);font-size:11px}.community-v2 .support button{flex-shrink:0;padding:10px 12px;border-radius:10px;background:${C.verdeOsc};color:#fff;font-weight:700}
+.community-v2 .inviteProgressTop strong{font-size:12px}.community-v2 .inviteProgressTop b{color:${C.verdeOsc};font-size:12px}.community-v2 .inviteProgressBar{height:7px;border-radius:999px;background:${C.borde};margin:12px 0 8px;overflow:hidden}.community-v2 .inviteProgressBar span{display:block;height:100%;background:${C.verde};border-radius:inherit;transition:width .25s}.community-v2 .inviteList>div{display:flex;align-items:center;gap:10px;padding:10px 0;border-top:1px solid ${C.borde}}.community-v2 .inviteList>div>span{width:27px;height:27px;display:grid;place-items:center;border-radius:50%;background:${C.verdeBg};color:${C.verde};font-weight:800}.community-v2 .inviteList p{display:grid;gap:2px}.community-v2 .inviteList small{font-size:10px;color:${C.textoTenue}}.community-v2 button:disabled{opacity:.5;cursor:not-allowed}.community-v2 .support p{color:rgba(255,255,255,.82);font-size:11px}.community-v2 .support button{flex-shrink:0;padding:10px 12px;border-radius:10px;background:${C.verdeOsc};color:#fff;font-weight:700}
 .community-v2 .socials>div{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:16px}.community-v2 .socials span{display:flex;align-items:center;gap:8px;font-size:12.5px;color:${C.textoSuave}}
 .community-v2 .settings button{width:100%;min-height:58px;padding:0 16px;display:grid;grid-template-columns:28px 1fr 20px;align-items:center;gap:10px;border-bottom:1px solid ${C.borde};text-align:left;color:${C.texto};font-size:13.5px}.community-v2 .settings button:last-child{border-bottom:0}
 .community-v2 .settings-switch{width:36px;height:21px;padding:3px;border-radius:999px;background:#cfd6d2}.community-v2 .settings-switch i{display:block;width:15px;height:15px;border-radius:50%;background:white;transition:transform .2s}.community-v2 .settings-switch.is-on{background:${C.verde}}.community-v2 .settings-switch.is-on i{transform:translateX(15px)}

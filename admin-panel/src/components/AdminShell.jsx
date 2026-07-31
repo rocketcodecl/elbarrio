@@ -7,6 +7,9 @@ const NAVIGATION = [
   { id: 'noticias', icon: '📰', label: 'Noticias' },
   { id: 'incidentes', icon: '🚨', label: 'Incidentes' },
   { id: 'usuarios', icon: '👥', label: 'Usuarios' },
+  { id: 'espera', icon: '📍', label: 'Lista de espera' },
+  { id: 'invitaciones', icon: '🔗', label: 'Invitaciones' },
+  { id: 'contenido', icon: '✎', label: 'Contenido de la app', superOnly: true },
   { id: 'notificaciones', icon: '🔔', label: 'Notificaciones' },
 ]
 
@@ -22,7 +25,7 @@ export default function AdminShell({ activeSection, onSelect, profile, onLogout,
         </div>
 
         <nav className="sidebar-nav" aria-label="Administración">
-          {NAVIGATION.map(item => (
+          {NAVIGATION.filter(item => !item.superOnly || profile?.is_superadmin).map(item => (
             <button
               key={item.id}
               type="button"

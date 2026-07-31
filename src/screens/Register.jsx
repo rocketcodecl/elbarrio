@@ -2,9 +2,9 @@ import { useState } from 'react'
 import { supabase } from '../lib/supabase'
 import Stepper from '../components/Stepper'
 
-function Register({ onFinish, onBack }) {
+function Register({ existingAccount = false, initialEmail = '', onFinish, onBack, onLogout }) {
   const [mode, setMode] = useState('signup')
-  const [email, setEmail] = useState('')
+  const [email, setEmail] = useState(initialEmail)
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -12,6 +12,11 @@ function Register({ onFinish, onBack }) {
 
   const handleSubmit = async () => {
     setError('')
+
+    if (existingAccount) {
+      onFinish()
+      return
+    }
 
     if (!email.trim() || !email.includes('@')) {
       setError('Ingresa un email válido')
@@ -86,17 +91,19 @@ function Register({ onFinish, onBack }) {
       {/* TÍTULO */}
       <div style={styles.titleSection}>
         <h1 style={styles.title}>
-          {mode === 'signup' ? 'Únete a tu barrio' : '¡Bienvenido de vuelta!'}
+          {existingAccount ? 'Tu cuenta está creada' : mode === 'signup' ? 'Únete a tu barrio' : '¡Bienvenido de vuelta!'}
         </h1>
         <p style={styles.subtitle}>
-          {mode === 'signup'
+          {existingAccount
+            ? 'Este es el correo asociado a tu registro'
+            : mode === 'signup'
             ? 'Crea tu cuenta para conectar con tu comunidad'
             : 'Ingresa a tu cuenta para continuar'}
         </p>
       </div>
 
       {/* TABS */}
-      <div style={styles.tabs}>
+      {!existingAccount && <div style={styles.tabs}>
         <button
           onClick={() => { setMode('signup'); setError('') }}
           style={{
@@ -115,7 +122,7 @@ function Register({ onFinish, onBack }) {
         >
           Iniciar sesión
         </button>
-      </div>
+      </div>}
 
       {/* FORMULARIO */}
       <div style={styles.form}>
@@ -128,12 +135,13 @@ function Register({ onFinish, onBack }) {
               placeholder="tu@email.com"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
+              disabled={existingAccount}
               style={styles.input}
             />
           </div>
         </div>
 
-        <div style={styles.inputGroup}>
+        {!existingAccount && <div style={styles.inputGroup}>
           <label style={styles.label}>Contraseña</label>
           <div style={styles.inputWrapper}>
             <span style={styles.inputIcon}>🔒</span>
@@ -152,9 +160,9 @@ function Register({ onFinish, onBack }) {
               {showPassword ? '🙈' : '👁️'}
             </button>
           </div>
-        </div>
+        </div>}
 
-        {mode === 'login' && (
+        {!existingAccount && mode === 'login' && (
           <button style={styles.forgotPassword}>
             ¿Olvidaste tu contraseña?
           </button>
@@ -176,14 +184,22 @@ function Register({ onFinish, onBack }) {
         >
           {loading
             ? 'Cargando...'
+            : existingAccount
+            ? 'Continuar'
             : mode === 'signup'
             ? 'Continuar'
             : 'Iniciar sesión'}
         </button>
+
+        {existingAccount && (
+          <button type="button" style={styles.forgotPassword} onClick={onLogout}>
+            Cerrar sesión y usar otra cuenta
+          </button>
+        )}
       </div>
 
       {/* GOOGLE LOGIN */}
-      <div style={styles.googleSection}>
+      {!existingAccount && <div style={styles.googleSection}>
         <div style={styles.divider}>
           <div style={styles.dividerLine} />
           <span style={styles.dividerText}>o continúa con</span>
@@ -200,7 +216,7 @@ function Register({ onFinish, onBack }) {
           <span style={styles.termsLink}>Términos y Condiciones</span> y{' '}
           <span style={styles.termsLink}>Política de Privacidad</span>
         </p>
-      </div>
+      </div>}
     </div>
   )
 }

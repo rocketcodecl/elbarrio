@@ -2,6 +2,9 @@
 
 ## Estado actual
 
+- El panel incorpora “Invitaciones” con registros iniciados, vecinos territorialmente verificados, conversión e insignias Conector por barrio. Usa `admin_list_neighbor_invite_metrics`; la migración `202607310003_neighbor_invites.sql` está preparada y pendiente de confirmación manual.
+- El módulo “Contenido de la app” permite al superadministrador editar los textos de Privacidad y seguridad y todos los textos, portada y cuatro imágenes de Nosotros, sin alterar el layout. Usa `app_content_pages` y `admin_update_app_content`; la migración `202607310002_editable_app_content.sql` está preparada pero pendiente de confirmación manual.
+- El panel incorpora “Lista de espera” para consultar email, dirección, comuna, estado y fecha de personas ubicadas fuera del polígono activo. Usa `admin_list_neighborhood_waitlist`; la migración `202607310001_neighborhood_waitlist.sql` fue ejecutada con resultado `Success` el 31 de julio de 2026 según confirmación manual.
 - Eventos incorpora un control independiente para poner o quitar un evento en la portada “Hoy en tu barrio”. La migración `202607300005_home_event_spotlight.sql` fue ejecutada con resultado `Success` el 31 de julio de 2026; una consulta remota confirmó la columna `posts.show_on_home`.
 - El panel está desplegado en `https://admin.elbarrio.lat/`, con DNS, HTTPS y certificado Let’s Encrypt propios. Su build reproducible para la raíz del subdominio usa `npm run build:plesk`; la ruta temporal `/el-barrio/admin/` redirige al dominio vigente.
 - Fase larga autorizada completada: moderación pública con IA, cierre integral de Comercios y Productos, reemplazo de Perfil y Modo accesible. Bloque actual: `4/4 — verificación final aprobada por build`.
@@ -42,6 +45,7 @@
 - Incidentes: implementado con bandeja de moderación, detalle, ubicación, evidencia y trazabilidad.
 - Usuarios: implementado con directorio, verificación, permisos, suspensión y trazabilidad.
 - Notificaciones: implementado con audiencias por barrio, verificados, comercios y actores autorizados, más historial administrativo.
+- Invitaciones: implementado con métricas reales y alcance territorial para administradores normales o global para el superadministrador.
 
 ## Decisiones
 
