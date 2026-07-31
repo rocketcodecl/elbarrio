@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import MiniMap from '../components/MiniMap'
 import { C, T, S, TIPOS, REPORTES, iniciales, hace, distancia } from '../lib/design'
+import { moderatePublicContent } from '../lib/moderation'
 
 /*
   AlertaDetail — pantalla de Detalle de Alerta para El Barrio.
@@ -307,23 +308,25 @@ function AlertaDetail({ alertId, currentUser, onNavigate, onEdit }) {
 
     setEnviando(true)
     const textoLocal = text
-    setNuevoComentario('')
-
-    // Insercion optimista: agregamos el comment al estado con un id temporal
-    // para que se vea al instante. Si falla, lo removemos y restauramos texto.
-    const tempId = `temp-${Date.now()}`
-    const optimisticComment = {
-      id: tempId,
-      incident_id: alertId,
-      author_id: currentProfile.id,
-      content: textoLocal,
-      created_at: new Date().toISOString(),
-      profiles: currentProfile,
-      _optimistic: true,
-    }
-    setComments((prev) => [...prev, optimisticComment])
+    let tempId = null
 
     try {
+      await moderatePublicContent({ kind: 'incident_comment', text: textoLocal })
+
+      setNuevoComentario('')
+      // Inserción optimista solo después de que el texto fue moderado.
+      tempId = `temp-${Date.now()}`
+      const optimisticComment = {
+        id: tempId,
+        incident_id: alertId,
+        author_id: currentProfile.id,
+        content: textoLocal,
+        created_at: new Date().toISOString(),
+        profiles: currentProfile,
+        _optimistic: true,
+      }
+      setComments((prev) => [...prev, optimisticComment])
+
       const sel = '*, profiles!comments_author_id_fkey(full_name, avatar_url)'
       const payload = {
         incident_id: alertId,
@@ -359,9 +362,11 @@ function AlertaDetail({ alertId, currentUser, onNavigate, onEdit }) {
       }
     } catch (err) {
       // Rollback: sacar el optimistic y restaurar el texto.
-      setComments((prev) => prev.filter((c) => c.id !== tempId))
-      setNuevoComentario(textoLocal)
-      showToast('No se pudo enviar el comentario')
+      if (tempId) {
+        setComments((prev) => prev.filter((c) => c.id !== tempId))
+        setNuevoComentario(textoLocal)
+      }
+      showToast(err?.message || 'No se pudo enviar el comentario')
     } finally {
       setEnviando(false)
     }

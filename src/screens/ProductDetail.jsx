@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
 import { C, T, S, TIPOS, CATEGORIAS, iniciales, hace, plata, distancia } from '../lib/design'
+import { moderatePublicContent } from '../lib/moderation'
 
 // ============================================================
 // ProductDetail.jsx — v2
@@ -525,20 +526,24 @@ export default function ProductDetail({ postId, currentUser, onNavigate, onEdit 
       return
     }
 
-    const tempId = `tmp-${Date.now()}`
-    const optimistic = {
-      id: tempId,
-      content: text,
-      created_at: new Date().toISOString(),
-      author: { id: profileId, full_name: currentUser.full_name || 'Tú', avatar_url: currentUser.avatar_url, badge_founder: false },
-      _pending: true,
-    }
-    setComments((prev) => [...prev, optimistic])
-    setCommentCount((c) => c + 1)
-    setCommentText('')
     setPostingComment(true)
+    let tempId = null
 
     try {
+      await moderatePublicContent({ kind: 'marketplace_comment', text })
+
+      tempId = `tmp-${Date.now()}`
+      const optimistic = {
+        id: tempId,
+        content: text,
+        created_at: new Date().toISOString(),
+        author: { id: profileId, full_name: currentUser.full_name || 'Tú', avatar_url: currentUser.avatar_url, badge_founder: false },
+        _pending: true,
+      }
+      setComments((prev) => [...prev, optimistic])
+      setCommentCount((c) => c + 1)
+      setCommentText('')
+
       const { data, error } = await supabase
         .from('comments')
         .insert({ post_id: postId, author_id: profileId, content: text })
@@ -549,9 +554,12 @@ export default function ProductDetail({ postId, currentUser, onNavigate, onEdit 
       setComments((prev) => prev.map((c) => (c.id === tempId ? data : c)))
     } catch (e) {
       console.error('[ProductDetail] sendComment:', e)
-      setComments((prev) => prev.filter((c) => c.id !== tempId))
-      setCommentCount((c) => Math.max(0, c - 1))
-      showToast('No se pudo enviar el comentario')
+      if (tempId) {
+        setComments((prev) => prev.filter((c) => c.id !== tempId))
+        setCommentCount((c) => Math.max(0, c - 1))
+        setCommentText(text)
+      }
+      showToast(e?.message || 'No se pudo enviar el comentario')
     } finally {
       setPostingComment(false)
     }

@@ -6,8 +6,10 @@
 ## Estado de continuidad — 30 de julio de 2026
 
 - Fase larga autorizada en curso: cierre de Comercios, moderación de contenido público con IA, reemplazo de Mi perfil y Modo accesible. Se trabaja por bloques con compilación, actualización de contexto y commit independiente.
-- Bloque actual: `0/4 — checkpoint y continuidad`.
-- Siguiente bloque: crear la Edge Function `moderate-community-content`, el cliente común de moderación y una migración SQL preparada, sin ejecutar `db push`.
+- Bloque actual: `1/4 — moderación preventiva de contenido público terminada`.
+- Siguiente bloque: auditar y cerrar la experiencia vigente de Comercios en la aplicación y el panel, sin datos simulados ni rediseños paralelos.
+- La Edge Function `moderate-community-content` está desplegada y validada en red: el preflight responde HTTP 200 y una solicitud sin sesión responde HTTP 401.
+- La migración `202607300004_content_moderation_events.sql` está preparada, pero **no está aplicada ni debe asumirse aplicada**. Su ausencia no bloquea la moderación: solo impide guardar el registro administrativo de decisiones.
 - No incluir `landing-page/` ni `supabase/.temp/` en los commits de esta fase.
 - La aplicación de vecinos y el panel administrativo comparten el mismo proyecto Supabase.
 - El último cierre funcional corrigió identidad de perfiles, estados de carga, contenido simulado y aislamiento territorial en feeds, detalles y perfiles públicos activos.
@@ -28,7 +30,7 @@
 - No existe un store global. Las pantallas mantienen estado local y consultan sus propios datos.
 - Supabase se consume directamente desde el cliente para Auth, PostgreSQL, Storage y Realtime.
 - Leaflet y React Leaflet se utilizan para mapas y selección de ubicaciones.
-- OpenRouter ayuda a completar publicaciones desde imágenes únicamente mediante la Edge Function autenticada `analyze-listing-image`. El secreto servidor `OPENROUTER_API_KEY` no llega al bundle y el cliente no contiene un fallback directo.
+- OpenRouter se consume únicamente desde Edge Functions autenticadas: `analyze-listing-image` ayuda a completar publicaciones desde imágenes y `moderate-community-content` revisa texto público antes de publicarlo. El secreto servidor `OPENROUTER_API_KEY` no llega al bundle y el cliente no contiene un fallback directo.
 - Los estilos son principalmente objetos inline, apoyados por estilos globales y el sistema visual de `src/lib/design.js`.
 - La tipografía activa es Plus Jakarta Sans, cargada localmente con `@fontsource`.
 
@@ -101,8 +103,10 @@ El botón de creación abre `CreatePost.jsx`, salvo la creación de comercios, q
 - `lib/supabase.js`: única instancia del cliente Supabase.
 - `lib/horarios.js`: estado y textos de horarios comerciales.
 - `lib/ia.js`: integración de IA para publicaciones.
+- `lib/moderation.js`: cliente común de moderación preventiva para texto público.
 - `supabase/functions/analyze-listing-image/index.ts`: proxy autenticado y validado hacia OpenRouter.
-- `supabase/config.toml`: configuración de despliegue de Edge Functions; el gateway deja pasar CORS y `analyze-listing-image` valida la sesión dentro de la función.
+- `supabase/functions/moderate-community-content/index.ts`: moderación autenticada de texto público con salida estructurada y privacidad reforzada del proveedor.
+- `supabase/config.toml`: configuración de despliegue de Edge Functions; el gateway deja pasar CORS y cada función valida la sesión dentro de su propio código.
 
 ## Reglas del proyecto
 
@@ -234,6 +238,7 @@ El botón de creación abre `CreatePost.jsx`, salvo la creación de comercios, q
 
 ## Funcionalidades terminadas
 
+- La moderación preventiva de texto público está integrada en publicaciones, comentarios de Mercado y Alertas, y opiniones de Servicios y Comercios mediante `moderate-community-content`. La función está desplegada; CORS y rechazo sin sesión fueron validados. El registro administrativo requiere la migración preparada `202607300004_content_moderation_events.sql`, todavía no aplicada.
 - El panel implementa dos alcances administrativos: territorial y supremo. Las listas fallan cerradas para admins sin barrio, el nivel supremo puede revisar todos los barrios, las altas globales exigen barrio explícito y solo el superadministrador ve controles para administrar otros permisos administrativos. La protección backend de `202607300001_admin_scope_and_superadmin.sql` está aplicada según confirmación manual.
 - Las pantallas administrativas móviles antiguas de Usuarios, Incidentes y Comercios respetan el mismo alcance. Usuarios e Incidentes ya no realizan cambios sensibles con `update` directo: usan `admin_manage_profile` y `admin_moderate_incident`.
 - Los feeds de Mercado, Servicios y Noticias, sus detalles directos de producto/servicio/evento/alerta y los perfiles públicos de vendedor quedan restringidos al barrio verificado del perfil. El Mercado aplica la misma regla a sus altas en tiempo real y publicaciones similares. Si el barrio no puede resolverse, estas vistas fallan de forma cerrada y no muestran contenido global.
@@ -250,6 +255,9 @@ El botón de creación abre `CreatePost.jsx`, salvo la creación de comercios, q
 - El reconocimiento visual continúa con modelos alternativos cuando una respuesta viene vacía o con JSON inválido. Solo informa que la foto no contiene un objeto reconocible cuando todos los modelos efectivamente consultados devuelven el resultado vacío.
 - El reconocimiento visual usa `google/gemini-2.5-flash-lite` pagado como modelo principal para evitar los límites del nivel gratuito. Gemma 31B, Gemma 26B y Nemotron VL permanecen como respaldo; la recarga automática de OpenRouter debe mantenerse desactivada.
 - La Edge Function de IA deja el preflight CORS fuera de la validación JWT del gateway (`verify_jwt=false`) y valida cada solicitud POST mediante Supabase Auth dentro de la propia función. El preflight responde HTTP 200 y una solicitud POST sin usuario válido responde HTTP 401.
+- La moderación preventiva se aplica a publicaciones, comentarios de Mercado y Alertas, y opiniones de Servicios y Comercios antes de persistir texto público. No inspecciona chats privados.
+- `moderate-community-content` usa `google/gemini-2.5-flash-lite`, exige JSON estructurado, solicita proveedores sin recolección de datos y con ZDR, y devuelve mensajes seguros sin exponer detalles internos. Ante una caída del proveedor opera en modo degradado y permite continuar para no dejar inutilizable la comunidad; la protección definitiva sigue dependiendo de RLS y de la moderación administrativa.
+- `202607300004_content_moderation_events.sql` crea una bitácora administrativa territorial para las decisiones de IA. Debe aplicarse manualmente y confirmarse; la función continúa operativa sin esa tabla y omite silenciosamente el registro.
 - La creación de publicaciones de Mercado y pedidos vuelve a estar autorizada mediante una política que usa el ID de perfil correcto. La inserción como usuario autenticado se validó dentro de una transacción con `ROLLBACK`.
 - Las alertas vecinales nuevas quedan activas de inmediato, vuelven a Inicio después de publicarse y aparecen primero por fecha en “Actividad de el barrio” con tratamiento visual urgente.
 - El chat implementa propuesta de encuentro, aceptación/rechazo, match persistente, cancelación y cierre. El cierre marca la publicación como `sold`; el ciclo completo fue validado en una transacción con `ROLLBACK`.
@@ -295,6 +303,8 @@ El botón de creación abre `CreatePost.jsx`, salvo la creación de comercios, q
 ## Funcionalidades pendientes
 
 - Validar una sugerencia de publicación con fotografía mediante `analyze-listing-image` usando una sesión real.
+- Ejecutar manualmente, si se desea conservar auditoría de moderación, `supabase/migrations/202607300004_content_moderation_events.sql` y confirmar su aplicación. No usar `supabase db push`.
+- Validar con una sesión real un texto permitido y un texto bloqueable en publicación o comentario; el endpoint ya fue validado para CORS y rechazo sin sesión.
 - Validar visualmente con dos sesiones reales el ciclo proponer encuentro → aceptar → continuar chat → cerrar trato.
 - Reconciliar el historial remoto de migraciones antes de usar `supabase db push`; actualmente la CLI no reconoce como registradas migraciones que sí están aplicadas.
 - Validar con una cuenta admin territorial que no pueda consultar ni modificar otro barrio.

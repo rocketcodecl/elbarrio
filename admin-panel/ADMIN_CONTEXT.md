@@ -2,7 +2,9 @@
 
 ## Estado actual
 
-- Fase larga autorizada en curso: moderación pública con IA, cierre integral de Comercios y Productos, y continuidad documentada por bloque. Bloque actual: `0/4 — checkpoint y continuidad`.
+- Fase larga autorizada en curso: moderación pública con IA, cierre integral de Comercios y Productos, reemplazo de Perfil y Modo accesible, con continuidad documentada por bloque. Bloque actual: `1/4 — moderación preventiva desplegada`.
+
+- La aplicación vecinal modera texto público antes de guardar publicaciones, comentarios y opiniones mediante la Edge Function autenticada `moderate-community-content`. Los chats privados quedan fuera. La migración opcional de auditoría administrativa `202607300004_content_moderation_events.sql` está preparada, pero no aplicada ni debe asumirse aplicada.
 
 - Existe un módulo independiente de Notificaciones para seleccionar audiencia, confirmar el número de destinatarios, enviar mensajes internos y consultar el historial. Usa RPC administrativas y la migración `202607290015_admin_broadcast_notifications.sql` está aplicada y validada según confirmación manual.
 
@@ -22,6 +24,7 @@
 - Después de iniciar sesión se consulta `profiles` mediante `user_id`.
 - Solo se permite continuar si `profiles.role` es `admin`.
 - La interfaz nunca debe considerarse la única barrera de seguridad: cada operación debe estar protegida además mediante RLS o una función segura en Supabase.
+- La moderación con IA es una barrera preventiva y no reemplaza RLS, RPC seguras ni revisión administrativa. Si OpenRouter no responde, opera en modo degradado para no bloquear toda la aplicación.
 
 ## Navegación actual
 
@@ -76,6 +79,7 @@
 
 ## Pendiente inmediato
 
+- Aplicar manualmente `supabase/migrations/202607300004_content_moderation_events.sql` solo si se desea conservar la auditoría administrativa de moderación y confirmar después su ejecución. No usar `supabase db push` mientras el historial remoto siga desalineado.
 - Validar con una cuenta admin territorial la separación efectiva respecto del superadministrador.
 - Mantener deshabilitada la asistencia. No crear ni aplicar cambios de asistencia hasta definir y autorizar cómo alinear `event_attendees` con los eventos actuales de `posts`.
 - Ejecutar `supabase/migrations/202607290001_incident_moderation.sql` y validar el flujo completo del módulo Incidentes.

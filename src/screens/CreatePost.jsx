@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import { C, T, TIPOS, CATEGORIAS, RUBROS, REPORTES, iniciales, plata } from '../lib/design'
 import { describirFoto } from '../lib/ia'
+import { moderatePublicContent } from '../lib/moderation'
 import MiniMap from '../components/MiniMap'
 
 /* ============================================================
@@ -674,6 +675,13 @@ function CreatePost({ onClose, onPublished, startWith, existingPost = null }) {
 
       if (pErr || !profile) throw new Error('No se encontró tu perfil')
       if (!profile.neighborhood_id) throw new Error('Tu perfil no tiene barrio asignado')
+
+      await moderatePublicContent({
+        kind: `publication_${t}`,
+        text: [title.trim(), content.trim(), t === 'trade' ? lookingFor.trim() : '']
+          .filter(Boolean)
+          .join('\n'),
+      })
 
       const urls = []
       for (const img of images) {

@@ -6,6 +6,7 @@ import {
 } from '../lib/design'
 import MiniMap from '../components/MiniMap'
 import { DIAS_SEMANA } from '../lib/horarios'
+import { moderatePublicContent } from '../lib/moderation'
 
 /*
   COMERCIOS — el directorio del barrio.
@@ -604,6 +605,13 @@ function ComercioDetalle({ c, userCoords, profile, onClose, onEditar, esAdmin, c
 
     setReviewSaving(true)
     setReviewError('')
+    try {
+      await moderatePublicContent({ kind: 'commerce_review', text: comment })
+    } catch (moderationError) {
+      setReviewError(moderationError?.message || 'No pudimos revisar tu opinión.')
+      setReviewSaving(false)
+      return
+    }
     const payload = {
       commerce_id: c.id,
       author_id: profile.id,

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { C, T, RUBROS, hace, iniciales, plata } from '../lib/design'
+import { moderatePublicContent } from '../lib/moderation'
 
 const Icon = ({ children, size = 20 }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">{children}</svg>
@@ -149,6 +150,13 @@ export default function ServiceDetail({ postId, currentUser, onNavigate, onEdit 
 
     setReviewSaving(true)
     setReviewError('')
+    try {
+      await moderatePublicContent({ kind: 'service_review', text: comment })
+    } catch (moderationError) {
+      setReviewError(moderationError?.message || 'No pudimos revisar tu opinión.')
+      setReviewSaving(false)
+      return
+    }
     const payload = {
       service_id: service.id,
       provider_id: service.author_id,

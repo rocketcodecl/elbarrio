@@ -1,2 +1,5 @@
 [functions.analyze-listing-image]
 verify_jwt = false
+
+[functions.moderate-community-content]
+verify_jwt = false
