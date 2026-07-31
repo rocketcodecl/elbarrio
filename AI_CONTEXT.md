@@ -6,8 +6,8 @@
 ## Estado de continuidad — 30 de julio de 2026
 
 - Fase larga autorizada en curso: cierre de Comercios, moderación de contenido público con IA, reemplazo de Mi perfil y Modo accesible. Se trabaja por bloques con compilación, actualización de contexto y commit independiente.
-- Bloque actual: `1/4 — moderación preventiva de contenido público terminada`.
-- Siguiente bloque: auditar y cerrar la experiencia vigente de Comercios en la aplicación y el panel, sin datos simulados ni rediseños paralelos.
+- Bloque actual: `2/4 — moderación y cierre funcional de Comercios terminados`.
+- Siguiente bloque: reemplazar `MyProfile.jsx` con la composición visual aprobada e integrar un Modo accesible persistente.
 - La Edge Function `moderate-community-content` está desplegada y validada en red: el preflight responde HTTP 200 y una solicitud sin sesión responde HTTP 401.
 - La migración `202607300004_content_moderation_events.sql` está preparada, pero **no está aplicada ni debe asumirse aplicada**. Su ausencia no bloquea la moderación: solo impide guardar el registro administrativo de decisiones.
 - No incluir `landing-page/` ni `supabase/.temp/` en los commits de esta fase.
@@ -171,6 +171,7 @@ El botón de creación abre `CreatePost.jsx`, salvo la creación de comercios, q
 - En comercios destacados, los productos marcados como destacados aparecen en un carrusel visual con badge; los productos normales forman un catálogo compacto independiente.
 - La monetización de comercios se basa en visibilidad y herramientas comerciales: los destacados ocupan el carrusel superior y acceden a ficha completa, galería, productos, promociones y descuento. Los comercios gratuitos permanecen en “Cerca de ti” con ficha desplegable, rubros, descripción, horario, ubicación, valoración, favoritos y contacto. La confianza (opiniones y valoración) no se bloquea por pago.
 - El carrusel de comercios destacados muestra una tarjeta de ancho completo por vez, avanza automáticamente con transición lateral, se pausa durante la interacción y muestra indicadores. El orden se aleatoriza de forma estable al cargar el feed para repartir la exposición pagada sin repetir comercios antes de completar la ronda.
+- El feed de Comercios distingue un directorio realmente vacío de un error de sesión, perfil, barrio o consulta. Ante un fallo muestra el motivo seguro y permite reintentar; nunca consulta sin `neighborhood_id`. La ficha usa `whatsapp` como contacto prioritario y `phone` como respaldo.
 - Invitar vecinos debe permanecer pendiente de habilitación aunque exista una pantalla implementada.
 - Las páginas comunitarias comparten la identidad visual vigente, el header simple con retorno y scroll independiente.
 - Los feeds de Mercado, Servicios, Eventos, Chat y Comercios usan un header interno común: botón volver, título centrado en gris carbón con `el barrio` en verde de marca, un ícono lineal grande y translúcido propio de la sección hacia el lado izquierdo, y una línea verde inferior. Inicio conserva su header propio.
@@ -238,6 +239,7 @@ El botón de creación abre `CreatePost.jsx`, salvo la creación de comercios, q
 
 ## Funcionalidades terminadas
 
+- El cierre funcional de Comercios fue auditado en la aplicación y el panel: feed territorial con error y reintento explícitos, contacto correcto por WhatsApp, ficha con promociones/catálogo/galería/opiniones, y catálogo administrativo con creación, edición, disponibilidad y destacados. Los builds de producción de ambas aplicaciones pasan.
 - La moderación preventiva de texto público está integrada en publicaciones, comentarios de Mercado y Alertas, y opiniones de Servicios y Comercios mediante `moderate-community-content`. La función está desplegada; CORS y rechazo sin sesión fueron validados. El registro administrativo requiere la migración preparada `202607300004_content_moderation_events.sql`, todavía no aplicada.
 - El panel implementa dos alcances administrativos: territorial y supremo. Las listas fallan cerradas para admins sin barrio, el nivel supremo puede revisar todos los barrios, las altas globales exigen barrio explícito y solo el superadministrador ve controles para administrar otros permisos administrativos. La protección backend de `202607300001_admin_scope_and_superadmin.sql` está aplicada según confirmación manual.
 - Las pantallas administrativas móviles antiguas de Usuarios, Incidentes y Comercios respetan el mismo alcance. Usuarios e Incidentes ya no realizan cambios sensibles con `update` directo: usan `admin_manage_profile` y `admin_moderate_incident`.
@@ -308,7 +310,7 @@ El botón de creación abre `CreatePost.jsx`, salvo la creación de comercios, q
 - Validar visualmente con dos sesiones reales el ciclo proponer encuentro → aceptar → continuar chat → cerrar trato.
 - Reconciliar el historial remoto de migraciones antes de usar `supabase db push`; actualmente la CLI no reconoce como registradas migraciones que sí están aplicadas.
 - Validar con una cuenta admin territorial que no pueda consultar ni modificar otro barrio.
-- Terminar y aprobar visualmente la página de detalle del comercio.
+- Aprobar visualmente la página de detalle del comercio con datos reales en una sesión vecinal.
 - Cargar productos reales de prueba en `commerce_products`.
 - Validar los módulos web de Comercios, Eventos, Incidentes, Usuarios y Farmacias.
 - Ejecutar la migración `202607290008_pharmacy_duty.sql` y validar la separación entre farmacias visibles y farmacias de turno.

@@ -2,7 +2,7 @@
 
 ## Estado actual
 
-- Fase larga autorizada en curso: moderación pública con IA, cierre integral de Comercios y Productos, reemplazo de Perfil y Modo accesible, con continuidad documentada por bloque. Bloque actual: `1/4 — moderación preventiva desplegada`.
+- Fase larga autorizada en curso: moderación pública con IA, cierre integral de Comercios y Productos, reemplazo de Perfil y Modo accesible, con continuidad documentada por bloque. Bloque actual: `2/4 — Comercios y Productos cerrados funcionalmente`.
 
 - La aplicación vecinal modera texto público antes de guardar publicaciones, comentarios y opiniones mediante la Edge Function autenticada `moderate-community-content`. Los chats privados quedan fuera. La migración opcional de auditoría administrativa `202607300004_content_moderation_events.sql` está preparada, pero no aplicada ni debe asumirse aplicada.
 
@@ -48,6 +48,7 @@
 - El editor permite seleccionar múltiples rubros por comercio; el primero se guarda además como rubro principal en `category` y el conjunto completo en `categories`. Cada rubro utiliza un emoji consistente definido por el panel.
 - La ubicación del comercio se define con un mapa OpenStreetMap: permite buscar una dirección, tocar el mapa o arrastrar el marcador; cada cambio sincroniza coordenadas y dirección mediante geocodificación inversa.
 - El catálogo permite crear, editar, ocultar, destacar o eliminar productos de `commerce_products` desde una subpágina propia.
+- Al editar un producto, el catálogo conserva su fotografía si no se reemplaza y confirma correctamente que fue actualizado. Los errores al cargar el catálogo se muestran sin reemplazar el estado real por una lista vacía silenciosa.
 - Las imágenes de productos se almacenan en el bucket público `commerces`, bajo la carpeta `products/{commerce_id}/`.
 - Los productos pertenecen a `commerce_products`, no a las publicaciones del Mercado.
 - Farmacias utiliza la tabla vigente `farmacias`. `is_active` controla si pertenece al directorio visible, `is_on_duty` si se destaca como farmacia de turno y `sort_order` cuál se presenta primero; el formulario reutiliza el selector cartográfico común para mantener dirección y coordenadas sincronizadas.

@@ -677,7 +677,7 @@ function ComercioDetalle({ c, userCoords, profile, onClose, onEditar, esAdmin, c
   const horario = horarioFeed(c.opening_hours)
   const metros = haversine(userCoords?.lat, userCoords?.lng, c.lat, c.lng)
   const dist = distancia(metros)
-  const wa = waLink(c.phone)
+  const wa = waLink(c.whatsapp || c.phone)
   const catInfo = COMERCIOS[cats[0]] || COMERCIOS['Otro']
   const isPremium = !!c.is_premium
 
@@ -1184,6 +1184,7 @@ function Comercios({ currentUser, onNavigate, onCrear, onEditar }) {
   const [profile, setProfile] = useState(null)
   const [comercios, setComercios] = useState([])
   const [cargando, setCargando] = useState(true)
+  const [loadError, setLoadError] = useState('')
   const [cat, setCat] = useState('Todas')
   const [userCoords, setUserCoords] = useState(null)
   const [seleccionado, setSeleccionado] = useState(null)
@@ -1213,17 +1214,27 @@ function Comercios({ currentUser, onNavigate, onCrear, onEditar }) {
 
   const cargar = async ({ silencioso = false } = {}) => {
     if (!currentUser?.id) {
+      setLoadError('Necesitas iniciar sesión para ver los comercios de tu barrio.')
       setCargando(false)
       return
     }
     if (!silencioso) setCargando(true)
+    setLoadError('')
     try {
-      const { data: p } = await supabase
+      const { data: p, error: profileError } = await supabase
         .from('profiles').select('*')
         .eq('user_id', currentUser.id).maybeSingle()
+      if (profileError) throw profileError
       if (!p) {
         setProfile(null)
         setComercios([])
+        setLoadError('No pudimos encontrar tu perfil vecinal.')
+        return
+      }
+      if (!p.neighborhood_id) {
+        setProfile(p)
+        setComercios([])
+        setLoadError('Tu perfil todavía no tiene un barrio verificado.')
         return
       }
       setProfile(p)
@@ -1242,7 +1253,7 @@ function Comercios({ currentUser, onNavigate, onCrear, onEditar }) {
         .order('is_premium', { ascending: false })
         .order('name', { ascending: true })
 
-      if (error) console.error('[comercios] Error cargando:', error)
+      if (error) throw error
       const loadedCommerces = data || []
       const premiumIds = loadedCommerces.filter(commerce => commerce.is_premium).map(commerce => commerce.id)
       for (let index = premiumIds.length - 1; index > 0; index -= 1) {
@@ -1253,6 +1264,8 @@ function Comercios({ currentUser, onNavigate, onCrear, onEditar }) {
       setComercios(loadedCommerces)
     } catch (err) {
       console.error('Error cargando comercios:', err)
+      setComercios([])
+      setLoadError('No pudimos cargar los comercios. Revisa tu conexión e inténtalo nuevamente.')
     } finally {
       if (!silencioso) setCargando(false)
     }
@@ -1495,6 +1508,15 @@ function Comercios({ currentUser, onNavigate, onCrear, onEditar }) {
         {cargando ? (
           <div style={s.cargando}>
             <img src="/isotipo.png" alt="" style={{ width: 58, opacity: 0.4 }} />
+          </div>
+        ) : loadError ? (
+          <div style={s.vacio} role="alert">
+            <div style={s.vacioEmoji}>⚠️</div>
+            <div style={s.vacioTit}>No pudimos mostrar los comercios</div>
+            <div style={s.vacioTxt}>{loadError}</div>
+            <button style={s.vacioBtn} type="button" onClick={() => cargar()}>
+              Reintentar
+            </button>
           </div>
         ) : filtrados.length === 0 ? (
           <div style={s.vacio}>

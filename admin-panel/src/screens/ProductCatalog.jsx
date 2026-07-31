@@ -24,6 +24,7 @@ export default function ProductCatalog({ commerce, onBack }) {
 
   const load = useCallback(async () => {
     setLoading(true)
+    setError('')
     const { data, error: loadError } = await supabase.from('commerce_products').select('*').eq('commerce_id', commerce.id).order('is_featured', { ascending: false }).order('sort_order').order('created_at', { ascending: false })
     setProducts(loadError ? [] : (data || []))
     if (loadError) setError('No fue posible cargar los productos.')
@@ -61,13 +62,14 @@ export default function ProductCatalog({ commerce, onBack }) {
     if (!draft.name.trim()) return
     if (draft.price !== '' && (!Number.isFinite(Number(draft.price)) || Number(draft.price) < 0)) { setError('El precio debe ser un número igual o mayor que cero.'); return }
     setSaving(true); setError('')
+    const wasEditing = !!editing
     try {
       const payload = { commerce_id: commerce.id, name: draft.name.trim(), description: draft.description.trim() || null, price: draft.price === '' ? null : Number(draft.price), unit_label: draft.unit_label.trim() || null, image_url: await upload(), is_available: !!draft.is_available, is_featured: !!draft.is_featured, sort_order: Math.max(0, Number.parseInt(draft.sort_order, 10) || 0) }
       const request = editing ? supabase.from('commerce_products').update(payload).eq('id', editing.id).select().single() : supabase.from('commerce_products').insert(payload).select().single()
       const { error: saveError } = await request
       if (saveError) throw saveError
       setSaving(false); setEditorOpen(false); setEditing(null); setDraft(EMPTY); setImageFile(null); setPreview('')
-      await load(); showNotice(editing ? 'Producto actualizado' : 'Producto creado')
+      await load(); showNotice(wasEditing ? 'Producto actualizado' : 'Producto creado')
     } catch (saveError) { setSaving(false); setError(saveError?.message || 'No fue posible guardar el producto.') }
   }
   const toggle = async (product, field) => {
