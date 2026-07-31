@@ -10,7 +10,8 @@ import Stepper from '../components/Stepper'
 // ============================================================
 
 function Profile({ onFinish, onBack }) {
-  const [fullName, setFullName] = useState('')
+  const [firstName, setFirstName] = useState('')
+  const [lastName, setLastName] = useState('')
   const [rut, setRut] = useState('')
   const [rutValid, setRutValid] = useState(null)
   const [phone, setPhone] = useState('')
@@ -83,7 +84,11 @@ function Profile({ onFinish, onBack }) {
         return
       }
 
-      if (existingProfile?.full_name) setFullName(existingProfile.full_name)
+      if (existingProfile?.full_name) {
+        const nameParts = existingProfile.full_name.trim().split(/\s+/).filter(Boolean)
+        setFirstName(nameParts[0] || '')
+        setLastName(nameParts.slice(1).join(' '))
+      }
       if (existingProfile?.rut) {
         const formattedRut = formatRut(existingProfile.rut)
         setRut(formattedRut)
@@ -136,7 +141,7 @@ function Profile({ onFinish, onBack }) {
   const handleContinue = async () => {
     setError('')
 
-    if (!fullName.trim() || fullName.trim().split(' ').length < 2) {
+    if (!firstName.trim() || !lastName.trim()) {
       setError('Ingresa tu nombre y apellido')
       return
     }
@@ -191,8 +196,12 @@ function Profile({ onFinish, onBack }) {
       }
 
       // Actualizar profile
+      const fullName = [firstName, lastName]
+        .map(value => value.trim())
+        .filter(Boolean)
+        .join(' ')
       const updateData = {
-        full_name: fullName.trim(),
+        full_name: fullName,
         rut: rut,
         phone: phone || null,
         email: user.email || null,
@@ -221,10 +230,8 @@ function Profile({ onFinish, onBack }) {
     }
   }
 
-  const initials = fullName
-    .split(' ')
-    .filter(n => n.length > 0)
-    .slice(0, 2)
+  const initials = [firstName, lastName]
+    .filter(n => n.trim().length > 0)
     .map(n => n[0])
     .join('')
     .toUpperCase() || '?'
@@ -233,7 +240,7 @@ function Profile({ onFinish, onBack }) {
     <div style={styles.container}>
       {/* HEADER */}
       <div style={styles.header}>
-        <button style={styles.backButton} onClick={onBack}>
+        <button style={styles.backButton} onClick={onBack} aria-label="Volver">
           <span style={{ fontSize: 18 }}>←</span>
         </button>
         <div style={{ flex: 1, marginLeft: 12 }}>
@@ -256,7 +263,7 @@ function Profile({ onFinish, onBack }) {
             <img src={avatarPreview} alt="Avatar" style={styles.avatarImg} />
           ) : (
             <div style={styles.avatarPlaceholder}>
-              {fullName ? (
+              {firstName ? (
                 <span style={styles.avatarInitials}>{initials}</span>
               ) : (
                 <span style={{ fontSize: 36, opacity: 0.4 }}>👤</span>
@@ -290,19 +297,28 @@ function Profile({ onFinish, onBack }) {
       {/* FORMULARIO */}
       <div style={styles.form}>
         <div style={styles.inputGroup}>
-          <label style={styles.label}>Escribe tu nombre y tu apellido</label>
+          <label style={styles.label}>Nombre</label>
           <div style={styles.inputWrapper}>
-            <span style={styles.inputIcon}>
-  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-    <circle cx="12" cy="7" r="4" />
-  </svg>
-</span>
             <input
               type="text"
-              placeholder="Ej: Carlos Mendoza"
-              value={fullName}
-              onChange={(e) => setFullName(e.target.value)}
+              autoComplete="given-name"
+              placeholder="Ej: Carlos"
+              value={firstName}
+              onChange={(e) => setFirstName(e.target.value)}
+              style={styles.input}
+            />
+          </div>
+        </div>
+
+        <div style={styles.inputGroup}>
+          <label style={styles.label}>Apellido</label>
+          <div style={styles.inputWrapper}>
+            <input
+              type="text"
+              autoComplete="family-name"
+              placeholder="Ej: Mendoza"
+              value={lastName}
+              onChange={(e) => setLastName(e.target.value)}
               style={styles.input}
             />
           </div>
@@ -340,9 +356,6 @@ function Profile({ onFinish, onBack }) {
               maxLength={12}
             />
           </div>
-          <p style={styles.hintText}>
-            Solo lo usamos para verificar tu identidad. Nunca se comparte.
-          </p>
         </div>
 
        <div style={styles.inputGroup}>
@@ -366,6 +379,15 @@ function Profile({ onFinish, onBack }) {
               maxLength={9}
             />
           </div>
+        </div>
+
+        <div style={styles.privacyBox}>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+          </svg>
+          <span>
+            Tu nombre identifica tu perfil vecinal. El RUT se usa solo para verificar tu identidad y nunca se muestra.
+          </span>
         </div>
 
         {error && (
@@ -403,11 +425,14 @@ function Profile({ onFinish, onBack }) {
 
 const styles = {
   container: {
-    minHeight: '100%',
+    height: '100%',
+    minHeight: 0,
     background: '#FAFAF7',
-    padding: '0 24px 40px',
+    padding: '0 24px max(40px, env(safe-area-inset-bottom))',
     display: 'flex',
     flexDirection: 'column',
+    overflowY: 'auto',
+    overscrollBehavior: 'contain',
   },
   header: {
     display: 'flex',
@@ -574,6 +599,18 @@ const styles = {
     color: '#6B7280',
     marginLeft: 4,
     marginTop: 2,
+  },
+  privacyBox: {
+    display: 'flex',
+    alignItems: 'flex-start',
+    gap: 9,
+    padding: 12,
+    color: '#0F5F48',
+    background: '#EDF8F3',
+    border: '1px solid #B8DFD0',
+    borderRadius: 12,
+    fontSize: 11,
+    lineHeight: 1.45,
   },
   errorBox: {
     padding: 12,
