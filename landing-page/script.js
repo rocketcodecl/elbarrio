@@ -5,6 +5,42 @@ const mobileNav = document.querySelector('[data-mobile-nav]')
 const steps = [...document.querySelectorAll('[data-scene]')]
 const panels = [...document.querySelectorAll('[data-scene-panel]')]
 const storyVisuals = [...document.querySelectorAll('[data-scene-visual]')]
+const hero = document.querySelector('.hero')
+const heroLive = document.querySelector('.hero-live')
+const heroVideo = document.querySelector('[data-hero-video]')
+const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)')
+const cinemaScenes = [...document.querySelectorAll('[data-cinema-scene]')]
+const cinemaVideos = [...document.querySelectorAll('[data-cinema-video]')]
+const cinemaCount = document.querySelector('[data-cinema-count]')
+const commerceScenes = [...document.querySelectorAll('[data-commerce-scene]')]
+const commerceCount = document.querySelector('[data-commerce-count]')
+const commerceProgress = document.querySelector('[data-commerce-progress]')
+const commerceStatus = document.querySelector('[data-commerce-status]')
+
+const getPath = (object, path) => path.split('.').reduce((value, key) => value?.[key], object)
+
+async function loadPublishedContent() {
+  try {
+    const response = await fetch('content/site.json', { cache: 'no-store' })
+    if (!response.ok) return
+    const config = await response.json()
+
+    document.querySelectorAll('[data-content]').forEach(element => {
+      const value = getPath(config.content, element.dataset.content)
+      if (typeof value === 'string' && value.trim()) element.textContent = value
+    })
+
+    const sizes = config.sizes || {}
+    const root = document.documentElement.style
+    if (Number.isFinite(Number(sizes.heroTitle))) root.setProperty('--hero-title-max', `${sizes.heroTitle}px`)
+    if (Number.isFinite(Number(sizes.sectionTitle))) root.setProperty('--section-title-max', `${sizes.sectionTitle}px`)
+    if (Number.isFinite(Number(sizes.body))) root.setProperty('--body-size', `${sizes.body}px`)
+  } catch (_) {
+    // La landing conserva su contenido integrado si la configuración no está disponible.
+  }
+}
+
+loadPublishedContent()
 
 function updatePageChrome() {
   const scrollable = document.documentElement.scrollHeight - window.innerHeight
@@ -15,6 +51,28 @@ function updatePageChrome() {
 
 window.addEventListener('scroll', updatePageChrome, { passive: true })
 updatePageChrome()
+
+const ambientVideos = [heroVideo, ...cinemaVideos].filter(Boolean)
+
+ambientVideos.forEach(video => video.play().catch(() => {}))
+
+document.addEventListener('visibilitychange', () => {
+  ambientVideos.forEach(video => {
+    if (document.hidden) video.pause()
+    else video.play().catch(() => {})
+  })
+})
+
+if (hero && heroLive && window.matchMedia('(pointer:fine)').matches && !reduceMotion.matches) {
+  hero.addEventListener('pointermove', event => {
+    const x = (event.clientX / window.innerWidth - .5) * 6
+    const y = (event.clientY / window.innerHeight - .5) * 5
+    heroLive.style.transform = `translate3d(${x}px,${y}px,0) rotate(${1 + x * .08}deg)`
+  })
+  hero.addEventListener('pointerleave', () => {
+    heroLive.style.transform = 'rotate(1deg)'
+  })
+}
 
 menuButton?.addEventListener('click', () => {
   const open = !menuButton.classList.contains('open')
@@ -48,6 +106,43 @@ const storyObserver = new IntersectionObserver(entries => {
 }, { rootMargin: '-28% 0px -48%', threshold: [0, .15, .35, .6] })
 
 steps.forEach(step => storyObserver.observe(step))
+
+const setCinemaScene = scene => {
+  const key = scene.dataset.cinemaScene
+  cinemaScenes.forEach(item => item.classList.toggle('active', item === scene))
+  cinemaVideos.forEach(video => {
+    const active = video.dataset.cinemaVideo === key
+    video.classList.toggle('active', active)
+    if (active) video.play().catch(() => {})
+  })
+  if (cinemaCount) cinemaCount.textContent = scene.dataset.count
+}
+
+const cinemaObserver = new IntersectionObserver(entries => {
+  const visible = entries
+    .filter(entry => entry.isIntersecting)
+    .sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0]
+  if (visible) setCinemaScene(visible.target)
+}, { rootMargin: '-34% 0px -34%', threshold: [0, .2, .5] })
+
+cinemaScenes.forEach(scene => cinemaObserver.observe(scene))
+
+const setCommerceScene = scene => {
+  const index = commerceScenes.indexOf(scene)
+  commerceScenes.forEach(item => item.classList.toggle('active', item === scene))
+  if (commerceCount) commerceCount.textContent = scene.dataset.count
+  if (commerceProgress) commerceProgress.style.width = `${((index + 1) / commerceScenes.length) * 100}%`
+  if (commerceStatus) commerceStatus.textContent = scene.dataset.status
+}
+
+const commerceObserver = new IntersectionObserver(entries => {
+  const visible = entries
+    .filter(entry => entry.isIntersecting)
+    .sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0]
+  if (visible) setCommerceScene(visible.target)
+}, { rootMargin: '-30% 0px -42%', threshold: [0, .2, .45] })
+
+commerceScenes.forEach(scene => commerceObserver.observe(scene))
 
 const revealObserver = new IntersectionObserver(entries => {
   entries.forEach(entry => {

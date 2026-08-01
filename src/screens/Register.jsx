@@ -58,8 +58,26 @@ function Register({ existingAccount = false, initialEmail = '', onFinish, onBack
     }
   }
 
-  const handleGoogleLogin = () => {
-    alert('Login con Google disponible próximamente')
+  const handleGoogleLogin = async () => {
+    setError('')
+    setLoading(true)
+    try {
+      const redirectTo = new URL(import.meta.env.BASE_URL, window.location.origin).toString()
+      const { error: authError } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo,
+          queryParams: {
+            access_type: 'offline',
+            prompt: 'select_account',
+          },
+        },
+      })
+      if (authError) throw authError
+    } catch (err) {
+      setError(err.message || 'No pudimos conectar con Google. Inténtalo nuevamente.')
+      setLoading(false)
+    }
   }
 
   return (
@@ -206,9 +224,9 @@ function Register({ existingAccount = false, initialEmail = '', onFinish, onBack
           <div style={styles.dividerLine} />
         </div>
 
-        <button style={styles.googleButton} onClick={handleGoogleLogin}>
+        <button type="button" style={styles.googleButton} onClick={handleGoogleLogin} disabled={loading}>
           <GoogleIcon />
-          <span>Continuar con Google</span>
+          <span>{loading ? 'Conectando con Google…' : 'Continuar con Google'}</span>
         </button>
 
         <p style={styles.terms}>

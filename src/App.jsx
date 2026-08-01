@@ -124,9 +124,10 @@ export default function App() {
 
   useEffect(() => {
     const sessionTimer = window.setTimeout(checkSession, 0)
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_e, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (session?.user) {
         setUser({ id: session.user.id, email: session.user.email })
+        if (event === 'SIGNED_IN') window.setTimeout(checkSession, 0)
       } else {
         setUser(null)
         setProfile(null)

@@ -1,0 +1,4 @@
+Options -Indexes
+<Files "defaults.json">
+  Require all denied
+</Files>
