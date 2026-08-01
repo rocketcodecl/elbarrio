@@ -59,6 +59,7 @@ const Icon = ({ name, size = 22, color = C.verde }) => {
     alert: <><path d="M10.3 2.9 1.8 17a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 2.9a2 2 0 0 0-3.4 0Z"/><path d="M12 9v4M12 17h.01"/></>,
     lock: <><rect x="5" y="10" width="14" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/><circle cx="12" cy="15" r="1"/><path d="M12 16v2"/></>,
     rules: <><path d="m14 4 6 6"/><path d="m13 5-8.5 8.5a2.1 2.1 0 0 0 3 3L16 8"/><path d="M16 2 22 8M3 21h10"/></>,
+    trash: <><path d="M3 6h18M8 6V4h8v2M19 6l-1 15H6L5 6M10 11v5M14 11v5"/></>,
     arrow: <><path d="M5 12h14"/><path d="m13 6 6 6-6 6"/></>,
   }
   return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">{paths[name]}</svg>
@@ -129,6 +130,32 @@ export function Terms({ onNavigate }) {
   </Screen>
 }
 
+export function PrivacyPolicy({ onNavigate }) {
+  return <Screen title="Política de privacidad" onNavigate={onNavigate}>
+    <div style={s.docIntro}><span style={s.docBadge}>Privacidad</span><h2 style={s.docTitle}>Cómo cuidamos tus datos</h2><p>Última actualización: 1 de agosto de 2026</p></div>
+    <article className="legalDocument" style={s.legalDocument}>
+      <LegalSection icon="file" number="1" title="Datos que utilizamos">
+        Usamos tu nombre, correo, teléfono y RUT para crear y proteger tu cuenta. La dirección, comuna y ubicación GPS se utilizan para verificar que resides dentro del territorio activo. El RUT, la dirección exacta y el GPS no se muestran públicamente.
+      </LegalSection>
+      <LegalSection icon="users" number="2" title="Actividad comunitaria">
+        Guardamos las publicaciones, comentarios, mensajes, opiniones, invitaciones y alertas necesarias para prestar el servicio. Las fotografías que eliges publicar pueden ser visibles para otros vecinos de tu barrio.
+      </LegalSection>
+      <LegalSection icon="shield" number="3" title="Seguridad y moderación">
+        El contenido público puede analizarse automáticamente para detectar amenazas, fraude, acoso, contenido ilegal o exposición de datos personales. Los chats privados no se envían al sistema de moderación de contenido público.
+      </LegalSection>
+      <LegalSection icon="lock" number="4" title="Ubicación y acceso">
+        La ubicación se solicita para comprobar pertenencia territorial y calcular referencias cercanas. No vendemos tu información personal. El acceso técnico se limita mediante autenticación y políticas de seguridad de Supabase.
+      </LegalSection>
+      <LegalSection icon="trash" number="5" title="Eliminación de cuenta">
+        Puedes iniciar la eliminación desde Privacidad y seguridad. Tu acceso se desactiva y tus datos identificatorios —incluidos RUT, dirección, GPS, correo, teléfono y avatar— se anonimizan. Para preservar conversaciones y seguridad comunitaria, ciertas publicaciones y mensajes pueden conservarse sin vincularse públicamente a tu identidad. Los registros mínimos de seguridad pueden mantenerse cuando exista una obligación legal o una necesidad de prevención de abuso.
+      </LegalSection>
+      <LegalSection icon="mail" number="6" title="Contacto">
+        Para consultas de privacidad o solicitudes relacionadas con tus datos, escribe a <a href="mailto:soporte@elbarrio.lat">soporte@elbarrio.lat</a>.
+      </LegalSection>
+    </article>
+  </Screen>
+}
+
 function LegalSection({ icon, number, title, children }) {
   return <section style={s.legalSection}><div style={s.legalTitle}><Icon name={icon} size={20}/><h3>{number}. {title}</h3></div><div style={s.legalText}>{children}</div></section>
 }
@@ -175,26 +202,68 @@ export function InviteNeighbors({ onNavigate, profile }) {
 }
 
 export function ContactUs({ onNavigate }) {
-  const [sent,setSent]=useState(false)
+  const [name,setName]=useState('')
+  const [email,setEmail]=useState('')
+  const [reason,setReason]=useState('Consulta general')
+  const [message,setMessage]=useState('')
+  const [prepared,setPrepared]=useState(false)
+  const submit=event=>{
+    event.preventDefault()
+    const subject=encodeURIComponent(`[El Barrio] ${reason}`)
+    const body=encodeURIComponent(`Nombre: ${name}\nCorreo: ${email}\nMotivo: ${reason}\n\n${message}`)
+    setPrepared(true)
+    window.location.href=`mailto:soporte@elbarrio.lat?subject=${subject}&body=${body}`
+  }
   return <Screen title="Contáctanos" onNavigate={onNavigate}>
     <div style={s.centerIntro}><div style={s.lineIconLarge}><Icon name="mail" size={28}/></div><h2>¿Cómo podemos ayudarte?</h2><p>Cuéntanos tu consulta, sugerencia o problema. Estamos para escucharte.</p></div>
-    <form style={s.form} onSubmit={e=>{e.preventDefault();setSent(true)}}>
-      <label>Nombre<input required placeholder="Tu nombre"/></label>
-      <label>Correo electrónico<input required type="email" placeholder="correo@ejemplo.com"/></label>
-      <label>Motivo<select><option>Consulta general</option><option>Problema técnico</option><option>Seguridad</option><option>Comercios</option></select></label>
-      <label>Mensaje<textarea required placeholder="Escribe tu mensaje…"/></label>
+    <form style={s.form} onSubmit={submit}>
+      <label>Nombre<input required value={name} onChange={event=>setName(event.target.value)} placeholder="Tu nombre"/></label>
+      <label>Correo electrónico<input required type="email" value={email} onChange={event=>setEmail(event.target.value)} placeholder="correo@ejemplo.com"/></label>
+      <label>Motivo<select value={reason} onChange={event=>setReason(event.target.value)}><option>Consulta general</option><option>Problema técnico</option><option>Seguridad</option><option>Comercios</option><option>Privacidad y datos</option></select></label>
+      <label>Mensaje<textarea required value={message} onChange={event=>setMessage(event.target.value)} placeholder="Escribe tu mensaje…"/></label>
       <button>Enviar mensaje <Icon name="arrow" size={18} color="#fff"/></button>
-      {sent&&<p style={s.success}>Mensaje preparado. Conectaremos el envío al definir el canal oficial de soporte.</p>}
+      {prepared&&<p style={s.success}>Abrimos tu aplicación de correo con el mensaje preparado. Debes confirmar el envío allí.</p>}
     </form>
-    <section className="support" style={s.support}><div><h2>¿Prefieres chatear?</h2><p>Atención de lunes a viernes, 9:00–18:00.</p></div><button onClick={()=>onNavigate?.('chat')}>Abrir chat</button></section>
-    <section className="socials" style={s.socials}><h2>Síguenos en redes</h2><div><span><Icon name="link" size={18}/> Instagram</span><span><Icon name="link" size={18}/> Facebook</span><span><Icon name="link" size={18}/> Twitter (X)</span><span><Icon name="link" size={18}/> TikTok</span></div></section>
+    <section className="support" style={s.support}><div><h2>Correo directo</h2><p>También puedes escribirnos sin usar el formulario.</p></div><a href="mailto:soporte@elbarrio.lat">Escribir</a></section>
     <aside style={s.emergency}><Icon name="alert" color={C.rojo}/><p><strong>¿Es una emergencia?</strong><br/>Llama al 133 o a Seguridad de Las Condes.</p></aside>
+  </Screen>
+}
+
+export function DeleteAccount({ onNavigate, onDeleted }) {
+  const [confirmed,setConfirmed]=useState(false)
+  const [phrase,setPhrase]=useState('')
+  const [loading,setLoading]=useState(false)
+  const [error,setError]=useState('')
+  const remove=async()=>{
+    setError('')
+    if(!confirmed||phrase.trim().toUpperCase()!=='ELIMINAR'){
+      setError('Marca la confirmación y escribe ELIMINAR para continuar.')
+      return
+    }
+    setLoading(true)
+    const {data,error:invokeError}=await supabase.functions.invoke('delete-my-account',{body:{confirmation:'ELIMINAR'}})
+    if(invokeError||!data?.deleted){
+      setError(data?.error?.message||invokeError?.message||'No pudimos eliminar la cuenta. Escribe a soporte@elbarrio.lat.')
+      setLoading(false)
+      return
+    }
+    await supabase.auth.signOut({scope:'local'})
+    onDeleted?.()
+  }
+  return <Screen title="Eliminar mi cuenta" onNavigate={onNavigate}>
+    <div style={s.centerIntro}><div style={s.warningIcon}><Icon name="trash" size={28} color={C.rojo}/></div><h2>Esta acción es permanente</h2><p>Tu acceso quedará desactivado y eliminaremos los datos que permiten identificarte.</p></div>
+    <article style={s.deleteSummary}><h3>Qué eliminaremos</h3><p>Nombre, RUT, correo, teléfono, dirección, GPS y fotografía de perfil.</p><h3>Qué puede conservarse</h3><p>Publicaciones, mensajes y registros mínimos de seguridad anonimizados, para no romper conversaciones ni la trazabilidad comunitaria.</p></article>
+    <label style={s.deleteCheck}><input type="checkbox" checked={confirmed} onChange={event=>setConfirmed(event.target.checked)}/><span>Entiendo que no podré recuperar esta cuenta.</span></label>
+    <label style={s.deletePhrase}>Escribe <strong>ELIMINAR</strong><input value={phrase} onChange={event=>setPhrase(event.target.value)} autoCapitalize="characters"/></label>
+    {error&&<p style={{...s.success,background:C.rojoBg,color:C.rojo}}>{error}</p>}
+    <button style={s.deleteButton} disabled={loading} onClick={remove}>{loading?'Eliminando…':'Eliminar mi cuenta definitivamente'}</button>
+    <button style={s.cancelDelete} onClick={()=>onNavigate?.('back')}>Cancelar y volver</button>
   </Screen>
 }
 
 export function SettingsHub({ onNavigate }) {
   const content = useAppContent('privacy_security', PRIVACY_DEFAULTS)
-  const links=[['terms','file',content.termsTitle],['prohibited','shield',content.prohibitedTitle],['contact','mail',content.contactTitle]]
+  const links=[['privacy','lock','Política de privacidad'],['terms','file',content.termsTitle],['prohibited','shield',content.prohibitedTitle],['contact','mail',content.contactTitle],['deleteaccount','trash','Eliminar mi cuenta']]
   return <Screen title="Privacidad y seguridad" onNavigate={onNavigate}><p style={s.settingsIntro}>{content.intro}</p><div className="settings" style={s.settings}>{links.map(([route,icon,label])=><button key={route} onClick={()=>onNavigate?.(route)}><Icon name={icon}/><span>{label}</span><Icon name="arrow" size={18} color={C.textoTenue}/></button>)}</div></Screen>
 }
 
@@ -204,7 +273,7 @@ const s={
   docIntro:{marginBottom:20},docBadge:{display:'inline-block',padding:'5px 9px',borderRadius:999,background:C.verde,color:'#fff',fontSize:9,fontWeight:700},docTitle:{fontSize:27,lineHeight:1.15,color:C.texto,margin:'9px 0 3px'},legalDocument:{background:C.card,border:`1px solid ${C.borde}`,borderRadius:16,padding:'22px 18px'},legalSection:{marginBottom:22},legalTitle:{display:'flex',alignItems:'flex-start',gap:9,color:C.verdeOsc,marginBottom:7},legalText:{fontSize:12.5,lineHeight:1.58,color:C.textoSuave},legalNote:{width:'calc(100% - 10px)',display:'grid',gridTemplateColumns:'34px 1fr',gap:11,alignItems:'start',margin:'15px 0 2px 10px',padding:'13px 14px',border:`1px solid ${C.borde}`,borderRadius:11,background:'#fafcf9',color:C.texto,lineHeight:1.45},legalNoteIcon:{width:34,height:34,borderRadius:9,display:'grid',placeItems:'center',background:C.verdeBg,color:C.verdeOsc},legalNoteTitle:{display:'block',fontSize:11.5,fontWeight:700,color:C.verdeOsc,marginBottom:3},legalNoteText:{display:'block',fontSize:11.5,color:C.textoSuave},legalFooter:{borderTop:`1px solid ${C.borde}`,paddingTop:20,textAlign:'center'},legalFooterTitle:{fontSize:15,color:C.texto,margin:'0 0 4px'},legalFooterText:{fontSize:12,color:C.textoSuave,margin:0},legalFooterButton:{marginTop:16,padding:'12px 22px',borderRadius:999,background:C.verdeOsc,color:'#fff',fontWeight:700},
   centerIntro:{textAlign:'center',margin:'8px auto 24px',maxWidth:330},warningIcon:{width:58,height:58,display:'grid',placeItems:'center',margin:'0 auto 12px'},prohibited:{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10},consequences:{marginTop:18,padding:18,borderRadius:16,background:C.card,border:`1px solid ${C.borde}`},reportBtn:{width:'100%',marginTop:14,padding:14,borderRadius:12,border:`1px solid ${C.rojoSuave}`,color:C.rojo,display:'flex',alignItems:'center',justifyContent:'center',gap:8,fontWeight:700},
   inviteHero:{height:330,borderRadius:18,backgroundSize:'cover',backgroundPosition:'center',padding:22,display:'flex',alignItems:'flex-end',color:'#fff'},inviteLink:{display:'grid',gridTemplateColumns:'44px 1fr auto',alignItems:'center',gap:12,padding:16,borderRadius:16,background:C.card,border:`1px solid ${C.borde}`},shareGrid:{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginTop:10},progress:{marginTop:20,padding:18,borderRadius:16,background:C.verdeBg},inviteProgressTop:{display:'flex',justifyContent:'space-between',alignItems:'center',gap:10},inviteList:{marginTop:14,padding:'16px 18px',borderRadius:16,background:C.card,border:`1px solid ${C.borde}`},infoBox:{display:'flex',alignItems:'flex-start',gap:12,marginTop:14,padding:16,borderRadius:14,background:C.card,border:`1px solid ${C.borde}`},support:{marginTop:16,padding:18,borderRadius:16,background:C.verde,color:'#fff',display:'flex',alignItems:'center',justifyContent:'space-between',gap:12},emergency:{display:'flex',gap:12,marginTop:16,padding:16,borderRadius:14,background:C.rojoBg,border:`1px solid ${C.rojoSuave}`},
-  form:{background:C.card,border:`1px solid ${C.borde}`,borderRadius:18,padding:18,display:'flex',flexDirection:'column',gap:16},success:{padding:12,borderRadius:10,background:C.verdeBg,color:C.verdeOsc},socials:{marginTop:16,padding:18,borderRadius:16,background:C.card,border:`1px solid ${C.borde}`},settingsIntro:{margin:'0 0 16px'},settings:{background:C.card,border:`1px solid ${C.borde}`,borderRadius:16,overflow:'hidden'},
+  form:{background:C.card,border:`1px solid ${C.borde}`,borderRadius:18,padding:18,display:'flex',flexDirection:'column',gap:16},success:{padding:12,borderRadius:10,background:C.verdeBg,color:C.verdeOsc},socials:{marginTop:16,padding:18,borderRadius:16,background:C.card,border:`1px solid ${C.borde}`},settingsIntro:{margin:'0 0 16px'},settings:{background:C.card,border:`1px solid ${C.borde}`,borderRadius:16,overflow:'hidden'},deleteSummary:{padding:18,borderRadius:16,background:C.card,border:`1px solid ${C.borde}`},deleteCheck:{display:'flex',alignItems:'flex-start',gap:10,marginTop:18,fontSize:12.5,color:C.texto},deletePhrase:{display:'grid',gap:8,marginTop:18,fontSize:12.5,color:C.texto},deleteButton:{width:'100%',minHeight:48,marginTop:18,padding:'0 16px',borderRadius:12,background:C.rojo,color:'#fff',fontWeight:700},cancelDelete:{width:'100%',minHeight:44,marginTop:8,color:C.textoSuave,fontWeight:700},
 }
 
 if(typeof document!=='undefined'&&!document.getElementById('community-v2-css')){const el=document.createElement('style');el.id='community-v2-css';el.textContent=`
@@ -215,7 +284,7 @@ if(typeof document!=='undefined'&&!document.getElementById('community-v2-css')){
 .community-v2 .cta h2{color:${C.texto};font-size:21px;margin-bottom:8px}.community-v2 .cta p{color:#14532d;max-width:280px;margin:0 auto}.community-v2 .cta button{min-width:178px;border-radius:999px;background:#073d25;margin-top:18px}.community-v2 .values>div{min-height:48px;display:flex;align-items:center;justify-content:flex-start;gap:9px;padding:0 14px;border:1px solid #c8d5c9;border-radius:999px;background:${C.card};font-size:12.5px;color:${C.texto}}.community-v2 .docIntro>span{display:inline-block;padding:5px 9px;border-radius:999px;background:${C.verde};color:#fff;font-size:9px;font-weight:700}.community-v2 .docIntro h2{font-size:27px;margin:9px 0 2px}.community-v2 .legalDocument ul{margin:10px 0 0;padding-left:20px}.community-v2 .legalDocument li{margin-bottom:7px}.community-v2 .legalFooter h3{font-size:15px;margin-bottom:4px;color:${C.texto}}.community-v2 .legalFooter p{font-size:12px}.community-v2 .legalFooter button{margin-top:16px;padding:12px 22px;border-radius:999px;background:${C.verdeOsc};color:#fff;font-weight:700}.community-v2 .settings small{display:block;color:${C.textoTenue};font-size:9px;margin-top:2px}
 .community-v2 .prohibited article{min-height:158px;padding:16px;border-radius:15px;background:${C.card};border:1px solid ${C.borde}}.community-v2 .prohibited article svg{margin-bottom:13px}.community-v2 .consequences p{display:flex;gap:9px;margin-top:10px}.community-v2 .consequences p span{color:${C.verde};font-weight:800}
 .community-v2 .inviteLink strong,.community-v2 .inviteLink span{display:block}.community-v2 .inviteLink span{font-size:11px;color:${C.textoTenue};margin-top:2px}.community-v2 .inviteLink button{padding:9px 13px;border-radius:9px;background:${C.verde};color:#fff;font-weight:700}.community-v2 .shareGrid button{padding:14px;border-radius:12px;background:${C.card};border:1px solid ${C.borde};color:${C.verdeOsc};font-weight:700}
-.community-v2 .inviteProgressTop strong{font-size:12px}.community-v2 .inviteProgressTop b{color:${C.verdeOsc};font-size:12px}.community-v2 .inviteProgressBar{height:7px;border-radius:999px;background:${C.borde};margin:12px 0 8px;overflow:hidden}.community-v2 .inviteProgressBar span{display:block;height:100%;background:${C.verde};border-radius:inherit;transition:width .25s}.community-v2 .inviteList>div{display:flex;align-items:center;gap:10px;padding:10px 0;border-top:1px solid ${C.borde}}.community-v2 .inviteList>div>span{width:27px;height:27px;display:grid;place-items:center;border-radius:50%;background:${C.verdeBg};color:${C.verde};font-weight:800}.community-v2 .inviteList p{display:grid;gap:2px}.community-v2 .inviteList small{font-size:10px;color:${C.textoTenue}}.community-v2 button:disabled{opacity:.5;cursor:not-allowed}.community-v2 .support p{color:rgba(255,255,255,.82);font-size:11px}.community-v2 .support button{flex-shrink:0;padding:10px 12px;border-radius:10px;background:${C.verdeOsc};color:#fff;font-weight:700}
+.community-v2 .inviteProgressTop strong{font-size:12px}.community-v2 .inviteProgressTop b{color:${C.verdeOsc};font-size:12px}.community-v2 .inviteProgressBar{height:7px;border-radius:999px;background:${C.borde};margin:12px 0 8px;overflow:hidden}.community-v2 .inviteProgressBar span{display:block;height:100%;background:${C.verde};border-radius:inherit;transition:width .25s}.community-v2 .inviteList>div{display:flex;align-items:center;gap:10px;padding:10px 0;border-top:1px solid ${C.borde}}.community-v2 .inviteList>div>span{width:27px;height:27px;display:grid;place-items:center;border-radius:50%;background:${C.verdeBg};color:${C.verde};font-weight:800}.community-v2 .inviteList p{display:grid;gap:2px}.community-v2 .inviteList small{font-size:10px;color:${C.textoTenue}}.community-v2 button:disabled{opacity:.5;cursor:not-allowed}.community-v2 .support p{color:rgba(255,255,255,.82);font-size:11px}.community-v2 .support a{flex-shrink:0;padding:10px 12px;border-radius:10px;background:${C.verdeOsc};color:#fff;font-weight:700;text-decoration:none}
 .community-v2 .socials>div{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:16px}.community-v2 .socials span{display:flex;align-items:center;gap:8px;font-size:12.5px;color:${C.textoSuave}}
 .community-v2 .settings button{width:100%;min-height:58px;padding:0 16px;display:grid;grid-template-columns:28px 1fr 20px;align-items:center;gap:10px;border-bottom:1px solid ${C.borde};text-align:left;color:${C.texto};font-size:13.5px}.community-v2 .settings button:last-child{border-bottom:0}
 .community-v2 .settings-switch{width:36px;height:21px;padding:3px;border-radius:999px;background:#cfd6d2}.community-v2 .settings-switch i{display:block;width:15px;height:15px;border-radius:50%;background:white;transition:transform .2s}.community-v2 .settings-switch.is-on{background:${C.verde}}.community-v2 .settings-switch.is-on i{transform:translateX(15px)}

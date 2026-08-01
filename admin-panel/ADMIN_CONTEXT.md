@@ -91,12 +91,9 @@
 
 ## Pendiente inmediato
 
+- Ejecutar la auditoría de solo lectura `supabase/MVP_RELEASE_AUDIT.sql` y revisar cualquier estructura marcada `FALTA`; no volver a aplicar migraciones por inferencia.
 - Validar poner, reemplazar y quitar el evento de portada después de la ejecución confirmada de `supabase/migrations/202607300005_home_event_spotlight.sql`.
 - Validar con una cuenta admin territorial la separación efectiva respecto del superadministrador.
 - Mantener deshabilitada la asistencia. No crear ni aplicar cambios de asistencia hasta definir y autorizar cómo alinear `event_attendees` con los eventos actuales de `posts`.
-- Ejecutar `supabase/migrations/202607290001_incident_moderation.sql` y validar el flujo completo del módulo Incidentes.
-- Ejecutar `supabase/migrations/202607290002_user_administration.sql` y validar el flujo completo del módulo Usuarios.
-- Ejecutar `supabase/migrations/202607290003_user_verification_activity.sql` y validar mapa, correo e historial de actividad.
-- Ejecutar `supabase/migrations/202607290004_beta_neighborhood_polygon.sql` y validar puntos dentro y fuera del barrio beta.
-- Ejecutar `supabase/migrations/202607290009_news_management.sql` y validar publicación, pausa, marca oficial y aparición opcional en Actividad.
-- Ejecutar `supabase/migrations/202607290010_news_categories.sql` y validar la administración y filtros de categorías de Noticias.
+- Validar funcionalmente Incidentes, Usuarios, mapa e historial, Noticias y categorías una vez certificado el schema remoto.
+- Limpiar el lint de fuentes del panel y excluir `dist` del lint raíz; el build de producción sí pasa.

@@ -2,16 +2,71 @@ import { useState } from 'react'
 import { supabase } from '../lib/supabase'
 import Stepper from '../components/Stepper'
 
-function Register({ existingAccount = false, initialEmail = '', onFinish, onBack, onLogout }) {
-  const [mode, setMode] = useState('signup')
+const PASSWORD_RECOVERY_KEY = 'elbarrio:password-recovery-pending'
+
+function Register({ existingAccount = false, initialEmail = '', recoveryMode = false, onFinish, onBack, onLogout, onNavigate }) {
+  const [mode, setMode] = useState(recoveryMode ? 'password-update' : 'signup')
   const [email, setEmail] = useState(initialEmail)
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [notice, setNotice] = useState('')
+
+  const requestPasswordReset = async () => {
+    setError('')
+    setNotice('')
+    if (!email.trim() || !email.includes('@')) {
+      setError('Escribe el correo de tu cuenta para recuperar el acceso.')
+      return
+    }
+    setLoading(true)
+    try {
+      const redirectUrl = new URL(import.meta.env.BASE_URL, window.location.origin)
+      redirectUrl.pathname = `${redirectUrl.pathname.replace(/\/$/, '')}/recovery`
+      const { error: resetError } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+        redirectTo: redirectUrl.toString(),
+      })
+      if (resetError) throw resetError
+      try { localStorage.setItem(PASSWORD_RECOVERY_KEY, 'true') } catch { /* la ruta sigue disponible */ }
+      setNotice('Si te registraste con contraseña, revisa tu correo.\nSi te registraste con Google, ingresa con tu cuenta de Google.')
+    } catch (err) {
+      setError(err.message || 'No pudimos enviar el correo de recuperación.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const updatePassword = async () => {
+    setError('')
+    setNotice('')
+    if (password.length < 8) {
+      setError('La nueva contraseña debe tener al menos 8 caracteres.')
+      return
+    }
+    setLoading(true)
+    try {
+      const { error: updateError } = await supabase.auth.updateUser({ password })
+      if (updateError) throw updateError
+      try { localStorage.removeItem(PASSWORD_RECOVERY_KEY) } catch { /* no bloquea el cierre */ }
+      const baseUrl = new URL(import.meta.env.BASE_URL, window.location.origin)
+      window.history.replaceState({}, '', `${baseUrl.pathname}${baseUrl.search}`)
+      setNotice('Contraseña actualizada correctamente.')
+      window.setTimeout(() => onFinish(), 700)
+    } catch (err) {
+      setError(err.message || 'El enlace venció o no pudimos actualizar tu contraseña.')
+    } finally {
+      setLoading(false)
+    }
+  }
 
   const handleSubmit = async () => {
     setError('')
+
+    if (recoveryMode || mode === 'password-update') {
+      await updatePassword()
+      return
+    }
 
     if (existingAccount) {
       onFinish()
@@ -49,6 +104,7 @@ function Register({ existingAccount = false, initialEmail = '', onFinish, onBack
         })
 
         if (authError) throw authError
+        try { localStorage.removeItem(PASSWORD_RECOVERY_KEY) } catch { /* no bloquea el acceso */ }
         onFinish()
       }
     } catch (err) {
@@ -62,6 +118,7 @@ function Register({ existingAccount = false, initialEmail = '', onFinish, onBack
     setError('')
     setLoading(true)
     try {
+      try { localStorage.removeItem(PASSWORD_RECOVERY_KEY) } catch { /* no bloquea Google */ }
       const redirectTo = new URL(import.meta.env.BASE_URL, window.location.origin).toString()
       const { error: authError } = await supabase.auth.signInWithOAuth({
         provider: 'google',
@@ -109,10 +166,12 @@ function Register({ existingAccount = false, initialEmail = '', onFinish, onBack
       {/* TÍTULO */}
       <div style={styles.titleSection}>
         <h1 style={styles.title}>
-          {existingAccount ? 'Tu cuenta está creada' : mode === 'signup' ? 'Únete a tu barrio' : '¡Bienvenido de vuelta!'}
+          {recoveryMode ? 'Crea una nueva contraseña' : existingAccount ? 'Tu cuenta está creada' : mode === 'signup' ? 'Únete a tu barrio' : '¡Bienvenido de vuelta!'}
         </h1>
         <p style={styles.subtitle}>
-          {existingAccount
+          {recoveryMode
+            ? 'Usa al menos 8 caracteres y guárdala en un lugar seguro'
+            : existingAccount
             ? 'Este es el correo asociado a tu registro'
             : mode === 'signup'
             ? 'Crea tu cuenta para conectar con tu comunidad'
@@ -121,7 +180,7 @@ function Register({ existingAccount = false, initialEmail = '', onFinish, onBack
       </div>
 
       {/* TABS */}
-      {!existingAccount && <div style={styles.tabs}>
+      {!existingAccount && !recoveryMode && <div style={styles.tabs}>
         <button
           onClick={() => { setMode('signup'); setError('') }}
           style={{
@@ -144,7 +203,7 @@ function Register({ existingAccount = false, initialEmail = '', onFinish, onBack
 
       {/* FORMULARIO */}
       <div style={styles.form}>
-        <div style={styles.inputGroup}>
+        {!recoveryMode && <div style={styles.inputGroup}>
           <label style={styles.label}>Email</label>
           <div style={styles.inputWrapper}>
             <span style={styles.inputIcon}>✉️</span>
@@ -157,15 +216,15 @@ function Register({ existingAccount = false, initialEmail = '', onFinish, onBack
               style={styles.input}
             />
           </div>
-        </div>
+        </div>}
 
-        {!existingAccount && <div style={styles.inputGroup}>
+        {(!existingAccount || recoveryMode) && <div style={styles.inputGroup}>
           <label style={styles.label}>Contraseña</label>
           <div style={styles.inputWrapper}>
             <span style={styles.inputIcon}>🔒</span>
             <input
               type={showPassword ? 'text' : 'password'}
-              placeholder="Mínimo 6 caracteres"
+              placeholder={recoveryMode ? 'Mínimo 8 caracteres' : 'Mínimo 6 caracteres'}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               style={styles.input}
@@ -181,7 +240,7 @@ function Register({ existingAccount = false, initialEmail = '', onFinish, onBack
         </div>}
 
         {!existingAccount && mode === 'login' && (
-          <button style={styles.forgotPassword}>
+          <button type="button" style={styles.forgotPassword} onClick={requestPasswordReset} disabled={loading}>
             ¿Olvidaste tu contraseña?
           </button>
         )}
@@ -191,6 +250,8 @@ function Register({ existingAccount = false, initialEmail = '', onFinish, onBack
             ⚠️ {error}
           </div>
         )}
+
+        {notice && <div style={styles.noticeBox}>{notice}</div>}
 
         <button
           onClick={handleSubmit}
@@ -202,6 +263,8 @@ function Register({ existingAccount = false, initialEmail = '', onFinish, onBack
         >
           {loading
             ? 'Cargando...'
+            : recoveryMode
+            ? 'Guardar nueva contraseña'
             : existingAccount
             ? 'Continuar'
             : mode === 'signup'
@@ -217,7 +280,7 @@ function Register({ existingAccount = false, initialEmail = '', onFinish, onBack
       </div>
 
       {/* GOOGLE LOGIN */}
-      {!existingAccount && <div style={styles.googleSection}>
+      {!existingAccount && !recoveryMode && <div style={styles.googleSection}>
         <div style={styles.divider}>
           <div style={styles.dividerLine} />
           <span style={styles.dividerText}>o continúa con</span>
@@ -231,8 +294,8 @@ function Register({ existingAccount = false, initialEmail = '', onFinish, onBack
 
         <p style={styles.terms}>
           Al continuar aceptas nuestros{' '}
-          <span style={styles.termsLink}>Términos y Condiciones</span> y{' '}
-          <span style={styles.termsLink}>Política de Privacidad</span>
+          <button type="button" style={styles.termsLink} onClick={() => onNavigate?.('terms')}>Términos y Condiciones</button> y{' '}
+          <button type="button" style={styles.termsLink} onClick={() => onNavigate?.('privacy')}>Política de Privacidad</button>
         </p>
       </div>}
     </div>
@@ -394,6 +457,17 @@ const styles = {
     fontWeight: 500,
     textAlign: 'center',
   },
+  noticeBox: {
+    padding: 12,
+    background: '#F3F4F6',
+    color: '#4B5563',
+    borderRadius: 10,
+    fontSize: 12,
+    fontWeight: 400,
+    textAlign: 'center',
+    lineHeight: 1.45,
+    whiteSpace: 'pre-line',
+  },
   primaryButton: {
     padding: 16,
     background: '#138864',
@@ -452,6 +526,10 @@ const styles = {
     color: '#138864',
     fontWeight: 600,
     cursor: 'pointer',
+    display: 'inline',
+    padding: 0,
+    background: 'transparent',
+    fontSize: 'inherit',
   },
 }
 

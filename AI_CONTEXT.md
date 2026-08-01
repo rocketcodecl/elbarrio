@@ -3,7 +3,13 @@
 > Contexto operativo breve para trabajar sobre el estado vigente del proyecto.
 > Debe actualizarse cuando cambien la arquitectura, la navegación, una decisión de producto importante o el estado de una funcionalidad.
 
-## Estado de continuidad — 30 de julio de 2026
+## Estado de continuidad — 1 de agosto de 2026
+
+- Auditoría local de cierre iniciada el 1 de agosto: la aplicación y el panel compilan en producción. Google OAuth fue validado manualmente con alta, cierre de sesión y reingreso. El informe vigente está en `MVP_RELEASE_AUDIT.md` y la comprobación remota de Supabase, que no modifica datos, está en `supabase/MVP_RELEASE_AUDIT.sql`.
+- La consulta `supabase/MVP_RELEASE_AUDIT.sql` fue ejecutada el 1 de agosto de 2026 y todas las tablas, columnas, funciones y verificaciones RLS incluidas devolvieron `OK`. Esto certifica las estructuras operativas consultadas, pero no reconcilia el historial remoto de migraciones; `supabase db push` continúa prohibido.
+- Bloqueos reales previos a tiendas: eliminación de cuenta, recuperación de contraseña, canal real de soporte, Política de privacidad pública, acceso equivalente para iOS al ofrecer Google, rotación de credenciales compartidas, validación remota de schema/RLS y prueba con administrador territorial. No ejecutar `supabase db push`; el historial remoto continúa sin reconciliar.
+- Todavía no existen proyectos nativos iOS/Android, Capacitor ni notificaciones push. Son la fase siguiente después de cerrar los bloqueos de la auditoría; la web vigente se conserva.
+- Cierre de cuenta y soporte implementados el 1 de agosto: recuperación de contraseña por correo, actualización segura al volver, contacto real mediante `soporte@elbarrio.lat`, Política de privacidad y eliminación autenticada con anonimización. La migración `202608010001_account_deletion_audit.sql` fue ejecutada con resultado `Success` según confirmación manual y `delete-my-account` fue desplegada mediante el empaquetado remoto de Supabase. Falta probar la eliminación con una cuenta desechable; nunca probar primero con la cuenta superadministradora.
 
 - Invitaciones vecinales reales implementadas y publicadas: enlace personal por perfil, captura persistente durante el alta, asociación única invitador/invitado, conteo exclusivo tras verificación territorial, notificación automática, insignia persistente “Conector” a los cinco verificados y métricas por barrio en el panel. La migración `202607310003_neighbor_invites.sql` fue ejecutada con resultado `Success` el 31 de julio de 2026; las tres RPC responden HTTP 401 sin sesión, confirmando que existen y permanecen protegidas.
 - Contenido institucional editable implementado y publicado: Perfil muestra “Nosotros” inmediatamente bajo “Privacidad y seguridad”; la página Nosotros conserva su layout y consume textos, portada y cuatro imágenes desde `app_content_pages` con fallback local. Privacidad y seguridad consume sus etiquetas desde la misma fuente. El panel agrega “Contenido de la app”, visible solo al superadministrador. La migración `202607310002_editable_app_content.sql` fue ejecutada con resultado `Success` el 31 de julio de 2026 según confirmación manual.
@@ -268,7 +274,7 @@ El botón de creación abre `CreatePost.jsx`, salvo la creación de comercios, q
 
 - Landing pública de El Barrio con navegación responsive, hero audiovisual, apertura de scrollytelling cinematográfico en cuatro actos (distancia, necesidad, respuesta y comunidad) y un segundo scrollytelling dedicado a comercios (invisibilidad, descubrimiento, confianza y crecimiento local). Utiliza dos videos web de Mixkit descargados localmente y acreditados en `landing-page/README.md`. Después continúa con la historia funcional de Marta. La demo de la aplicación es ficticia y no utiliza datos ni pantallas reales. Incluye propuesta para vecinos y comercios y formulario de contacto por correo.
 - `landing-page/admin/` es un editor PHP independiente para modificar textos y tamaños básicos de la landing. Se instala una sola vez desde `admin/install.php`, guarda credenciales cifradas en `admin/config.php` (ignorado por Git), usa sesión y CSRF, y publica una configuración validada en `landing-page/content/site.json`. No usa Supabase ni comparte autenticación con los otros paneles.
-- Despliegue definido para la landing: `elbarrio.lat` usa `httpdocs/` y `cms.elbarrio.lat` usa `httpdocs/admin/` como raíz documental dentro de la misma suscripción Plesk. El CMS escribe directamente en `httpdocs/content/site.json`; `elbarrio.lat/admin` redirige al subdominio.
+- Despliegue definido para la landing: `elbarrio.lat` y `cms.elbarrio.lat` son instalaciones físicamente independientes. El CMS publica por HTTPS hacia `https://elbarrio.lat/publish.php` usando una clave aleatoria incluida solamente en los dos ZIP emparejados. Ya no depende de carpetas compartidas ni de permisos cruzados en Plesk.
 - Alta y verificación territorial refinadas: Nombre y Apellido separados sin migración, copy de privacidad coherente, scroll interno, mapa del polígono MVP, geocodificación automática de dirección y marcador previo al GPS.
 - Inicio incorpora una portada editorial real para el próximo evento elegido desde el panel, sin datos simulados ni duplicación inmediata en Actividad. Mi perfil amplía las tarjetas de favoritos y el Modo accesible conserva cuadrados los controles circulares.
 - Pulido UX/UI final de la app vecinal: subpantallas superiores de Perfil, buscador permanente y jerarquía real en Servicios, detalle con métricas reales y CTA dominante, menú Crear adaptable, safe areas, reducción de movimiento, Chat con recuperación y Home con caché más aviso de actualización fallida.
@@ -339,6 +345,12 @@ El botón de creación abre `CreatePost.jsx`, salvo la creación de comercios, q
 
 ## Funcionalidades pendientes
 
+- Validar el correo de recuperación de contraseña tanto en local como en producción.
+- Probar `delete-my-account` únicamente con una cuenta desechable. La migración de auditoría ya fue aplicada y la función ya está desplegada.
+- Confirmar que `soporte@elbarrio.lat` esté creado y reciba mensajes antes del lanzamiento.
+- Confirmar la URL pública definitiva de la Política de privacidad que se entregará a las tiendas.
+- Incorporar “Iniciar sesión con Apple” durante la preparación iOS, porque la aplicación ofrece Google para autenticar la cuenta principal.
+- Rotar credenciales de servidor, Plesk, SSH y cualquier contraseña compartida antes de producción.
 - Validar desde el panel poner un evento en Inicio, reemplazarlo por otro y quitarlo después de la ejecución confirmada de `202607300005_home_event_spotlight.sql`.
 - Validar visualmente con una sesión real las subpantallas de Mi perfil, Servicios, su detalle, el menú Crear y el Modo accesible dentro del marco móvil; los builds y ESLint focalizado pasan, pero no hubo un navegador conectado para aprobar la captura final.
 - Validar una sugerencia de publicación con fotografía mediante `analyze-listing-image` usando una sesión real.
@@ -347,32 +359,21 @@ El botón de creación abre `CreatePost.jsx`, salvo la creación de comercios, q
 - Reconciliar el historial remoto de migraciones antes de usar `supabase db push`; actualmente la CLI no reconoce como registradas migraciones que sí están aplicadas.
 - Validar con una cuenta admin territorial que no pueda consultar ni modificar otro barrio.
 - Aprobar visualmente la página de detalle del comercio con datos reales en una sesión vecinal.
-- Cargar productos reales de prueba en `commerce_products`.
 - Validar los módulos web de Comercios, Eventos, Incidentes, Usuarios y Farmacias.
-- Ejecutar la migración `202607290008_pharmacy_duty.sql` y validar la separación entre farmacias visibles y farmacias de turno.
-- Ejecutar la migración `202607290009_news_management.sql` y validar el ciclo crear → publicar/pausar → mostrar en Noticias y, cuando corresponda, en Actividad.
-- Ejecutar la migración `202607290010_news_categories.sql` y validar creación, edición, ocultamiento y filtros de categorías de Noticias.
-- Ejecutar la migración `202607290006_service_moderation_and_featured.sql` y validar el ciclo servicio pendiente → aprobado → patrocinado/pausado/rechazado.
+- Validar la separación entre farmacias visibles y farmacias de turno, el ciclo de Noticias y sus categorías, y el ciclo servicio pendiente → aprobado → patrocinado/pausado/rechazado. Su estructura remota debe comprobarse primero con la auditoría SQL, sin presumir migraciones.
 - Validar creación, edición, bloqueo de autoevaluación y actualización del promedio de opiniones de servicios.
-- Ejecutar la migración `202607290001_incident_moderation.sql` en Supabase y probar el ciclo completo alerta activa → oficial, resuelta o rechazada, incluida la aprobación de pendientes antiguos si existieran.
-- Ejecutar la migración `202607290002_user_administration.sql` en Supabase y probar verificación, autorización, roles y suspensión.
-- Ejecutar la migración `202607290003_user_verification_activity.sql` para guardar la coincidencia dirección/GPS, completar correos y habilitar el historial administrativo.
-- Ejecutar la migración `202607290004_beta_neighborhood_polygon.sql` para activar el polígono oficial del barrio beta y la RPC `barrio_en_punto_mvp`.
-- Ejecutar la migración `202607290005_posts_activity_selection.sql` para habilitar la selección editorial de eventos en Actividad.
+- Probar el ciclo completo de incidentes, usuarios, verificación territorial y selección editorial de eventos después de certificar sus estructuras con la auditoría SQL.
 - Validar visual y funcionalmente la publicación y edición de eventos desde el panel web.
 - Probar rango horario y categorías administrables después de la ejecución confirmada de `202607280001_event_schedule_and_categories.sql`.
 - Probar tarifas múltiples después de la ejecución confirmada de `202607280002_event_ticket_prices.sql`.
 - Probar la visibilidad de asistentes después de la ejecución confirmada de `202607280003_event_attendance_visibility.sql`.
 - Definir y autorizar una estrategia para alinear `event_attendees` con los eventos actuales de `posts` antes de reactivar la asistencia. No crear ni aplicar cambios de asistencia mientras siga esta incompatibilidad.
-- Habilitar el flujo real de Invitar vecinos; la pantalla existe, pero el acceso está marcado como próximo.
-- Conectar el formulario de contacto con un canal real de soporte; actualmente solo confirma localmente.
-- Definir y conectar enlaces oficiales de redes sociales y soporte.
-- Revisar el panel administrativo cuando el producto principal esté estabilizado.
 - Confirmar en Supabase las políticas RLS, permisos, funciones RPC y migraciones necesarias para producción.
 - Alinear el schema realmente utilizado con las tablas actuales de Supabase y eliminar dependencias de estructuras antiguas cuando se autorice.
 - Resolver la estrategia definitiva para `Barrio.jsx`, `Feed.jsx`, `Search.jsx` y las copias de respaldo de `App.jsx`; hoy no intervienen en la ejecución.
 - Completar pruebas funcionales integrales de los flujos de vecino, comercio y actores autorizados.
-- Preparar registro de usuarios y monetización cuando el prototipo visual y funcional esté sólido.
+- Limpiar el lint de las fuentes conectadas y excluir los directorios `dist`; los builds pasan, pero el lint completo todavía contiene deuda de React 19 y pantallas antiguas desconectadas.
+- Antes de abrir nuevos barrios, exigir que invitador e invitado pertenezcan al mismo barrio para que una invitación verificada sume a la insignia.
 
 ## Procedimiento obligatorio
 

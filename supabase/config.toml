@@ -3,3 +3,6 @@ verify_jwt = false
 
 [functions.moderate-community-content]
 verify_jwt = false
+
+[functions.delete-my-account]
+verify_jwt = false

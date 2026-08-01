@@ -9,26 +9,23 @@ Landing independiente con scrollytelling, videos locales y un editor de contenid
 - HTTPS activo.
 - Permiso de escritura de PHP sobre `admin/` y `content/` durante la instalación y el uso.
 
-## Dominios y carpetas definitivas
+## Dominios definitivos
 
-- `https://elbarrio.lat` sirve la landing desde `httpdocs/`.
-- `https://cms.elbarrio.lat` sirve el panel desde `httpdocs/admin/`.
-- El panel publica los cambios en `httpdocs/content/site.json`.
+- `https://elbarrio.lat` sirve la landing.
+- `https://cms.elbarrio.lat` sirve el panel desde su propia carpeta independiente.
+- El CMS publica mediante HTTPS en el receptor protegido de la landing.
 
-Ambos dominios deben pertenecer a la misma suscripción de Plesk para compartir la carpeta `content/`.
+No necesitan compartir carpetas, rutas documentales ni permisos entre dominios. Los dos ZIP se generan emparejados con una clave aleatoria que no se guarda en Git.
 
 ## Subir a Plesk
 
-1. En Plesk, abrir **Archivos** y entrar en `httpdocs/`.
-2. Subir `elbarrio-landing.zip` y descomprimirlo directamente en `httpdocs/`.
-3. Crear la carpeta `httpdocs/admin/` si todavía no existe.
-4. Subir `elbarrio-cms.zip` dentro de `httpdocs/admin/` y descomprimirlo allí.
-5. Confirmar que existan `httpdocs/index.html` y `httpdocs/admin/index.php`.
-6. Crear `cms.elbarrio.lat` y establecer su raíz documental en `httpdocs/admin`.
-7. Activar PHP 8.1 o superior y HTTPS para el subdominio.
-8. Abrir `https://cms.elbarrio.lat/install.php`.
-9. Crear el usuario y una contraseña de al menos 10 caracteres.
-10. Entrar posteriormente desde `https://cms.elbarrio.lat/`.
+1. En la raíz pública de `elbarrio.lat`, subir y descomprimir `elbarrio-landing.zip`.
+2. En la raíz pública independiente de `cms.elbarrio.lat`, subir y descomprimir `elbarrio-cms.zip`.
+3. Activar PHP 8.1 o superior y HTTPS en ambos dominios.
+4. Confirmar que `https://elbarrio.lat/publish.php` responda `Conexión no autorizada`; eso demuestra que el receptor está protegido y activo.
+5. Abrir `https://cms.elbarrio.lat/install.php`.
+6. Crear el usuario y una contraseña de al menos 10 caracteres.
+7. Entrar posteriormente desde `https://cms.elbarrio.lat/`.
 
 La ruta `https://elbarrio.lat/admin` redirige automáticamente al subdominio del CMS.
 
@@ -36,10 +33,10 @@ El instalador se bloquea automáticamente cuando crea `admin/config.php`. Ese ar
 
 ## Si Plesk informa un error de permisos
 
-Desde el administrador de archivos, asignar escritura al usuario de la suscripción sobre:
+Cada dominio necesita escritura solamente dentro de su propia raíz:
 
-- `httpdocs/admin/`
-- `httpdocs/content/`
+- En `elbarrio.lat`: `content/`.
+- En `cms.elbarrio.lat`: la raíz del CMS y `content/`.
 
 No usar permisos `777`. En una instalación normal de Plesk basta con que el propietario de la suscripción tenga lectura y escritura.
 

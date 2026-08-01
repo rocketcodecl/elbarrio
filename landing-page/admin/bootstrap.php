@@ -1,11 +1,11 @@
 <?php
 declare(strict_types=1);
 
-const LANDING_ROOT = __DIR__ . '/..';
-const CONTENT_DIR = LANDING_ROOT . '/content';
+const CONTENT_DIR = __DIR__ . '/content';
 const CONTENT_FILE = CONTENT_DIR . '/site.json';
 const DEFAULTS_FILE = CONTENT_DIR . '/defaults.json';
 const ADMIN_CONFIG = __DIR__ . '/config.php';
+const PAIRING_CONFIG = __DIR__ . '/pairing.php';
 
 if (session_status() !== PHP_SESSION_ACTIVE) {
     session_set_cookie_params([
@@ -28,6 +28,36 @@ function admin_config(): array
     }
     $config = require ADMIN_CONFIG;
     return is_array($config) ? $config : [];
+}
+
+function pairing_config(): array
+{
+    if (!is_file(PAIRING_CONFIG)) {
+        return [];
+    }
+    $config = require PAIRING_CONFIG;
+    return is_array($config) ? $config : [];
+}
+
+function publish_remote(array $data): array
+{
+    $pairing = pairing_config();
+    $url = (string)($pairing['publish_url'] ?? '');
+    $token = (string)($pairing['publish_token'] ?? '');
+    if ($url === '' || $token === '') {
+        return ['ok' => false, 'message' => 'El paquete del CMS no contiene la conexión con la landing.'];
+    }
+    $payload = json_encode(['data' => $data], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    $context = stream_context_create(['http' => [
+        'method' => 'POST',
+        'header' => "Content-Type: application/json\r\nAuthorization: Bearer {$token}\r\n",
+        'content' => $payload,
+        'timeout' => 12,
+        'ignore_errors' => true,
+    ]]);
+    $response = @file_get_contents($url, false, $context);
+    $decoded = $response ? json_decode($response, true) : null;
+    return is_array($decoded) ? $decoded : ['ok' => false, 'message' => 'El CMS no pudo comunicarse con elbarrio.lat.'];
 }
 
 function is_logged_in(): bool

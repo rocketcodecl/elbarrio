@@ -1,0 +1,33 @@
+{
+  "content": {
+    "hero": {
+      "eyebrow": "El Barrio · Comenzamos en Las Condes",
+      "title": "Lo que necesitas",
+      "accent": "podría estar a tres cuadras.",
+      "lead": "La red local que transforma personas cercanas en vecinos, negocios desconocidos en favoritos y calles compartidas en comunidad.",
+      "primaryCta": "Quiero ser de los primeros"
+    },
+    "commerce": {
+      "eyebrow": "Para comercios locales",
+      "title": "Tu próximo cliente pasa todos los días",
+      "accent": "a metros de tu puerta.",
+      "intro": "El problema no es que el barrio no necesite lo que haces. Es que muchas veces todavía no sabe que existes.",
+      "discoveryTitle": "Dejas de ser un local en la ruta. Te conviertes en una opción cercana.",
+      "discoveryBody": "Tu ficha muestra lo importante: qué haces, dónde estás, cuándo abres y cómo contactarte. Sin ruido y frente a quienes realmente pueden visitarte.",
+      "trustTitle": "Una recomendación del barrio vale más que mil impresiones lejanas.",
+      "trustBody": "Productos, beneficios y opiniones de vecinos transforman curiosidad en una primera visita, y una primera visita en una relación que puede durar años.",
+      "closeTitle": "No necesitas llegar a todo el mundo. Necesitas llegar a tu barrio.",
+      "closeBody": "Destácate cuando necesites mayor visibilidad y construye una comunidad de clientes que viven, caminan y compran cerca.",
+      "cta": "Quiero sumar mi comercio"
+    },
+    "join": {
+      "title": "El barrio que necesitas ya está más cerca.",
+      "body": "Estamos construyendo la primera comunidad en Las Condes. Déjanos tus datos para ser de los primeros."
+    }
+  },
+  "sizes": {
+    "heroTitle": 94,
+    "sectionTitle": 72,
+    "body": 16
+  }
+}

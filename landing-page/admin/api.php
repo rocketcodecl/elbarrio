@@ -11,9 +11,10 @@ $action = is_array($request) ? (string)($request['action'] ?? '') : '';
 
 if ($action === 'reset') {
     $defaults = read_json_file(DEFAULTS_FILE);
-    if (!$defaults || !write_json_atomic(CONTENT_FILE, $defaults)) {
+    $remote = $defaults ? publish_remote($defaults) : ['ok' => false];
+    if (!$defaults || empty($remote['ok']) || !write_json_atomic(CONTENT_FILE, $defaults)) {
         http_response_code(500);
-        echo json_encode(['ok' => false, 'message' => 'No fue posible restaurar el contenido.']);
+        echo json_encode(['ok' => false, 'message' => $remote['message'] ?? 'No fue posible restaurar el contenido.']);
         exit;
     }
     echo json_encode(['ok' => true, 'message' => 'Contenido original restaurado.', 'data' => $defaults]);
@@ -51,6 +52,13 @@ $clean['sizes']['heroTitle'] = max(64, min(120, (int)($incoming['sizes']['heroTi
 $clean['sizes']['sectionTitle'] = max(48, min(90, (int)($incoming['sizes']['sectionTitle'] ?? 72)));
 $clean['sizes']['body'] = max(14, min(20, (int)($incoming['sizes']['body'] ?? 16)));
 $clean['updatedAt'] = gmdate('c');
+
+$remote = publish_remote($clean);
+if (empty($remote['ok'])) {
+    http_response_code(502);
+    echo json_encode(['ok' => false, 'message' => $remote['message'] ?? 'La landing no recibió los cambios.']);
+    exit;
+}
 
 if (!write_json_atomic(CONTENT_FILE, $clean)) {
     http_response_code(500);

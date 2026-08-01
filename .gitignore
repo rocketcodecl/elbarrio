@@ -12,6 +12,9 @@ dist
 dist-ssr
 *.local
 landing-page/admin/config.php
+landing-page/releases/
+landing-page/publish-config.php
+landing-page/admin/pairing.php
 
 # Editor directories and files
 .vscode/*

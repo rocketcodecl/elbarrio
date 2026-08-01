@@ -43,10 +43,21 @@ import AdminFarmacias from './screens/AdminFarmacias'
 import AdminComercios from './screens/AdminComercios'
 import AdminUsuarios from './screens/AdminUsuarios'
 import AdminIncidentes from './screens/AdminIncidentes'
-import { AboutUs, Terms, ProhibitedProducts, InviteNeighbors, ContactUs, SettingsHub } from './screens/CommunityPagesV2'
+import { AboutUs, Terms, PrivacyPolicy, ProhibitedProducts, InviteNeighbors, ContactUs, SettingsHub, DeleteAccount } from './screens/CommunityPagesV2'
 
 const ACCESSIBLE_MODE_KEY = 'elbarrio:accessible-mode'
 const INVITE_CODE_KEY = 'elbarrio:pending-invite'
+const PASSWORD_RECOVERY_KEY = 'elbarrio:password-recovery-pending'
+const isPasswordRecoveryUrl = () => {
+  const search = new URLSearchParams(window.location.search)
+  const hash = new URLSearchParams(window.location.hash.replace(/^#/, ''))
+  let pending = false
+  try { pending = localStorage.getItem(PASSWORD_RECOVERY_KEY) === 'true' } catch { /* usa la URL */ }
+  return window.location.pathname.endsWith('/recovery')
+    || search.get('recovery') === 'password'
+    || hash.get('type') === 'recovery'
+    || pending
+}
 
 export default function App() {
   /* ── LOGIN FLOW STATE ── */
@@ -55,6 +66,7 @@ export default function App() {
   const [user, setUser] = useState(null)
   const [profile, setProfile] = useState(null)
   const [verificationDraft, setVerificationDraft] = useState(null)
+  const [passwordRecovery, setPasswordRecovery] = useState(isPasswordRecoveryUrl)
 
   /* ── MAIN APP STATE ── */
   const [activeTab, setActiveTab] = useState('inicio')
@@ -105,6 +117,13 @@ export default function App() {
     }
     setUser({ id: session.user.id, email: session.user.email })
 
+    if (isPasswordRecoveryUrl()) {
+      setPasswordRecovery(true)
+      setCurrentScreen('register')
+      setLoading(false)
+      return
+    }
+
     const { data: p } = await supabase
       .from('profiles')
       .select('*')
@@ -127,7 +146,11 @@ export default function App() {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (session?.user) {
         setUser({ id: session.user.id, email: session.user.email })
-        if (event === 'SIGNED_IN') window.setTimeout(checkSession, 0)
+        if (event === 'PASSWORD_RECOVERY') {
+          setPasswordRecovery(true)
+          setCurrentScreen('register')
+          setLoading(false)
+        } else if (event === 'SIGNED_IN') window.setTimeout(checkSession, 0)
       } else {
         setUser(null)
         setProfile(null)
@@ -186,9 +209,11 @@ export default function App() {
 
   const handleLogout = useCallback(async () => {
     await supabase.auth.signOut()
+    try { localStorage.removeItem(PASSWORD_RECOVERY_KEY) } catch { /* no bloquea la salida */ }
     setUser(null)
     setProfile(null)
     setVerificationDraft(null)
+    setPasswordRecovery(false)
     setActiveTab('inicio')
     setCurrentScreen('splash')
     historyRef.current = []
@@ -266,7 +291,7 @@ export default function App() {
       return
     }
 
-    const subScreens = ['post', 'productdetail', 'servicedetail', 'eventdetail', 'chatconversation', 'dealdone', 'alerta', 'notificaciones', 'sellerprofile', 'noticias', 'admin', 'adminfarmacias', 'admincomercios', 'adminusuarios', 'adminincidentes', 'settings', 'about', 'terms', 'prohibited', 'invite', 'contact']
+    const subScreens = ['post', 'productdetail', 'servicedetail', 'eventdetail', 'chatconversation', 'dealdone', 'alerta', 'notificaciones', 'sellerprofile', 'noticias', 'admin', 'adminfarmacias', 'admincomercios', 'adminusuarios', 'adminincidentes', 'settings', 'about', 'terms', 'privacy', 'prohibited', 'invite', 'contact', 'deleteaccount']
     if (subScreens.includes(lower)) {
       setNavigationMotion('forward')
       historyRef.current.push({ screen: currentScreen, params })
@@ -314,12 +339,16 @@ export default function App() {
       setCurrentScreen('about')
     } else if (lower === 'terms' || lower === 'terminos') {
       setCurrentScreen('terms')
+    } else if (lower === 'privacy' || lower === 'privacidad') {
+      setCurrentScreen('privacy')
     } else if (lower === 'prohibited' || lower === 'productosprohibidos') {
       setCurrentScreen('prohibited')
     } else if (lower === 'invite' || lower === 'invitar') {
       setCurrentScreen('invite')
     } else if (lower === 'contact' || lower === 'contactanos') {
       setCurrentScreen('contact')
+    } else if (lower === 'deleteaccount' || lower === 'eliminarcuenta') {
+      setCurrentScreen('deleteAccount')
     } else if (lower === 'chat' || lower === 'chatlist') {
       setNavigationMotion('tab')
       if (activeTabRef.current !== 'chat') prevTabRef.current = activeTabRef.current
@@ -405,9 +434,9 @@ export default function App() {
 
   /* ── SCREEN RENDER ── */
   const flowScreens = ['splash', 'onboarding', 'register', 'profile', 'verification', 'complete']
-  const modalScreens = ['productDetail', 'serviceDetail', 'chatConversation', 'dealDone', 'alertaDetail', 'notificaciones', 'sellerProfile', 'noticiasScreen', 'admin', 'adminFarmacias', 'adminComercios', 'adminUsuarios', 'adminIncidentes', 'settings', 'about', 'terms', 'prohibited', 'invite', 'contact']
+  const modalScreens = ['productDetail', 'serviceDetail', 'chatConversation', 'dealDone', 'alertaDetail', 'notificaciones', 'sellerProfile', 'noticiasScreen', 'admin', 'adminFarmacias', 'adminComercios', 'adminUsuarios', 'adminIncidentes', 'settings', 'about', 'terms', 'privacy', 'prohibited', 'invite', 'contact', 'deleteAccount']
   const isModalScreen = modalScreens.includes(currentScreen)
-  const isCommunityScreen = ['settings', 'about', 'terms', 'prohibited', 'invite', 'contact'].includes(currentScreen)
+  const isCommunityScreen = ['settings', 'about', 'terms', 'privacy', 'prohibited', 'invite', 'contact', 'deleteAccount'].includes(currentScreen)
   const isMainApp = !flowScreens.includes(currentScreen) && !isModalScreen
   const screenIdentity = currentScreen === 'main'
     ? `main-${activeTab}`
@@ -448,9 +477,11 @@ export default function App() {
         <Register
           existingAccount={!!user}
           initialEmail={user?.email || ''}
-          onFinish={async () => { await checkSession() }}
-          onBack={() => setCurrentScreen('onboarding')}
+          recoveryMode={passwordRecovery}
+          onFinish={async () => { setPasswordRecovery(false); await checkSession() }}
+          onBack={passwordRecovery ? handleLogout : () => setCurrentScreen('onboarding')}
           onLogout={handleLogout}
+          onNavigate={onNavigate}
         />
       )
     }
@@ -599,13 +630,15 @@ export default function App() {
     if (currentScreen === 'settings') return <SettingsHub onNavigate={onNavigate} accessibleMode={accessibleMode} onAccessibleModeChange={setAccessibleMode} />
     if (currentScreen === 'about') return <AboutUs onNavigate={onNavigate} />
     if (currentScreen === 'terms') return <Terms onNavigate={onNavigate} />
+    if (currentScreen === 'privacy') return <PrivacyPolicy onNavigate={onNavigate} />
     if (currentScreen === 'prohibited') return <ProhibitedProducts onNavigate={onNavigate} />
     if (currentScreen === 'invite') return <InviteNeighbors onNavigate={onNavigate} profile={profile} />
     if (currentScreen === 'contact') return <ContactUs onNavigate={onNavigate} />
+    if (currentScreen === 'deleteAccount') return <DeleteAccount onNavigate={onNavigate} onDeleted={handleLogout} />
 
     /* ── No hay user → Register ── */
     if (!user) {
-      return <Register onFinish={() => checkSession()} onBack={() => setCurrentScreen('onboarding')} />
+      return <Register onFinish={() => checkSession()} onBack={() => setCurrentScreen('onboarding')} onNavigate={onNavigate} />
     }
 
     /* ── MAIN APP (TABS) ── */
