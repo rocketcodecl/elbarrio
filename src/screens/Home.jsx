@@ -195,13 +195,6 @@ const fechaEventoPortada = (start, end) => {
   return `${day} · ${startTime}–${endTime}`
 }
 
-const etiquetaEvento = (event) => {
-  const raw = event?.category || event?.event_type || 'Actividad'
-  return String(raw)
-    .replace(/[_-]+/g, ' ')
-    .replace(/\b\w/g, letter => letter.toUpperCase())
-}
-
 /* ── Íconos lineales (verde marca) para títulos de sección ──
    Mismo lenguaje visual que el TabBar: trazo 1.9, sin relleno,
    extremos redondos. Heredan C.verde por defecto. ── */
@@ -280,6 +273,82 @@ function PostCardH({ post, onClick, wide }) {
   )
 }
 
+function HomeDiscoveryCarousel({ items }) {
+  const railRef = useRef(null)
+  const resumeTimerRef = useRef(null)
+  const [activeIndex, setActiveIndex] = useState(0)
+  const [paused, setPaused] = useState(false)
+
+  useEffect(() => {
+    if (items.length < 2 || paused) return undefined
+    const timer = window.setInterval(() => {
+      const next = (activeIndex + 1) % items.length
+      const rail = railRef.current
+      const card = rail?.children?.[next]
+      if (rail && card) rail.scrollTo({ left: card.offsetLeft - 16, behavior: 'smooth' })
+      setActiveIndex(next)
+    }, 5000)
+    return () => window.clearInterval(timer)
+  }, [activeIndex, items.length, paused])
+
+  useEffect(() => () => window.clearTimeout(resumeTimerRef.current), [])
+
+  const pauseTemporarily = () => {
+    setPaused(true)
+    window.clearTimeout(resumeTimerRef.current)
+    resumeTimerRef.current = window.setTimeout(() => setPaused(false), 8000)
+  }
+
+  const updateActiveCard = event => {
+    const rail = event.currentTarget
+    const cards = Array.from(rail.children)
+    if (!cards.length) return
+    const closest = cards.reduce((best, card, index) => {
+      const distance = Math.abs(card.offsetLeft - 16 - rail.scrollLeft)
+      return distance < best.distance ? { index, distance } : best
+    }, { index: 0, distance: Infinity })
+    setActiveIndex(closest.index)
+  }
+
+  if (!items.length) return null
+  return (
+    <section style={s.paraTiSection} aria-label="Para ti, cerca de casa">
+      <div style={s.paraTiHeading}>
+        <span style={s.paraTiHeadingTitle}>
+          <svg aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke={C.verde} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m12 3 1.5 4.3L18 9l-4.5 1.7L12 15l-1.5-4.3L6 9l4.5-1.7L12 3Z"/><path d="m19 15 .8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8L19 15Z"/></svg>
+          Para ti, cerca de casa
+        </span>
+        <small style={s.paraTiHeadingHint}>{items.length > 1 ? 'Desliza para descubrir' : 'Recomendado'}</small>
+      </div>
+      <div
+        ref={railRef}
+        className="home-para-ti-scroll"
+        style={s.paraTiScroll}
+        onScroll={updateActiveCard}
+        onTouchStart={pauseTemporarily}
+        onPointerDown={pauseTemporarily}
+      >
+        {items.map(item => (
+          <button
+            type="button"
+            key={`${item.portadaLabel}-${item.id}`}
+            style={{ ...s.paraTiCard, backgroundImage: `linear-gradient(180deg, rgba(9,25,17,.04) 24%, rgba(7,31,21,.88) 100%), url("${item.images[0]}")` }}
+            onClick={item.portadaAction}
+          >
+            <span style={s.paraTiBadge}>{item.portadaLabel}</span>
+            <span style={s.paraTiCopy}>
+              <strong style={s.paraTiTitle}>{item.title || 'Algo interesante cerca de ti'}</strong>
+              <span style={s.paraTiMeta}>{item.portadaMeta}</span>
+            </span>
+            <span style={s.paraTiArrow} aria-hidden="true">→</span>
+          </button>
+        ))}
+      </div>
+      {items.length > 1 && <div style={s.paraTiDots} aria-hidden="true">{items.map((item, index) => <span key={item.id} style={{ ...s.paraTiDot, ...(index === activeIndex ? s.paraTiDotActive : {}) }} />)}</div>}
+    </section>
+  )
+}
+
 // haversine: distancia en METROS entre 2 coords (lat/lng).
 // Se usa para calcular qué tan lejos está cada alerta del usuario.
 // No necesita PostGIS ni triggers — puro JS con la lat/lng que ya
@@ -296,6 +365,15 @@ const haversine = (lat1, lng1, lat2, lng2) => {
   return Math.round(R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)))
 }
 
+const mezclarPortada = (items, limit = 5) => {
+  const copy = [...items]
+  for (let index = copy.length - 1; index > 0; index -= 1) {
+    const target = Math.floor(Math.random() * (index + 1))
+    ;[copy[index], copy[target]] = [copy[target], copy[index]]
+  }
+  return copy.slice(0, limit)
+}
+
 function Home({ currentUser, onNavigate, onCrear }) {
   const [profile, setProfile] = useState(null)
   const [barrio, setBarrio] = useState(null)
@@ -306,6 +384,7 @@ function Home({ currentUser, onNavigate, onCrear }) {
   const [regalos, setRegalos] = useState([])
   const [eventos, setEventos] = useState([])
   const [eventoPortada, setEventoPortada] = useState(null)
+  const [portadaSeleccionada, setPortadaSeleccionada] = useState([])
   const [actividad, setActividad] = useState([])
   const [noLeidos, setNoLeidos] = useState(0)
   const [clima, setClima] = useState(null)
@@ -416,6 +495,7 @@ function Home({ currentUser, onNavigate, onCrear }) {
       setRegalos(cache.regalos || [])
       setEventos(cache.eventos || [])
       setEventoPortada(cache.eventoPortada || null)
+      setPortadaSeleccionada(cache.portadaSeleccionada || [])
       setActividad(cache.actividad || [])
       setNoLeidos(cache.noLeidos || 0)
       setClima(cache.clima || null)
@@ -501,7 +581,7 @@ function Home({ currentUser, onNavigate, onCrear }) {
       const TIPOS_FEED = ['request', 'sell', 'gift', 'trade', 'event', 'news', 'general']
       const selectPost = '*, author:profiles!author_id (full_name, avatar_url, badge_founder, verified)'
 
-      const [profileRes, hoodRes, alertRes, postsRes, msgRes, spotlightRes] = await Promise.all([
+      const [profileRes, hoodRes, alertRes, postsRes, msgRes, spotlightRes, carouselRes] = await Promise.all([
         // Refresca el profile en background si lo teníamos del cache.
         cache ? profilePromise : Promise.resolve({ data: p }),
         supabase.from('neighborhoods').select('*')
@@ -539,6 +619,14 @@ function Home({ currentUser, onNavigate, onCrear }) {
           .order('starts_at', { ascending: true })
           .limit(1)
           .maybeSingle(),
+
+        supabase.from('posts')
+          .select(selectPost)
+          .eq('neighborhood_id', neighborhoodId)
+          .eq('status', 'active')
+          .not('home_carousel_order', 'is', null)
+          .order('home_carousel_order', { ascending: true })
+          .limit(15),
       ])
 
       if (hoodRes.error) throw hoodRes.error
@@ -549,6 +637,8 @@ function Home({ currentUser, onNavigate, onCrear }) {
         console.warn('[home] portada editorial no disponible:', spotlightRes.error.message)
       }
       const spotlightEvent = spotlightRes.error ? null : spotlightRes.data
+      const carouselPool = carouselRes.error ? [] : (carouselRes.data || []).filter(item => item.images?.[0])
+      const carouselItems = mezclarPortada(carouselPool, 5)
 
       // Si el profile refrescado trae datos nuevos, los usamos.
       const profileFresco = profileRes?.data || p
@@ -599,6 +689,7 @@ function Home({ currentUser, onNavigate, onCrear }) {
       setRegalos(regalos)
       setEventos(eventos)
       setEventoPortada(spotlightEvent || null)
+      setPortadaSeleccionada(carouselItems)
       setActividad(actividad)
       setNoLeidos(msgRes.count || 0)
 
@@ -609,7 +700,7 @@ function Home({ currentUser, onNavigate, onCrear }) {
         alertas: alertasActivas,
         alertasVecinales: alertasVecinalesActivas,
         pedidos: pedidosActivos,
-        ventas, regalos, eventos, eventoPortada: spotlightEvent || null, actividad,
+        ventas, regalos, eventos, eventoPortada: spotlightEvent || null, portadaSeleccionada: carouselItems, actividad,
         noLeidos: msgRes.count || 0,
         clima: cache?.clima || null,
       })
@@ -770,6 +861,48 @@ function Home({ currentUser, onNavigate, onCrear }) {
     new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
   )
 
+  // Portada útil y cercana: máximo tres contenidos reales con fotografía.
+  // El evento elegido desde el panel conserva prioridad; los demás espacios
+  // se completan con información editorial y un descubrimiento del Mercado.
+  const eventoParaTi = [eventoDestacado, ...eventos]
+    .filter((item, index, list) => item?.images?.[0] && list.findIndex(candidate => candidate?.id === item.id) === index)
+    .filter(item => !item.starts_at || new Date(item.starts_at).getTime() >= Date.now())
+    .sort((a, b) => {
+      if (a.id === eventoDestacado?.id) return -1
+      if (b.id === eventoDestacado?.id) return 1
+      return new Date(a.starts_at || a.created_at).getTime() - new Date(b.starts_at || b.created_at).getTime()
+    })[0]
+  const datoParaTi = actividad.find(item => item.type === 'news' && item.images?.[0])
+  const descubrimientoParaTi = mercado.find(item => item.images?.[0])
+  const paraTiAutomatico = [
+    eventoParaTi && {
+      ...eventoParaTi,
+      portadaLabel: 'PANORAMA',
+      portadaMeta: fechaEventoPortada(eventoParaTi.starts_at, eventoParaTi.ends_at),
+      portadaAction: () => nav('eventdetail', { postId: eventoParaTi.id }),
+    },
+    datoParaTi && {
+      ...datoParaTi,
+      portadaLabel: 'DATO ÚTIL',
+      portadaMeta: datoParaTi.news_source || 'Información para tu barrio',
+      portadaAction: () => nav('noticias'),
+    },
+    descubrimientoParaTi && {
+      ...descubrimientoParaTi,
+      portadaLabel: descubrimientoParaTi.type === 'gift' ? 'PARA COMPARTIR' : 'DESCUBRE',
+      portadaMeta: descubrimientoParaTi.price > 0 ? plata(descubrimientoParaTi.price) : (TIPOS[descubrimientoParaTi.type]?.corto || 'Cerca de casa'),
+      portadaAction: () => nav('post', { postId: descubrimientoParaTi.id }),
+    },
+  ].filter(Boolean)
+  const paraTi = (portadaSeleccionada.length ? portadaSeleccionada : paraTiAutomatico)
+    .slice(0, 5)
+    .map(item => {
+      if (item.portadaAction) return item
+      if (item.type === 'event') return { ...item, portadaLabel: 'PANORAMA', portadaMeta: fechaEventoPortada(item.starts_at, item.ends_at), portadaAction: () => nav('eventdetail', { postId: item.id }) }
+      if (item.type === 'news') return { ...item, portadaLabel: 'DATO ÚTIL', portadaMeta: item.news_source || 'Información para tu barrio', portadaAction: () => nav('noticias') }
+      return { ...item, portadaLabel: item.type === 'gift' ? 'PARA COMPARTIR' : 'DESCUBRE', portadaMeta: item.price > 0 ? plata(item.price) : (TIPOS[item.type]?.corto || 'Cerca de casa'), portadaAction: () => nav('post', { postId: item.id }) }
+    })
+
   return (
     <div style={s.wrap}>
 
@@ -798,6 +931,7 @@ function Home({ currentUser, onNavigate, onCrear }) {
         @keyframes homeRefreshSpin {
           to { transform: rotate(360deg); }
         }
+        .home-para-ti-scroll::-webkit-scrollbar { display: none; }
 
       `}</style>
 
@@ -903,45 +1037,8 @@ function Home({ currentUser, onNavigate, onCrear }) {
           </div>
         )}
 
-        {/* ══════ HOY EN TU BARRIO — evento real elegido desde el panel ══════ */}
-        {!buscando && eventoDestacado && (
-          <section style={s.spotlightSection} aria-label="Hoy en tu barrio">
-            <div style={s.spotlightHeading}>
-              <span>Hoy en tu barrio</span>
-              <small style={s.spotlightHeadingMeta}>Actividad destacada</small>
-            </div>
-            <button
-              type="button"
-              style={s.spotlightCard}
-              onClick={() => nav('eventdetail', { postId: eventoDestacado.id })}
-            >
-              <span style={{
-                ...s.spotlightVisual,
-                ...(eventoDestacado.images?.[0]
-                  ? { backgroundImage: `linear-gradient(180deg, rgba(7,54,38,.03), rgba(7,54,38,.70)), url("${eventoDestacado.images[0]}")` }
-                  : {}),
-              }}>
-                <span style={s.spotlightOfficial}>EL BARRIO · ACTIVIDAD VECINAL</span>
-                {!eventoDestacado.images?.[0] && <span style={s.spotlightFallbackIcon}>🏘️</span>}
-              </span>
-              <span style={s.spotlightBody}>
-                <span style={s.spotlightBadges}>
-                  <span style={s.spotlightCategory}>{etiquetaEvento(eventoDestacado)}</span>
-                  <span style={s.spotlightSchedule}>{fechaEventoPortada(eventoDestacado.starts_at, eventoDestacado.ends_at)}</span>
-                </span>
-                <strong style={s.spotlightTitle}>{eventoDestacado.title || 'Actividad del barrio'}</strong>
-                {eventoDestacado.content && <span style={s.spotlightDescription}>{eventoDestacado.content}</span>}
-                <span style={s.spotlightFooter}>
-                  <span style={s.spotlightLocation}>
-                    <Ico.pin size={12} />
-                    {eventoDestacado.location_text || 'Lugar por confirmar'}
-                  </span>
-                  <span style={s.spotlightCta}>Ver detalles <b>→</b></span>
-                </span>
-              </span>
-            </button>
-          </section>
-        )}
+        {/* ══════ PARA TI, CERCA DE CASA — contenido real, útil y visual ══════ */}
+        {!buscando && <HomeDiscoveryCarousel items={paraTi} />}
 
         {/* ══════ ALERTA OFICIAL (solo creada/marcada desde el panel) ══════ */}
         {!buscando && alertas.length > 0 && (
@@ -998,7 +1095,7 @@ function Home({ currentUser, onNavigate, onCrear }) {
 
         {/* ══════ PEDIDOS VECINALES ══════ */}
         {!buscando && (
-          <div style={s.seccion}>
+          <div style={{ ...s.seccion, marginBottom: 6 }}>
             <button style={s.pedirBarra} onClick={() => crear('request')}>
               <span style={s.pedirBarraEmoji}>🙋</span>
               <span style={s.pedirBarraTxt}>
@@ -1016,19 +1113,19 @@ function Home({ currentUser, onNavigate, onCrear }) {
             Botón "ver más" navega al Marketplace completo.
             marginBottom: 20 inline para separar bien de Actividad de el barrio. */}
         {!buscando && mercado.length > 0 && (
-          <div style={{ ...s.seccion, marginBottom: 20 }}>
+          <div style={{ ...s.seccion, marginBottom: 7 }}>
             <div style={s.seccionTit}>
               <Ico.mercado />
               <span style={s.seccionTxt}>Mercado</span>
               <button
-                style={s.verTodasBtn}
+                style={{ ...s.verTodasBtn, fontSize: 13.5, padding: '5px 2px 5px 8px' }}
                 onClick={() => nav('mercado')}
               >
                 + ver más
                 <span style={s.verTodasFlecha}>→</span>
               </button>
             </div>
-            <div style={s.scrollH}>
+            <div style={{ ...s.scrollH, paddingTop: 2 }}>
               {mercado.slice(0, 15).map((p) => (
                 <PostCardH
                   key={p.id}
@@ -1104,9 +1201,9 @@ function Home({ currentUser, onNavigate, onCrear }) {
                         {p.is_negotiable && <span style={s.chipNeg}>Conversable</span>}
                       </div>
                     </div>
-                    {p.__incident && (
-                      <span style={s.alertActivityBeacon} aria-label="Alerta vecinal">🚨</span>
-                    )}
+                    <span style={s.activityTypeIcon} aria-label={p.__incident ? 'Alerta vecinal' : (TIPOS[p.type]?.label || 'Publicación')}>
+                      {p.__incident ? '🚨' : (TIPOS[p.type]?.emoji || '💬')}
+                    </span>
                   </div>
                 )
               })}
@@ -1305,8 +1402,9 @@ const s = {
   tiraInfo: {
     display: 'flex', alignItems: 'center',
     gap: 0,
-    background: C.tira, border: `1px solid ${C.tiraBorde}`,
-    borderRadius: 14, padding: '12px 14px', marginBottom: 14,
+    background: 'rgba(255,255,255,.78)', border: '1px solid rgba(183,201,190,.58)',
+    borderRadius: 14, padding: '10px 14px', marginBottom: 8,
+    boxShadow: '0 3px 12px rgba(31,63,46,.035)',
   },
   climaBloque: { display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 },
   climaEmoji: {
@@ -1336,140 +1434,63 @@ const s = {
   },
   farmaciaMas: { fontSize: 9, fontWeight: 700, color: C.verde },
 
-  /* ── actividad editorial destacada ── */
-  spotlightSection: { marginBottom: 15 },
-  spotlightHeading: {
-    minHeight: 30,
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 10,
+  /* ── portada de descubrimiento ── */
+  paraTiSection: { marginBottom: 7 },
+  paraTiHeading: {
+    minHeight: 27,
+    display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10,
     color: C.texto,
-    fontSize: 14,
-    fontWeight: 800,
   },
-  spotlightHeadingMeta: {
-    color: C.textoTenue,
-    fontSize: 9.5,
-    fontWeight: 600,
+  paraTiHeadingTitle: { display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 14, fontWeight: 600, letterSpacing: 0, color: C.texto },
+  paraTiHeadingHint: { color: C.textoTenue, fontSize: 9.5, fontWeight: 600 },
+  paraTiScroll: {
+    margin: '0 -16px', padding: '0 16px 3px',
+    display: 'flex', gap: 10,
+    overflowX: 'auto', overflowY: 'hidden',
+    scrollSnapType: 'x mandatory', scrollbarWidth: 'none',
+    WebkitOverflowScrolling: 'touch',
   },
-  spotlightCard: {
-    width: '100%',
-    padding: 0,
-    overflow: 'hidden',
-    display: 'block',
-    textAlign: 'left',
-    border: '1px solid #a7dbc4',
-    borderRadius: 18,
-    color: '#fff',
-    background: C.verdeOsc,
-    boxShadow: '0 8px 20px rgba(13,104,72,.13)',
-  },
-  spotlightVisual: {
+  paraTiCard: {
     position: 'relative',
-    minHeight: 104,
-    padding: 12,
-    display: 'flex',
-    alignItems: 'flex-start',
-    justifyContent: 'space-between',
-    backgroundColor: '#d8efe5',
-    backgroundImage: 'linear-gradient(135deg,#d8efe5 0%,#f6d394 52%,#138864 100%)',
-    backgroundSize: 'cover',
-    backgroundPosition: 'center',
+    width: '88%', minWidth: '88%', height: 174,
+    padding: 14, overflow: 'hidden',
+    display: 'flex', flexDirection: 'column', alignItems: 'flex-start', justifyContent: 'space-between',
+    scrollSnapAlign: 'start',
+    border: '1px solid rgba(15,95,54,.16)', borderRadius: 18,
+    color: '#fff', backgroundColor: '#dcebe4', backgroundSize: 'cover', backgroundPosition: 'center',
+    boxShadow: '0 8px 22px rgba(22,33,26,.12)',
+    textAlign: 'left', fontFamily: 'inherit', cursor: 'pointer',
   },
-  spotlightOfficial: {
-    padding: '5px 8px',
-    borderRadius: 7,
-    color: '#fff',
-    background: 'rgba(8,89,61,.88)',
-    boxShadow: '0 2px 8px rgba(0,0,0,.12)',
-    fontSize: 8.5,
-    fontWeight: 900,
-    letterSpacing: '.045em',
+  paraTiBadge: {
+    padding: '5px 8px', borderRadius: 999,
+    color: '#07543a', background: 'rgba(236,255,246,.94)',
+    fontSize: 8.5, fontWeight: 900, letterSpacing: '.055em',
+    boxShadow: '0 2px 8px rgba(0,0,0,.08)',
   },
-  spotlightFallbackIcon: {
-    position: 'absolute',
-    right: 18,
-    bottom: 7,
-    fontSize: 48,
-    filter: 'drop-shadow(0 3px 6px rgba(0,0,0,.14))',
+  paraTiCopy: {
+    width: 'calc(100% - 36px)',
+    display: 'flex', flexDirection: 'column', gap: 5,
   },
-  spotlightBody: {
-    padding: '12px 14px 13px',
-    display: 'block',
-    color: '#fff',
-    background: C.verdeOsc,
+  paraTiTitle: {
+    display: '-webkit-box', overflow: 'hidden',
+    fontSize: 16, fontWeight: 800, lineHeight: 1.25, letterSpacing: '-.25px',
+    textShadow: '0 1px 8px rgba(0,0,0,.28)',
+    WebkitBoxOrient: 'vertical', WebkitLineClamp: 2,
   },
-  spotlightBadges: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: 7,
-    minWidth: 0,
+  paraTiMeta: {
+    overflow: 'hidden', color: 'rgba(255,255,255,.88)',
+    fontSize: 10.5, fontWeight: 600, whiteSpace: 'nowrap', textOverflow: 'ellipsis',
   },
-  spotlightCategory: {
-    flex: '0 0 auto',
-    padding: '4px 7px',
-    borderRadius: 6,
-    color: '#07543a',
-    background: '#bde8d5',
-    fontSize: 8.5,
-    fontWeight: 900,
-    textTransform: 'uppercase',
+  paraTiArrow: {
+    position: 'absolute', right: 14, bottom: 14,
+    width: 28, height: 28, borderRadius: '50%',
+    display: 'grid', placeItems: 'center',
+    color: C.verdeOsc, background: '#fff',
+    fontSize: 15, fontWeight: 800,
   },
-  spotlightSchedule: {
-    minWidth: 0,
-    overflow: 'hidden',
-    color: '#d7f2e7',
-    fontSize: 9.5,
-    fontWeight: 700,
-    whiteSpace: 'nowrap',
-    textOverflow: 'ellipsis',
-  },
-  spotlightTitle: {
-    marginTop: 8,
-    display: 'block',
-    fontSize: 16,
-    fontWeight: 800,
-    lineHeight: 1.25,
-    letterSpacing: '-.25px',
-  },
-  spotlightDescription: {
-    marginTop: 5,
-    display: '-webkit-box',
-    overflow: 'hidden',
-    color: '#e8f7f1',
-    fontSize: 11,
-    lineHeight: 1.42,
-    WebkitBoxOrient: 'vertical',
-    WebkitLineClamp: 2,
-  },
-  spotlightFooter: {
-    marginTop: 10,
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 10,
-  },
-  spotlightLocation: {
-    minWidth: 0,
-    display: 'flex',
-    alignItems: 'center',
-    gap: 5,
-    overflow: 'hidden',
-    color: '#d7f2e7',
-    fontSize: 9.5,
-    whiteSpace: 'nowrap',
-    textOverflow: 'ellipsis',
-  },
-  spotlightCta: {
-    flex: '0 0 auto',
-    padding: '7px 9px',
-    borderRadius: 9,
-    color: C.verdeOsc,
-    background: '#fff',
-    fontSize: 9.5,
-    fontWeight: 800,
-  },
+  paraTiDots: { height: 10, display: 'flex', alignItems: 'flex-end', justifyContent: 'center', gap: 5 },
+  paraTiDot: { width: 5, height: 5, borderRadius: 999, background: '#c9d5cd', transition: 'width 220ms ease, background 220ms ease' },
+  paraTiDotActive: { width: 16, background: C.verde },
 
   modalFondo: {
     position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
@@ -1516,16 +1537,16 @@ const s = {
   /* ── accesos ── */
   accesos: {
     display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)',
-    gap: 9, marginBottom: 10,
+    gap: 9, marginBottom: 7,
   },
   acceso: {
     display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6,
     background: C.card, border: `1px solid ${C.borde}`,
-    borderRadius: 13, padding: '11px 3px',
+    borderRadius: 13, padding: '8px 3px',
     cursor: 'pointer', fontFamily: 'inherit',
   },
   accesoIcono: {
-    width: 34, height: 34, borderRadius: 10,
+    width: 30, height: 30, borderRadius: 9,
     display: 'flex', alignItems: 'center', justifyContent: 'center',
     fontSize: 18,
   },
@@ -1843,11 +1864,12 @@ const s = {
     border: `1px solid ${C.borde}`,
     marginBottom: 9, cursor: 'pointer',
   },
-  alertActivityBeacon: {
-    position: 'absolute', top: 7, right: 8,
-    fontSize: 14, lineHeight: 1, pointerEvents: 'none',
+  activityTypeIcon: {
+    position: 'absolute', top: 8, right: 9,
+    fontSize: 15, lineHeight: 1, opacity: .82,
+    filter: 'saturate(.82)', pointerEvents: 'none',
   },
-  alertActivityInfo: { paddingRight: 17 },
+  alertActivityInfo: { paddingRight: 19 },
   postFoto: {
     width: 56, height: 'auto', minHeight: 56,
     alignSelf: 'stretch', borderRadius: 11, flexShrink: 0, overflow: 'hidden',
@@ -1856,7 +1878,7 @@ const s = {
   postImg: { width: '100%', height: '100%', objectFit: 'cover' },
   postEmoji: { fontSize: 24 },
 
-  postInfo: { flex: 1, minWidth: 0 },
+  postInfo: { flex: 1, minWidth: 0, paddingRight: 19 },
   postMetaRow: {
     display: 'flex', alignItems: 'center', gap: 5, minWidth: 0,
     marginTop: 6,

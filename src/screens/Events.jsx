@@ -774,8 +774,8 @@ const s = {
 
   /* ── header ── */
   header: {
-    minHeight: 72,
-    padding: 'calc(env(safe-area-inset-top, 0px) + 22px) 58px 16px',
+    minHeight: 'var(--screen-header-height)',
+    padding: 'calc(env(safe-area-inset-top, 0px) + 18px) 58px 10px',
     backgroundColor: C.card,
     backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='72' height='64' viewBox='0 0 72 64'%3E%3Cg fill='none' stroke='%2316a34a' stroke-opacity='.22' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='12' y='13' width='48' height='42' rx='6'/%3E%3Cpath d='M24 8v11M48 8v11M12 25h48M24 35h5M34 35h5M44 35h5M24 45h5M34 45h5'/%3E%3C/g%3E%3C/svg%3E")`,
     backgroundSize: '72px 64px',
@@ -787,13 +787,13 @@ const s = {
   },
   backBtn: {
     position: 'absolute', left: 16, bottom: 10,
-    width: 38, height: 38, borderRadius: '50%',
+    width: 'var(--screen-header-control-size)', height: 'var(--screen-header-control-size)', borderRadius: '50%',
     background: 'rgba(255,255,255,0.88)', border: `1px solid ${C.borde}`,
     color: C.verdeOsc, cursor: 'pointer', padding: 0,
     display: 'grid', placeItems: 'center', fontFamily: 'inherit',
   },
   headerTit: {
-    minWidth: 0, textAlign: 'center', fontSize: 16, lineHeight: 1.2,
+    minWidth: 0, textAlign: 'center', fontSize: 'var(--screen-header-title-size)', lineHeight: 1.2,
     color: '#26302b', fontWeight: 600, whiteSpace: 'nowrap',
     overflow: 'hidden', textOverflow: 'ellipsis', padding: '5px 10px',
     background: 'transparent', border: 'none', boxShadow: 'none',

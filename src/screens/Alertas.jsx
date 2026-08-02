@@ -77,9 +77,13 @@ const IcoUbicacion = ({ size = 12 }) => (
 const CATS = [
   { key: 'todas',     label: 'Todas',     emoji: '📋' },
   { key: 'seguridad', label: 'Seguridad', emoji: REPORTES.seguridad?.emoji || '🔒' },
-  { key: 'infra',     label: 'Infra',     emoji: REPORTES.infra?.emoji || '🚧' },
-  { key: 'mascotas',  label: 'Mascotas',  emoji: REPORTES.mascotas?.emoji || '🐾' },
-  { key: 'otro',      label: 'Otro',      emoji: REPORTES.otro?.emoji || '📌' },
+  { key: 'incendio',  label: 'Incendio',  emoji: REPORTES.incendio.emoji },
+  { key: 'servicios', label: 'Servicios', emoji: REPORTES.servicios.emoji },
+  { key: 'animales',  label: 'Animales',  emoji: REPORTES.animales.emoji },
+  { key: 'fugas',     label: 'Fugas',     emoji: REPORTES.fugas.emoji },
+  { key: 'luz',       label: 'Luz',       emoji: REPORTES.luz.emoji },
+  { key: 'salud',     label: 'Salud',     emoji: REPORTES.salud.emoji },
+  { key: 'otro',      label: 'Otros',     emoji: REPORTES.otro.emoji },
 ]
 
 // haversine: distancia en METROS entre 2 coords (lat/lng).
@@ -188,6 +192,13 @@ function Alertas({ currentUser, onNavigate, onCrear }) {
   const filtradas = filtro === 'todas'
     ? alertas
     : alertas.filter((a) => (a.category || 'otro') === filtro)
+  const criticasCercanas = alertasActivas.filter(a => {
+    if (a.category !== 'seguridad') return false
+    const meters = a.latitude && a.longitude && userCoords
+      ? haversine(userCoords.lat, userCoords.lng, a.latitude, a.longitude)
+      : a.distance_meters
+    return meters != null && meters <= 500
+  }).length
 
   if (cargando) {
     return (
@@ -195,7 +206,7 @@ function Alertas({ currentUser, onNavigate, onCrear }) {
         <div style={s.cargando}>
           <img src={`${import.meta.env.BASE_URL}isotipo.png`} alt="" style={{ width: 58, opacity: 0.4 }} />
         </div>
-      </div>
+    </div>
     )
   }
 
@@ -207,39 +218,22 @@ function Alertas({ currentUser, onNavigate, onCrear }) {
         <button style={s.backBtn} onClick={() => nav('inicio')} aria-label="Volver">
           <IcoVolver />
         </button>
-        <div style={s.headerTit}>Alertas</div>
-        <div style={{ width: 40 }} />
+        <div style={s.headerTit}>Alertas de <span style={s.headerBrand}>el barrio</span></div>
       </div>
 
       <div style={s.scroll}>
 
-        {/* ══════ CTA GRANDE: REPORTAR ══════ */}
-        <button style={s.ctaReportar} onClick={() => crear('alert')}>
-          <div style={s.ctaIcono}>
-            <IcoAlerta size={20} color="#fff" />
-          </div>
-          <div style={s.ctaTexto}>
-            <div style={s.ctaTit}>Reportar una alerta</div>
-            <div style={s.ctaSub}>
-              Avisa a tus vecinos de algo urgente que pasa ahora
-            </div>
-          </div>
-          <div style={s.ctaFlecha}>→</div>
-        </button>
+        <section style={s.safetyCard}>
+          <span style={{ ...s.safetyIcon, ...(criticasCercanas ? s.safetyIconDanger : {}) }}>{criticasCercanas ? '!' : '✓'}</span>
+          <span style={s.safetyCopy}><strong style={s.safetyTitle}>{criticasCercanas ? 'Atención cerca de ti' : 'Tu zona está tranquila'}</strong><small style={s.safetyText}>{criticasCercanas ? `${criticasCercanas} alerta${criticasCercanas === 1 ? '' : 's'} de seguridad en los últimos 500 m.` : 'Sin alertas críticas cercanas en este momento.'}</small></span>
+        </section>
 
-        {/* ══════ RESUMEN ══════ */}
-        <div style={s.resumen}>
-          <span style={s.resumenNum}>{alertasActivas.length}</span>
-          <span style={s.resumenTxt}>
-            alerta{alertasActivas.length === 1 ? '' : 's'} activa{alertasActivas.length === 1 ? '' : 's'} en{' '}
-            <span style={s.marca}>el barrio</span>
-            {pendientesPropias.length > 0 && (
-              <span style={s.pendingSummary}>
-                {' '}· {pendientesPropias.length} tuya{pendientesPropias.length === 1 ? '' : 's'} en revisión
-              </span>
-            )}
-          </span>
+        <div style={s.emitWrap}>
+          <button style={s.emitButton} onClick={() => crear('alert')}><IcoAlerta size={28} color="#fff"/><strong>EMITIR ALERTA</strong></button>
+          <small style={s.emitHelp}>Para avisar algo urgente a tus vecinos</small>
         </div>
+
+        <div style={s.alertListHeading}><div style={s.alertListCopy}><strong>Alertas recientes</strong><small>{alertasActivas.length} activa{alertasActivas.length === 1 ? '' : 's'}{pendientesPropias.length ? ` · ${pendientesPropias.length} tuya${pendientesPropias.length === 1 ? '' : 's'} en revisión` : ''}</small></div><button style={s.alertListAction} type="button" onClick={() => setFiltro('todas')}>Ver todas</button></div>
 
         {error && <div style={s.errorBox}>{error}</div>}
 
@@ -304,7 +298,7 @@ function Alertas({ currentUser, onNavigate, onCrear }) {
             {filtradas.map((a) => {
               const cat = REPORTES[a.category] || REPORTES.seguridad
               const pendiente = a.status === 'pendiente'
-              const urgente = a.category === 'seguridad' || a.category === 'salud'
+              const urgente = a.severity === 'alta' || (!a.severity && (a.category === 'seguridad' || a.category === 'salud' || a.category === 'incendio'))
               const confirmado = a.confirms_count >= 3
               // Distancia Haversine desde el GPS del user hasta la alerta.
               const metros = (a.latitude && a.longitude && userCoords)
@@ -317,14 +311,10 @@ function Alertas({ currentUser, onNavigate, onCrear }) {
                   key={a.id}
                   style={{
                     ...s.alertaCard,
-                    background: cat.bg,
-                    borderColor: cat.color,
+                    borderLeftColor: cat.color,
                   }}
                   onClick={() => nav('alerta', { id: a.id })}
                 >
-                  {/* Banda superior de color */}
-                  <div style={{ ...s.alertaBanda, background: cat.color }} />
-
                   <div style={s.alertaCuerpo}>
                     <div style={s.alertaTop}>
                       <div style={{ ...s.alertaIcono, background: '#fff', color: cat.color }}>
@@ -356,6 +346,7 @@ function Alertas({ currentUser, onNavigate, onCrear }) {
                       )}
                     </div>
 
+                    <div style={s.alertaTitle}>{a.title || cat.label}</div>
                     <div style={s.alertaDesc}>{a.description}</div>
 
                     <div style={s.alertaMeta}>
@@ -394,10 +385,7 @@ function Alertas({ currentUser, onNavigate, onCrear }) {
         {/* ══════ INFO LEGAL ══════ */}
         <div style={s.infoLegal}>
           <IcoAlerta size={13} color={C.textoTenue} />
-          <span>
-            Las alertas son reportes de vecinos, no avisos oficiales.
-            En emergencias llamá a Carabineros al <strong>133</strong>.
-          </span>
+          <span style={s.infoLegalCopy}><strong>Las alertas son reportes de vecinos, no avisos oficiales.</strong><small>Emergencias: 131 Ambulancia · 132 Bomberos · 133 Carabineros · 1402 Seguridad Las Condes.</small></span>
         </div>
       </div>
     </div>
@@ -418,22 +406,63 @@ const s = {
 
   /* ── header ── */
   header: {
-    background: C.card,
-    padding: '28px 18px 12px',
-    borderBottom: `1px solid ${C.borde}`,
-    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-    flexShrink: 0,
+    minHeight: 'var(--screen-header-height)',
+    padding: 'calc(env(safe-area-inset-top, 0px) + 18px) 58px 10px',
+    backgroundColor: C.card,
+    backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='72' height='64' viewBox='0 0 72 64'%3E%3Cg fill='none' stroke='%2316a34a' stroke-opacity='.22' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M36 8 61 52H11L36 8Z'/%3E%3Cpath d='M36 24v13M36 44h.01'/%3E%3C/g%3E%3C/svg%3E")`,
+    backgroundSize: '72px 64px', backgroundPosition: 'calc(50% - 86px) center', backgroundRepeat: 'no-repeat',
+    borderBottom: `2px solid ${C.verde}`,
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    flexShrink: 0, position: 'relative', boxSizing: 'border-box',
   },
   backBtn: {
-    width: 40, height: 40, borderRadius: '50%',
-    background: C.fondo, border: `1px solid ${C.borde}`,
+    position: 'absolute', left: 16, bottom: 10,
+    width: 'var(--screen-header-control-size)', height: 'var(--screen-header-control-size)', borderRadius: '50%',
+    background: 'rgba(255,255,255,.88)', border: `1px solid ${C.borde}`,
     color: C.texto, cursor: 'pointer', padding: 0,
     display: 'flex', alignItems: 'center', justifyContent: 'center',
     fontFamily: 'inherit',
   },
-  headerTit: { fontSize: 17, fontWeight: 700, color: C.texto },
+  headerTit: { minWidth: 0, textAlign: 'center', fontSize: 'var(--screen-header-title-size)', lineHeight: 1.2, fontWeight: 600, color: '#26302b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' },
+  headerBrand: { color: C.verde, fontWeight: 700 },
 
   scroll: { flex: 1, overflowY: 'auto', padding: '14px 16px 120px' },
+
+  safetyCard: {
+    display: 'flex', alignItems: 'center', gap: 11,
+    padding: '12px 14px', marginBottom: 12,
+    background: '#fff', border: `1px solid ${C.borde}`, borderRadius: 15,
+    boxShadow: '0 4px 14px rgba(20,44,29,.045)',
+  },
+  safetyIcon: {
+    width: 34, height: 34, borderRadius: '50%', flexShrink: 0,
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    background: C.verdeSuave, color: C.verdeOsc, fontSize: 17, fontWeight: 900,
+  },
+  safetyIconDanger: { background: '#fee2e2', color: '#c81e1e' },
+  safetyCopy: {
+    minWidth: 0, display: 'flex', flexDirection: 'column', gap: 2,
+    color: C.texto,
+  },
+  safetyTitle: { fontSize: 13.5, lineHeight: 1.25 },
+  safetyText: { fontSize: 11.5, color: C.textoTenue, lineHeight: 1.35 },
+  emitWrap: {
+    display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 7,
+    padding: '4px 0 27px', color: C.textoTenue,
+  },
+  emitHelp: { fontSize: 13, lineHeight: 1.35, fontWeight: 600 },
+  emitButton: {
+    width: 108, height: 108, borderRadius: '50%', border: 'none',
+    display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 7,
+    background: '#c81e1e', color: '#fff', cursor: 'pointer', fontFamily: 'inherit',
+    fontSize: 11, letterSpacing: '.02em', boxShadow: '0 10px 25px rgba(200,30,30,.26)',
+  },
+  alertListHeading: {
+    display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 12,
+    marginBottom: 11,
+  },
+  alertListCopy: { display: 'flex', flexDirection: 'column', gap: 2, fontSize: 15, color: C.texto },
+  alertListAction: { padding: 0, border: 0, background: 'transparent', color: C.verdeOsc, fontSize: 11.5, fontWeight: 700, fontFamily: 'inherit', cursor: 'pointer' },
 
   /* ── CTA reportar ── */
   ctaReportar: {
@@ -507,7 +536,8 @@ const s = {
     border: `1px solid`,
     overflow: 'hidden',
     cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left',
-    padding: 0,
+    padding: 0, background: '#fff', borderColor: C.borde,
+    boxShadow: '0 3px 12px rgba(20,44,29,.035)',
   },
   alertaBanda: {
     height: 4, width: '100%',
@@ -524,7 +554,7 @@ const s = {
     flexShrink: 0,
   },
   alertaCat: {
-    fontSize: 13, fontWeight: 800, letterSpacing: 0.2,
+    fontSize: 10, fontWeight: 800, letterSpacing: 0.25,
     textTransform: 'uppercase',
   },
   urgentePill: {
@@ -547,6 +577,11 @@ const s = {
     color: '#7c5b00', background: '#fff7d6',
     border: '1px solid #ead58b', borderRadius: 999,
     padding: '3px 7px', whiteSpace: 'nowrap',
+  },
+
+  alertaTitle: {
+    fontSize: 14.5, lineHeight: 1.3, fontWeight: 800, color: C.texto,
+    marginBottom: 4,
   },
 
   alertaDesc: {
@@ -610,6 +645,7 @@ const s = {
     borderRadius: 12,
     fontSize: 11.5, color: C.textoTenue, lineHeight: 1.45,
   },
+  infoLegalCopy: { display: 'flex', flexDirection: 'column', gap: 5, minWidth: 0 },
 }
 
 export default Alertas

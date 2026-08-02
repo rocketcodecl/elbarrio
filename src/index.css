@@ -5,6 +5,13 @@
   -webkit-tap-highlight-color: transparent;
 }
 
+:root {
+  --screen-header-height: 72px;
+  --screen-header-title-size: 16px;
+  --screen-header-control-size: 38px;
+  --screen-header-side: 16px;
+}
+
 html, body {
   font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
   background: #1a1a1a;
@@ -29,7 +36,7 @@ button, input, textarea, select {
 
 /* Marco iPhone 17 Pro Max en naranja cósmico para simular mobile */
 .phone-frame {
-  --home-header-safe-top: 34px;
+  --home-header-safe-top: 48px;
   width: 393px;
   height: 852px;
   background: #FAFAF7;
@@ -96,7 +103,7 @@ button, input, textarea, select {
     background: #FAFAF7;
   }
   .phone-frame {
-    --home-header-safe-top: max(env(safe-area-inset-top, 0px), 12px);
+    --home-header-safe-top: max(env(safe-area-inset-top, 0px), 20px);
     width: 100%;
     height: 100vh;
     height: 100dvh;

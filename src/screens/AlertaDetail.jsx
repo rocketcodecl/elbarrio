@@ -464,6 +464,11 @@ function AlertaDetail({ alertId, currentUser, onNavigate, onEdit }) {
   const titulo = alert.title || alert.category || tipo.label || 'Alerta'
   const imagenes = getAlertImages(alert.images)
   const imagenPrincipal = imagenes[activeImageIndex] || imagenes[0]
+  const nivel = alert.severity === 'alta' || (!alert.severity && ['seguridad', 'salud', 'incendio'].includes(alert.category))
+    ? { label: 'NIVEL CRÍTICO', color: '#c81e1e', bg: '#fee2e2' }
+    : alert.severity === 'media' || (!alert.severity && ['infra', 'servicios', 'fugas', 'luz'].includes(alert.category))
+      ? { label: 'NIVEL MODERADO', color: '#c05a08', bg: '#fff1df' }
+      : { label: 'INFORMATIVA', color: C.verdeOsc, bg: C.verdeSuave }
 
   return (
     <div style={s.wrap}>
@@ -489,6 +494,15 @@ function AlertaDetail({ alertId, currentUser, onNavigate, onEdit }) {
               <span style={s.resueltaTxt}>Esta alerta fue resuelta por el autor</span>
             </div>
           )}
+
+          <section style={{ ...s.severityBanner, background: nivel.bg, borderColor: `${nivel.color}35` }}>
+            <span style={{ ...s.severityIcon, background: nivel.color }}><IcoAlerta size={19} /></span>
+            <span style={s.severityCopy}>
+              <strong style={{ color: nivel.color }}>{tipo.label}</strong>
+              <small style={{ color: nivel.color }}>{nivel.label}</small>
+            </span>
+            <span style={{ ...s.severityTime, color: nivel.color }}>{hace(alert.created_at)}</span>
+          </section>
 
           {/* ── FOTO PRINCIPAL + TIRA DE FOTOS ── */}
           {imagenes.length > 0 ? (
@@ -864,23 +878,23 @@ const s = {
 
   /* ── header ── */
   header: {
-    background: C.card,
-    /* FIX: 44px para safe-area (App.jsx ya no agrega contentPad a modalScreens). */
-    padding: '44px 16px 12px',
-    borderBottom: `1px solid ${C.borde}`,
+    minHeight: 'var(--screen-header-height)', background: C.card,
+    padding: 'calc(env(safe-area-inset-top, 0px) + 18px) 58px 10px', boxSizing: 'border-box',
+    borderBottom: `2px solid ${C.verde}`,
     display: 'flex',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    flexShrink: 0,
+    justifyContent: 'center',
+    flexShrink: 0, position: 'relative',
   },
   backBtn: {
-    width: 40, height: 40, borderRadius: '50%',
+    position: 'absolute', left: 16, bottom: 10,
+    width: 38, height: 38, borderRadius: '50%',
     background: C.fondo, border: `1px solid ${C.borde}`,
     color: C.texto, cursor: 'pointer', padding: 0,
     display: 'flex', alignItems: 'center', justifyContent: 'center',
     fontFamily: 'inherit',
   },
-  headerTit: { fontSize: 17, fontWeight: 700, color: C.texto },
+  headerTit: { fontSize: 16, fontWeight: 600, color: '#26302b' },
 
   /* ── scroll ── */
   scrollArea: {
@@ -910,9 +924,19 @@ const s = {
   resueltaTxt: {
     fontSize: 13, fontWeight: 700, color: C.verdeOsc,
   },
+  severityBanner: {
+    display: 'flex', alignItems: 'center', gap: 11,
+    border: '1px solid', borderRadius: 15, padding: '12px 13px', marginTop: 14,
+  },
+  severityIcon: {
+    width: 38, height: 38, borderRadius: '50%', color: '#fff', flexShrink: 0,
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+  },
+  severityCopy: { display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0 },
+  severityTime: { marginLeft: 'auto', fontSize: 10.5, fontWeight: 700, textAlign: 'right' },
 
   /* ── galería de evidencia ── */
-  gallery: { marginTop: 14 },
+  gallery: { marginTop: 12 },
   galleryMain: {
     width: '100%', height: 190,
     display: 'block', objectFit: 'cover',
@@ -977,7 +1001,7 @@ const s = {
   },
 
   /* ── titulo + autor ── */
-  tituloBlock: { padding: '18px 0 4px' },
+  tituloBlock: { padding: '14px 0 4px' },
   tipoBadgeRow: {
     display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 7,
     marginBottom: 9,

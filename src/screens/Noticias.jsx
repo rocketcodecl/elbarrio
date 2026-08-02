@@ -63,20 +63,6 @@ const Ico = ({ size = 18, children, stroke = 1.9, fill = 'none' }) => (
   </svg>
 )
 
-const IcoBell = (p) => (
-  <Ico {...p}>
-    <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" />
-    <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" />
-  </Ico>
-)
-const IcoNews = (p) => (
-  <Ico {...p}>
-    <path d="M4 22h16a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v16a2 2 0 0 1-2 2Zm0 0a2 2 0 0 1-2-2v-9a2 2 0 0 1 2-2h2" />
-    <path d="M18 14h-8" />
-    <path d="M15 18h-5" />
-    <path d="M10 6h8v4h-8z" />
-  </Ico>
-)
 const IcoBack = (p) => (
   <Ico {...p}><polyline points="15 18 9 12 15 6" /></Ico>
 )
@@ -461,15 +447,8 @@ export default function Noticias({ currentUser, onNavigate }) {
           <button style={s.backBtn} onClick={() => nav('back')} aria-label="Volver">
             <IcoBack size={22} />
           </button>
-          <div style={s.headerLeft}>
-            <div style={s.headerTit}>Noticias</div>
-            <div style={s.headerSub}>Lo que pasa en tu barrio</div>
-          </div>
-          {/* Campana decorativa */}
-          <div style={s.bellBtn} aria-label="Notificaciones">
-            <IcoBell size={22} />
-            <span style={s.bellDot} />
-          </div>
+          <div style={s.headerTit}>Noticias de <span style={s.headerBrand}>el barrio</span></div>
+          <div style={s.headerBalance} aria-hidden="true" />
         </div>
 
         {/* Chips de filtro horizontales scrollables */}
@@ -584,20 +563,22 @@ const s = {
   header: {
     flexShrink: 0,
     background: C.card,
-    /* FIX: padding superior aumentado a 44px para safe-area del notch,
-       porque App.jsx ya no agrega contentPad a las modalScreens. */
-    padding: '44px 16px 12px',
+    padding: 0,
     borderBottom: `1px solid ${C.borde}`,
     boxShadow: '0 2px 8px rgba(0,0,0,0.03)',
   },
   headerTopRow: {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 10,
+    minHeight: 'var(--screen-header-height)',
+    padding: 'calc(env(safe-area-inset-top, 0px) + 18px) 58px 10px',
+    display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative', boxSizing: 'border-box',
+    backgroundColor: C.card,
+    backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='72' height='64' viewBox='0 0 72 64'%3E%3Cg fill='none' stroke='%2316a34a' stroke-opacity='.22' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='13' y='10' width='46' height='44' rx='5'/%3E%3Cpath d='M23 21h26M23 30h26M23 39h17'/%3E%3C/g%3E%3C/svg%3E")`,
+    backgroundSize: '72px 64px', backgroundPosition: 'calc(50% - 86px) center', backgroundRepeat: 'no-repeat',
+    borderBottom: `2px solid ${C.verde}`,
   },
   backBtn: {
-    width: 38, height: 38,
+    position: 'absolute', left: 16, bottom: 10,
+    width: 'var(--screen-header-control-size)', height: 'var(--screen-header-control-size)',
     borderRadius: '50%',
     background: C.fondo,
     border: `1px solid ${C.borde}`,
@@ -606,45 +587,12 @@ const s = {
     display: 'flex', alignItems: 'center', justifyContent: 'center',
     flexShrink: 0,
   },
-  headerLeft: { flex: 1, minWidth: 0 },
   headerTit: {
-    fontSize: 28,
-    fontWeight: 800,
-    color: C.verdeOsc,
-    letterSpacing: '-0.5px',
-    lineHeight: 1.1,
+    minWidth: 0, textAlign: 'center', fontSize: 'var(--screen-header-title-size)', fontWeight: 600,
+    color: '#26302b', lineHeight: 1.2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
   },
-  headerSub: {
-    fontSize: 14,
-    color: C.textoSuave,
-    marginTop: 4,
-    fontWeight: 500,
-  },
-  bellBtn: {
-    position: 'relative',
-    width: 42,
-    height: 42,
-    borderRadius: '50%',
-    background: C.verdeBg,
-    color: C.verde,
-    border: `1px solid ${C.verdeSuave}`,
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexShrink: 0,
-    cursor: 'default',
-  },
-  bellDot: {
-    position: 'absolute',
-    top: 9,
-    right: 10,
-    width: 8,
-    height: 8,
-    borderRadius: '50%',
-    background: C.rojo,
-    border: `2px solid ${C.card}`,
-    boxSizing: 'content-box',
-  },
+  headerBrand: { color: C.verde, fontWeight: 700 },
+  headerBalance: { display: 'none' },
 
   /* ── CHIPS DE FILTRO ── */
   chipsScroll: {

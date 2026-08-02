@@ -130,7 +130,7 @@ function TabBar({ activeTab, onChangeTab, onCrear, noLeidos = 0, showCreateButto
       <div style={s.barra}>
         {TABS.map((t) => {
           const activo = activeTab === t.id
-          const color = activo ? C.verde : C.textoTenue
+          const color = activo ? C.verde : '#66736b'
           return (
             <button
               key={t.id}
@@ -143,7 +143,7 @@ function TabBar({ activeTab, onChangeTab, onCrear, noLeidos = 0, showCreateButto
               <span style={{
                 ...s.tabIcon,
                 ...(activo ? s.tabIconActive : {}),
-                opacity: activo ? 1 : 0.62,
+                opacity: activo ? 1 : 0.78,
               }}>
                 {t.icon(color)}
               </span>

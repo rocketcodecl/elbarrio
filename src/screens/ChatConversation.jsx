@@ -693,11 +693,11 @@ const s = {
   },
 
   header: {
-    flexShrink: 0,
+    minHeight: 'var(--screen-header-height)', flexShrink: 0,
     display: 'flex',
     alignItems: 'center',
     gap: 10,
-    padding: 'max(env(safe-area-inset-top, 44px), 44px) 12px 12px',
+    padding: 'calc(env(safe-area-inset-top, 0px) + 22px) 16px 16px', boxSizing: 'border-box',
     borderBottom: '1px solid #eee',
     backgroundColor: '#fff'
   },

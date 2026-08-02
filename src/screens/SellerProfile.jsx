@@ -840,18 +840,19 @@ const s = {
 
   // HEADER
   header: {
+    minHeight: 'var(--screen-header-height)',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'space-between',
     /* FIX: padding superior 44px para safe-area (App.jsx ya no agrega
        contentPad a las modalScreens). */
-    padding: '44px 16px 14px',
+    padding: 'calc(env(safe-area-inset-top, 0px) + 22px) 16px 16px', boxSizing: 'border-box',
     background: C.card,
     borderBottom: `1px solid ${C.borde}`,
     flexShrink: 0,
   },
   backBtn: {
-    width: 40, height: 40, borderRadius: '50%',
+    width: 38, height: 38, borderRadius: '50%',
     background: C.fondo, color: C.texto,
     border: `1px solid ${C.borde}`,
     display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -859,8 +860,7 @@ const s = {
     flexShrink: 0,
   },
   headerTitle: {
-    fontSize: 17, fontWeight: 800, color: C.texto,
-    letterSpacing: '-0.2px',
+    fontSize: 16, fontWeight: 600, color: '#26302b', letterSpacing: 0,
   },
 
   // SCROLL

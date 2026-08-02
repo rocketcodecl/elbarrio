@@ -328,7 +328,7 @@ function Notifications({ currentUser, onNavigate }) {
           aria-label="Marcar todas como leídas"
         >
           <IcoCheckCheck size={16} color={C.verde} />
-          <span>Marcar todas</span>
+          <span style={{ display: 'none' }}>Marcar todas</span>
         </button>
       </div>
 
@@ -512,33 +512,28 @@ const s = {
 
   /* HEADER */
   header: {
-    flexShrink: 0,
-    background: '#ffffff',
-    /* FIX: 44px para safe-area (App.jsx ya no agrega contentPad a modalScreens). */
-    padding: '44px 12px 12px',
-    borderBottom: `1px solid ${C.borde}`,
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 8,
+    minHeight: 'var(--screen-header-height)', flexShrink: 0,
+    background: '#ffffff', padding: 'calc(env(safe-area-inset-top, 0px) + 22px) 16px 16px',
+    borderBottom: `2px solid ${C.verde}`,
+    display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative', boxSizing: 'border-box',
   },
   backBtn: {
-    width: 40, height: 40, borderRadius: '50%',
+    position: 'absolute', left: 16, bottom: 10,
+    width: 38, height: 38, borderRadius: '50%',
     background: C.fondo, border: `1px solid ${C.borde}`,
     color: C.texto, cursor: 'pointer', padding: 0,
     display: 'flex', alignItems: 'center', justifyContent: 'center',
     fontFamily: 'inherit',
   },
   headerTit: {
-    fontSize: 17, fontWeight: 800, color: C.texto,
-    letterSpacing: '-0.2px',
+    minWidth: 0, textAlign: 'center', fontSize: 16, fontWeight: 600, color: '#26302b', letterSpacing: 0,
   },
   markAllBtn: {
-    display: 'flex', alignItems: 'center', gap: 5,
-    background: 'none', border: 'none',
-    color: C.verde, fontSize: 12.5, fontWeight: 700,
-    cursor: 'pointer', fontFamily: 'inherit',
-    padding: '6px 4px',
+    position: 'absolute', right: 16, bottom: 10,
+    width: 38, height: 38, padding: 0, borderRadius: '50%',
+    display: 'grid', placeItems: 'center',
+    background: C.verdeBg, border: `1px solid ${C.verdeSuave}`,
+    color: C.verde, cursor: 'pointer', fontFamily: 'inherit',
   },
 
   /* TABS */

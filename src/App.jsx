@@ -291,7 +291,7 @@ export default function App() {
       return
     }
 
-    const subScreens = ['post', 'productdetail', 'servicedetail', 'eventdetail', 'chatconversation', 'dealdone', 'alerta', 'notificaciones', 'sellerprofile', 'noticias', 'admin', 'adminfarmacias', 'admincomercios', 'adminusuarios', 'adminincidentes', 'settings', 'about', 'terms', 'privacy', 'prohibited', 'invite', 'contact', 'deleteaccount']
+    const subScreens = ['post', 'productdetail', 'servicedetail', 'eventdetail', 'chatconversation', 'dealdone', 'alerta', 'notificaciones', 'sellerprofile', 'noticias', 'admin', 'adminfarmacias', 'admincomercios', 'adminusuarios', 'adminincidentes', 'settings', 'editprofile', 'about', 'terms', 'privacy', 'prohibited', 'invite', 'contact', 'deleteaccount']
     if (subScreens.includes(lower)) {
       setNavigationMotion('forward')
       historyRef.current.push({ screen: currentScreen, params })
@@ -335,6 +335,8 @@ export default function App() {
       setCurrentScreen('adminIncidentes')
     } else if (lower === 'settings') {
       setCurrentScreen('settings')
+    } else if (lower === 'editprofile' || lower === 'editarperfil') {
+      setCurrentScreen('editProfile')
     } else if (lower === 'about' || lower === 'nosotros') {
       setCurrentScreen('about')
     } else if (lower === 'terms' || lower === 'terminos') {
@@ -434,9 +436,9 @@ export default function App() {
 
   /* ── SCREEN RENDER ── */
   const flowScreens = ['splash', 'onboarding', 'register', 'profile', 'verification', 'complete']
-  const modalScreens = ['productDetail', 'serviceDetail', 'chatConversation', 'dealDone', 'alertaDetail', 'notificaciones', 'sellerProfile', 'noticiasScreen', 'admin', 'adminFarmacias', 'adminComercios', 'adminUsuarios', 'adminIncidentes', 'settings', 'about', 'terms', 'privacy', 'prohibited', 'invite', 'contact', 'deleteAccount']
+  const modalScreens = ['productDetail', 'serviceDetail', 'chatConversation', 'dealDone', 'alertaDetail', 'notificaciones', 'sellerProfile', 'noticiasScreen', 'admin', 'adminFarmacias', 'adminComercios', 'adminUsuarios', 'adminIncidentes', 'settings', 'editProfile', 'about', 'terms', 'privacy', 'prohibited', 'invite', 'contact', 'deleteAccount']
   const isModalScreen = modalScreens.includes(currentScreen)
-  const isCommunityScreen = ['settings', 'about', 'terms', 'privacy', 'prohibited', 'invite', 'contact', 'deleteAccount'].includes(currentScreen)
+  const isCommunityScreen = ['settings', 'editProfile', 'about', 'terms', 'privacy', 'prohibited', 'invite', 'contact', 'deleteAccount'].includes(currentScreen)
   const isMainApp = !flowScreens.includes(currentScreen) && !isModalScreen
   const screenIdentity = currentScreen === 'main'
     ? `main-${activeTab}`
@@ -628,6 +630,7 @@ export default function App() {
       return <AdminIncidentes currentUser={user} profile={profile} onNavigate={onNavigate} />
     }
     if (currentScreen === 'settings') return <SettingsHub onNavigate={onNavigate} accessibleMode={accessibleMode} onAccessibleModeChange={setAccessibleMode} />
+    if (currentScreen === 'editProfile') return <Profile editMode onBack={() => onNavigate('back')} onFinish={async () => { await checkSession(); onNavigate('back') }} />
     if (currentScreen === 'about') return <AboutUs onNavigate={onNavigate} />
     if (currentScreen === 'terms') return <Terms onNavigate={onNavigate} />
     if (currentScreen === 'privacy') return <PrivacyPolicy onNavigate={onNavigate} />

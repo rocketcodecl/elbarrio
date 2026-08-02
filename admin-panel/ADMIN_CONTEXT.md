@@ -2,6 +2,7 @@
 
 ## Estado actual
 
+- El panel incorpora “Portada de Inicio” para seleccionar y ordenar hasta cinco publicaciones activas con fotografía por barrio. Usa `posts.home_carousel_order` y `admin_set_home_discovery_carousel`; la migración `202608010002_home_discovery_carousel.sql` fue ejecutada con resultado `Success` el 1 de agosto de 2026 y una consulta remota confirmó la columna y la protección de la RPC.
 - El panel incorpora “Invitaciones” con registros iniciados, vecinos territorialmente verificados, conversión e insignias Conector por barrio. Usa `admin_list_neighbor_invite_metrics`; la migración `202607310003_neighbor_invites.sql` fue ejecutada con resultado `Success` el 31 de julio de 2026 y el módulo está publicado.
 - El módulo “Contenido de la app” permite al superadministrador editar los textos de Privacidad y seguridad y todos los textos, portada y cuatro imágenes de Nosotros, sin alterar el layout. Usa `app_content_pages` y `admin_update_app_content`; la migración `202607310002_editable_app_content.sql` fue ejecutada con resultado `Success` el 31 de julio de 2026.
 - El panel incorpora “Lista de espera” para consultar email, dirección, comuna, estado y fecha de personas ubicadas fuera del polígono activo. Usa `admin_list_neighborhood_waitlist`; la migración `202607310001_neighborhood_waitlist.sql` fue ejecutada con resultado `Success` el 31 de julio de 2026 según confirmación manual.
@@ -46,6 +47,7 @@
 - Usuarios: implementado con directorio, verificación, permisos, suspensión y trazabilidad.
 - Notificaciones: implementado con audiencias por barrio, verificados, comercios y actores autorizados, más historial administrativo.
 - Invitaciones: implementado con métricas reales y alcance territorial para administradores normales o global para el superadministrador.
+- Portada de Inicio: implementada para seleccionar y retirar hasta quince tarjetas reales por barrio; la app mezcla el conjunto y muestra cinco por carga. `202608010003_home_carousel_pool.sql` fue ejecutada correctamente según confirmación manual.
 
 ## Decisiones
 
@@ -66,7 +68,7 @@
 - Servicios permite crear una publicación administrativa asociándola a un perfil del barrio, además de moderar y programar su visibilidad patrocinada.
 - No se incluirá ninguna llave privada o `service_role` en el navegador.
 - Los eventos usan la tabla `posts` con `type='event'`. El panel permite administrar su portada compacta 16:9, rango desde/hasta, tipo, ubicación, condiciones de entrada y visibilidad.
-- `posts.show_on_home` controla exclusivamente “Hoy en tu barrio” y no reemplaza `show_in_activity`. La RPC administrativa garantiza un máximo de un evento de portada por barrio y valida el alcance territorial o supremo. Pausar o cancelar un evento lo retira de Inicio.
+- `posts.show_on_home` conserva compatibilidad con la selección histórica de un evento. La portada vigente usa `posts.home_carousel_order` para mantener un conjunto editorial de hasta quince publicaciones activas con fotografía; la app mezcla y presenta cinco. La RPC `admin_set_home_discovery_carousel` valida cantidad, barrio, estado, imagen y alcance administrativo.
 - En Eventos, `active` significa publicado, `closed` pausado y reactivable, y `cancelled` cancelado definitivamente dentro del panel. La eliminación es una acción separada, irreversible y confirmada.
 - Las categorías de Eventos son globales para El Barrio. El administrador puede crearlas, editarlas, asignar un ícono u ocultarlas desde el panel; los eventos existentes conservan su categoría aunque esta se oculte para futuras publicaciones.
 - Los eventos pagados pueden definir varias tarifas con etiqueta y valor; el primer valor sigue respaldando el campo histórico `event_price`.

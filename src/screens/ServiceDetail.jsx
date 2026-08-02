@@ -291,8 +291,8 @@ export default function ServiceDetail({ postId, currentUser, onNavigate, onEdit 
 const s = {
   wrap: { width: '100%', height: '100%', position: 'relative', display: 'flex', flexDirection: 'column', overflow: 'hidden', color: C.texto, background: C.fondo, fontFamily: T.font },
   scroll: { flex: 1, minHeight: 0, overflowY: 'auto', WebkitOverflowScrolling: 'touch' },
-  header: { minHeight: 72, padding: 'calc(env(safe-area-inset-top, 0px) + 14px) 16px 10px', position: 'sticky', top: 0, zIndex: 20, display: 'grid', gridTemplateColumns: '40px 1fr 40px', alignItems: 'center', gap: 10, borderBottom: `1px solid ${C.borde}`, background: 'rgba(255,255,255,.94)', backdropFilter: 'blur(12px)' },
-  headerTitle: { fontSize: 15, fontWeight: 700, textAlign: 'center' },
+  header: { minHeight: 'var(--screen-header-height)', padding: 'calc(env(safe-area-inset-top, 0px) + 22px) 16px 16px', position: 'sticky', top: 0, zIndex: 20, display: 'grid', gridTemplateColumns: '38px 1fr 38px', alignItems: 'center', gap: 10, boxSizing: 'border-box', borderBottom: `1px solid ${C.borde}`, background: 'rgba(255,255,255,.94)', backdropFilter: 'blur(12px)' },
+  headerTitle: { fontSize: 16, fontWeight: 600, textAlign: 'center' },
   circleBtn: { width: 38, height: 38, padding: 0, display: 'grid', placeItems: 'center', border: `1px solid ${C.borde}`, borderRadius: '50%', color: C.texto, background: '#fff' },
   main: { padding: '14px 16px 108px' },
   heroCard: { overflow: 'hidden', border: `1px solid ${C.borde}`, borderRadius: 17, background: '#fff', boxShadow: '0 5px 18px rgba(31,55,39,.06)' },

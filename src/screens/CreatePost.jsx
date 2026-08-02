@@ -194,15 +194,40 @@ const ALERT_CATEGORIES = [
   { key: 'seguridad', label: REPORTES.seguridad.label, emoji: REPORTES.seguridad.emoji,
     hours: 6, color: REPORTES.seguridad.color, bg: REPORTES.seguridad.bg,
     desc: 'Robo, sospecha, intrusión' },
-  { key: 'infra', label: REPORTES.infra.label, emoji: REPORTES.infra.emoji,
-    hours: 48, color: REPORTES.infra.color, bg: REPORTES.infra.bg,
-    desc: 'Luz, agua, bache, vereda' },
-  { key: 'mascotas', label: REPORTES.mascotas.label, emoji: REPORTES.mascotas.emoji,
-    hours: 72, color: REPORTES.mascotas.color, bg: REPORTES.mascotas.bg,
-    desc: 'Perro perdido, animal suelto' },
-  { key: 'otro', label: 'Otro', emoji: '📢',
+  { key: 'incendio', label: REPORTES.incendio.label, emoji: REPORTES.incendio.emoji,
+    hours: 6, color: REPORTES.incendio.color, bg: REPORTES.incendio.bg,
+    desc: 'Fuego, humo o riesgo' },
+  { key: 'servicios', label: REPORTES.servicios.label, emoji: REPORTES.servicios.emoji,
+    hours: 48, color: REPORTES.servicios.color, bg: REPORTES.servicios.bg,
+    desc: 'Calles, tránsito y espacios' },
+  { key: 'animales', label: REPORTES.animales.label, emoji: REPORTES.animales.emoji,
+    hours: 72, color: REPORTES.animales.color, bg: REPORTES.animales.bg,
+    desc: 'Perdidos, heridos o sueltos' },
+  { key: 'fugas', label: REPORTES.fugas.label, emoji: REPORTES.fugas.emoji,
+    hours: 24, color: REPORTES.fugas.color, bg: REPORTES.fugas.bg,
+    desc: 'Agua, gas u otra fuga' },
+  { key: 'luz', label: REPORTES.luz.label, emoji: REPORTES.luz.emoji,
+    hours: 24, color: REPORTES.luz.color, bg: REPORTES.luz.bg,
+    desc: 'Corte, poste o cableado' },
+  { key: 'salud', label: REPORTES.salud.label, emoji: REPORTES.salud.emoji,
+    hours: 6, color: REPORTES.salud.color, bg: REPORTES.salud.bg,
+    desc: 'Riesgo o emergencia médica' },
+  { key: 'otro', label: 'Otros', emoji: REPORTES.otro.emoji,
     hours: 24, color: C.textoTenue, bg: C.fondo,
     desc: 'Otra alerta del barrio' },
+]
+
+const ALERT_PRIORITIES = [
+  { key: 'alta', label: 'Crítica', desc: 'Riesgo inmediato', color: '#c81e1e', bg: '#fee2e2', emoji: '✱' },
+  { key: 'media', label: 'Moderada', desc: 'Requiere atención', color: '#e5a900', bg: '#fff7d6', emoji: '⚠' },
+  { key: 'baja', label: 'Informativa', desc: 'Aviso preventivo', color: '#159969', bg: '#def7e9', emoji: 'ⓘ' },
+]
+
+const EMERGENCY_CONTACTS = [
+  { label: 'Ambulancia', number: '131', tone: '#b91c1c' },
+  { label: 'Bomberos', number: '132', tone: '#c2410c' },
+  { label: 'Carabineros', number: '133', tone: '#1d4ed8' },
+  { label: 'Seguridad Las Condes', number: '1402', tone: '#0f766e' },
 ]
 
 const calcNeededBy = (plazoKey) => {
@@ -260,7 +285,9 @@ function CreatePost({ onClose, onPublished, startWith, existingPost = null }) {
 
   // Alerta vecinal
   const [alertCategory, setAlertCategory] = useState(existingPost?.category || '')
+  const [alertSeverity, setAlertSeverity] = useState(existingPost?.severity || '')
   const [alertLocation, setAlertLocation] = useState(existingPost?.location_text || '')
+  const alertPriorityRef = useRef(null)
   const [mapaAbierto, setMapaAbierto] = useState(false)
   const [pinCoords, setPinCoords] = useState(() => {
     const lat = existingPost?.latitude ?? existingPost?.lat
@@ -318,7 +345,7 @@ function CreatePost({ onClose, onPublished, startWith, existingPost = null }) {
           type: selectedType.id,
           title, content, price, isNegotiable, category, lookingFor,
           rubro, budget, budgetOpen, plazo,
-          alertCategory, alertLocation,
+          alertCategory, alertSeverity, alertLocation,
           ts: Date.now(),
         }
         localStorage.setItem(DRAFT_KEY, JSON.stringify(draft))
@@ -326,7 +353,7 @@ function CreatePost({ onClose, onPublished, startWith, existingPost = null }) {
     }, 800)
     return () => { if (draftTimer.current) clearTimeout(draftTimer.current) }
   }, [editing, step, selectedType, title, content, price, isNegotiable, category, lookingFor,
-      rubro, budget, budgetOpen, plazo, alertCategory, alertLocation])
+      rubro, budget, budgetOpen, plazo, alertCategory, alertSeverity, alertLocation])
 
   // Cargar draft al montar (solo si no hay startWith)
   useEffect(() => {
@@ -348,6 +375,7 @@ function CreatePost({ onClose, onPublished, startWith, existingPost = null }) {
         if (draft.budgetOpen) setBudgetOpen(draft.budgetOpen)
         if (draft.plazo) setPlazo(draft.plazo)
         if (draft.alertCategory) setAlertCategory(draft.alertCategory)
+        if (draft.alertSeverity) setAlertSeverity(draft.alertSeverity)
         if (draft.alertLocation) setAlertLocation(draft.alertLocation)
       }
     } catch {}
@@ -633,6 +661,7 @@ function CreatePost({ onClose, onPublished, startWith, existingPost = null }) {
       if (!budgetOpen && !budget) return setError('Indica un presupuesto o marca "A convenir"')
     } else if (t === 'alert') {
       if (!alertCategory) return setError('Elige un tipo de alerta')
+      if (!alertSeverity) return setError('Elige el nivel de prioridad')
       if (!title.trim()) return setError('Ponle un título a la alerta')
       if (!content.trim()) return setError('Describe qué pasó')
     } else if (t === 'sell') {
@@ -704,6 +733,7 @@ function CreatePost({ onClose, onPublished, startWith, existingPost = null }) {
           title: title.trim(),
           description: content.trim(),
           category: alertCategory,
+          severity: alertSeverity,
           location_text: alertLocation.trim() || null,
           latitude: pinCoords?.lat || null,
           longitude: pinCoords?.lng || null,
@@ -1044,7 +1074,7 @@ function CreatePost({ onClose, onPublished, startWith, existingPost = null }) {
       <div style={s.formScroll}>
 
         {/* ---- PREVIEW EN VIVO ---- */}
-        {t !== 'event' && <PreviewCard
+        {t !== 'event' && t !== 'alert' && <PreviewCard
           emoji={previewEmoji}
           title={previewTitle}
           price={previewPrice}
@@ -1060,22 +1090,31 @@ function CreatePost({ onClose, onPublished, startWith, existingPost = null }) {
         {/* ---------- ALERTA VECINAL ---------- */}
         {t === 'alert' && (
           <div style={s.form}>
-            <div style={s.hintBoxAlerta}>
-              <IcoAlerta size={14} />
-              <span>
-                Las alertas llegan a todos tus vecinos. Úsalas con criterio
-                para cosas que importen ahora.
-              </span>
+            <div style={s.alertPrioritySection}>
+              <label style={s.alertPriorityLabel}>NIVEL DE PRIORIDAD</label>
+              <div style={s.alertPriorityGrid}>
+                {ALERT_PRIORITIES.map(priority => {
+                  const active = alertSeverity === priority.key
+                  const strongSelection = active && priority.key !== 'media'
+                  return <button key={priority.key} type="button" style={{ ...s.alertPriority, ...(active ? { background: priority.color, boxShadow: `0 4px 10px ${priority.color}42`, transform: 'translateY(-1px)' } : {}) }} onClick={() => setAlertSeverity(priority.key)}>
+                    <span style={{ ...s.alertPriorityIcon, color: active ? (strongSelection ? '#fff' : '#3d3100') : priority.color }}>{priority.emoji}</span>
+                    <strong style={{ color: active ? (strongSelection ? '#fff' : '#3d3100') : C.texto }}>{priority.label}</strong>
+                  </button>
+                })}
+              </div>
             </div>
 
-            <label style={s.labelFirst}>¿Qué tipo de alerta?</label>
+            <label style={s.alertSectionLabel}>Tipo de incidente</label>
             <div style={s.alertCatList}>
               {ALERT_CATEGORIES.map((c) => {
                 const activo = alertCategory === c.key
                 return (
                   <button
                     key={c.key}
-                    onClick={() => setAlertCategory(c.key)}
+                    onClick={() => {
+                      setAlertCategory(c.key)
+                      window.requestAnimationFrame(() => alertPriorityRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }))
+                    }}
                     style={{
                       ...s.alertCat,
                       background: activo ? c.bg : C.card,
@@ -1102,6 +1141,23 @@ function CreatePost({ onClose, onPublished, startWith, existingPost = null }) {
                 )
               })}
             </div>
+
+            <div style={s.hintBoxAlerta}>
+              <IcoAlerta size={14} />
+              <span>Las alertas llegan a todos tus vecinos. Úsalas con criterio para cosas que importen ahora.</span>
+            </div>
+
+            <section ref={alertPriorityRef} style={{ ...s.emergencyBox, scrollMarginTop: 18 }} aria-label="Teléfonos de emergencia">
+              <div style={s.emergencyHeading}><strong>¿Hay riesgo inmediato?</strong><span>Llama primero. Después puedes avisar al barrio.</span></div>
+              <div style={s.emergencyGrid}>
+                {EMERGENCY_CONTACTS.map(contact => (
+                  <button key={contact.number} type="button" style={{ ...s.emergencyButton, color: contact.tone, borderColor: `${contact.tone}38` }} onClick={() => {
+                    if (window.confirm(`¿Llamar a ${contact.label} al ${contact.number}?`)) window.location.assign(`tel:${contact.number}`)
+                  }}><span>{contact.label}</span><strong>{contact.number}</strong></button>
+                ))}
+              </div>
+              <small style={s.emergencyNote}>El Barrio no reemplaza a los servicios de emergencia.</small>
+            </section>
 
             <label style={s.label}>Título <span style={s.req}>*</span></label>
             <input
@@ -2253,19 +2309,20 @@ const s = {
   },
 
   /* --- categorías de alerta --- */
-  alertCatList: { display: 'flex', flexDirection: 'column', gap: 8 },
+  alertCatList: { display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 8 },
+  alertSectionLabel: { display: 'block', marginTop: 24, marginBottom: 10, fontSize: 13, fontWeight: 700, color: C.texto },
   alertCat: {
-    display: 'flex', alignItems: 'center', gap: 12,
-    padding: 12, borderRadius: 14,
+    position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 7,
+    minHeight: 116, padding: '11px 8px', borderRadius: 14,
     border: `1.5px solid ${C.borde}`, background: C.card,
-    cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left',
+    cursor: 'pointer', fontFamily: 'inherit', textAlign: 'center',
     transition: 'background 0.15s',
   },
   alertCatIcon: {
     width: 38, height: 38, borderRadius: 10, flexShrink: 0,
     display: 'flex', alignItems: 'center', justifyContent: 'center',
   },
-  alertCatText: { flex: 1, display: 'flex', flexDirection: 'column', gap: 1, minWidth: 0 },
+  alertCatText: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1, minWidth: 0 },
   alertCatLabel: { fontSize: 14, fontWeight: 600 },
   alertCatDesc: { fontSize: 11.5, color: C.textoSuave, fontWeight: 500 },
   alertCatHours: {
@@ -2274,9 +2331,19 @@ const s = {
     marginTop: 2,
   },
   alertCatCheck: {
-    flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
-    width: 22, height: 22,
+    position: 'absolute', right: 6, top: 6, display: 'flex', alignItems: 'center', justifyContent: 'center',
+    width: 18, height: 18,
   },
+  alertPrioritySection: { marginBottom: 20 },
+  alertPriorityLabel: { display: 'block', marginBottom: 12, color: '#59616c', fontSize: 10, fontWeight: 700, letterSpacing: '.1em' },
+  alertPriorityGrid: { display: 'grid', gridTemplateColumns: 'repeat(3,minmax(0,1fr))', padding: 5, border: `1px solid ${C.borde}`, borderRadius: 11, background: '#f1f3fb', overflow: 'hidden' },
+  alertPriority: { minHeight: 62, padding: '7px 4px', border: 0, borderRadius: 8, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 4, background: 'transparent', fontFamily: 'inherit', cursor: 'pointer', textAlign: 'center', boxShadow: 'none', transition: 'background .18s ease, color .18s ease, transform .18s ease, box-shadow .18s ease' },
+  alertPriorityIcon: { height: 19, display: 'grid', placeItems: 'center', fontSize: 18, lineHeight: 1, fontWeight: 900 },
+  emergencyBox: { padding: 12, border: `1px solid ${C.borde}`, borderRadius: 15, background: '#fff', boxShadow: '0 4px 14px rgba(20,44,29,.04)' },
+  emergencyHeading: { display: 'grid', gap: 2, marginBottom: 9, color: C.texto },
+  emergencyGrid: { display: 'grid', gridTemplateColumns: 'repeat(2,minmax(0,1fr))', gap: 7 },
+  emergencyButton: { minHeight: 48, padding: '7px 9px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6, border: '1px solid', borderRadius: 11, background: '#fbfdfb', fontFamily: 'inherit', textAlign: 'left' },
+  emergencyNote: { display: 'block', marginTop: 8, color: C.textoTenue, fontSize: 9.5, lineHeight: 1.35 },
 
   row: { display: 'flex', gap: 8, alignItems: 'stretch' },
   priceBox: {

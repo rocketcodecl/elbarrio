@@ -110,6 +110,24 @@ button { cursor: pointer; }
 .placeholder-module { min-height: 500px; display: grid; place-content: center; justify-items: center; color: #5f6b62; text-align: center; }
 .placeholder-module span { font-size: 46px; }.placeholder-module h1 { margin: 14px 0 6px; color: #16211a; }
 
+/* Portada editorial de Inicio */
+.home-carousel-manager { max-width: 1320px; margin: 0 auto; }
+.home-carousel-neighborhood { max-width: 430px; margin-bottom: 20px; }
+.home-carousel-layout { display: grid; grid-template-columns: minmax(0,1.1fr) minmax(340px,.9fr); gap: 20px; align-items: start; }
+.home-carousel-selected,.home-carousel-library { padding: 22px; border: 1px solid #e1e9e3; border-radius: 18px; background: #fff; box-shadow: 0 7px 24px rgba(20,44,29,.045); }
+.home-carousel-section-title,.home-carousel-section-title>div { display: flex; align-items: center; justify-content: space-between; gap: 11px; }
+.home-carousel-section-title>div>span { width: 29px; height: 29px; display: grid; place-items: center; border-radius: 9px; color: #0f5f36; background: #dcfce7; font-size: 10px; font-weight: 800; }
+.home-carousel-section-title h2 { margin: 0 0 3px; font-size: 15px; }.home-carousel-section-title p { margin: 0; color: #748078; font-size: 9px; }
+.home-carousel-section-title>button { min-height: 38px; padding: 0 14px; border: 0; border-radius: 10px; color: #fff; background: #16a34a; font-size: 9px; font-weight: 800; }
+.home-carousel-empty { padding: 26px 4px; color: #8b978e; font-size: 10px; text-align: center; }
+.home-carousel-selected-card { position: relative; margin-top: 12px; padding: 9px; display: grid; grid-template-columns: 82px 25px minmax(0,1fr) auto; align-items: center; gap: 10px; border: 1px solid #e1e9e3; border-radius: 13px; }
+.home-carousel-selected-card>img { width: 82px; height: 58px; border-radius: 9px; object-fit: cover; }.home-carousel-selected-card>b { width: 24px; height: 24px; display: grid; place-items: center; border-radius: 50%; color: #fff; background: #0f5f36; font-size: 9px; }
+.home-carousel-selected-card>div,.home-carousel-library-card>span { min-width: 0; display: grid; gap: 4px; }.home-carousel-selected-card small,.home-carousel-library-card small { color: #0f7a49; font-size: 7.5px; font-weight: 900; text-transform: uppercase; }.home-carousel-selected-card strong,.home-carousel-library-card strong { overflow: hidden; font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+.home-carousel-selected-card>span { display: flex; gap: 5px; }.home-carousel-selected-card>span button { min-width: 29px; height: 29px; padding: 0 7px; border: 1px solid #dce5de; border-radius: 8px; color: #536057; background: #fff; font-size: 8px; font-weight: 700; }.home-carousel-selected-card>span button:last-child { color: #b91c1c; }
+.home-carousel-search { width: 100%; height: 40px; margin: 15px 0 4px; padding: 0 12px; border: 1px solid #dce5de; border-radius: 10px; outline: 0; font-size: 10px; }
+.home-carousel-library-card { width: 100%; margin-top: 9px; padding: 8px; display: grid; grid-template-columns: 62px minmax(0,1fr) 28px; align-items: center; gap: 10px; border: 1px solid #e1e9e3; border-radius: 11px; color: #16211a; background: #fff; text-align: left; }.home-carousel-library-card:hover:not(:disabled) { border-color: #86cbaa; background: #f6fcf8; }.home-carousel-library-card>img { width: 62px; height: 46px; border-radius: 8px; object-fit: cover; }.home-carousel-library-card>b { width: 27px; height: 27px; display: grid; place-items: center; border-radius: 50%; color: #fff; background: #16a34a; font-size: 16px; }
+@media (max-width: 1050px) { .home-carousel-layout { grid-template-columns: 1fr; } }
+
 /* Comercios y productos */
 .commerce-manager { max-width: 1480px; margin: 0 auto; }
 .waitlist-manager { max-width: 1200px; margin: 0 auto; }

@@ -1,5 +1,6 @@
 const NAVIGATION = [
   { id: 'dashboard', icon: '▦', label: 'Resumen' },
+  { id: 'portada', icon: '▤', label: 'Portada de Inicio' },
   { id: 'comercios', icon: '🏪', label: 'Comercios' },
   { id: 'servicios', icon: '🧰', label: 'Servicios' },
   { id: 'eventos', icon: '📅', label: 'Eventos' },

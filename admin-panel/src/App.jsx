@@ -14,6 +14,7 @@ import NotificationManager from './screens/NotificationManager.jsx'
 import WaitlistManager from './screens/WaitlistManager.jsx'
 import ContentManager from './screens/ContentManager.jsx'
 import InviteManager from './screens/InviteManager.jsx'
+import HomeCarouselManager from './screens/HomeCarouselManager.jsx'
 
 const ADMIN_ROLE = 'admin'
 
@@ -136,7 +137,8 @@ export default function App() {
       {activeSection === 'invitaciones' && <InviteManager />}
       {activeSection === 'contenido' && <ContentManager profile={profile} />}
       {activeSection === 'notificaciones' && <NotificationManager profile={profile} />}
-      {!['dashboard', 'comercios', 'servicios', 'eventos', 'farmacias', 'noticias', 'incidentes', 'usuarios', 'espera', 'invitaciones', 'contenido', 'notificaciones'].includes(activeSection) && (
+      {activeSection === 'portada' && <HomeCarouselManager profile={profile} />}
+      {!['dashboard', 'comercios', 'servicios', 'eventos', 'farmacias', 'noticias', 'incidentes', 'usuarios', 'espera', 'invitaciones', 'contenido', 'notificaciones', 'portada'].includes(activeSection) && (
         <section className="placeholder-module"><span>🚧</span><h1>Módulo en preparación</h1><p>Lo construiremos en una siguiente fase.</p></section>
       )}
     </AdminShell>

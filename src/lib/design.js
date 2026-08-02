@@ -123,6 +123,13 @@ export const TIPOS = {
 export const REPORTES = {
   seguridad: { emoji: '🚨', label: 'Seguridad',      color: C.rojo,    bg: C.rojoSuave },
   salud:     { emoji: '🏥', label: 'Salud',          color: C.verde,   bg: C.verdeSuave },
+  incendio:  { emoji: '🔥', label: 'Incendio',       color: '#dc2626', bg: '#fee2e2' },
+  servicios: { emoji: '🛠️', label: 'Servicios',      color: C.naranjo, bg: C.naranjoSuave },
+  animales:  { emoji: '🐾', label: 'Animales',       color: '#db2777', bg: '#fce7f3' },
+  fugas:     { emoji: '💧', label: 'Fugas',           color: C.azul,    bg: C.azulSuave },
+  luz:       { emoji: '💡', label: 'Luz',             color: C.dorado,  bg: C.doradoSuave },
+  otro:      { emoji: '📌', label: 'Otros',           color: C.textoTenue, bg: C.fondo },
+  // Compatibilidad con alertas creadas antes de separar las categorías.
   infra:     { emoji: '🔧', label: 'Infraestructura',color: C.naranjo, bg: C.naranjoSuave },
   mascotas:  { emoji: '🐕', label: 'Mascotas',       color: '#db2777', bg: '#fce7f3' },
 }

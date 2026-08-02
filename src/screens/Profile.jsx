@@ -9,7 +9,7 @@ import Stepper from '../components/Stepper'
 // la restricción única de la base de datos.
 // ============================================================
 
-function Profile({ onFinish, onBack }) {
+function Profile({ onFinish, onBack, editMode = false }) {
   const [firstName, setFirstName] = useState('')
   const [lastName, setLastName] = useState('')
   const [rut, setRut] = useState('')
@@ -243,16 +243,16 @@ function Profile({ onFinish, onBack }) {
         <button style={styles.backButton} onClick={onBack} aria-label="Volver">
           <span style={{ fontSize: 18 }}>←</span>
         </button>
-        <div style={{ flex: 1, marginLeft: 12 }}>
-          <Stepper currentStep={2} totalSteps={4} />
-        </div>
+        {editMode
+          ? <div style={{ flex: 1, marginRight: 40, textAlign: 'center', fontSize: 16, fontWeight: 700 }}>Editar mi perfil</div>
+          : <div style={{ flex: 1, marginLeft: 12 }}><Stepper currentStep={2} totalSteps={4} /></div>}
       </div>
 
       {/* TÍTULO */}
       <div style={styles.titleSection}>
-        <h1 style={styles.title}>Cuéntanos sobre ti</h1>
+        <h1 style={styles.title}>{editMode ? 'Tus datos' : 'Cuéntanos sobre ti'}</h1>
         <p style={styles.subtitle}>
-          Esta información ayuda a generar confianza con tus vecinos
+          {editMode ? 'Mantén actualizada la información que ven tus vecinos' : 'Esta información ayuda a generar confianza con tus vecinos'}
         </p>
       </div>
 
@@ -416,7 +416,7 @@ function Profile({ onFinish, onBack }) {
             opacity: loading ? 0.6 : 1,
           }}
         >
-          {loading ? 'Guardando...' : 'Continuar'}
+          {loading ? 'Guardando...' : editMode ? 'Guardar cambios' : 'Continuar'}
         </button>
       </div>
     </div>
