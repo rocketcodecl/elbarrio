@@ -9,8 +9,8 @@
     <meta property="og:description" content="La red local para saber qué pasa, encontrar lo que necesitas y participar donde vives." />
     <title>El Barrio — Tu barrio, más cerca que nunca</title>
     <link rel="icon" href="assets/isotipo.png" />
-    <link rel="stylesheet" href="styles.css?v=20260731-5" />
-    <script src="script.js?v=20260731-5" defer></script>
+    <link rel="stylesheet" href="styles.css?v=20260801-33" />
+    <script src="script.js?v=20260801-33" defer></script>
   </head>
   <body>
     <div class="progress" aria-hidden="true"><span></span></div>
@@ -21,65 +21,59 @@
         <span>El Barrio</span>
       </a>
       <nav class="desktop-nav" aria-label="Navegación principal">
-        <a href="#como-funciona">Cómo funciona</a>
-        <a href="#vecinos">Para vecinos</a>
-        <a href="#comercios">Para comercios</a>
-        <a href="#servicios">Para servicios</a>
+        <a href="#como-funciona" data-content="nav.how">Cómo funciona</a>
+        <a href="#vecinos" data-content="nav.neighbors">Para vecinos</a>
+        <a href="#comercios" data-content="nav.commerce">Para comercios</a>
+        <a href="#servicios" data-content="nav.services">Para servicios</a>
       </nav>
-      <a class="nav-cta" href="#sumate">Quiero ser parte <span>↗</span></a>
+      <a class="nav-cta" href="#sumate"><b data-content="nav.cta">Quiero ser parte</b> <span>↗</span></a>
       <button class="menu-button" type="button" aria-label="Abrir menú" aria-expanded="false" data-menu-button>
         <span></span><span></span>
       </button>
       <nav class="mobile-nav" aria-label="Navegación móvil" data-mobile-nav>
-        <a href="#como-funciona">Cómo funciona</a>
-        <a href="#vecinos">Para vecinos</a>
-        <a href="#comercios">Para comercios</a>
-        <a href="#servicios">Para servicios</a>
-        <a href="#sumate">Quiero ser parte</a>
+        <a href="#como-funciona" data-content="nav.how">Cómo funciona</a>
+        <a href="#vecinos" data-content="nav.neighbors">Para vecinos</a>
+        <a href="#comercios" data-content="nav.commerce">Para comercios</a>
+        <a href="#servicios" data-content="nav.services">Para servicios</a>
+        <a href="#sumate" data-content="nav.cta">Quiero ser parte</a>
       </nav>
     </header>
 
     <main>
-      <section class="hero" id="inicio">
+      <div class="hero-journey" id="inicio">
+      <section class="hero">
         <div class="hero-media" aria-hidden="true">
-          <video autoplay muted loop playsinline preload="metadata" poster="assets/hero-barrio.jpg" data-hero-video>
+          <video class="active" autoplay muted loop playsinline preload="metadata" poster="assets/hero-barrio.jpg" data-hero-video data-journey-visual="hero">
             <source src="assets/barrio-en-movimiento.mp4" type="video/mp4" />
           </video>
+          <video muted loop playsinline preload="metadata" poster="assets/vecina-historia.jpg" data-journey-visual="distancia"><source src="assets/scene-distancia.mp4" type="video/mp4" /></video>
+          <video muted loop playsinline preload="metadata" poster="assets/hero-barrio.jpg" data-journey-visual="pregunta"><source src="assets/scene-pregunta.mp4" type="video/mp4" /></video>
+          <video muted loop playsinline preload="metadata" poster="assets/comunidad-barrio.jpg" data-journey-visual="encuentro">
+            <source src="assets/scene-encuentro.mp4" type="video/mp4" />
+          </video>
+          <video muted loop playsinline preload="metadata" poster="assets/comunidad-barrio.jpg" data-journey-visual="comunidad"><source src="assets/scene-comunidad.mp4" type="video/mp4" /></video>
           <div class="hero-shade"></div>
         </div>
-        <div class="hero-orbit" aria-hidden="true"><span></span><span></span><span></span></div>
         <div class="hero-layout">
           <div class="hero-content">
             <p class="eyebrow light"><span></span> <b data-content="hero.eyebrow">El Barrio · Comenzamos en Las Condes</b></p>
-            <h1><span data-content="hero.title">Lo que necesitas</span><br /><em data-content="hero.accent">podría estar a tres cuadras.</em></h1>
+            <h1><span data-content="hero.title">Lo que necesitas</span><br /><em data-content="hero.accent">podría estar a</em> <strong>tres cuadras.</strong></h1>
             <p class="hero-lead" data-content="hero.lead">La red local que transforma personas cercanas en vecinos, negocios desconocidos en favoritos y calles compartidas en comunidad.</p>
             <div class="hero-actions">
               <a class="button primary" href="#sumate"><b data-content="hero.primaryCta">Quiero ser de los primeros</b> <span>→</span></a>
-              <a class="button ghost" href="#como-funciona"><span class="play-icon">▶</span> Mira cómo cobra vida</a>
-            </div>
-            <div class="hero-proof">
-              <div class="avatar-stack" aria-hidden="true"><span>FV</span><span>MR</span><span>PD</span><span>+42</span></div>
-              <p><strong>Personas reales. Lugares reales.</strong><br />Todo conectado por vivir cerca.</p>
+              <a class="button ghost" href="#como-funciona"><span class="play-icon">▶</span> <b data-content="hero.secondaryCta">Mira cómo cobra vida</b></a>
+              <div class="hero-proof">
+                <div class="avatar-stack photo-avatars" aria-hidden="true"><img src="assets/vecina-historia.jpg" alt="" /><img src="assets/comunidad-barrio.jpg" alt="" /><img src="assets/comercio-local.jpg" alt="" /><span>+42</span></div>
+                <p><strong data-content="hero.proofTitle">Personas reales. Lugares reales.</strong><br /><span data-content="hero.proofBody">Todo conectado por vivir cerca.</span></p>
+              </div>
             </div>
           </div>
 
-          <div class="hero-live" aria-label="Así se siente El Barrio en este momento">
-            <div class="live-top"><span><i></i> El barrio está pasando ahora</span><small>Las Condes</small></div>
-            <div class="live-event live-event-one">
-              <span class="live-icon">🙋</span><div><small>Hace 2 min · a 180 m</small><strong>¿Alguien conoce un gasfiter de confianza?</strong></div><b>3</b>
-            </div>
-            <div class="live-connector"><span></span><em>Una persona pregunta</em></div>
-            <div class="live-event live-event-two">
-              <span class="live-avatar">P</span><div><small>Pedro · vecino verificado</small><strong>“Estoy cerca. Puedo ayudarte.”</strong></div><b>✓</b>
-            </div>
-            <div class="live-connector"><span></span><em>El barrio responde</em></div>
-            <div class="live-event live-event-three">
-              <span class="live-icon">🥖</span><div><small>Abierto · a 280 m</small><strong>La panadería de la esquina te espera</strong></div><b>→</b>
-            </div>
-            <div class="live-bottom"><span>📍 Todo esto ocurre cerca de casa</span><i>En vivo</i></div>
+          <div class="hero-device hero-device-placeholder" aria-label="Placeholder de imagen de la aplicación El Barrio">
+            <img src="assets/story-hero-phone.png" alt="Vista reemplazable de la aplicación El Barrio" />
           </div>
         </div>
-        <a class="scroll-cue" href="#manifiesto"><span>Desliza para vivir la historia</span><i>↓</i></a>
+        <a class="scroll-cue" href="#manifiesto" aria-label="Desliza para vivir la historia"><i><b></b></i><span>Desliza</span></a>
       </section>
 
       <section class="cinema" id="manifiesto">
@@ -90,85 +84,54 @@
           <div class="cinema-counter"><span data-cinema-count>01</span><i></i><em>04</em></div>
         </div>
         <div class="cinema-story">
+          <div class="cinema-device-stage" aria-hidden="true"><img data-cinema-device src="assets/story-hero-phone.png" alt="" /></div>
           <article class="cinema-scene active" data-cinema-scene="distancia" data-count="01">
-            <p class="eyebrow light"><span></span> Una verdad incómoda</p>
-            <h2>Vivimos a pocos metros.<br />Pero a veces, a <em>mundos de distancia.</em></h2>
-            <p>Nos cruzamos cada día sin conocernos. Pedimos ayuda lejos. Compramos lejos. Nos enteramos tarde de lo que pasó al lado de casa.</p>
+            <p class="eyebrow light"><span></span> <b data-content="cinema.oneLabel">Una verdad incómoda</b></p>
+            <h2 data-content="cinema.oneTitle">Vivimos a pocos metros. Pero a veces, a mundos de distancia.</h2>
+            <p data-content="cinema.oneBody">Nos cruzamos cada día sin conocernos. Pedimos ayuda lejos. Compramos lejos. Nos enteramos tarde de lo que pasó al lado de casa.</p>
           </article>
-          <article class="cinema-scene" data-cinema-scene="distancia" data-count="02">
-            <p class="eyebrow light"><span></span> Todo comienza con algo pequeño</p>
-            <h2>Una pregunta.<br /><em>“¿Alguien puede ayudarme?”</em></h2>
-            <p>No necesita hacerse viral. Solo necesita llegar a la persona correcta, en el lugar correcto, cuando todavía importa.</p>
+          <article class="cinema-scene" data-cinema-scene="pregunta" data-count="02">
+            <p class="eyebrow light"><span></span> <b data-content="cinema.twoLabel">Todo comienza con algo pequeño</b></p>
+            <h2 data-content="cinema.twoTitle">Una pregunta. “¿Alguien puede ayudarme?”</h2>
+            <p data-content="cinema.twoBody">No necesita hacerse viral. Solo necesita llegar a la persona correcta, en el lugar correcto, cuando todavía importa.</p>
           </article>
           <article class="cinema-scene" data-cinema-scene="encuentro" data-count="03">
-            <p class="eyebrow light"><span></span> Entonces ocurre algo</p>
-            <h2>Un desconocido responde.<br />Y empieza a convertirse en <em>vecino.</em></h2>
-            <p>La distancia se acorta. Aparece la confianza. Una necesidad cotidiana crea una conexión que antes no existía.</p>
+            <p class="eyebrow light"><span></span> <b data-content="cinema.threeLabel">Entonces ocurre algo</b></p>
+            <h2 data-content="cinema.threeTitle">Un desconocido responde. Y empieza a convertirse en vecino.</h2>
+            <p data-content="cinema.threeBody">La distancia se acorta. Aparece la confianza. Una necesidad cotidiana crea una conexión que antes no existía.</p>
           </article>
-          <article class="cinema-scene" data-cinema-scene="encuentro" data-count="04">
-            <p class="eyebrow light"><span></span> Eso es El Barrio</p>
-            <h2>No inventamos la comunidad.<br /><em>La hacemos visible.</em></h2>
-            <p>Personas, comercios, servicios y experiencias que ya estaban ahí. Ahora, conectadas por el lugar que comparten.</p>
-            <a class="button primary" href="#como-funciona">Descubre cómo funciona <span>↓</span></a>
+          <article class="cinema-scene" data-cinema-scene="comunidad" data-count="04">
+            <p class="eyebrow light"><span></span> <b data-content="cinema.fourLabel">Eso es El Barrio</b></p>
+            <h2 data-content="cinema.fourTitle">No inventamos la comunidad. La hacemos visible.</h2>
+            <p data-content="cinema.fourBody">Personas, comercios, servicios y experiencias que ya estaban ahí. Ahora, conectadas por el lugar que comparten.</p>
           </article>
         </div>
       </section>
+      </div>
 
       <section class="story" id="como-funciona">
         <div class="story-intro section">
-          <p class="eyebrow"><span></span> Una historia que podría pasar mañana</p>
-          <h2>Todo empieza con una pregunta<br />que alguien hace <em>cerca.</em></h2>
-          <p>Marta vive hace doce años en el barrio. Conoce su edificio, su almacén y la plaza. Pero todavía hay muchas personas y soluciones cercanas que no sabe que existen.</p>
+          <p class="eyebrow"><span></span> <b data-content="story.eyebrow">Una historia que podría pasar mañana</b></p>
+          <h2 data-content="story.title">Todo empieza con una pregunta que alguien hace cerca.</h2>
+          <p data-content="story.intro">Marta vive hace doce años en el barrio. Conoce su edificio, su almacén y la plaza. Pero todavía hay muchas personas y soluciones cercanas que no sabe que existen.</p>
         </div>
 
         <div class="story-layout">
           <div class="phone-stage">
             <div class="story-photo-reel" aria-hidden="true">
-              <figure class="active" data-scene-visual="inicio"><img src="assets/vecina-historia.jpg" alt="" /><figcaption>08:12 · En casa de Marta</figcaption></figure>
-              <figure data-scene-visual="servicios"><img src="assets/hero-barrio.jpg" alt="" /><figcaption>08:19 · A tres cuadras</figcaption></figure>
-              <figure data-scene-visual="mercado"><img src="assets/comercio-local.jpg" alt="" /><figcaption>12:40 · En la panadería</figcaption></figure>
-              <figure data-scene-visual="eventos"><img src="assets/comunidad-barrio.jpg" alt="" /><figcaption>18:30 · En la plaza</figcaption></figure>
+              <figure class="active" data-scene-visual="inicio"><img src="assets/story-bg-inicio.jpg" alt="" /><figcaption>08:12 · En casa de Marta</figcaption></figure>
+              <figure data-scene-visual="servicios"><img src="assets/story-bg-servicios.jpg" alt="" /><figcaption>08:19 · A tres cuadras</figcaption></figure>
+              <figure data-scene-visual="mercado"><img src="assets/story-bg-mercado.jpg" alt="" /><figcaption>12:40 · En la panadería</figcaption></figure>
+              <figure data-scene-visual="eventos"><img src="assets/story-bg-eventos.jpg" alt="" /><figcaption>18:30 · En la plaza</figcaption></figure>
             </div>
             <div class="phone-glow"></div>
             <div class="demo-phone" aria-label="Demostración visual de la aplicación El Barrio">
               <div class="phone-island"></div>
               <div class="phone-screen">
-                <div class="app-top">
-                  <div><small>¡Hola, Fernando! 👋</small><strong>📍 El Barrio, Las Condes</strong></div>
-                  <span>🔔</span>
-                </div>
-
-                <div class="demo-scene active" data-scene-panel="inicio">
-                  <div class="story-app-time">08:12 <span>Una pregunta cerca de ti</span></div>
-                  <div class="help-strip">🙋 <strong>¿Necesitas una mano?</strong><b>¡Pídelo!</b></div>
-                  <div class="request-card"><div class="request-author"><span>M</span><div><b>Marta R.</b><small>Vecina verificada · a 120 m</small></div></div><strong>Se soltó la llave del lavaplatos</strong><p>¿Alguien conoce a un gasfiter del barrio que pueda venir hoy?</p><div class="request-meta"><span>🔧 Gasfitería</span><span>Ahora</span></div></div>
-                  <div class="nearby-answer"><span>●</span><p><strong>3 vecinos</strong> ya vieron el pedido</p></div>
-                </div>
-
-                <div class="demo-scene" data-scene-panel="mercado">
-                  <div class="story-app-time">12:40 <span>Un comercio de toda la vida</span></div>
-                  <div class="app-section-title"><span>🏪</span><div><small>Comercios de</small><strong>el barrio</strong></div></div>
-                  <div class="commerce-demo-cover"><img src="assets/comercio-local.jpg" alt="" /><span>Destacado</span></div>
-                  <div class="commerce-demo-info"><div><strong>Panadería La Esquina</strong><small>🥖 Panadería · a 280 m</small></div><b>Abierto</b></div>
-                  <div class="commerce-demo-promo">🎁 <div><small>Beneficio para vecinos</small><strong>Pan amasado recién horneado</strong></div><span>Ver</span></div>
-                </div>
-
-                <div class="demo-scene" data-scene-panel="servicios">
-                  <div class="story-app-time">08:19 <span>La respuesta estaba cerca</span></div>
-                  <div class="app-section-title"><span>🧰</span><div><small>Servicios de</small><strong>el barrio</strong></div></div>
-                  <div class="service-hero"><span>🔧</span><div><small>Gasfitería</small><strong>Soluciones Don Pedro</strong><p>⭐ 4.9 · A 350 m</p></div><b>Contactar</b></div>
-                  <div class="neighbor-proof"><div class="avatar-stack"><span>AC</span><span>JR</span><span>ML</span></div><p><strong>Recomendado por 18 vecinos</strong><small>“Llegó rápido y dejó todo impecable.”</small></p></div>
-                  <div class="message-bubble"><span>Pedro</span><p>Hola Marta 👋 Estoy terminando un trabajo cerca. Puedo pasar en 20 minutos.</p><small>08:19 ✓✓</small></div>
-                </div>
-
-                <div class="demo-scene" data-scene-panel="eventos">
-                  <div class="story-app-time">18:30 <span>De vecinos a comunidad</span></div>
-                  <div class="app-section-title"><span>📅</span><div><small>Eventos de</small><strong>el barrio</strong></div></div>
-                  <div class="event-cover"><img src="assets/comunidad-barrio.jpg" alt="" /><div><small>Comunidad</small><strong>Encuentro en la plaza</strong><p>Hoy · 18:30 · A 450 m</p></div></div>
-                  <div class="event-attendance"><div class="avatar-stack"><span>M</span><span>P</span><span>FV</span><span>+38</span></div><div><strong>Marta y Pedro asistirán</strong><small>Junto a 38 vecinos del barrio</small></div></div>
-                </div>
-
-                <div class="app-tabs"><span class="selected">⌂<small>Inicio</small></span><span>▣<small>Mercado</small></span><span>⌕<small>Servicios</small></span><span>□<small>Eventos</small></span><span>○<small>Chat</small></span></div>
+                <img class="demo-scene active" data-scene-panel="inicio" src="assets/story-screen-inicio.jpg" alt="Pantalla Inicio de El Barrio" />
+                <img class="demo-scene" data-scene-panel="servicios" src="assets/story-screen-servicios.jpg" alt="Pantalla Servicios de El Barrio" />
+                <img class="demo-scene" data-scene-panel="mercado" src="assets/story-screen-mercado.jpg" alt="Pantalla Comercios de El Barrio" />
+                <img class="demo-scene" data-scene-panel="eventos" src="assets/story-screen-eventos.jpg" alt="Pantalla Eventos de El Barrio" />
               </div>
             </div>
           </div>
@@ -176,31 +139,31 @@
           <div class="story-steps" id="vecinos">
             <article class="story-step active" data-scene="inicio">
               <span class="step-number">01 · 08:12</span>
-              <p class="eyebrow">La pregunta</p>
-              <h3>Marta necesita una mano. No quiere llamar a un desconocido de otra comuna.</h3>
-              <p>Publica lo que necesita en su barrio. Sin grupos eternos, sin preguntar en cinco lugares distintos y sin sentirse sola frente al problema.</p>
-              <blockquote>“¿Alguien conoce a alguien de confianza que esté cerca?”</blockquote>
+              <p class="eyebrow" data-content="story.oneLabel">La pregunta</p>
+              <h3 data-content="story.oneTitle">Marta necesita una mano. No quiere llamar a un desconocido de otra comuna.</h3>
+              <p data-content="story.oneBody">Publica lo que necesita en su barrio. Sin grupos eternos, sin preguntar en cinco lugares distintos y sin sentirse sola frente al problema.</p>
+              <blockquote data-content="story.oneQuote">“¿Alguien conoce a alguien de confianza que esté cerca?”</blockquote>
             </article>
             <article class="story-step" data-scene="servicios">
               <span class="step-number">02 · 08:19</span>
-              <p class="eyebrow">La respuesta</p>
-              <h3>Siete minutos después, Pedro responde. Está trabajando a tres cuadras.</h3>
-              <p>No aparece porque pagó por estar primero. Aparece porque está cerca, otros vecinos lo recomiendan y puede ayudar hoy.</p>
-              <blockquote>La confianza deja de ser un comentario perdido. Se vuelve una red.</blockquote>
+              <p class="eyebrow" data-content="story.twoLabel">La respuesta</p>
+              <h3 data-content="story.twoTitle">Siete minutos después, Pedro responde. Está trabajando a tres cuadras.</h3>
+              <p data-content="story.twoBody">No aparece porque pagó por estar primero. Aparece porque está cerca, otros vecinos lo recomiendan y puede ayudar hoy.</p>
+              <blockquote data-content="story.twoQuote">La confianza deja de ser un comentario perdido. Se vuelve una red.</blockquote>
             </article>
             <article class="story-step" data-scene="mercado">
               <span class="step-number">03 · 12:40</span>
-              <p class="eyebrow">El encuentro</p>
-              <h3>Camino a casa, Marta descubre la panadería que siempre estuvo ahí.</h3>
-              <p>El comercio gana una clienta del sector. Marta encuentra un lugar al que quiere volver. El dinero circula cerca y el barrio empieza a reconocerse.</p>
-              <blockquote>No se trata de llegar a más personas. Se trata de llegar a las correctas.</blockquote>
+              <p class="eyebrow" data-content="story.threeLabel">El encuentro</p>
+              <h3 data-content="story.threeTitle">Camino a casa, Marta descubre la panadería que siempre estuvo ahí.</h3>
+              <p data-content="story.threeBody">El comercio gana una clienta del sector. Marta encuentra un lugar al que quiere volver. El dinero circula cerca y el barrio empieza a reconocerse.</p>
+              <blockquote data-content="story.threeQuote">No se trata de llegar a más personas. Se trata de llegar a las correctas.</blockquote>
             </article>
             <article class="story-step" data-scene="eventos">
               <span class="step-number">04 · 18:30</span>
-              <p class="eyebrow">La comunidad</p>
-              <h3>Por la tarde, Marta y Pedro se vuelven a encontrar. Esta vez, en la plaza.</h3>
-              <p>Ya no son un perfil y un servicio. Son dos personas del mismo lugar, compartiendo un evento que antes quizás ninguno habría visto.</p>
-              <blockquote>Eso es El Barrio: hacer visible la comunidad que ya existe.</blockquote>
+              <p class="eyebrow" data-content="story.fourLabel">La comunidad</p>
+              <h3 data-content="story.fourTitle">Por la tarde, Marta y Pedro se vuelven a encontrar. Esta vez, en la plaza.</h3>
+              <p data-content="story.fourBody">Ya no son un perfil y un servicio. Son dos personas del mismo lugar, compartiendo un evento que antes quizás ninguno habría visto.</p>
+              <blockquote data-content="story.fourQuote">Eso es El Barrio: hacer visible la comunidad que ya existe.</blockquote>
             </article>
           </div>
         </div>
@@ -211,6 +174,10 @@
           <div class="commerce-stage-photo"><img src="assets/comercio-local.jpg" alt="Comercio local atendiendo a una vecina" /></div>
           <div class="commerce-stage-shade"></div>
           <div class="commerce-phone">
+            <img class="editable-stage-panel active" data-commerce-panel="01" src="assets/story-commerce-panel-1.jpg" alt="Vista de comercios: descubrimiento" />
+            <img class="editable-stage-panel" data-commerce-panel="02" src="assets/story-commerce-panel-2.jpg" alt="Vista de comercios: perfil" />
+            <img class="editable-stage-panel" data-commerce-panel="03" src="assets/story-commerce-panel-3.jpg" alt="Vista de comercios: confianza" />
+            <img class="editable-stage-panel" data-commerce-panel="04" src="assets/story-commerce-panel-4.jpg" alt="Vista de comercios: crecimiento" />
             <div class="commerce-phone-top"><span>🏪</span><strong>Comercios de <em>el barrio</em></strong><i>⌕</i></div>
             <div class="commerce-ui active" data-commerce-ui="01">
               <small class="commerce-ui-label">CERCA DE TI</small>
@@ -225,6 +192,7 @@
               <div class="commerce-profile-head"><span>PL</span><div><small>PERFIL COMERCIAL</small><strong>Panadería La Esquina</strong><p>✓ Comercio verificado</p></div></div>
               <div class="commerce-actions"><span>💬<small>WhatsApp</small></span><span>📍<small>Cómo llegar</small></span><span>♡<small>Guardar</small></span></div>
               <div class="commerce-offer"><small>BENEFICIO PARA VECINOS</small><strong>10% en pan amasado</strong><span>Ver promoción →</span></div>
+              <div class="commerce-products"><article><span>🥖</span><div><b>Marraqueta tradicional</b><small>$1.200 · recién horneada</small></div></article><article><span>🥐</span><div><b>Croissant de almendras</b><small>$2.800 · destacado</small></div></article></div>
             </div>
             <div class="commerce-ui" data-commerce-ui="03">
               <div class="commerce-score"><strong>4.9</strong><span>★★★★★<small>Opiniones de vecinos</small></span></div>
@@ -268,84 +236,112 @@
       </section>
 
       <section class="services-business" id="servicios">
-        <div class="services-business-inner section">
-          <div class="services-copy reveal">
-            <p class="eyebrow"><span></span> <b data-content="services.eyebrow">Para quienes hacen que el barrio funcione</b></p>
-            <h2><span data-content="services.title">Tu oficio merece algo mejor que perderse</span> <em data-content="services.accent">en un grupo de WhatsApp.</em></h2>
-            <p data-content="services.body">Construye reputación donde realmente trabajas. Que tus próximos clientes te encuentren por cercanía, confianza y recomendaciones reales.</p>
-            <div class="services-benefits">
-              <article><span>01</span><div><strong>Perfil profesional</strong><small>Especialidad, cobertura, contacto y trabajos realizados.</small></div></article>
-              <article><span>02</span><div><strong>Confianza que permanece</strong><small>Las opiniones dejan de perderse y construyen tu reputación.</small></div></article>
-              <article><span>03</span><div><strong>Visibilidad cuando importa</strong><small>Destácate frente a vecinos que necesitan lo que haces.</small></div></article>
+        <div class="service-story-scenes">
+          <article class="service-story-scene active" data-service-story-scene data-count="01" data-status="Un vecino necesita ayuda cerca">
+            <p class="eyebrow"><span></span> <b data-content="services.eyebrow">Para profesionales del barrio</b></p>
+            <h2><span data-content="services.title">Tu próximo trabajo puede estar</span> <em data-content="services.accent">a tres cuadras.</em></h2>
+            <p data-content="services.body">No necesitas llegar a toda la ciudad. Necesitas aparecer frente a quienes buscan exactamente lo que sabes hacer.</p>
+          </article>
+          <article class="service-story-scene" data-service-story-scene data-count="02" data-status="Tu perfil aparece por cercanía y oficio">
+            <span class="commerce-kicker">01 · Te encuentran</span>
+            <h3 data-content="services.discoveryTitle">Tu oficio deja de perderse entre mensajes.</h3>
+            <p data-content="services.discoveryBody">Especialidad, disponibilidad, cobertura y contacto viven en un perfil profesional claro.</p>
+          </article>
+          <article class="service-story-scene" data-service-story-scene data-count="03" data-status="Cada trabajo suma confianza real">
+            <span class="commerce-kicker">02 · Te recomiendan</span>
+            <h3 data-content="services.trustTitle">Un buen trabajo abre la puerta al siguiente.</h3>
+            <p data-content="services.trustBody">Las opiniones de vecinos permanecen y construyen una reputación visible dentro del barrio.</p>
+          </article>
+          <article class="service-story-scene" data-service-story-scene data-count="04" data-status="Tu servicio se vuelve referente local">
+            <span class="commerce-kicker">03 · Creces cerca</span>
+            <h3 data-content="services.closeTitle">Hazte visible justo cuando te necesitan.</h3>
+            <p data-content="services.closeBody">Destaca tu servicio para recibir más oportunidades dentro de tu zona de trabajo.</p>
+            <a class="button primary" href="#sumate"><b data-content="services.cta">Quiero publicar mi servicio</b> <span>→</span></a>
+          </article>
+        </div>
+        <div class="service-story-stage">
+          <div class="service-story-photo">
+            <img src="assets/hero-barrio.jpg" alt="Profesional ofreciendo sus servicios dentro del barrio" />
+          </div>
+          <div class="service-story-shade"></div>
+          <div class="service-story-phone">
+            <img class="editable-stage-panel active" data-service-panel="01" src="assets/story-service-panel-1.jpg" alt="Vista de servicios: solicitud" />
+            <img class="editable-stage-panel" data-service-panel="02" src="assets/story-service-panel-2.jpg" alt="Vista de servicios: perfil" />
+            <img class="editable-stage-panel" data-service-panel="03" src="assets/story-service-panel-3.jpg" alt="Vista de servicios: reputación" />
+            <img class="editable-stage-panel" data-service-panel="04" src="assets/story-service-panel-4.jpg" alt="Vista de servicios: oportunidades" />
+            <div class="service-story-top"><span>🧰</span><strong>Servicios de <em>el barrio</em></strong><i>⌕</i></div>
+            <div class="service-story-ui active" data-service-story-ui="01">
+              <small>SOLICITUD CERCA DE TI</small>
+              <div class="service-need"><span>🙋</span><div><b>Necesito reparar una llave hoy</b><small>Gasfitería · a 300 m · ahora</small></div></div>
+              <div class="service-nearby"><i></i> 4 profesionales disponibles cerca</div>
+              <div class="service-detail-row"><span>📍</span><div><b>Dentro de tu barrio</b><small>Respuesta promedio: 12 minutos</small></div></div>
+              <div class="service-candidates"><span><img src="assets/comercio-local.jpg" alt="" /><b>Pedro</b><small>4,9 ★</small></span><span><img src="assets/comunidad-barrio.jpg" alt="" /><b>Mario</b><small>4,8 ★</small></span><span><img src="assets/vecina-historia.jpg" alt="" /><b>Ana</b><small>4,9 ★</small></span></div>
             </div>
-            <a class="button primary" href="#sumate"><b data-content="services.cta">Quiero ofrecer mi servicio</b><span>→</span></a>
-          </div>
-          <div class="service-product reveal">
-            <div class="service-product-glow"></div>
-            <div class="service-app-card">
-              <div class="service-card-cover"><span>🔧</span><div><small>GASFITERÍA · LAS CONDES</small><strong>Soluciones Don Pedro</strong><p><b>✓ Verificado</b> · Responde rápido</p></div><i>♡</i></div>
-              <div class="service-rating"><strong>4.9</strong><span>★★★★★<small>18 vecinos lo recomiendan</small></span><b>Disponible hoy</b></div>
-              <p>Reparaciones, instalaciones y urgencias domiciliarias dentro del barrio.</p>
-              <div class="service-tags"><span>🚿 Filtraciones</span><span>🔧 Reparaciones</span><span>🏠 Domicilio</span></div>
-              <div class="service-contact"><button>💬 Conversar</button><button>📞 Llamar</button></div>
+            <div class="service-story-ui" data-service-story-ui="02">
+              <article class="service-profile-preview compact">
+              <header><span>DP</span><div><small>GASFITERÍA · LAS CONDES</small><strong>Soluciones Don Pedro</strong><p>✓ Perfil verificado</p></div><b>4.9 ★</b></header>
+              <p>Reparaciones e instalaciones a domicilio. Atención dentro del barrio.</p>
+              <div><span>🚿 Filtraciones</span><span>🔧 Reparaciones</span><span>🏠 Domicilio</span></div>
+              </article>
+              <div class="service-provider-data"><span><b>Disponible hoy</b><small>09:00–19:00 hrs.</small></span><span><b>300 m</b><small>de tu ubicación</small></span></div>
+              <div class="service-contact-preview"><span>💬 Conversar</span><span>📞 Llamar</span></div>
             </div>
-            <div class="service-request"><span>🙋</span><div><small>NUEVA SOLICITUD · A 300 M</small><strong>“Necesito reparar una llave hoy”</strong></div><b>Ahora</b></div>
-            <div class="service-featured"><span>✦</span><div><small>SERVICIO DESTACADO</small><strong>Hazte visible justo cuando te necesitan.</strong></div></div>
+            <div class="service-story-ui" data-service-story-ui="03">
+              <div class="service-score"><strong>4.9</strong><span>★★★★★<small>18 vecinos lo recomiendan</small></span></div>
+              <blockquote>“Llegó rápido, explicó todo y dejó la reparación impecable.”</blockquote>
+              <div class="commerce-reviewer"><span>MR</span><div><b>María R.</b><small>Vecina verificada · a 200 m</small></div><i>✓</i></div>
+              <div class="service-history"><b>24 trabajos completados</b><small>93% responde el mismo día</small></div>
+              <div class="service-review-mini"><img src="assets/vecina-historia.jpg" alt="" /><p><b>Recomendado por Carolina</b><small>“Puntual, amable y transparente con el valor.”</small></p></div>
+            </div>
+            <div class="service-story-ui" data-service-story-ui="04">
+              <small>TU SERVICIO EN EL BARRIO</small>
+              <div class="service-opportunity"><strong>3</strong><span>solicitudes cercanas<small>esta semana</small></span></div>
+              <div class="service-feature-card"><span>✦</span><div><small>VISIBILIDAD DESTACADA</small><strong>Aparece primero cuando buscan tu oficio.</strong></div></div>
+              <div class="service-impact-grid"><span><b>+62</b><small>vistas cercanas</small></span><span><b>8</b><small>contactos nuevos</small></span><span><b>4,9</b><small>reputación</small></span></div>
+              <a class="service-ui-cta" href="#sumate">Publicar mi servicio <span>→</span></a>
+            </div>
+            <div class="commerce-phone-pulse"><i></i><span data-service-story-status>Un vecino necesita ayuda cerca</span></div>
           </div>
+          <div class="service-story-progress"><span data-service-story-count>01</span><i><b data-service-story-progress></b></i><em>04</em></div>
         </div>
       </section>
 
-      <section class="trust">
-        <div class="section trust-inner">
-          <p class="eyebrow"><span></span> Confianza hiperlocal</p>
-          <h2>Un barrio digital que sigue sintiéndose <em>humano.</em></h2>
-          <div class="trust-grid">
-            <article><span>📍</span><h3>Realmente cerca</h3><p>La experiencia cambia según el lugar donde vives.</p></article>
-            <article><span>✅</span><h3>Comunidad verificada</h3><p>Personas vinculadas a un territorio concreto.</p></article>
-            <article><span>🤝</span><h3>Útil antes que viral</h3><p>Menos ruido. Más información para la vida cotidiana.</p></article>
-          </div>
-        </div>
-      </section>
-
-      <section class="community" id="comunidad">
-        <div class="community-media"><img src="assets/comunidad-barrio.jpg" alt="Encuentro comunitario de vecinos en una plaza de Las Condes" /></div>
-        <div class="community-overlay"></div>
-        <div class="community-content section reveal">
-          <p class="eyebrow light"><span></span> Más que una aplicación</p>
-          <h2>Cuando sabemos quién está cerca, es más fácil <em>hacer comunidad.</em></h2>
-          <p>El Barrio convierte la proximidad en algo útil: descubrir, participar, ayudar y fortalecer la economía local.</p>
-        </div>
-      </section>
-
-      <section class="join section" id="sumate">
-        <div class="join-card">
+      <section class="join" id="sumate">
+        <div class="join-card section">
           <div class="join-copy">
-            <p class="eyebrow light"><span></span> Próximamente</p>
+            <div class="join-intro-row"><div class="join-proof"><img src="assets/vecina-historia.jpg" alt="" /><img src="assets/comunidad-barrio.jpg" alt="" /><img src="assets/comercio-local.jpg" alt="" /><p><strong data-content="join.proofTitle">Únete a los primeros vecinos</strong><small data-content="join.proofBody">Te avisaremos antes del lanzamiento público.</small></p></div></div>
             <h2 data-content="join.title">El barrio que necesitas ya está más cerca.</h2>
             <p data-content="join.body">Estamos construyendo la primera comunidad en Las Condes. Déjanos tus datos para ser de los primeros.</p>
+            <div class="join-meta-row"><div class="join-availability"><i></i><span><strong data-content="join.openingTitle">Primera apertura: Las Condes</strong><small data-content="join.openingBody">Acceso por etapas · cupos iniciales limitados</small></span><b data-content="join.openingStatus">Próximamente</b></div></div>
           </div>
           <form class="join-form" data-join-form>
             <fieldset>
-              <legend>Quiero participar como</legend>
-              <label><input type="radio" name="tipo" value="Vecino" checked /><span>🏠 Vecino</span></label>
-              <label><input type="radio" name="tipo" value="Comercio" /><span>🏪 Comercio</span></label>
+              <legend data-content="join.participantLabel">Quiero participar como</legend>
+              <label><input type="radio" name="tipo" value="Vecino" checked /><span data-content="join.neighborOption">🏠 Vecino</span></label>
+              <label><input type="radio" name="tipo" value="Comercio" /><span data-content="join.commerceOption">🏪 Comercio</span></label>
+              <label><input type="radio" name="tipo" value="Servicio" /><span data-content="join.serviceOption">🧰 Servicio</span></label>
             </fieldset>
-            <label class="input-label">Tu nombre<input type="text" name="nombre" placeholder="¿Cómo te llamas?" required /></label>
-            <label class="input-label">Tu correo<input type="email" name="correo" placeholder="tu@correo.cl" required /></label>
-            <button class="button dark" type="submit">Quiero ser parte <span>→</span></button>
-            <p class="form-note" data-form-note>Te contactaremos cuando abramos el acceso en tu sector.</p>
+            <label class="input-label"><span data-content="join.nameLabel">Nombre completo</span><input type="text" name="nombre" autocomplete="name" placeholder="Ej: Fernando Vergara" data-placeholder-content="join.namePlaceholder" maxlength="100" required /></label>
+            <label class="input-label"><span data-content="join.emailLabel">Correo</span><input type="email" name="correo" autocomplete="email" placeholder="nombre@correo.cl" data-placeholder-content="join.emailPlaceholder" maxlength="160" required /></label>
+            <label class="input-label"><span data-content="join.whatsappLabel">WhatsApp</span><input type="tel" name="whatsapp" autocomplete="tel" placeholder="+56 9 1234 5678" data-placeholder-content="join.whatsappPlaceholder" maxlength="30" required /></label>
+            <label class="input-label"><span data-content="join.comunaLabel">Comuna</span><input type="text" name="comuna" autocomplete="address-level2" placeholder="Ej: Las Condes" data-placeholder-content="join.comunaPlaceholder" maxlength="80" required /></label>
+            <label class="join-trap" aria-hidden="true">Sitio web<input type="text" name="sitio" tabindex="-1" autocomplete="off" /></label>
+            <button class="button dark" type="submit"><b data-content="join.formCta">Quiero acceso anticipado</b> <span>→</span></button>
+            <p class="form-note" data-form-note data-content="join.formNote">Guardaremos estos datos únicamente para avisarte sobre el lanzamiento de El Barrio.</p>
           </form>
         </div>
       </section>
+
     </main>
 
     <footer class="footer">
       <div class="footer-inner section">
-        <div class="footer-brand"><a class="brand" href="#inicio"><img src="assets/isotipo.png" alt="" /><span>El Barrio</span></a><p>Conectando lo que importa, cerca de casa.</p></div>
-        <div><strong>Explora</strong><a href="#como-funciona">Cómo funciona</a><a href="#vecinos">Para vecinos</a><a href="#comercios">Para comercios</a></div>
-        <div><strong>Contacto</strong><a href="mailto:elbarrio.lat@gmail.com">elbarrio.lat@gmail.com</a><span>Las Condes · Santiago</span></div>
+        <div class="footer-brand"><a class="brand" href="#inicio"><img src="assets/isotipo.png" alt="" /><span>El Barrio</span></a><p data-content="footer.tagline">La red local que convierte cercanía en comunidad.</p></div>
+        <div><strong>Producto</strong><a href="#como-funciona" data-content="nav.how">Cómo funciona</a><a href="#vecinos" data-content="nav.neighbors">Para vecinos</a><a href="#comercios" data-content="nav.commerce">Para comercios</a><a href="#servicios" data-content="nav.services">Para servicios</a></div>
+        <div><strong>Comunidad</strong><a href="#como-funciona">Cómo funciona</a><a href="#sumate">Acceso anticipado</a><span>Las Condes · Chile</span></div>
+        <div class="footer-status"><i></i><span><strong data-content="footer.statusTitle">Construyendo el primer barrio</strong><small data-content="footer.statusBody">Próximamente en Las Condes</small></span></div>
       </div>
-      <div class="footer-bottom"><span>© 2026 El Barrio</span><span>Hecho para barrios que quieren estar más cerca.</span></div>
+      <div class="footer-bottom"><span data-content="footer.copyright">© 2026 El Barrio</span><span data-content="footer.signature" data-heart-content>Hecho con <b class="footer-heart">♥</b> desde Santiago, CL.</span></div>
     </footer>
   </body>
 </html>

@@ -71,3 +71,64 @@ resetButton?.addEventListener('click', async () => {
     notify(error.message, true)
   }
 })
+
+document.querySelectorAll('[data-media-upload]').forEach(input => {
+  input.addEventListener('change', () => {
+    const file = input.files?.[0]
+    if (!file) return
+    if (file.type !== 'video/mp4' || file.size > 25 * 1024 * 1024) {
+      notify('Usa un video MP4 de hasta 25 MB.', true)
+      input.value = ''
+      return
+    }
+    const label = input.closest('.media-upload')
+    const reader = new FileReader()
+    label?.classList.add('uploading')
+    reader.onload = async () => {
+      try {
+        const result = await request({ action: 'upload_media', slot: input.dataset.mediaUpload, file: reader.result })
+        notify(result.message)
+        label?.classList.add('complete')
+      } catch (error) {
+        notify(error.message, true)
+      } finally {
+        label?.classList.remove('uploading')
+        input.value = ''
+      }
+    }
+    reader.readAsDataURL(file)
+  })
+})
+
+document.querySelectorAll('[data-image-upload]').forEach(input => {
+  input.addEventListener('change', () => {
+    const file = input.files?.[0]
+    if (!file) return
+    if (input.dataset.imageUpload === 'hero-phone' && file.type !== 'image/png') {
+      notify('La composición completa del hero debe ser un archivo PNG.', true)
+      input.value = ''
+      return
+    }
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type) || file.size > 8 * 1024 * 1024) {
+      notify('Usa una imagen JPG, PNG o WEBP de hasta 8 MB.', true)
+      input.value = ''
+      return
+    }
+    const label = input.closest('.media-upload')
+    const reader = new FileReader()
+    label?.classList.add('uploading')
+    reader.onload = async () => {
+      try {
+        const result = await request({ action: 'upload_image', slot: input.dataset.imageUpload, file: reader.result })
+        notify(result.message)
+        label?.classList.add('complete')
+      } catch (error) {
+        notify(error.message, true)
+      } finally {
+        label?.classList.remove('uploading')
+        input.value = ''
+      }
+    }
+    reader.readAsDataURL(file)
+  })
+})

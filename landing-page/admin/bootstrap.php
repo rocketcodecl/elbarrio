@@ -60,6 +60,40 @@ function publish_remote(array $data): array
     return is_array($decoded) ? $decoded : ['ok' => false, 'message' => 'El CMS no pudo comunicarse con elbarrio.lat.'];
 }
 
+function publish_remote_media(string $slot, string $base64, string $action = 'upload_media'): array
+{
+    $pairing = pairing_config();
+    $url = (string)($pairing['publish_url'] ?? '');
+    $token = (string)($pairing['publish_token'] ?? '');
+    if ($url === '' || $token === '') return ['ok' => false, 'message' => 'El CMS no contiene la conexión con la landing.'];
+    $payload = json_encode(['action' => $action, 'slot' => $slot, 'file' => $base64]);
+    $context = stream_context_create(['http' => ['method' => 'POST', 'header' => "Content-Type: application/json\r\nAuthorization: Bearer {$token}\r\n", 'content' => $payload, 'timeout' => 45, 'ignore_errors' => true]]);
+    $response = @file_get_contents($url, false, $context);
+    $decoded = $response ? json_decode($response, true) : null;
+    return is_array($decoded) ? $decoded : ['ok' => false, 'message' => 'No fue posible subir el video a la landing.'];
+}
+
+function fetch_remote_leads(): array
+{
+    $pairing = pairing_config();
+    $publishUrl = (string)($pairing['publish_url'] ?? '');
+    $token = (string)($pairing['publish_token'] ?? '');
+    if ($publishUrl === '' || $token === '') {
+        $local = dirname(__DIR__) . '/data/leads.json';
+        return is_file($local) ? read_json_file($local) : [];
+    }
+    $url = preg_replace('~/publish\.php$~', '/leads.php', $publishUrl) ?: '';
+    $context = stream_context_create(['http' => [
+        'method' => 'GET',
+        'header' => "Authorization: Bearer {$token}\r\n",
+        'timeout' => 12,
+        'ignore_errors' => true,
+    ]]);
+    $response = @file_get_contents($url, false, $context);
+    $decoded = $response ? json_decode($response, true) : null;
+    return is_array($decoded) && !empty($decoded['ok']) && is_array($decoded['data'] ?? null) ? $decoded['data'] : [];
+}
+
 function is_logged_in(): bool
 {
     return !empty($_SESSION['landing_admin']);

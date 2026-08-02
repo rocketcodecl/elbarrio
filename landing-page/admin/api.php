@@ -9,6 +9,24 @@ verify_csrf($_SERVER['HTTP_X_CSRF_TOKEN'] ?? null);
 $request = json_decode((string)file_get_contents('php://input'), true);
 $action = is_array($request) ? (string)($request['action'] ?? '') : '';
 
+if ($action === 'upload_media') {
+    $slot = (string)($request['slot'] ?? '');
+    $file = (string)($request['file'] ?? '');
+    $remote = publish_remote_media($slot, $file);
+    if (empty($remote['ok'])) { http_response_code(502); }
+    echo json_encode($remote);
+    exit;
+}
+
+if ($action === 'upload_image') {
+    $slot = (string)($request['slot'] ?? '');
+    $file = (string)($request['file'] ?? '');
+    $remote = publish_remote_media($slot, $file, 'upload_image');
+    if (empty($remote['ok'])) { http_response_code(502); }
+    echo json_encode($remote);
+    exit;
+}
+
 if ($action === 'reset') {
     $defaults = read_json_file(DEFAULTS_FILE);
     $remote = $defaults ? publish_remote($defaults) : ['ok' => false];
@@ -31,15 +49,15 @@ $defaults = read_json_file(DEFAULTS_FILE);
 $incoming = $request['data'];
 $clean = $defaults;
 
-$textPaths = [
-    ['hero', 'eyebrow'], ['hero', 'title'], ['hero', 'accent'], ['hero', 'lead'], ['hero', 'primaryCta'],
-    ['commerce', 'eyebrow'], ['commerce', 'title'], ['commerce', 'accent'], ['commerce', 'intro'],
-    ['commerce', 'discoveryTitle'], ['commerce', 'discoveryBody'], ['commerce', 'trustTitle'], ['commerce', 'trustBody'],
-    ['commerce', 'closeTitle'], ['commerce', 'closeBody'], ['commerce', 'cta'], ['join', 'title'], ['join', 'body'],
-];
+$textPaths = [];
+foreach (($defaults['content'] ?? []) as $group => $fields) {
+    foreach (array_keys(is_array($fields) ? $fields : []) as $key) {
+        $textPaths[] = [$group, $key];
+    }
+}
 
 foreach ($textPaths as [$group, $key]) {
-    $value = trim((string)($incoming['content'][$group][$key] ?? ''));
+    $value = trim((string)($incoming['content'][$group][$key] ?? $defaults['content'][$group][$key] ?? ''));
     if ($value === '' || mb_strlen($value) > 500) {
         http_response_code(422);
         echo json_encode(['ok' => false, 'message' => "Revisa el campo {$group}.{$key}."]);
@@ -48,7 +66,7 @@ foreach ($textPaths as [$group, $key]) {
     $clean['content'][$group][$key] = $value;
 }
 
-$clean['sizes']['heroTitle'] = max(64, min(120, (int)($incoming['sizes']['heroTitle'] ?? 94)));
+$clean['sizes']['heroTitle'] = max(48, min(90, (int)($incoming['sizes']['heroTitle'] ?? 72)));
 $clean['sizes']['sectionTitle'] = max(48, min(90, (int)($incoming['sizes']['sectionTitle'] ?? 72)));
 $clean['sizes']['body'] = max(14, min(20, (int)($incoming['sizes']['body'] ?? 16)));
 $clean['updatedAt'] = gmdate('c');

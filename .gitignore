@@ -15,6 +15,7 @@ landing-page/admin/config.php
 landing-page/releases/
 landing-page/publish-config.php
 landing-page/admin/pairing.php
+landing-page/data/leads.json
 
 # Editor directories and files
 .vscode/*

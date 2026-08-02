@@ -28,8 +28,10 @@ function openZip(string $path): ZipArchive
 }
 
 $landing = openZip($releaseDir . '/elbarrio-landing.zip');
-foreach (['.htaccess', 'index.html', 'styles.css', 'script.js', 'README.md', 'publish.php'] as $file) addPath($landing, $root . '/' . $file, $file);
+foreach (['.htaccess', 'index.html', 'styles.css', 'script.js', 'README.md', 'publish.php', 'leads.php'] as $file) addPath($landing, $root . '/' . $file, $file);
 foreach (['assets', 'content'] as $directory) addPath($landing, $root . '/' . $directory, $directory);
+$landing->addEmptyDir('data');
+$landing->addFile($root . '/data/.htaccess', 'data/.htaccess');
 $landing->addFromString('publish-config.php', "<?php\nreturn ['token' => " . var_export($token, true) . "];\n");
 $landing->close();
 

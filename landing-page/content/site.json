@@ -1,11 +1,56 @@
 {
   "content": {
+    "nav": {
+      "how": "Cómo funciona",
+      "neighbors": "Para vecinos",
+      "commerce": "Para comercios",
+      "services": "Para servicios",
+      "cta": "Quiero ser parte"
+    },
     "hero": {
-      "eyebrow": "El Barrio · Comenzamos en Las Condes",
+      "eyebrow": "La app hiperlocal · Comenzamos en Las Condes",
       "title": "Lo que necesitas",
-      "accent": "podría estar a tres cuadras.",
-      "lead": "La red local que transforma personas cercanas en vecinos, negocios desconocidos en favoritos y calles compartidas en comunidad.",
-      "primaryCta": "Quiero ser de los primeros"
+      "accent": "podría estar a",
+      "lead": "Una app para descubrir qué pasa, pedir ayuda, encontrar comercios y conectar con las personas que viven cerca de ti.",
+      "primaryCta": "Quiero ser de los primeros",
+      "secondaryCta": "Mira cómo cobra vida",
+      "proofTitle": "Personas reales. Lugares reales.",
+      "proofBody": "Todo conectado por vivir cerca."
+    },
+    "cinema": {
+      "oneLabel": "Una verdad incómoda",
+      "oneTitle": "Vivimos a pocos metros. Pero a veces, a mundos de distancia.",
+      "oneBody": "Nos cruzamos cada día sin conocernos. Pedimos ayuda lejos. Compramos lejos. Nos enteramos tarde de lo que pasó al lado de casa.",
+      "twoLabel": "Todo comienza con algo pequeño",
+      "twoTitle": "Una pregunta. ¿Alguien puede ayudarme?",
+      "twoBody": "No necesita hacerse viral. Solo necesita llegar a la persona correcta, en el lugar correcto, cuando todavía importa.",
+      "threeLabel": "Entonces ocurre algo",
+      "threeTitle": "Un desconocido responde. Y empieza a convertirse en vecino.",
+      "threeBody": "La distancia se acorta. Aparece la confianza. Una necesidad cotidiana crea una conexión que antes no existía.",
+      "fourLabel": "Eso es El Barrio",
+      "fourTitle": "No inventamos la comunidad. La hacemos visible.",
+      "fourBody": "Personas, comercios, servicios y experiencias que ya estaban ahí. Ahora, conectadas por el lugar que comparten."
+    },
+    "story": {
+      "eyebrow": "Una historia que podría pasar mañana",
+      "title": "Todo empieza con una pregunta que alguien hace cerca.",
+      "intro": "Marta vive hace doce años en el barrio. Conoce su edificio, su almacén y la plaza. Pero todavía hay muchas personas y soluciones cercanas que no sabe que existen.",
+      "oneLabel": "La pregunta",
+      "oneTitle": "Marta necesita una mano. No quiere llamar a un desconocido de otra comuna.",
+      "oneBody": "Publica lo que necesita en su barrio. Sin grupos eternos, sin preguntar en cinco lugares distintos y sin sentirse sola frente al problema.",
+      "oneQuote": "¿Alguien conoce a alguien de confianza que esté cerca?",
+      "twoLabel": "La respuesta",
+      "twoTitle": "Siete minutos después, Pedro responde. Está trabajando a tres cuadras.",
+      "twoBody": "No aparece porque pagó por estar primero. Aparece porque está cerca, otros vecinos lo recomiendan y puede ayudar hoy.",
+      "twoQuote": "La confianza deja de ser un comentario perdido. Se vuelve una red.",
+      "threeLabel": "El encuentro",
+      "threeTitle": "Camino a casa, Marta descubre la panadería que siempre estuvo ahí.",
+      "threeBody": "El comercio gana una clienta del sector. Marta encuentra un lugar al que quiere volver. El dinero circula cerca y el barrio empieza a reconocerse.",
+      "threeQuote": "No se trata de llegar a más personas. Se trata de llegar a las correctas.",
+      "fourLabel": "La comunidad",
+      "fourTitle": "Por la tarde, Marta y Pedro se vuelven a encontrar. Esta vez, en la plaza.",
+      "fourBody": "Ya no son un perfil y un servicio. Son dos personas del mismo lugar, compartiendo un evento que antes quizás ninguno habría visto.",
+      "fourQuote": "Eso es El Barrio: hacer visible la comunidad que ya existe."
     },
     "commerce": {
       "eyebrow": "Para comercios locales",
@@ -20,13 +65,55 @@
       "closeBody": "Destácate cuando necesites mayor visibilidad y construye una comunidad de clientes que viven, caminan y compran cerca.",
       "cta": "Quiero sumar mi comercio"
     },
+    "services": {
+      "eyebrow": "Para profesionales del barrio",
+      "title": "Tu próximo trabajo puede estar",
+      "accent": "a tres cuadras.",
+      "body": "No necesitas llegar a toda la ciudad. Necesitas aparecer frente a quienes buscan exactamente lo que sabes hacer.",
+      "discoveryTitle": "Tu oficio deja de perderse entre mensajes.",
+      "discoveryBody": "Especialidad, disponibilidad, cobertura y contacto viven en un perfil profesional claro.",
+      "trustTitle": "Un buen trabajo abre la puerta al siguiente.",
+      "trustBody": "Las opiniones de vecinos permanecen y construyen una reputación visible dentro del barrio.",
+      "closeTitle": "Hazte visible justo cuando te necesitan.",
+      "closeBody": "Destaca tu servicio para recibir más oportunidades dentro de tu zona de trabajo.",
+      "cta": "Quiero publicar mi servicio"
+    },
     "join": {
+      "eyebrow": "ACCESO ANTICIPADO · LAS CONDES",
       "title": "El barrio que necesitas ya está más cerca.",
-      "body": "Estamos construyendo la primera comunidad en Las Condes. Déjanos tus datos para ser de los primeros."
+      "body": "Estamos construyendo la primera comunidad en Las Condes. Déjanos tus datos para ser de los primeros.",
+      "proofTitle": "Únete a los primeros vecinos",
+      "proofBody": "Te avisaremos antes del lanzamiento público.",
+      "openingTitle": "Primera apertura: Las Condes",
+      "openingBody": "Acceso por etapas · cupos iniciales limitados",
+      "openingStatus": "Próximamente",
+      "formTitle": "Reserva tu lugar",
+      "formBody": "Déjanos tus datos para avisarte cuando abramos.",
+      "participantLabel": "Quiero participar como",
+      "neighborOption": "🏠 Vecino",
+      "commerceOption": "🏪 Comercio",
+      "serviceOption": "🧰 Servicio",
+      "nameLabel": "Nombre completo",
+      "namePlaceholder": "Ej: Fernando Vergara",
+      "emailLabel": "Correo",
+      "emailPlaceholder": "nombre@correo.cl",
+      "whatsappLabel": "WhatsApp",
+      "whatsappPlaceholder": "+56 9 1234 5678",
+      "comunaLabel": "Comuna",
+      "comunaPlaceholder": "Ej: Las Condes",
+      "formCta": "Quiero acceso anticipado",
+      "formNote": "Guardaremos estos datos únicamente para avisarte sobre el lanzamiento de El Barrio."
+    },
+    "footer": {
+      "tagline": "La red local que convierte cercanía en comunidad.",
+      "statusTitle": "Construyendo el primer barrio",
+      "statusBody": "Próximamente en Las Condes",
+      "copyright": "© 2026 El Barrio",
+      "signature": "Hecho con ♥ desde Santiago, CL."
     }
   },
   "sizes": {
-    "heroTitle": 94,
+    "heroTitle": 72,
     "sectionTitle": 72,
     "body": 16
   }
