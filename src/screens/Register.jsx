@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { supabase } from '../lib/supabase'
+import { authRedirectUrl, isNativeApp, openNativeAuth } from '../lib/mobileAuth'
 import Stepper from '../components/Stepper'
 
 const PASSWORD_RECOVERY_KEY = 'elbarrio:password-recovery-pending'
@@ -22,10 +23,8 @@ function Register({ existingAccount = false, initialEmail = '', recoveryMode = f
     }
     setLoading(true)
     try {
-      const redirectUrl = new URL(import.meta.env.BASE_URL, window.location.origin)
-      redirectUrl.pathname = `${redirectUrl.pathname.replace(/\/$/, '')}/recovery`
       const { error: resetError } = await supabase.auth.resetPasswordForEmail(email.trim(), {
-        redirectTo: redirectUrl.toString(),
+        redirectTo: authRedirectUrl('recovery'),
       })
       if (resetError) throw resetError
       try { localStorage.setItem(PASSWORD_RECOVERY_KEY, 'true') } catch { /* la ruta sigue disponible */ }
@@ -119,11 +118,12 @@ function Register({ existingAccount = false, initialEmail = '', recoveryMode = f
     setLoading(true)
     try {
       try { localStorage.removeItem(PASSWORD_RECOVERY_KEY) } catch { /* no bloquea Google */ }
-      const redirectTo = new URL(import.meta.env.BASE_URL, window.location.origin).toString()
-      const { error: authError } = await supabase.auth.signInWithOAuth({
+      const native = isNativeApp()
+      const { data, error: authError } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo,
+          redirectTo: authRedirectUrl('oauth'),
+          skipBrowserRedirect: native,
           queryParams: {
             access_type: 'offline',
             prompt: 'select_account',
@@ -131,6 +131,7 @@ function Register({ existingAccount = false, initialEmail = '', recoveryMode = f
         },
       })
       if (authError) throw authError
+      if (native && data?.url) await openNativeAuth(data.url)
     } catch (err) {
       setError(err.message || 'No pudimos conectar con Google. Inténtalo nuevamente.')
       setLoading(false)

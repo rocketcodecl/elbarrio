@@ -13,6 +13,7 @@ const cinemaScenes = [...document.querySelectorAll('[data-cinema-scene]')]
 const cinemaVideos = [...document.querySelectorAll('[data-cinema-video]')]
 const cinemaCount = document.querySelector('[data-cinema-count]')
 const cinemaSection = document.querySelector('.cinema')
+const cinemaStory = document.querySelector('.cinema-story')
 const cinemaDevice = document.querySelector('[data-cinema-device]')
 const journeyVisuals = [...document.querySelectorAll('[data-journey-visual]')]
 const journeyVideos = journeyVisuals.filter(visual => visual.tagName === 'VIDEO')
@@ -193,14 +194,21 @@ const setCinemaScene = scene => {
   }
 }
 
-const cinemaObserver = new IntersectionObserver(entries => {
-  const visible = entries
-    .filter(entry => entry.isIntersecting)
-    .sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0]
-  if (visible) setCinemaScene(visible.target)
-}, { rootMargin: '-34% 0px -34%', threshold: [0, .2, .5] })
-
-cinemaScenes.forEach(scene => cinemaObserver.observe(scene))
+let cinemaFrame = 0
+const updateCinemaScene = () => {
+  cinemaFrame = 0
+  if (!cinemaStory || !cinemaScenes.length) return
+  const rect = cinemaStory.getBoundingClientRect()
+  const focusInsideStory = window.innerHeight * .5 - rect.top
+  const sceneHeight = cinemaScenes[0].getBoundingClientRect().height || window.innerHeight
+  const index = Math.max(0, Math.min(cinemaScenes.length - 1, Math.floor(focusInsideStory / sceneHeight)))
+  setCinemaScene(cinemaScenes[index])
+}
+window.addEventListener('scroll', () => {
+  if (!cinemaFrame) cinemaFrame = requestAnimationFrame(updateCinemaScene)
+}, { passive: true })
+window.addEventListener('resize', updateCinemaScene)
+updateCinemaScene()
 
 let activeCommerceScene = ''
 const setCommerceScene = scene => {

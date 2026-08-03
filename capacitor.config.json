@@ -1,0 +1,13 @@
+{
+  "appId": "lat.elbarrio.app",
+  "appName": "El Barrio",
+  "webDir": "dist",
+  "backgroundColor": "#f7faf7",
+  "android": {
+    "backgroundColor": "#f7faf7"
+  },
+  "ios": {
+    "backgroundColor": "#f7faf7",
+    "contentInset": "automatic"
+  }
+}

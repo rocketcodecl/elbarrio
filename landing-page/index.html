@@ -9,8 +9,9 @@
     <meta property="og:description" content="La red local para saber qué pasa, encontrar lo que necesitas y participar donde vives." />
     <title>El Barrio — Tu barrio, más cerca que nunca</title>
     <link rel="icon" href="assets/isotipo.png" />
-    <link rel="stylesheet" href="styles.css?v=20260801-33" />
-    <script src="script.js?v=20260801-33" defer></script>
+    <link rel="stylesheet" href="styles.css?v=20260801-41" />
+    <link rel="stylesheet" href="mobile.css?v=20260802-2" />
+    <script src="script.js?v=20260801-41" defer></script>
   </head>
   <body>
     <div class="progress" aria-hidden="true"><span></span></div>
@@ -40,7 +41,19 @@
     </header>
 
     <main>
-      <div class="hero-journey" id="inicio">
+      <div class="mobile-journey" id="inicio" aria-label="Historia de El Barrio">
+        <section class="mobile-journey-slide">
+          <video autoplay muted loop playsinline preload="metadata" poster="assets/hero-barrio.jpg"><source src="assets/barrio-en-movimiento.mp4" type="video/mp4" /></video>
+          <div class="mobile-journey-shade"></div><img class="mobile-journey-phone" src="assets/story-hero-phone.png" alt="Aplicación El Barrio" />
+          <div class="mobile-journey-copy"><p class="eyebrow light"><span></span><b data-content="hero.eyebrow">La app hiperlocal · Comenzamos en Las Condes</b></p><h1><span data-content="hero.title">Lo que necesitas</span> <em data-content="hero.accent">podría estar a</em> <strong>tres cuadras.</strong></h1><p data-content="hero.lead">Una app para descubrir qué pasa, pedir ayuda, encontrar comercios y conectar con las personas que viven cerca de ti.</p><a class="button primary" href="#sumate"><b data-content="hero.primaryCta">Quiero ser de los primeros</b><span>→</span></a></div>
+          <span class="mobile-scroll-mouse"><i></i></span>
+        </section>
+        <section class="mobile-journey-slide"><video autoplay muted loop playsinline preload="metadata" poster="assets/vecina-historia.jpg"><source src="assets/scene-distancia.mp4" type="video/mp4" /></video><div class="mobile-journey-shade"></div><img class="mobile-journey-phone" src="assets/story-hero-phone.png" alt="Aplicación El Barrio" /><div class="mobile-journey-copy"><p class="eyebrow light"><span></span><b data-content="cinema.oneLabel">Una verdad incómoda</b></p><h2 data-content="cinema.oneTitle">Vivimos a pocos metros. Pero a veces, a mundos de distancia.</h2><p data-content="cinema.oneBody">Nos cruzamos cada día sin conocernos. Pedimos ayuda lejos. Compramos lejos. Nos enteramos tarde de lo que pasó al lado de casa.</p></div></section>
+        <section class="mobile-journey-slide"><video autoplay muted loop playsinline preload="metadata" poster="assets/hero-barrio.jpg"><source src="assets/scene-pregunta.mp4" type="video/mp4" /></video><div class="mobile-journey-shade"></div><img class="mobile-journey-phone" src="assets/story-hero-phone.png" alt="Aplicación El Barrio" /><div class="mobile-journey-copy"><p class="eyebrow light"><span></span><b data-content="cinema.twoLabel">Todo comienza con algo pequeño</b></p><h2 data-content="cinema.twoTitle">Una pregunta. ¿Alguien puede ayudarme?</h2><p data-content="cinema.twoBody">No necesita hacerse viral. Solo necesita llegar a la persona correcta, en el lugar correcto, cuando todavía importa.</p></div></section>
+        <section class="mobile-journey-slide"><video autoplay muted loop playsinline preload="metadata" poster="assets/comunidad-barrio.jpg"><source src="assets/scene-encuentro.mp4" type="video/mp4" /></video><div class="mobile-journey-shade"></div><img class="mobile-journey-phone" src="assets/story-hero-phone.png" alt="Aplicación El Barrio" /><div class="mobile-journey-copy"><p class="eyebrow light"><span></span><b data-content="cinema.threeLabel">Entonces ocurre algo</b></p><h2 data-content="cinema.threeTitle">Un desconocido responde. Y empieza a convertirse en vecino.</h2><p data-content="cinema.threeBody">La distancia se acorta. Aparece la confianza. Una necesidad cotidiana crea una conexión que antes no existía.</p></div></section>
+        <section class="mobile-journey-slide"><video autoplay muted loop playsinline preload="metadata" poster="assets/comunidad-barrio.jpg"><source src="assets/scene-comunidad.mp4" type="video/mp4" /></video><div class="mobile-journey-shade"></div><img class="mobile-journey-phone" src="assets/story-hero-phone.png" alt="Aplicación El Barrio" /><div class="mobile-journey-copy"><p class="eyebrow light"><span></span><b data-content="cinema.fourLabel">Eso es El Barrio</b></p><h2 data-content="cinema.fourTitle">No inventamos la comunidad. La hacemos visible.</h2><p data-content="cinema.fourBody">Personas, comercios, servicios y experiencias que ya estaban ahí. Ahora, conectadas por el lugar que comparten.</p></div></section>
+      </div>
+      <div class="hero-journey" id="inicio-desktop">
       <section class="hero">
         <div class="hero-media" aria-hidden="true">
           <video class="active" autoplay muted loop playsinline preload="metadata" poster="assets/hero-barrio.jpg" data-hero-video data-journey-visual="hero">

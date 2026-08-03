@@ -1,5 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { supabase } from './lib/supabase'
+import { App as CapacitorApp } from '@capacitor/app'
+import { finishNativeAuth, isNativeApp } from './lib/mobileAuth'
 import { C, T } from './lib/design'
 import './App.css'
 
@@ -160,6 +162,31 @@ export default function App() {
       window.clearTimeout(sessionTimer)
       subscription.unsubscribe()
     }
+  }, [checkSession])
+
+  useEffect(() => {
+    if (!isNativeApp()) return undefined
+    let active = true
+    let listener
+    const processUrl = async (url) => {
+      if (!url || !active) return
+      try {
+        const result = await finishNativeAuth(url)
+        if (!result.handled || !active) return
+        if (result.recovery) {
+          setPasswordRecovery(true)
+          setCurrentScreen('register')
+          setLoading(false)
+        } else {
+          await checkSession()
+        }
+      } catch (error) {
+        console.error('[auth] No pudimos completar el retorno nativo:', error)
+      }
+    }
+    CapacitorApp.addListener('appUrlOpen', ({ url }) => processUrl(url)).then(handle => { listener = handle })
+    CapacitorApp.getLaunchUrl().then(result => processUrl(result?.url))
+    return () => { active = false; listener?.remove() }
   }, [checkSession])
 
   const userId = user?.id

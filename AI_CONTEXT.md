@@ -3,12 +3,13 @@
 > Contexto operativo breve para trabajar sobre el estado vigente del proyecto.
 > Debe actualizarse cuando cambien la arquitectura, la navegación, una decisión de producto importante o el estado de una funcionalidad.
 
-## Estado de continuidad — 1 de agosto de 2026
+## Estado de continuidad — 2 de agosto de 2026
 
 - Auditoría local de cierre iniciada el 1 de agosto: la aplicación y el panel compilan en producción. Google OAuth fue validado manualmente con alta, cierre de sesión y reingreso. El informe vigente está en `MVP_RELEASE_AUDIT.md` y la comprobación remota de Supabase, que no modifica datos, está en `supabase/MVP_RELEASE_AUDIT.sql`.
 - La consulta `supabase/MVP_RELEASE_AUDIT.sql` fue ejecutada el 1 de agosto de 2026 y todas las tablas, columnas, funciones y verificaciones RLS incluidas devolvieron `OK`. Esto certifica las estructuras operativas consultadas, pero no reconcilia el historial remoto de migraciones; `supabase db push` continúa prohibido.
 - Bloqueos reales previos a tiendas: eliminación de cuenta, recuperación de contraseña, canal real de soporte, Política de privacidad pública, acceso equivalente para iOS al ofrecer Google, rotación de credenciales compartidas, validación remota de schema/RLS y prueba con administrador territorial. No ejecutar `supabase db push`; el historial remoto continúa sin reconciliar.
-- Todavía no existen proyectos nativos iOS/Android, Capacitor ni notificaciones push. Son la fase siguiente después de cerrar los bloqueos de la auditoría; la web vigente se conserva.
+- La aplicación ya tiene contenedores nativos Android e iOS mediante Capacitor 8, con identificador `lat.elbarrio.app`, permisos de cámara/ubicación, orientación vertical, íconos, splash y callback OAuth propio. El APK Android debug fue compilado, instalado y revisado en emulador el 2 de agosto de 2026; abre a pantalla completa sin marco web. La web vigente se conserva como otra salida del mismo código, no como sustituto de la app.
+- Falta registrar `lat.elbarrio.app://auth/callback` en las Redirect URLs de Supabase y probar Google/recuperación en un teléfono. iOS está generado pero no puede compilarse en este Mac hasta instalar Xcode. Las notificaciones push nativas todavía no están implementadas.
 - Cierre de cuenta y soporte implementados el 1 de agosto: recuperación de contraseña por correo, actualización segura al volver, contacto real mediante `soporte@elbarrio.lat`, Política de privacidad y eliminación autenticada con anonimización. La migración `202608010001_account_deletion_audit.sql` fue ejecutada con resultado `Success` según confirmación manual y `delete-my-account` fue desplegada mediante el empaquetado remoto de Supabase. Falta probar la eliminación con una cuenta desechable; nunca probar primero con la cuenta superadministradora.
 - Inicio aprobado conceptualmente: bajo el bloque intacto de clima y farmacia aparece “Para ti, cerca de casa”, un carrusel suave de hasta cinco contenidos reales con fotografía. Avanza automáticamente cada cinco segundos, se pausa ante interacción y permite deslizamiento manual. No utiliza alertas ni contenido simulado. La selección y el orden quedan en el nuevo módulo “Portada de Inicio” del panel mediante `home_carousel_order`; la migración `202608010002_home_discovery_carousel.sql` fue ejecutada con resultado `Success` el 1 de agosto de 2026 y una consulta remota confirmó la columna y la protección de la RPC.
 - Sistema visual de cabeceras normalizado en la app vecinal: las secciones principales usan 72 px mínimos, título de 16 px, controles circulares de 38 px, safe area común y centrado consistente. Alertas, Noticias y Notificaciones dejaron sus variantes sobredimensionadas; las páginas comunitarias, hojas de Perfil, detalle de alerta, perfil público, detalle de servicio y conversación adoptaron las mismas medidas conservando su contenido propio.
@@ -44,6 +45,8 @@
 ## Arquitectura actual
 
 - Aplicación web móvil construida con Vite 8, React 19 y JavaScript/JSX.
+- `android/` e `ios/` son los proyectos nativos generados por Capacitor. Ambos consumen el mismo build de React desde `dist/`; después de cada cambio de la app debe ejecutarse `npm run mobile:sync` antes de compilar en Android Studio o Xcode.
+- `capacitor.config.json` define la aplicación nativa `lat.elbarrio.app`. `src/lib/mobileAuth.js` adapta Google OAuth y recuperación de contraseña al callback nativo, manteniendo el flujo web existente.
 - Existe una aplicación web administrativa independiente en `admin-panel/`, conectada al mismo Supabase y orientada al uso desde computador.
 - Existe una landing pública independiente en `landing-page/`, construida con HTML, CSS y JavaScript estáticos para desplegarse directamente sin afectar la aplicación ni el panel.
 - La interfaz se presenta dentro de un marco de teléfono en escritorio y ocupa la pantalla disponible en móvil.
@@ -155,6 +158,7 @@ El botón de creación abre `CreatePost.jsx`, salvo la creación de comercios, q
 - La landing usa `#1b9e75` como único verde de marca visible. Su narrativa principal, comercios y servicios funcionan mediante escenas de scroll con interfaces móviles rectas y proporciones contenidas.
 - Los cuatro videos narrativos de la landing son archivos MP4 independientes (`scene-distancia`, `scene-pregunta`, `scene-encuentro`, `scene-comunidad`) reemplazables desde el CMS; actualmente contienen material demostrativo.
 - Las pantallas del teléfono de la historia y los paneles visuales de Comercios y Servicios dejaron de construirse como interfaces HTML: ahora son imágenes reemplazables desde el CMS (`screen-inicio`, `screen-servicios`, `screen-mercado`, `screen-eventos` y cuatro imágenes independientes por cada relato comercial y de servicios). Estas últimas cambian con un fade según el paso activo.
+- La landing carga `landing-page/mobile.css` después de los estilos generales. Esa hoja contiene la composición móvil aislada; comparte todos los textos y medios del mismo CMS, mientras escritorio conserva su composición propia.
 - El formulario de acceso anticipado y su almacenamiento son independientes de Supabase.
 
 - `Home.jsx` es el feed principal y controla el tab Inicio.
@@ -362,6 +366,11 @@ El botón de creación abre `CreatePost.jsx`, salvo la creación de comercios, q
 
 ## Funcionalidades pendientes
 
+- Agregar `lat.elbarrio.app://auth/callback` a Authentication → URL Configuration → Redirect URLs en Supabase y validar Google OAuth y recuperación de contraseña desde Android real.
+- Instalar Xcode, abrir `ios/App/App.xcworkspace` y validar la compilación gratuita en un iPhone propio. Para TestFlight/App Store se necesita la membresía anual de Apple Developer; el proyecto no debe esperar ese pago para seguir avanzando Android y pruebas locales iOS.
+- Implementar push reales con registro de dispositivo, Firebase Cloud Messaging para Android, APNs para iOS, contador de ícono y apertura directa de la pantalla correspondiente.
+- Incorporar “Iniciar sesión con Apple” antes de enviar a revisión en iOS, porque la aplicación ofrece Google para autenticar la cuenta principal.
+
 - La migración `supabase/migrations/202608010003_home_carousel_pool.sql` fue ejecutada correctamente según confirmación manual; Portada de Inicio admite hasta quince contenidos seleccionados y muestra cinco mezclados por carga.
 - Validar visualmente en móvil real el nuevo listado, detalle y composición de Alertas, incluidas las llamadas telefónicas.
 
@@ -369,7 +378,6 @@ El botón de creación abre `CreatePost.jsx`, salvo la creación de comercios, q
 - Probar `delete-my-account` únicamente con una cuenta desechable. La migración de auditoría ya fue aplicada y la función ya está desplegada.
 - Confirmar que `soporte@elbarrio.lat` esté creado y reciba mensajes antes del lanzamiento.
 - Confirmar la URL pública definitiva de la Política de privacidad que se entregará a las tiendas.
-- Incorporar “Iniciar sesión con Apple” durante la preparación iOS, porque la aplicación ofrece Google para autenticar la cuenta principal.
 - Rotar credenciales de servidor, Plesk, SSH y cualquier contraseña compartida antes de producción.
 - Validar desde el panel poner un evento en Inicio, reemplazarlo por otro y quitarlo después de la ejecución confirmada de `202607300005_home_event_spotlight.sql`.
 - Validar visualmente con una sesión real las subpantallas de Mi perfil, Servicios, su detalle, el menú Crear y el Modo accesible dentro del marco móvil; los builds y ESLint focalizado pasan, pero no hubo un navegador conectado para aprobar la captura final.
