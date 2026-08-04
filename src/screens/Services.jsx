@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase'
 import { C, T, distancia, iniciales, RUBROS } from '../lib/design'
 import { openWhatsApp } from '../lib/contact'
 import ThumbUpIcon from '../components/ThumbUpIcon'
+import { getContentCategories } from '../lib/contentCategories'
 
 /* ============================================================
    Services.jsx — Tab "servicios" de El Barrio.
@@ -115,11 +116,6 @@ const IcoStar = ({ size = 12, color = '#f59e0b' }) => (
 )
 
 /* ─── CATEGORÍAS (chips horizontales scrollables) ─── */
-const CATS = [{ key: 'Todos', emoji: '🛠️', label: 'Todos' }, ...RUBROS]
-
-/* Emoji para el badge de cada card según la categoría del post. */
-const CAT_EMOJI = Object.fromEntries(RUBROS.map(r => [r.key, r.emoji]))
-
 /* ─── Helpers ─── */
 const getDistanceLabel = (post) => {
   const m = post?.distance_meters
@@ -158,6 +154,7 @@ const SERVICES_CACHE = new Map()
    COMPONENTE
    ============================================================ */
 export default function Services({ currentUser, onNavigate, onCrear }) {
+  const [serviceCategories, setServiceCategories] = useState(RUBROS)
   const neighborhoodId = currentUser?.neighborhoodId
   const [services, setServices] = useState(() => SERVICES_CACHE.get(neighborhoodId) || [])
   const [loading, setLoading] = useState(() => !SERVICES_CACHE.has(neighborhoodId))
@@ -171,6 +168,10 @@ export default function Services({ currentUser, onNavigate, onCrear }) {
   const featuredPausedRef = useRef(false)
   const featuredResumeRef = useRef(null)
   const searchInputRef = useRef(null)
+  const categoryOptions = [{ key: 'Todos', emoji: '🛠️', label: 'Todos' }, ...serviceCategories]
+  const categoryEmoji = Object.fromEntries(serviceCategories.map(item => [item.key, item.emoji]))
+
+  useEffect(() => { getContentCategories('service', RUBROS).then(setServiceCategories) }, [])
 
   // Pull-to-refresh
   const scrollRef = useRef(null)
@@ -369,8 +370,8 @@ export default function Services({ currentUser, onNavigate, onCrear }) {
     const distLabel = getDistanceLabel(svc)
     const price = formatPrice(svc)
     const serviceKey = svc.service_key || svc.category
-    const rubro = RUBROS.find(r => r.key === serviceKey)
-    const catEmoji = CAT_EMOJI[serviceKey] || '🛠️'
+    const rubro = serviceCategories.find(r => r.key === serviceKey)
+    const catEmoji = categoryEmoji[serviceKey] || '🛠️'
     const desc = svc.description || svc.content || ''
     const verified = author?.badge_trusted_seller || author?.badge_founder
     const expanded = expandedServiceId === svc.id
@@ -439,7 +440,7 @@ export default function Services({ currentUser, onNavigate, onCrear }) {
   const renderFeaturedCard = (svc) => {
     const author = svc.author
     const serviceKey = svc.service_key || svc.category
-    const rubro = RUBROS.find(r => r.key === serviceKey)
+    const rubro = serviceCategories.find(r => r.key === serviceKey)
     const price = formatPrice(svc)
     const rating = getRating(svc)
     const image = Array.isArray(svc.images) ? svc.images.find(Boolean) : null
@@ -504,7 +505,7 @@ export default function Services({ currentUser, onNavigate, onCrear }) {
 
         {/* Chips de categoría */}
         <div style={s.catsScroll}>
-          {CATS.map((cat) => {
+          {categoryOptions.map((cat) => {
             const active = category === cat.key
             return (
               <button

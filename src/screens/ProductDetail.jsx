@@ -730,7 +730,7 @@ export default function ProductDetail({ postId, currentUser, onNavigate, onEdit 
           <div style={s.priceRow}>
             <span style={s.price}>{precioLabel(post)}</span>
             {post.price && esVenta(post.type) && <span style={s.currency}>CLP</span>}
-            {post.is_negotiable && <span style={s.negotiable}>Negociable</span>}
+            {post.is_negotiable && <span style={s.negotiable}>Conversable</span>}
           </div>
           <h1 style={s.title}>{post.title || 'Sin título'}</h1>
 

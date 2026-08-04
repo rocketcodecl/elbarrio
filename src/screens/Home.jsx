@@ -285,7 +285,7 @@ function HomeDiscoveryCarousel({ items }) {
       const next = (activeIndex + 1) % items.length
       const rail = railRef.current
       const card = rail?.children?.[next]
-      if (rail && card) rail.scrollTo({ left: card.offsetLeft - 16, behavior: 'smooth' })
+      if (rail && card) rail.scrollTo({ left: card.offsetLeft - rail.offsetLeft, behavior: 'smooth' })
       setActiveIndex(next)
     }, 5000)
     return () => window.clearInterval(timer)
@@ -304,7 +304,7 @@ function HomeDiscoveryCarousel({ items }) {
     const cards = Array.from(rail.children)
     if (!cards.length) return
     const closest = cards.reduce((best, card, index) => {
-      const distance = Math.abs(card.offsetLeft - 16 - rail.scrollLeft)
+      const distance = Math.abs((card.offsetLeft - rail.offsetLeft) - rail.scrollLeft)
       return distance < best.distance ? { index, distance } : best
     }, { index: 0, distance: Infinity })
     setActiveIndex(closest.index)
@@ -333,7 +333,7 @@ function HomeDiscoveryCarousel({ items }) {
             type="button"
             key={`${item.portadaLabel}-${item.id}`}
             className="home-featured-card"
-            style={{ ...s.paraTiCard, backgroundImage: `linear-gradient(180deg, rgba(9,25,17,.04) 24%, rgba(7,31,21,.88) 100%), url("${item.images[0]}")` }}
+            style={{ ...s.paraTiCard, backgroundImage: `linear-gradient(180deg, rgba(27,158,117,0) 25%, rgba(27,158,117,.68) 58%, #1B9E75 82%, #1B9E75 100%), url("${item.images[0]}")` }}
             onClick={item.portadaAction}
           >
             <span style={s.paraTiBadge}>{item.portadaLabel}</span>
@@ -1368,7 +1368,8 @@ const s = {
   },
 
   scroll: {
-    flex: 1, overflowY: 'auto', padding: '6px 16px 120px',
+    flex: 1, overflowY: 'auto', overflowX: 'clip', padding: '6px 16px 120px',
+    width: '100%', maxWidth: '100%',
     overscrollBehaviorY: 'contain', WebkitOverflowScrolling: 'touch',
   },
   pullRefresh: {
@@ -1439,7 +1440,7 @@ const s = {
   paraTiHeadingTitle: { display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 14, fontWeight: 600, letterSpacing: 0, color: C.texto },
   paraTiHeadingHint: { color: C.textoTenue, fontSize: 8.5, fontWeight: 600 },
   paraTiScroll: {
-    margin: '0 -16px', padding: '0 16px 3px',
+    width: '100%', margin: 0, padding: '0 0 3px',
     display: 'flex', gap: 18,
     overflowX: 'auto', overflowY: 'hidden',
     scrollSnapType: 'x mandatory', scrollbarWidth: 'none',
@@ -1450,10 +1451,10 @@ const s = {
     width: '100%', minWidth: '100%', flex: '0 0 100%', boxSizing: 'border-box', height: 174,
     padding: 14, overflow: 'hidden',
     display: 'flex', flexDirection: 'column', alignItems: 'flex-start', justifyContent: 'space-between',
-    scrollSnapAlign: 'start',
+    scrollSnapAlign: 'start', scrollSnapStop: 'always',
     border: 'none', outline: 'none', WebkitAppearance: 'none', borderRadius: 18,
     color: '#fff', backgroundColor: '#dcebe4', backgroundSize: 'cover', backgroundPosition: 'center',
-    boxShadow: '0 8px 22px rgba(22,33,26,.12)',
+    boxShadow: 'none',
     textAlign: 'left', fontFamily: 'inherit', cursor: 'pointer',
   },
   paraTiBadge: {

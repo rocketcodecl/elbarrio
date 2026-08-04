@@ -2,6 +2,8 @@
 
 ## Estado actual
 
+- Control global implementado: los módulos exclusivos “Publicaciones” y “Categorías” permiten al superadministrador moderar todo el contenido almacenado en `posts` con motivo e historial, y administrar categorías de Mercado, Servicios y Alertas sin editar colores. La migración `supabase/migrations/202608040002_superadmin_content_control.sql` fue ejecutada con resultado `Success` según confirmación manual del usuario. El panel actualizado todavía no se presume publicado en el servidor.
+
 - El panel incorpora “Portada de Inicio” para seleccionar y ordenar hasta cinco publicaciones activas con fotografía por barrio. Usa `posts.home_carousel_order` y `admin_set_home_discovery_carousel`; la migración `202608010002_home_discovery_carousel.sql` fue ejecutada con resultado `Success` el 1 de agosto de 2026 y una consulta remota confirmó la columna y la protección de la RPC.
 - El panel incorpora “Invitaciones” con registros iniciados, vecinos territorialmente verificados, conversión e insignias Conector por barrio. Usa `admin_list_neighbor_invite_metrics`; la migración `202607310003_neighbor_invites.sql` fue ejecutada con resultado `Success` el 31 de julio de 2026 y el módulo está publicado.
 - El módulo “Contenido de la app” permite al superadministrador editar los textos de Privacidad y seguridad y todos los textos, portada y cuatro imágenes de Nosotros, sin alterar el layout. Usa `app_content_pages` y `admin_update_app_content`; la migración `202607310002_editable_app_content.sql` fue ejecutada con resultado `Success` el 31 de julio de 2026.

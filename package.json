@@ -10,6 +10,7 @@
     "build:plesk": "vite build --base=/el-barrio/",
     "mobile:sync": "npm run build && cap sync",
     "mobile:android": "npm run mobile:sync && cap open android",
+    "mobile:android:apk": "npm run mobile:sync && cd android && JAVA_HOME=\"/Applications/Android Studio.app/Contents/jbr/Contents/Home\" ./gradlew assembleDebug",
     "mobile:ios": "npm run mobile:sync && cap open ios",
     "lint": "eslint .",
     "preview": "vite preview"

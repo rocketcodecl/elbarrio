@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase'
 import {
   C, T, REPORTES, iniciales, hace, distancia,
 } from '../lib/design'
+import { getContentCategories } from '../lib/contentCategories'
 
 /*
   ALERTAS — Central hub de alertas de el barrio.
@@ -101,11 +102,19 @@ const haversine = (lat1, lng1, lat2, lng2) => {
 }
 
 function Alertas({ currentUser, onNavigate, onCrear }) {
+  const [categories, setCategories] = useState(CATS)
   const [alertas, setAlertas] = useState([])
   const [filtro, setFiltro] = useState('todas')
   const [cargando, setCargando] = useState(true)
   const [error, setError] = useState('')
   const [userCoords, setUserCoords] = useState(null)
+
+  useEffect(() => {
+    getContentCategories('incident', CATS.slice(1)).then(items => setCategories([
+      CATS[0],
+      ...items,
+    ]))
+  }, [])
 
   // GPS del usuario para calcular distancia a cada alerta.
   useEffect(() => {
@@ -240,7 +249,7 @@ function Alertas({ currentUser, onNavigate, onCrear }) {
         {/* ══════ FILTROS ══════ */}
         {alertas.length > 0 && (
           <div style={s.filtros}>
-            {CATS.map((c) => {
+            {categories.map((c) => {
               const activo = filtro === c.key
               const count = conteos[c.key] || 0
               if (c.key !== 'todas' && count === 0) return null
@@ -296,7 +305,8 @@ function Alertas({ currentUser, onNavigate, onCrear }) {
         ) : (
           <div style={s.lista}>
             {filtradas.map((a) => {
-              const cat = REPORTES[a.category] || REPORTES.seguridad
+              const dynamicCategory = categories.find(item => item.key === a.category)
+              const cat = REPORTES[a.category] || { ...REPORTES.otro, label: dynamicCategory?.label || a.category || 'Otra', emoji: dynamicCategory?.emoji || '📌', color: C.verde, bg: C.verdeSuave }
               const pendiente = a.status === 'pendiente'
               const urgente = a.severity === 'alta' || (!a.severity && (a.category === 'seguridad' || a.category === 'salud' || a.category === 'incendio'))
               const confirmado = a.confirms_count >= 3

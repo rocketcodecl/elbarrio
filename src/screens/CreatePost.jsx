@@ -4,6 +4,7 @@ import { C, T, TIPOS, CATEGORIAS, RUBROS, REPORTES, iniciales, plata } from '../
 import { describirFoto } from '../lib/ia'
 import { moderatePublicContent } from '../lib/moderation'
 import MiniMap from '../components/MiniMap'
+import { getContentCategories } from '../lib/contentCategories'
 
 /* ============================================================
    CreatePost.jsx — v2
@@ -83,6 +84,16 @@ const IcoVolver = ({ size = 20 }) => (
     <polyline points="12 19 5 12 12 5" />
   </Ico>
 )
+
+const CREATE_HEADER_TITLES = {
+  sell: 'Nueva venta',
+  gift: 'Nuevo regalo',
+  trade: 'Nuevo trueque',
+  request: 'Pedir ayuda',
+  alert: 'Nueva alerta',
+  service: 'Publicar servicio',
+  event: 'Publicar evento',
+}
 const IcoCheck = ({ size = 44 }) => (
   <Ico size={size} stroke={2.5}>
     <polyline points="20 6 9 17 4 12" />
@@ -238,9 +249,9 @@ const calcNeededBy = (plazoKey) => {
 
 // Expiración automática de alertas según categoría.
 // seguridad 6h, salud 3h, infra 48h, mascotas 72h, default 24h.
-const calcExpiresAt = (categoryKey) => {
-  const cat = ALERT_CATEGORIES.find((c) => c.key === categoryKey)
-  const hours = cat ? cat.hours : 24
+const calcExpiresAt = (categoryKey, categories = ALERT_CATEGORIES) => {
+  const cat = categories.find((c) => c.key === categoryKey)
+  const hours = cat ? (cat.hours || cat.expiresHours || 24) : 24
   return new Date(Date.now() + hours * 3600 * 1000).toISOString()
 }
 
@@ -258,6 +269,9 @@ const DRAFT_KEY = 'elbarrio-draft-createpost'
 // startWith='alert'    -> abre directo el formulario de Alerta
 // sin startWith         -> muestra Vender / Regalar / Intercambiar
 function CreatePost({ onClose, onPublished, startWith, existingPost = null }) {
+  const [marketCategories, setMarketCategories] = useState(CATEGORIAS)
+  const [serviceCategories, setServiceCategories] = useState(RUBROS)
+  const [alertCategories, setAlertCategories] = useState(ALERT_CATEGORIES)
   const editing = !!existingPost?.id
   const initialTypeId = existingPost?.type || startWith
   const initialType = initialTypeId
@@ -285,6 +299,24 @@ function CreatePost({ onClose, onPublished, startWith, existingPost = null }) {
 
   // Alerta vecinal
   const [alertCategory, setAlertCategory] = useState(existingPost?.category || '')
+
+  useEffect(() => {
+    let active = true
+    Promise.all([
+      getContentCategories('marketplace', CATEGORIAS),
+      getContentCategories('service', RUBROS),
+      getContentCategories('incident', ALERT_CATEGORIES),
+    ]).then(([market, services, incidents]) => {
+      if (!active) return
+      setMarketCategories(market)
+      setServiceCategories(services)
+      setAlertCategories(incidents.map(item => {
+        const fallback = REPORTES[item.key] || REPORTES.otro
+        return { ...item, hours: item.expiresHours || 24, desc: item.description || '', color: fallback.color, bg: fallback.bg }
+      }))
+    })
+    return () => { active = false }
+  }, [])
   const [alertSeverity, setAlertSeverity] = useState(existingPost?.severity || '')
   const [alertLocation, setAlertLocation] = useState(existingPost?.location_text || '')
   const alertPriorityRef = useRef(null)
@@ -738,7 +770,7 @@ function CreatePost({ onClose, onPublished, startWith, existingPost = null }) {
           latitude: pinCoords?.lat || null,
           longitude: pinCoords?.lng || null,
           images: urls.length > 0 ? urls : null,
-          expires_at: calcExpiresAt(alertCategory),
+          expires_at: calcExpiresAt(alertCategory, alertCategories),
         }
 
         if (editing) {
@@ -885,7 +917,7 @@ function CreatePost({ onClose, onPublished, startWith, existingPost = null }) {
           @keyframes cpSpin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
         `}</style>
         <div style={s.header}>
-          <button style={s.iconBtn} onClick={onClose} aria-label="Volver"><IcoVolver /><span>Volver</span></button>
+          <button className="create-header-back" style={s.iconBtn} onClick={onClose} aria-label="Volver"><IcoVolver /><span>Volver</span></button>
           <div style={s.headerTitle}>Publicar</div>
           <div style={{ width: 76 }} />
         </div>
@@ -1033,7 +1065,7 @@ function CreatePost({ onClose, onPublished, startWith, existingPost = null }) {
      PANTALLA — FORMULARIO
      ============================================================ */
   const t = selectedType.id
-  const alertCatElegida = ALERT_CATEGORIES.find((c) => c.key === alertCategory)
+  const alertCatElegida = alertCategories.find((c) => c.key === alertCategory)
 
   // ---- Preview card data ----
   const previewEmoji = t === 'alert' ? (alertCatElegida?.emoji || '🚨')
@@ -1059,6 +1091,7 @@ function CreatePost({ onClose, onPublished, startWith, existingPost = null }) {
       <style>{`@keyframes cpSpin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
       <div style={s.header}>
         <button
+          className="create-header-back"
           style={s.iconBtn}
           onClick={() => (startWith || editing ? onClose?.() : setStep('type'))}
           aria-label="Volver"
@@ -1066,8 +1099,7 @@ function CreatePost({ onClose, onPublished, startWith, existingPost = null }) {
           <IcoVolver /><span>Volver</span>
         </button>
         <div style={s.headerTitleRow}>
-          <span style={{ fontSize: 16 }}>{selectedType.emoji}</span>
-          <span style={s.headerTitle}>{t === 'event' ? 'Publicar evento' : selectedType.label}</span>
+          <span style={s.headerTitle}>{CREATE_HEADER_TITLES[t] || 'Nueva publicación'}</span>
         </div>
         <div style={{ width: 76 }} />
       </div>
@@ -1107,7 +1139,7 @@ function CreatePost({ onClose, onPublished, startWith, existingPost = null }) {
 
             <label style={s.alertSectionLabel}>Tipo de incidente</label>
             <div style={s.alertCatList}>
-              {ALERT_CATEGORIES.map((c) => {
+              {alertCategories.map((c) => {
                 const activo = alertCategory === c.key
                 return (
                   <button
@@ -1349,7 +1381,7 @@ function CreatePost({ onClose, onPublished, startWith, existingPost = null }) {
 
             <label style={s.label}>Categoría</label>
             <div style={s.chipGrid2}>
-              {RUBROS.map((r) => (
+              {serviceCategories.map((r) => (
                 <button
                   key={r.key}
                   onClick={() => setRubro(r.key)}
@@ -1604,7 +1636,7 @@ function CreatePost({ onClose, onPublished, startWith, existingPost = null }) {
 
             <label style={s.label}>Rubro</label>
             <div style={s.chipGrid2}>
-              {RUBROS.map((r) => (
+              {serviceCategories.map((r) => (
                 <button
                   key={r.key}
                   type="button"
@@ -1716,7 +1748,7 @@ function CreatePost({ onClose, onPublished, startWith, existingPost = null }) {
 
             <label style={s.label}>Categoría</label>
             <div style={s.chipGrid3}>
-              {CATEGORIAS.map((c) => (
+              {marketCategories.map((c) => (
                 <button
                   key={c.key}
                   onClick={() => onCategoryClick(c.key)}
@@ -1825,7 +1857,7 @@ function CreatePost({ onClose, onPublished, startWith, existingPost = null }) {
 
             <label style={s.label}>Categoría</label>
             <div style={s.chipGrid3}>
-              {CATEGORIAS.map((c) => (
+              {marketCategories.map((c) => (
                 <button
                   key={c.key}
                   onClick={() => onCategoryClick(c.key)}
@@ -2064,20 +2096,20 @@ const s = {
 
   header: {
     display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-    minHeight: 56,
-    padding: 'calc(env(safe-area-inset-top, 0px) + 8px) 14px 9px',
+    minHeight: 54,
+    padding: 'calc(env(safe-area-inset-top, 0px) + 7px) 14px 8px',
     background: C.verde,
     borderBottom: '1px solid rgba(0,0,0,.08)',
     flexShrink: 0,
   },
-  headerTitle: { fontSize: 15, fontWeight: 700, color: '#fff' },
+  headerTitle: { fontSize: 16, lineHeight: 1.2, fontWeight: 700, color: '#fff', whiteSpace: 'nowrap' },
   headerTitleRow: { display: 'flex', alignItems: 'center', gap: 8 },
   iconBtn: {
-    width: 76, height: 38, borderRadius: 999, gap: 4,
+    width: 76, height: 36, borderRadius: 999, gap: 4,
     background: 'rgba(255,255,255,.16)', color: '#fff',
     display: 'flex', alignItems: 'center', justifyContent: 'center',
     border: '1px solid rgba(255,255,255,.34)', cursor: 'pointer', flexShrink: 0,
-    fontFamily: T.font, fontSize: 11.5, fontWeight: 700,
+    fontFamily: T.font, fontSize: 11.5, lineHeight: 1, fontWeight: 700,
   },
 
   /* --- selección de tipo --- */

@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
 import { C, T, S, CATEGORIAS, iniciales, hace, plata, distancia } from '../lib/design'
+import { getContentCategories } from '../lib/contentCategories'
 
 // ============================================================
 // Marketplace.jsx — Rediseño v8
@@ -147,9 +148,9 @@ const PILLS = [
 ]
 
 // ---- Helper: emoji por categoría (para placeholder cuando no hay imagen) ----
-const catEmoji = (cat) => {
+const catEmoji = (cat, categories = CATEGORIAS) => {
   if (!cat) return '📦'
-  const found = CATEGORIAS.find(c => cat.toLowerCase().includes(c.key.toLowerCase()))
+  const found = categories.find(c => cat.toLowerCase().includes(c.key.toLowerCase()))
   return found ? found.emoji : '📦'
 }
 
@@ -216,6 +217,7 @@ const precioInfo = (post) => {
 // COMPONENTE PRINCIPAL
 // ============================================================
 export default function Marketplace({ currentUser, onNavigate, onCrear }) {
+  const [categories, setCategories] = useState(CATEGORIAS)
   // Al entrar mostramos una mezcla de todos los tipos. Las pills sirven para
   // acotar el feed y se pueden tocar nuevamente para volver a la mezcla.
   const [activeTab, setActiveTab] = useState('todos')
@@ -241,6 +243,8 @@ export default function Marketplace({ currentUser, onNavigate, onCrear }) {
 
   const nav = onNavigate || (() => {})
   const neighborhoodId = currentUser?.neighborhoodId
+
+  useEffect(() => { getContentCategories('marketplace', CATEGORIAS).then(setCategories) }, [])
 
   // ---- Cargar posts ----
   // Fetch único: trae 60 posts de TODOS los tipos y los separa en cliente.
@@ -531,7 +535,7 @@ export default function Marketplace({ currentUser, onNavigate, onCrear }) {
           >
             Todo
           </button>
-          {CATEGORIAS.map((categoria) => (
+          {categories.map((categoria) => (
             <button
               key={categoria.key}
               style={{ ...s.categoryPill, ...(categoriaActiva === categoria.key ? s.categoryPillActive : {}) }}
@@ -609,6 +613,7 @@ export default function Marketplace({ currentUser, onNavigate, onCrear }) {
                     <MarketCard
                       key={post.id}
                       post={post}
+                      categories={categories}
                       currentUser={userWithCoords}
                       onClick={() => irA(post.id)}
                     />
@@ -705,7 +710,7 @@ export default function Marketplace({ currentUser, onNavigate, onCrear }) {
 // ============================================================
 // MARKET CARD — tarjeta única para la cuadrícula de Mercado
 // ============================================================
-function MarketCard({ post, currentUser, onClick }) {
+function MarketCard({ post, currentUser, onClick, categories = CATEGORIAS }) {
   const precio = precioInfo(post)
   const tieneImg = post.images && post.images.length > 0
   const [imgError, setImgError] = useState(false)
@@ -720,7 +725,7 @@ function MarketCard({ post, currentUser, onClick }) {
           <img src={imgSrc} alt={post.title || ''} style={s.img} onError={() => setImgError(true)} />
         ) : (
           <div style={s.noImg}>
-            <span style={{ fontSize: 34 }}>{catEmoji(post.category)}</span>
+            <span style={{ fontSize: 34 }}>{catEmoji(post.category, categories)}</span>
           </div>
         )}
         {esVenta(post.type) && post.is_negotiable === true && (
@@ -754,7 +759,7 @@ function MarketCard({ post, currentUser, onClick }) {
 // HFEED CARD — tarjeta grande para el feed horizontal "Nuevos en el barrio"
 // (72% width, peek de la siguiente, scroll-snap start)
 // ============================================================
-function HFeedCard({ post, currentUser, onClick }) {
+function HFeedCard({ post, currentUser, onClick, categories = CATEGORIAS }) {
   const precio = precioInfo(post)
   const nuevo = esNuevo(post.created_at)
   const tieneImg = post.images && post.images.length > 0
@@ -771,7 +776,7 @@ function HFeedCard({ post, currentUser, onClick }) {
           <img src={imgSrc} alt={post.title || ''} style={s.img} onError={() => setImgError(true)} />
         ) : (
           <div style={s.noImg}>
-            <span style={{ fontSize: 40 }}>{catEmoji(post.category)}</span>
+            <span style={{ fontSize: 40 }}>{catEmoji(post.category, categories)}</span>
           </div>
         )}
         {dist && (
@@ -818,7 +823,7 @@ function HFeedCard({ post, currentUser, onClick }) {
 // HMINI CARD — cuadrado pequeño para las secciones de venta/regalo/trueque
 // (~31% width, 3 por vista con peek, scroll-snap start)
 // ============================================================
-function HMiniCard({ post, currentUser, onClick }) {
+function HMiniCard({ post, currentUser, onClick, categories = CATEGORIAS }) {
   const precio = precioInfo(post)
   const tieneImg = post.images && post.images.length > 0
   const [imgError, setImgError] = useState(false)
@@ -834,7 +839,7 @@ function HMiniCard({ post, currentUser, onClick }) {
           <img src={imgSrc} alt={post.title || ''} style={s.img} onError={() => setImgError(true)} />
         ) : (
           <div style={s.noImg}>
-            <span style={{ fontSize: 26 }}>{catEmoji(post.category)}</span>
+            <span style={{ fontSize: 26 }}>{catEmoji(post.category, categories)}</span>
           </div>
         )}
         {dist && (
@@ -857,7 +862,7 @@ function HMiniCard({ post, currentUser, onClick }) {
 // Si no hay posts, muestra un empty state pequeño de la sección.
 // `expanded` = modo pill específica (sin botón "Ver todos").
 // ============================================================
-function MiniSection({ title, emoji, posts, currentUser, onVerTodos, onClick, expanded }) {
+function MiniSection({ title, emoji, posts, currentUser, onVerTodos, onClick, expanded, categories = CATEGORIAS }) {
   if (posts.length === 0) {
     return (
       <div style={s.section}>
@@ -891,7 +896,7 @@ function MiniSection({ title, emoji, posts, currentUser, onVerTodos, onClick, ex
       </div>
       <div className="mp-hscroll" style={s.hScroll}>
         {posts.map(post => (
-          <HMiniCard key={post.id} post={post} currentUser={currentUser} onClick={() => onClick(post.id)} />
+          <HMiniCard key={post.id} post={post} currentUser={currentUser} categories={categories} onClick={() => onClick(post.id)} />
         ))}
       </div>
     </div>
