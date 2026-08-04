@@ -22,7 +22,7 @@
 // ─────────────────────────────────────────────
 export const C = {
   // Verdes de El Barrio
-  verde:       '#16a34a',
+  verde:       '#1b9e75',
   verdeOsc:    '#0f5f36',
   verdeSuave:  '#dcfce7',
   verdeBg:     '#f0fdf4',

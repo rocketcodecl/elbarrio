@@ -7,6 +7,8 @@ import {
 import MiniMap from '../components/MiniMap'
 import { DIAS_SEMANA } from '../lib/horarios'
 import { moderatePublicContent } from '../lib/moderation'
+import { openWhatsApp } from '../lib/contact'
+import ThumbUpIcon from '../components/ThumbUpIcon'
 
 /*
   COMERCIOS — el directorio del barrio.
@@ -1184,10 +1186,15 @@ function ComercioDetalle({ c, userCoords, profile, onClose, onEditar, esAdmin, c
 /* ════════════════════════════════════════════════════════════
    COMERCIOS — componente principal
    ════════════════════════════════════════════════════════════ */
+const COMMERCE_CACHE = new Map()
+
 function Comercios({ currentUser, onNavigate, onCrear, onEditar, initialCommerceId = null }) {
-  const [profile, setProfile] = useState(null)
-  const [comercios, setComercios] = useState([])
-  const [cargando, setCargando] = useState(true)
+  const initialProfile = currentUser?.profileData || null
+  const cacheKey = initialProfile?.neighborhood_id
+  const cachedCommerces = COMMERCE_CACHE.get(cacheKey)
+  const [profile, setProfile] = useState(initialProfile)
+  const [comercios, setComercios] = useState(() => cachedCommerces || [])
+  const [cargando, setCargando] = useState(() => !cachedCommerces)
   const [loadError, setLoadError] = useState('')
   const [cat, setCat] = useState('Todas')
   const [userCoords, setUserCoords] = useState(null)
@@ -1207,7 +1214,7 @@ function Comercios({ currentUser, onNavigate, onCrear, onEditar, initialCommerce
   const initialCommerceIdRef = useRef(initialCommerceId)
 
   useEffect(() => {
-    const timer = window.setTimeout(cargar, 0)
+    const timer = window.setTimeout(() => cargar({ silencioso: !!COMMERCE_CACHE.get(currentUser?.profileData?.neighborhood_id) }), 0)
     return () => window.clearTimeout(timer)
   }, [currentUser?.id]) // eslint-disable-line react-hooks/exhaustive-deps -- carga al cambiar de sesión
 
@@ -1229,10 +1236,14 @@ function Comercios({ currentUser, onNavigate, onCrear, onEditar, initialCommerce
     if (!silencioso) setCargando(true)
     setLoadError('')
     try {
-      const { data: p, error: profileError } = await supabase
-        .from('profiles').select('*')
-        .eq('user_id', currentUser.id).maybeSingle()
-      if (profileError) throw profileError
+      let p = currentUser?.profileData || null
+      if (!p) {
+        const { data, error: profileError } = await supabase
+          .from('profiles').select('*')
+          .eq('user_id', currentUser.id).maybeSingle()
+        if (profileError) throw profileError
+        p = data
+      }
       if (!p) {
         setProfile(null)
         setComercios([])
@@ -1270,6 +1281,7 @@ function Comercios({ currentUser, onNavigate, onCrear, onEditar, initialCommerce
       }
       setFeaturedOrder(premiumIds)
       setComercios(loadedCommerces)
+      COMMERCE_CACHE.set(p.neighborhood_id, loadedCommerces)
       const requestedCommerceId = initialCommerceIdRef.current
       if (requestedCommerceId) {
         initialCommerceIdRef.current = null
@@ -1629,6 +1641,15 @@ function Comercios({ currentUser, onNavigate, onCrear, onEditar, initialCommerce
                 ))}
               </section>
             )}
+            <button
+              type="button"
+              style={s.advertisingCard}
+              onClick={() => openWhatsApp('Hola El Barrio, quiero destacar mi comercio.')}
+            >
+              <span style={s.advertisingIcon}><ThumbUpIcon size={16} color="#fff" /></span>
+              <span style={s.advertisingCopy}><strong style={s.advertisingTitle}>¡Destaca tu comercio!</strong><small style={s.advertisingText}>Consulta planes para llegar a más vecinos.</small></span>
+              <span style={s.advertisingAction}>Contactar →</span>
+            </button>
           </div>
         )}
       </div>
@@ -1668,6 +1689,17 @@ const s = {
     display: 'flex', flexDirection: 'column', overflow: 'hidden',
     position: 'relative',
   },
+  advertisingCard: {
+    width: 'calc(100% - 32px)', minHeight: 72, margin: '16px 16px 0', padding: '11px 12px',
+    display: 'grid', gridTemplateColumns: '30px minmax(0,1fr) auto', alignItems: 'center', gap: 9,
+    border: '1px solid rgba(27,158,117,.24)', borderRadius: 15, background: 'rgba(27,158,117,.10)',
+    color: C.texto, textAlign: 'left', fontFamily: 'inherit', cursor: 'pointer',
+  },
+  advertisingIcon: { width: 30, height: 30, borderRadius: 9, display: 'grid', placeItems: 'center', color: '#fff', background: C.verde },
+  advertisingCopy: { minWidth: 0, display: 'grid', gap: 4 },
+  advertisingTitle: { fontSize: 13, fontWeight: 800 },
+  advertisingText: { color: C.textoTenue, fontSize: 10.5, lineHeight: 1.35 },
+  advertisingAction: { minHeight: 34, paddingLeft: 11, borderLeft: '1px solid rgba(27,158,117,.28)', display: 'flex', alignItems: 'center', color: C.verdeOsc, fontSize: 11, fontWeight: 800 },
 
   feedHeader: {
     minHeight: 72,

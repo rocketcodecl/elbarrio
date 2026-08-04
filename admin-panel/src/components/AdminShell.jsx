@@ -10,6 +10,7 @@ const NAVIGATION = [
   { id: 'usuarios', icon: '👥', label: 'Usuarios' },
   { id: 'espera', icon: '📍', label: 'Lista de espera' },
   { id: 'invitaciones', icon: '🔗', label: 'Invitaciones' },
+  { id: 'consultas', icon: '💬', label: 'Consultas' },
   { id: 'contenido', icon: '✎', label: 'Contenido de la app', superOnly: true },
   { id: 'notificaciones', icon: '🔔', label: 'Notificaciones' },
 ]

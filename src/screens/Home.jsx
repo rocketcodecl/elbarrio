@@ -332,6 +332,7 @@ function HomeDiscoveryCarousel({ items }) {
           <button
             type="button"
             key={`${item.portadaLabel}-${item.id}`}
+            className="home-featured-card"
             style={{ ...s.paraTiCard, backgroundImage: `linear-gradient(180deg, rgba(9,25,17,.04) 24%, rgba(7,31,21,.88) 100%), url("${item.images[0]}")` }}
             onClick={item.portadaAction}
           >
@@ -424,8 +425,6 @@ function Home({ currentUser, onNavigate, onCrear }) {
     })()
     return () => { cancelado = true }
   }, [])
-  const [busqueda, setBusqueda] = useState('')
-  const [verBuscador, setVerBuscador] = useState(false)
   const [verMasActividad, setVerMasActividad] = useState(false)
   const [userCoords, setUserCoords] = useState(null)
 
@@ -821,18 +820,7 @@ function Home({ currentUser, onNavigate, onCrear }) {
     new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
   )
 
-  // Buscador filtra sobre TODOS los posts visibles.
-  const todosLosPosts = [
-    ...actividadBarrio,
-    ...ventas,
-    ...regalos,
-    ...eventos.filter((evento) => evento.show_in_activity !== true),
-  ]
-  const filtrados = busqueda.trim()
-    ? todosLosPosts.filter((p) =>
-        (p.title || '').toLowerCase().includes(busqueda.toLowerCase()) ||
-        (p.content || '').toLowerCase().includes(busqueda.toLowerCase()))
-    : actividadBarrio
+  const filtrados = actividadBarrio
 
   const onAcceso = (id) => {
     if (id === 'pedidos') crear('request')
@@ -853,8 +841,7 @@ function Home({ currentUser, onNavigate, onCrear }) {
 
   const nombre = (profile?.full_name || '').split(' ')[0] || 'vecino'
 
-  // Si hay búsqueda activa, ocultamos las filas laterales y mostramos solo resultados verticales
-  const buscando = busqueda.trim().length > 0
+  const buscando = false
 
   // Mercado = ventas + regalos/trueques en una sola fila (ordenados por fecha)
   const mercado = [...ventas, ...regalos].sort((a, b) =>
@@ -931,7 +918,25 @@ function Home({ currentUser, onNavigate, onCrear }) {
         @keyframes homeRefreshSpin {
           to { transform: rotate(360deg); }
         }
+        @keyframes homeFeaturedShine {
+          0%, 72% { transform: translateX(-150%) rotate(16deg); opacity: 0; }
+          78% { opacity: .34; }
+          92%, 100% { transform: translateX(470%) rotate(16deg); opacity: 0; }
+        }
+        .home-featured-card::after {
+          content: '';
+          position: absolute;
+          inset: -45% auto -45% -24%;
+          width: 13%;
+          pointer-events: none;
+          background: linear-gradient(90deg, transparent, rgba(255,255,255,.9), transparent);
+          filter: blur(1px);
+          animation: homeFeaturedShine 6.8s ease-in-out infinite;
+        }
         .home-para-ti-scroll::-webkit-scrollbar { display: none; }
+        @media (prefers-reduced-motion: reduce) {
+          .home-featured-card::after { animation: none; }
+        }
 
       `}</style>
 
@@ -951,7 +956,6 @@ function Home({ currentUser, onNavigate, onCrear }) {
           </div>
 
           <div style={s.headerBtns}>
-            <button style={s.iconBtn} onClick={() => setVerBuscador(!verBuscador)} aria-label="Buscar">🔍</button>
             <button style={s.iconBtn} onClick={() => nav('notificaciones')} aria-label="Notificaciones">
               🔔
               {noLeidos > 0 && (
@@ -966,15 +970,6 @@ function Home({ currentUser, onNavigate, onCrear }) {
           </div>
         </div>
 
-        {verBuscador && (
-          <input
-            autoFocus
-            placeholder="Buscar en el barrio..."
-            value={busqueda}
-            onChange={(e) => setBusqueda(e.target.value)}
-            style={s.buscador}
-          />
-        )}
       </div>
 
       <div
@@ -1095,7 +1090,7 @@ function Home({ currentUser, onNavigate, onCrear }) {
 
         {/* ══════ PEDIDOS VECINALES ══════ */}
         {!buscando && (
-          <div style={{ ...s.seccion, marginBottom: 6 }}>
+          <div style={{ ...s.seccion, margin: '8px 0' }}>
             <button style={s.pedirBarra} onClick={() => crear('request')}>
               <span style={s.pedirBarraEmoji}>🙋</span>
               <span style={s.pedirBarraTxt}>
@@ -1341,9 +1336,9 @@ const s = {
 
   headerBtns: { display: 'flex', alignItems: 'center', gap: 7, flexShrink: 0 },
   iconBtn: {
-    position: 'relative', width: 36, height: 36, borderRadius: '50%',
+    position: 'relative', width: 40, height: 40, borderRadius: '50%',
     background: C.fondo, border: `1px solid ${C.borde}`,
-    fontSize: 15, cursor: 'pointer', padding: 0,
+    fontSize: 18, cursor: 'pointer', padding: 0,
     display: 'flex', alignItems: 'center', justifyContent: 'center',
   },
   badge: {
@@ -1355,7 +1350,7 @@ const s = {
     border: '2px solid #fff',
   },
   avatarBtn: {
-    width: 38, height: 38, borderRadius: '50%',
+    width: 42, height: 42, borderRadius: '50%',
     background: C.verdeSuave, color: C.verde,
     border: `2px solid ${C.verde}`, padding: 0, overflow: 'hidden',
     display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -1442,21 +1437,21 @@ const s = {
     color: C.texto,
   },
   paraTiHeadingTitle: { display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 14, fontWeight: 600, letterSpacing: 0, color: C.texto },
-  paraTiHeadingHint: { color: C.textoTenue, fontSize: 9.5, fontWeight: 600 },
+  paraTiHeadingHint: { color: C.textoTenue, fontSize: 8.5, fontWeight: 600 },
   paraTiScroll: {
     margin: '0 -16px', padding: '0 16px 3px',
-    display: 'flex', gap: 10,
+    display: 'flex', gap: 18,
     overflowX: 'auto', overflowY: 'hidden',
     scrollSnapType: 'x mandatory', scrollbarWidth: 'none',
     WebkitOverflowScrolling: 'touch',
   },
   paraTiCard: {
     position: 'relative',
-    width: '88%', minWidth: '88%', height: 174,
+    width: '100%', minWidth: '100%', flex: '0 0 100%', boxSizing: 'border-box', height: 174,
     padding: 14, overflow: 'hidden',
     display: 'flex', flexDirection: 'column', alignItems: 'flex-start', justifyContent: 'space-between',
     scrollSnapAlign: 'start',
-    border: '1px solid rgba(15,95,54,.16)', borderRadius: 18,
+    border: 'none', outline: 'none', WebkitAppearance: 'none', borderRadius: 18,
     color: '#fff', backgroundColor: '#dcebe4', backgroundSize: 'cover', backgroundPosition: 'center',
     boxShadow: '0 8px 22px rgba(22,33,26,.12)',
     textAlign: 'left', fontFamily: 'inherit', cursor: 'pointer',
@@ -1540,15 +1535,15 @@ const s = {
     gap: 9, marginBottom: 7,
   },
   acceso: {
-    display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6,
+    display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3,
     background: C.card, border: `1px solid ${C.borde}`,
-    borderRadius: 13, padding: '8px 3px',
+    borderRadius: 13, padding: '7px 3px 6px',
     cursor: 'pointer', fontFamily: 'inherit',
   },
   accesoIcono: {
-    width: 30, height: 30, borderRadius: 9,
+    width: 38, height: 38, borderRadius: 11,
     display: 'flex', alignItems: 'center', justifyContent: 'center',
-    fontSize: 18,
+    fontSize: 24, lineHeight: 1,
   },
   accesoLabel: { fontSize: 11, fontWeight: 600, color: C.textoSuave },
 

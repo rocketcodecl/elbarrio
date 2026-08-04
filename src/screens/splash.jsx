@@ -2,6 +2,10 @@ import { useEffect } from 'react'
 
 export default function Splash({ onFinish }) {
   useEffect(() => {
+    ;['comunidad.webp', 'confianza.webp', 'informado.webp'].forEach(file => {
+      const image = new Image()
+      image.src = `${import.meta.env.BASE_URL}onboarding/${file}`
+    })
     const timer = setTimeout(() => {
       onFinish()
     }, 2500)
@@ -10,23 +14,35 @@ export default function Splash({ onFinish }) {
 
   return (
     <div style={styles.container}>
-      <div style={styles.logoBox} className="fade-in">
+      <style>{`
+        @keyframes splashBaseEnter {
+          0% { opacity: 0; transform: scale(.88); }
+          100% { opacity: 1; transform: scale(1); }
+        }
+        @keyframes splashDotsRise {
+          0% { opacity: 0; transform: translateY(118px); }
+          68% { opacity: 1; transform: translateY(-7px); }
+          84% { transform: translateY(3px); }
+          100% { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes splashCopyEnter {
+          from { opacity: 0; transform: translateY(10px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        .splash-isotipo-base { animation: splashBaseEnter .48s ease-out both; }
+        .splash-isotipo-dots { animation: splashDotsRise 1.08s cubic-bezier(.22,1,.36,1) .16s both; }
+        .splash-copy { animation: splashCopyEnter .5s ease-out .42s both; }
+      `}</style>
+      <div style={styles.logoBox}>
         <div style={styles.iconWrapper}>
-          <svg width="80" height="80" viewBox="0 0 100 100" fill="none">
-            {/* Isotipo El Barrio: dos figuras/arco */}
-            <circle cx="30" cy="25" r="7" fill="white" />
-            <circle cx="70" cy="25" r="7" fill="white" />
-            <path
-              d="M18 45 L18 78 L38 78 L38 60 Q38 55 43 55 L57 55 Q62 55 62 60 L62 78 L82 78 L82 45 Q82 38 75 38 L25 38 Q18 38 18 45 Z"
-              fill="white"
-            />
-          </svg>
+          <img className="splash-isotipo-base" src={`${import.meta.env.BASE_URL}isotipo.png`} alt="" style={{ ...styles.isotipoLayer, clipPath: 'inset(32% 0 0 0)' }} />
+          <img className="splash-isotipo-dots" src={`${import.meta.env.BASE_URL}isotipo.png`} alt="" style={{ ...styles.isotipoLayer, clipPath: 'inset(0 0 68% 0)' }} />
         </div>
-        <div style={styles.textWrapper}>
+        <div className="splash-copy" style={styles.textWrapper}>
           <span style={styles.text}>el barrio</span>
         </div>
       </div>
-      <div style={styles.tagline} className="fade-in">
+      <div style={styles.tagline} className="splash-copy">
         Tu comunidad, en un solo lugar
       </div>
     </div>
@@ -36,28 +52,31 @@ export default function Splash({ onFinish }) {
 const styles = {
   container: {
     height: '100%',
-    background: 'linear-gradient(180deg, #138864 0%, #0d6b4f 100%)',
+    background: '#1B9E75',
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
     justifyContent: 'center',
-    color: 'white',
+    color: '#fff',
   },
   logoBox: {
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
-    gap: '20px',
+    gap: '2px',
   },
   iconWrapper: {
-    width: '110px',
-    height: '110px',
-    background: 'rgba(255,255,255,0.15)',
-    borderRadius: '28px',
+    width: '150px',
+    height: '104px',
+    position: 'relative',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    backdropFilter: 'blur(10px)',
+  },
+  isotipoLayer: {
+    position: 'absolute', zIndex: 2,
+    width: '92px', height: '92px', objectFit: 'contain',
+    filter: 'brightness(0) invert(1)',
   },
   textWrapper: {
     display: 'flex',
@@ -67,13 +86,13 @@ const styles = {
     fontSize: '38px',
     fontWeight: 800,
     letterSpacing: '-1px',
-    color: 'white',
+    color: '#fff',
   },
   tagline: {
     position: 'absolute',
     bottom: '80px',
     fontSize: '14px',
-    opacity: 0.85,
+    color: 'rgba(255,255,255,.86)', opacity: 1,
     fontWeight: 500,
   },
 }

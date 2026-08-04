@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "tunnel": "\"/Users/fenha/Downloads/ngrok\" http --url=balsamic-cola-steadfast.ngrok-free.dev 5173",
     "build": "vite build",
     "build:plesk": "vite build --base=/el-barrio/",
     "mobile:sync": "npm run build && cap sync",

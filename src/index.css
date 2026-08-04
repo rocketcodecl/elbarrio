@@ -133,6 +133,28 @@ button:active {
   transition: transform 0.1s;
 }
 
+/* Todos los controles de retorno usan exactamente la misma geometría. */
+.phone-content button[aria-label^="Volver"],
+.phone-content button[aria-label="Atrás"] {
+  width: 38px !important;
+  height: 38px !important;
+  min-width: 38px !important;
+  min-height: 38px !important;
+  padding: 0 !important;
+  border-radius: 50% !important;
+  aspect-ratio: 1 / 1;
+  display: grid !important;
+  place-items: center !important;
+  flex: 0 0 38px !important;
+  line-height: 1 !important;
+}
+
+.phone-content button[aria-label^="Volver"] > svg,
+.phone-content button[aria-label="Atrás"] > svg {
+  display: block;
+  margin: auto;
+}
+
 input, textarea {
   font-family: inherit;
   outline: none;

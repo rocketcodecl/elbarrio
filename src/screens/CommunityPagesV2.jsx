@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { C, T } from '../lib/design'
 import { supabase } from '../lib/supabase'
+import { whatsappUrl } from '../lib/contact'
 
 const ASSET = `${import.meta.env.BASE_URL}community-assets/`
 
@@ -191,7 +192,7 @@ export function InviteNeighbors({ onNavigate, profile }) {
   const verified=Number(data?.verified_count||0);const started=Number(data?.started_count||0);const target=5;const progress=Math.min(100,(verified/target)*100)
   return <Screen title="Invitar vecinos" onNavigate={onNavigate}>
     <section style={{...s.inviteHero,backgroundImage:`linear-gradient(transparent 45%,rgba(0,0,0,.68)),url(${ASSET}invite-hero.jpg)`}}><h2>Construye comunidad,<br/>un vecino a la vez.</h2></section>
-    <div style={s.centerIntro}><h2>Tu barrio crece contigo</h2><p>Invita a personas que realmente viven cerca. Cada una deberá verificar su residencia igual que tú.</p></div>
+    <div style={s.centerIntro}><h2>Tu barrio crece contigo</h2><p>Invita a personas que realmente viven cerca.<br/>Cada una deberá verificar su residencia igual que tú.</p></div>
     {error&&<aside style={{...s.infoBox,color:C.rojo}}><Icon name="alert" color={C.rojo}/><p>{error}</p></aside>}
     <section className="inviteLink" style={s.inviteLink}><div style={s.lineIcon}><Icon name="link"/></div><div><strong>Tu enlace personal</strong><span>{loading?'Preparándolo…':code?`Código ${code}`:'No disponible'}</span></div><button disabled={!url} onClick={copy}>{copied?'Copiado':'Copiar'}</button></section>
     <div className="shareGrid" style={s.shareGrid}><button disabled={!url} onClick={()=>window.open(`https://wa.me/?text=${encodeURIComponent(`${message} ${url}`)}`,'_blank','noopener,noreferrer')}>WhatsApp</button><button disabled={!url} onClick={share}>Compartir</button></div>
@@ -206,25 +207,30 @@ export function ContactUs({ onNavigate }) {
   const [email,setEmail]=useState('')
   const [reason,setReason]=useState('Consulta general')
   const [message,setMessage]=useState('')
-  const [prepared,setPrepared]=useState(false)
-  const submit=event=>{
+  const [sending,setSending]=useState(false)
+  const [sent,setSent]=useState(false)
+  const [submitError,setSubmitError]=useState('')
+  useEffect(()=>{supabase.auth.getUser().then(({data})=>{const user=data?.user;if(!user)return;setEmail(current=>current||user.email||'');setName(current=>current||user.user_metadata?.full_name||'')})},[])
+  const submit=async event=>{
     event.preventDefault()
-    const subject=encodeURIComponent(`[El Barrio] ${reason}`)
-    const body=encodeURIComponent(`Nombre: ${name}\nCorreo: ${email}\nMotivo: ${reason}\n\n${message}`)
-    setPrepared(true)
-    window.location.href=`mailto:soporte@elbarrio.lat?subject=${subject}&body=${body}`
+    setSending(true);setSent(false);setSubmitError('')
+    const {error}=await supabase.rpc('submit_contact_request',{p_name:name,p_email:email,p_reason:reason,p_message:message})
+    setSending(false)
+    if(error){setSubmitError('No pudimos guardar tu mensaje. Inténtalo nuevamente.');return}
+    setSent(true);setMessage('')
   }
   return <Screen title="Contáctanos" onNavigate={onNavigate}>
     <div style={s.centerIntro}><div style={s.lineIconLarge}><Icon name="mail" size={28}/></div><h2>¿Cómo podemos ayudarte?</h2><p>Cuéntanos tu consulta, sugerencia o problema. Estamos para escucharte.</p></div>
     <form style={s.form} onSubmit={submit}>
       <label>Nombre<input required value={name} onChange={event=>setName(event.target.value)} placeholder="Tu nombre"/></label>
       <label>Correo electrónico<input required type="email" value={email} onChange={event=>setEmail(event.target.value)} placeholder="correo@ejemplo.com"/></label>
-      <label>Motivo<select value={reason} onChange={event=>setReason(event.target.value)}><option>Consulta general</option><option>Problema técnico</option><option>Seguridad</option><option>Comercios</option><option>Privacidad y datos</option></select></label>
+      <label>Motivo<select value={reason} onChange={event=>setReason(event.target.value)}><option>Consulta general</option><option>Problema técnico</option><option>Seguridad</option><option>Publicidad y destacados</option><option>Comercios y servicios</option><option>Privacidad y datos</option></select></label>
       <label>Mensaje<textarea required value={message} onChange={event=>setMessage(event.target.value)} placeholder="Escribe tu mensaje…"/></label>
-      <button>Enviar mensaje <Icon name="arrow" size={18} color="#fff"/></button>
-      {prepared&&<p style={s.success}>Abrimos tu aplicación de correo con el mensaje preparado. Debes confirmar el envío allí.</p>}
+      <button disabled={sending}>{sending?'Enviando…':'Enviar mensaje'} {!sending&&<Icon name="arrow" size={18} color="#fff"/>}</button>
+      {sent&&<p style={s.success}>Recibimos tu mensaje. El equipo de El Barrio podrá verlo desde el panel de administración.</p>}
+      {submitError&&<p style={{...s.success,background:C.rojoBg,color:C.rojo}}>{submitError}</p>}
     </form>
-    <section className="support" style={s.support}><div><h2>Correo directo</h2><p>También puedes escribirnos sin usar el formulario.</p></div><a href="mailto:soporte@elbarrio.lat">Escribir</a></section>
+    <section className="support" style={s.support}><div><h2>WhatsApp directo</h2><p>Para publicidad, comercios, servicios o ayuda rápida.</p></div><a href={whatsappUrl('Hola El Barrio, necesito información.')} target="_blank" rel="noreferrer">Hablemos</a></section>
     <aside style={s.emergency}><Icon name="alert" color={C.rojo}/><p><strong>¿Es una emergencia?</strong><br/>Llama al 133 o a Seguridad de Las Condes.</p></aside>
   </Screen>
 }
@@ -272,7 +278,7 @@ const s={
   hero:{height:290,borderRadius:16,backgroundSize:'cover',backgroundPosition:'center',padding:20,display:'flex',flexDirection:'column',justifyContent:'flex-end',color:'#fff',marginBottom:16},featureCard:{background:C.card,border:`1px solid ${C.borde}`,borderRadius:16,padding:18,marginBottom:12},lineIcon:{width:42,height:42,display:'grid',placeItems:'center',marginBottom:12},lineIconLarge:{width:56,height:56,display:'grid',placeItems:'center',margin:'0 auto 12px'},sectionHeading:{margin:'28px 0 12px'},values:{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10},valuePill:{minHeight:46,display:'flex',alignItems:'center',gap:8,padding:'0 13px',border:`1px solid ${C.borde}`,borderRadius:999,background:C.card,color:C.texto,fontSize:12.5,fontWeight:600},faces:{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10},face:{height:130,borderRadius:14,backgroundSize:'cover',display:'flex',alignItems:'flex-end',padding:12,color:'#fff',fontSize:11,fontWeight:700},cta:{position:'relative',overflow:'hidden',marginTop:24,padding:'26px 24px',borderRadius:18,background:`linear-gradient(135deg, ${C.verdeOsc} 0%, ${C.verde} 100%)`,textAlign:'left',boxShadow:'0 8px 22px rgba(15,95,54,.20)'},ctaIcon:{width:46,height:46,borderRadius:14,display:'grid',placeItems:'center',background:'rgba(255,255,255,.14)',marginBottom:18},ctaTitle:{fontSize:21,lineHeight:1.25,color:'#fff',margin:'0 0 8px'},ctaText:{maxWidth:290,fontSize:13,lineHeight:1.5,color:'rgba(255,255,255,.82)',margin:0},ctaButton:{minHeight:46,marginTop:20,padding:'0 18px',borderRadius:999,background:'#fff',color:C.verdeOsc,fontWeight:700,display:'flex',alignItems:'center',justifyContent:'center',gap:8},
   docIntro:{marginBottom:20},docBadge:{display:'inline-block',padding:'5px 9px',borderRadius:999,background:C.verde,color:'#fff',fontSize:9,fontWeight:700},docTitle:{fontSize:27,lineHeight:1.15,color:C.texto,margin:'9px 0 3px'},legalDocument:{background:C.card,border:`1px solid ${C.borde}`,borderRadius:16,padding:'22px 18px'},legalSection:{marginBottom:22},legalTitle:{display:'flex',alignItems:'flex-start',gap:9,color:C.verdeOsc,marginBottom:7},legalText:{fontSize:12.5,lineHeight:1.58,color:C.textoSuave},legalNote:{width:'calc(100% - 10px)',display:'grid',gridTemplateColumns:'34px 1fr',gap:11,alignItems:'start',margin:'15px 0 2px 10px',padding:'13px 14px',border:`1px solid ${C.borde}`,borderRadius:11,background:'#fafcf9',color:C.texto,lineHeight:1.45},legalNoteIcon:{width:34,height:34,borderRadius:9,display:'grid',placeItems:'center',background:C.verdeBg,color:C.verdeOsc},legalNoteTitle:{display:'block',fontSize:11.5,fontWeight:700,color:C.verdeOsc,marginBottom:3},legalNoteText:{display:'block',fontSize:11.5,color:C.textoSuave},legalFooter:{borderTop:`1px solid ${C.borde}`,paddingTop:20,textAlign:'center'},legalFooterTitle:{fontSize:15,color:C.texto,margin:'0 0 4px'},legalFooterText:{fontSize:12,color:C.textoSuave,margin:0},legalFooterButton:{marginTop:16,padding:'12px 22px',borderRadius:999,background:C.verdeOsc,color:'#fff',fontWeight:700},
   centerIntro:{textAlign:'center',margin:'8px auto 24px',maxWidth:330},warningIcon:{width:58,height:58,display:'grid',placeItems:'center',margin:'0 auto 12px'},prohibited:{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10},consequences:{marginTop:18,padding:18,borderRadius:16,background:C.card,border:`1px solid ${C.borde}`},reportBtn:{width:'100%',marginTop:14,padding:14,borderRadius:12,border:`1px solid ${C.rojoSuave}`,color:C.rojo,display:'flex',alignItems:'center',justifyContent:'center',gap:8,fontWeight:700},
-  inviteHero:{height:330,borderRadius:18,backgroundSize:'cover',backgroundPosition:'center',padding:22,display:'flex',alignItems:'flex-end',color:'#fff'},inviteLink:{display:'grid',gridTemplateColumns:'44px 1fr auto',alignItems:'center',gap:12,padding:16,borderRadius:16,background:C.card,border:`1px solid ${C.borde}`},shareGrid:{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginTop:10},progress:{marginTop:20,padding:18,borderRadius:16,background:C.verdeBg},inviteProgressTop:{display:'flex',justifyContent:'space-between',alignItems:'center',gap:10},inviteList:{marginTop:14,padding:'16px 18px',borderRadius:16,background:C.card,border:`1px solid ${C.borde}`},infoBox:{display:'flex',alignItems:'flex-start',gap:12,marginTop:14,padding:16,borderRadius:14,background:C.card,border:`1px solid ${C.borde}`},support:{marginTop:16,padding:18,borderRadius:16,background:C.verde,color:'#fff',display:'flex',alignItems:'center',justifyContent:'space-between',gap:12},emergency:{display:'flex',gap:12,marginTop:16,padding:16,borderRadius:14,background:C.rojoBg,border:`1px solid ${C.rojoSuave}`},
+  inviteHero:{height:255,borderRadius:18,backgroundSize:'cover',backgroundPosition:'center',padding:22,display:'flex',alignItems:'flex-end',color:'#fff'},inviteLink:{display:'grid',gridTemplateColumns:'44px 1fr auto',alignItems:'center',gap:12,padding:16,borderRadius:16,background:C.card,border:`1px solid ${C.borde}`},shareGrid:{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginTop:10},progress:{marginTop:20,padding:18,borderRadius:16,background:C.verdeBg},inviteProgressTop:{display:'flex',justifyContent:'space-between',alignItems:'center',gap:10},inviteList:{marginTop:14,padding:'16px 18px',borderRadius:16,background:C.card,border:`1px solid ${C.borde}`},infoBox:{display:'flex',alignItems:'flex-start',gap:12,marginTop:14,padding:16,borderRadius:14,background:C.card,border:`1px solid ${C.borde}`},support:{marginTop:16,padding:18,borderRadius:16,background:C.verde,color:'#fff',display:'flex',alignItems:'center',justifyContent:'space-between',gap:12},emergency:{display:'flex',gap:12,marginTop:16,padding:16,borderRadius:14,background:C.rojoBg,border:`1px solid ${C.rojoSuave}`},
   form:{background:C.card,border:`1px solid ${C.borde}`,borderRadius:18,padding:18,display:'flex',flexDirection:'column',gap:16},success:{padding:12,borderRadius:10,background:C.verdeBg,color:C.verdeOsc},socials:{marginTop:16,padding:18,borderRadius:16,background:C.card,border:`1px solid ${C.borde}`},settingsIntro:{margin:'0 0 16px'},settings:{background:C.card,border:`1px solid ${C.borde}`,borderRadius:16,overflow:'hidden'},deleteSummary:{padding:18,borderRadius:16,background:C.card,border:`1px solid ${C.borde}`},deleteCheck:{display:'flex',alignItems:'flex-start',gap:10,marginTop:18,fontSize:12.5,color:C.texto},deletePhrase:{display:'grid',gap:8,marginTop:18,fontSize:12.5,color:C.texto},deleteButton:{width:'100%',minHeight:48,marginTop:18,padding:'0 16px',borderRadius:12,background:C.rojo,color:'#fff',fontWeight:700},cancelDelete:{width:'100%',minHeight:44,marginTop:8,color:C.textoSuave,fontWeight:700},
 }
 

@@ -153,14 +153,7 @@ function Register({ existingAccount = false, initialEmail = '', recoveryMode = f
       {/* LOGO */}
       <div style={styles.logoSection}>
         <div style={styles.logoBox}>
-          <svg width="30" height="30" viewBox="0 0 100 100" fill="none">
-            <circle cx="30" cy="25" r="7" fill="white" />
-            <circle cx="70" cy="25" r="7" fill="white" />
-            <path
-              d="M18 45 L18 78 L38 78 L38 60 Q38 55 43 55 L57 55 Q62 55 62 60 L62 78 L82 78 L82 45 Q82 38 75 38 L25 38 Q18 38 18 45 Z"
-              fill="white"
-            />
-          </svg>
+          <img src={`${import.meta.env.BASE_URL}icons/icon-192.webp`} alt="" style={styles.isotipo} />
         </div>
       </div>
 
@@ -349,13 +342,14 @@ const styles = {
   logoBox: {
     width: 52,
     height: 52,
-    background: '#138864',
+    background: 'transparent',
     borderRadius: 14,
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    boxShadow: '0 6px 20px rgba(19, 136, 100, 0.25)',
+    boxShadow: '0 6px 20px rgba(27, 158, 117, 0.22)',
   },
+  isotipo: { width: 52, height: 52, objectFit: 'contain' },
   titleSection: {
     textAlign: 'center',
     marginBottom: 20,

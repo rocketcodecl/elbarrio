@@ -145,11 +145,11 @@ function Profile({ onFinish, onBack, editMode = false }) {
       setError('Ingresa tu nombre y apellido')
       return
     }
-    if (!rut.trim()) {
+    if (!editMode && !rut.trim()) {
       setError('Ingresa tu RUT')
       return
     }
-    if (!validateRut(rut)) {
+    if (!editMode && !validateRut(rut)) {
       setError('El RUT ingresado no es valido. Revisa el digito verificador (el numero despues del guion).')
       return
     }
@@ -202,10 +202,10 @@ function Profile({ onFinish, onBack, editMode = false }) {
         .join(' ')
       const updateData = {
         full_name: fullName,
-        rut: rut,
         phone: phone || null,
         email: user.email || null,
       }
+      if (!editMode) updateData.rut = rut
       if (avatarUrl) updateData.avatar_url = avatarUrl
 
       const { data: updatedProfile, error: updateError } = await supabase
@@ -241,7 +241,7 @@ function Profile({ onFinish, onBack, editMode = false }) {
       {/* HEADER */}
       <div style={styles.header}>
         <button style={styles.backButton} onClick={onBack} aria-label="Volver">
-          <span style={{ fontSize: 18 }}>←</span>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M19 12H5"/><path d="m12 19-7-7 7-7"/></svg>
         </button>
         {editMode
           ? <div style={{ flex: 1, marginRight: 40, textAlign: 'center', fontSize: 16, fontWeight: 700 }}>Editar mi perfil</div>
@@ -328,7 +328,7 @@ function Profile({ onFinish, onBack, editMode = false }) {
           <label style={styles.label}>
             RUT
             {rutValid === true && (
-              <span style={styles.validBadge}>✓ Válido</span>
+              <span style={styles.validBadge}>{editMode ? 'Identidad verificada' : '✓ Válido'}</span>
             )}
             {rutValid === false && (
               <span style={styles.invalidBadge}>✗ Inválido</span>
@@ -336,7 +336,8 @@ function Profile({ onFinish, onBack, editMode = false }) {
           </label>
           <div style={{
             ...styles.inputWrapper,
-            borderColor: rutValid === true ? '#138864' : rutValid === false ? '#E63946' : '#E5E7EB',
+            ...(editMode ? styles.inputWrapperDisabled : {}),
+            borderColor: editMode ? '#D8DDD9' : rutValid === true ? '#138864' : rutValid === false ? '#E63946' : '#E5E7EB',
           }}>
             <span style={styles.inputIcon}>
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -352,8 +353,10 @@ function Profile({ onFinish, onBack, editMode = false }) {
               placeholder="12.345.678-9"
               value={rut}
               onChange={handleRutChange}
-              style={styles.input}
+              style={{ ...styles.input, ...(editMode ? styles.inputDisabled : {}) }}
               maxLength={12}
+              disabled={editMode}
+              aria-readonly={editMode}
             />
           </div>
         </div>
@@ -441,8 +444,11 @@ const styles = {
     paddingBottom: 20,
   },
   backButton: {
-    width: 40,
-    height: 40,
+    width: 38,
+    height: 38,
+    minWidth: 38,
+    minHeight: 38,
+    padding: 0,
     borderRadius: '50%',
     background: 'white',
     display: 'flex',
@@ -450,6 +456,7 @@ const styles = {
     justifyContent: 'center',
     boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
     flexShrink: 0,
+    color: '#1D211F',
   },
   titleSection: {
     textAlign: 'center',
@@ -572,6 +579,8 @@ const styles = {
     padding: '0 14px',
     transition: 'border-color 0.2s',
   },
+  inputWrapperDisabled: { background: '#EEF1EF' },
+  inputDisabled: { color: '#727A75', cursor: 'not-allowed', WebkitTextFillColor: '#727A75', opacity: 1 },
   inputIcon: {
     fontSize: 16,
     marginRight: 8,

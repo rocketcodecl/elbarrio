@@ -283,29 +283,33 @@ export default function App() {
   }, [user])
 
   /* ── NAVIGATION (con back/home y sub-pantallas) ── */
+  const performInternalBack = useCallback(() => {
+    setNavigationMotion('back')
+    const prev = historyRef.current.pop()
+    if (prev) {
+      if (prev.tab) setActiveTab(prev.tab)
+      setCurrentScreen(prev.screen || 'main')
+      setParams(prev.params || {})
+      return
+    }
+    setCurrentScreen('main')
+    const currentTab = activeTabRef.current
+    if (currentTab && currentTab !== 'inicio') {
+      const fallback = prevTabRef.current && prevTabRef.current !== currentTab
+        ? prevTabRef.current
+        : 'inicio'
+      setActiveTab(fallback)
+    }
+  }, [])
+
   const onNavigate = useCallback((next, p = {}) => {
     const lower = typeof next === 'string' ? next.toLowerCase() : next
 
     if (lower === 'back') {
-      setNavigationMotion('back')
-      const prev = historyRef.current.pop()
-      if (prev) {
-        if (prev.tab) setActiveTab(prev.tab)
-        setCurrentScreen(prev.screen || 'main')
-        setParams(prev.params || {})
+      if (!isNativeApp() && window.history.state?.elBarrioNavigation) {
+        window.history.back()
       } else {
-        // Sin sub-pantalla en historial: si estamos en un tab con flecha back
-        // (ej: perfil), volver al tab previo para que el back sea efectivo.
-        // Sin esto, el back desde el perfil no cambia nada visible porque
-        // currentScreen ya era 'main' y activeTab seguía siendo 'perfil'.
-        setCurrentScreen('main')
-        const currentTab = activeTabRef.current
-        if (currentTab && currentTab !== 'inicio') {
-          const fallback = prevTabRef.current && prevTabRef.current !== currentTab
-            ? prevTabRef.current
-            : 'inicio'
-          setActiveTab(fallback)
-        }
+        performInternalBack()
       }
       return
     }
@@ -321,7 +325,8 @@ export default function App() {
     const subScreens = ['post', 'productdetail', 'servicedetail', 'eventdetail', 'chatconversation', 'dealdone', 'alerta', 'notificaciones', 'sellerprofile', 'noticias', 'admin', 'adminfarmacias', 'admincomercios', 'adminusuarios', 'adminincidentes', 'settings', 'editprofile', 'about', 'terms', 'privacy', 'prohibited', 'invite', 'contact', 'deleteaccount']
     if (subScreens.includes(lower)) {
       setNavigationMotion('forward')
-      historyRef.current.push({ screen: currentScreen, params })
+      historyRef.current.push({ screen: currentScreen, tab: activeTabRef.current, params })
+      if (!isNativeApp()) window.history.pushState({ elBarrioNavigation: true }, '', window.location.href)
     }
 
     setParams(p)
@@ -330,6 +335,9 @@ export default function App() {
       servicios: 'servicios', events: 'eventos', eventos: 'eventos',
       chat: 'chat', chatlist: 'chat', comercios: 'comercios',
       alertas: 'alertas', perfil: 'perfil', profile: 'perfil',
+    }
+    if (tabMap[lower] && tabMap[lower] !== activeTabRef.current && !isNativeApp()) {
+      window.history.pushState({ elBarrioNavigation: true }, '', window.location.href)
     }
 
     if (lower === 'post' || lower === 'productdetail') {
@@ -396,7 +404,14 @@ export default function App() {
       const el = document.getElementById('elbarrio-scroll')
       if (el) el.scrollTop = 0
     })
-  }, [currentScreen, params])
+  }, [currentScreen, params, performInternalBack])
+
+  useEffect(() => {
+    if (isNativeApp()) return undefined
+    const handleBrowserBack = () => performInternalBack()
+    window.addEventListener('popstate', handleBrowserBack)
+    return () => window.removeEventListener('popstate', handleBrowserBack)
+  }, [performInternalBack])
 
   /* ── CREAR (post / commerce) ── */
   const onCrear = useCallback((type = null) => {
@@ -416,6 +431,45 @@ export default function App() {
     setCreateType(null)
     setEditingPost(null)
   }, [])
+
+  /* Android: el botón/gesto Atrás debe recorrer la navegación interna.
+     Solo permite salir cuando el vecino ya está en Inicio. */
+  useEffect(() => {
+    if (!isNativeApp()) return undefined
+    let listener
+    CapacitorApp.addListener('backButton', () => {
+      if (createOpen) {
+        onCerrarCrear()
+        return
+      }
+
+      if (currentScreen === 'main') {
+        if (activeTab !== 'inicio') onNavigate('home')
+        else CapacitorApp.exitApp()
+        return
+      }
+
+      if (currentScreen === 'register') {
+        setCurrentScreen('onboarding')
+        return
+      }
+      if (currentScreen === 'profile') {
+        setCurrentScreen('register')
+        return
+      }
+      if (currentScreen === 'verification') {
+        setCurrentScreen('profile')
+        return
+      }
+      if (currentScreen === 'splash' || currentScreen === 'onboarding') {
+        CapacitorApp.exitApp()
+        return
+      }
+
+      onNavigate('back')
+    }).then(handle => { listener = handle })
+    return () => { listener?.remove() }
+  }, [activeTab, createOpen, currentScreen, onCerrarCrear, onNavigate])
 
   const onPublicadoComercio = useCallback(() => {
     setCreateOpen(false)
@@ -453,6 +507,7 @@ export default function App() {
     const current = activeTabRef.current
     if (tabId !== current) {
       prevTabRef.current = current
+      if (!isNativeApp()) window.history.pushState({ elBarrioNavigation: true }, '', window.location.href)
     }
     historyRef.current = []
     setNavigationMotion('tab')
@@ -480,7 +535,7 @@ export default function App() {
           background: C.fondo, fontFamily: T.font, gap: 12,
           flexDirection: 'column',
         }}>
-          <div style={{ fontSize: 56 }}>🏘️</div>
+          <img src={`${import.meta.env.BASE_URL}icons/icon-192.webp`} alt="" style={{ width: 66, height: 66, borderRadius: 18 }} />
           <div style={{ fontSize: 22, fontWeight: 700, color: C.verde }}>el barrio</div>
         </div>
       )
@@ -704,7 +759,7 @@ export default function App() {
     if (activeTab === 'comercios') {
       return (
         <Comercios
-          currentUser={user}
+          currentUser={{ ...user, profileData: profile }}
           onNavigate={onNavigate}
           onCrear={onCrear}
           initialCommerceId={params?.commerceId}

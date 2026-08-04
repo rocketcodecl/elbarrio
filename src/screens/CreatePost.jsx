@@ -885,9 +885,9 @@ function CreatePost({ onClose, onPublished, startWith, existingPost = null }) {
           @keyframes cpSpin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
         `}</style>
         <div style={s.header}>
-          <button style={s.iconBtn} onClick={onClose}><IcoCerrar /></button>
+          <button style={s.iconBtn} onClick={onClose} aria-label="Volver"><IcoVolver /><span>Volver</span></button>
           <div style={s.headerTitle}>Publicar</div>
-          <div style={{ width: 40 }} />
+          <div style={{ width: 76 }} />
         </div>
 
         <div style={s.typeScroll}>
@@ -1061,14 +1061,15 @@ function CreatePost({ onClose, onPublished, startWith, existingPost = null }) {
         <button
           style={s.iconBtn}
           onClick={() => (startWith || editing ? onClose?.() : setStep('type'))}
+          aria-label="Volver"
         >
-          {startWith || editing ? <IcoCerrar /> : <IcoVolver />}
+          <IcoVolver /><span>Volver</span>
         </button>
         <div style={s.headerTitleRow}>
           <span style={{ fontSize: 16 }}>{selectedType.emoji}</span>
           <span style={s.headerTitle}>{t === 'event' ? 'Publicar evento' : selectedType.label}</span>
         </div>
-        <div style={{ width: 40 }} />
+        <div style={{ width: 76 }} />
       </div>
 
       <div style={s.formScroll}>
@@ -2063,18 +2064,20 @@ const s = {
 
   header: {
     display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-    padding: '50px 16px 14px',
-    background: C.card,
-    borderBottom: `1px solid ${C.bordeSuave}`,
+    minHeight: 56,
+    padding: 'calc(env(safe-area-inset-top, 0px) + 8px) 14px 9px',
+    background: C.verde,
+    borderBottom: '1px solid rgba(0,0,0,.08)',
     flexShrink: 0,
   },
-  headerTitle: { fontSize: 15, fontWeight: 600, color: C.texto },
+  headerTitle: { fontSize: 15, fontWeight: 700, color: '#fff' },
   headerTitleRow: { display: 'flex', alignItems: 'center', gap: 8 },
   iconBtn: {
-    width: 40, height: 40, borderRadius: '50%',
-    background: C.fondo, color: C.textoSuave,
+    width: 76, height: 38, borderRadius: 999, gap: 4,
+    background: 'rgba(255,255,255,.16)', color: '#fff',
     display: 'flex', alignItems: 'center', justifyContent: 'center',
-    border: 'none', cursor: 'pointer', flexShrink: 0,
+    border: '1px solid rgba(255,255,255,.34)', cursor: 'pointer', flexShrink: 0,
+    fontFamily: T.font, fontSize: 11.5, fontWeight: 700,
   },
 
   /* --- selección de tipo --- */
@@ -2123,7 +2126,7 @@ const s = {
   ruleText: { fontSize: 12.5, color: C.textoSuave, lineHeight: 1.45 },
 
   /* --- formulario --- */
-  formScroll: { flex: 1, minHeight: 0, overflowY: 'auto', padding: '16px 20px 20px' },
+  formScroll: { flex: 1, minHeight: 0, overflowY: 'auto', padding: '12px 20px 20px' },
   form: { display: 'flex', flexDirection: 'column' },
 
   /* --- preview en vivo --- */

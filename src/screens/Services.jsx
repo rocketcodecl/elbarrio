@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import { C, T, distancia, iniciales, RUBROS } from '../lib/design'
+import { openWhatsApp } from '../lib/contact'
+import ThumbUpIcon from '../components/ThumbUpIcon'
 
 /* ============================================================
    Services.jsx — Tab "servicios" de El Barrio.
@@ -20,6 +22,21 @@ const SVC_CSS = `
   transform: translateY(-2px);
   box-shadow: 0 6px 18px rgba(0,0,0,0.08);
 }
+@keyframes services-featured-shine {
+  0%, 72% { transform: translateX(-170%) rotate(16deg); opacity: 0; }
+  78% { opacity: .32; }
+  92%, 100% { transform: translateX(560%) rotate(16deg); opacity: 0; }
+}
+.services-featured-card { position: relative; }
+.services-featured-card::after {
+  content: '';
+  position: absolute;
+  inset: -45% auto -45% -26%;
+  width: 12%;
+  pointer-events: none;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,.94), transparent);
+  animation: services-featured-shine 7.2s ease-in-out infinite;
+}
 @keyframes services-spin {
   to { transform: rotate(360deg); }
 }
@@ -32,6 +49,7 @@ const SVC_CSS = `
 }
 @media (prefers-reduced-motion: reduce) {
   .services-feed-header { animation: none !important; }
+  .services-featured-card::after { animation: none; }
 }
 `
 
@@ -134,12 +152,15 @@ const isFeaturedActive = (svc) => {
   return (!starts || new Date(starts).getTime() <= now) && (!until || new Date(until).getTime() > now)
 }
 
+const SERVICES_CACHE = new Map()
+
 /* ============================================================
    COMPONENTE
    ============================================================ */
 export default function Services({ currentUser, onNavigate, onCrear }) {
-  const [services, setServices] = useState([])
-  const [loading, setLoading] = useState(true)
+  const neighborhoodId = currentUser?.neighborhoodId
+  const [services, setServices] = useState(() => SERVICES_CACHE.get(neighborhoodId) || [])
+  const [loading, setLoading] = useState(() => !SERVICES_CACHE.has(neighborhoodId))
   const [error, setError] = useState(null)
   const [category, setCategory] = useState('Todos')
   const [search, setSearch] = useState('')
@@ -159,10 +180,8 @@ export default function Services({ currentUser, onNavigate, onCrear }) {
   const [refreshing, setRefreshing] = useState(false)
 
   const nav = onNavigate || (() => {})
-  const neighborhoodId = currentUser?.neighborhoodId
-
   const fetchServices = useCallback(async () => {
-    setLoading(true)
+    if (!SERVICES_CACHE.has(neighborhoodId)) setLoading(true)
     setError(null)
     if (!neighborhoodId) {
       setServices([])
@@ -177,7 +196,6 @@ export default function Services({ currentUser, onNavigate, onCrear }) {
         .eq('type', 'service')
         .eq('status', 'active')
         .eq('neighborhood_id', neighborhoodId)
-      if (category !== 'Todos') q = q.eq('service_key', category)
       q = q.order('created_at', { ascending: false }).limit(40)
       const { data, error: e } = await q
       if (e) throw e
@@ -190,13 +208,14 @@ export default function Services({ currentUser, onNavigate, onCrear }) {
       setFeaturedOrder(order)
       setFeaturedIndex(0)
       setServices(nextServices)
+      SERVICES_CACHE.set(neighborhoodId, nextServices)
     } catch (err) {
       console.error('Services fetch error:', err)
       setError(err?.message || 'No pudimos cargar los servicios.')
     } finally {
       setLoading(false)
     }
-  }, [category, neighborhoodId])
+  }, [neighborhoodId])
 
   useEffect(() => {
     fetchServices()
@@ -204,6 +223,7 @@ export default function Services({ currentUser, onNavigate, onCrear }) {
 
   // Búsqueda en cliente sobre title + description (instantáneo).
   const filtered = services.filter((svc) => {
+    if (category !== 'Todos' && svc.service_key !== category) return false
     if (!search.trim()) return true
     const q = search.trim().toLowerCase()
     const t = (svc.title || '').toLowerCase()
@@ -424,7 +444,7 @@ export default function Services({ currentUser, onNavigate, onCrear }) {
     const rating = getRating(svc)
     const image = Array.isArray(svc.images) ? svc.images.find(Boolean) : null
     return (
-      <button key={svc.id} style={s.featuredCard} onClick={() => nav('servicedetail', { postId: svc.id })}>
+      <button key={svc.id} className="services-featured-card" style={s.featuredCard} onClick={() => nav('servicedetail', { postId: svc.id })}>
         <div style={s.featuredVisual}>
           {image ? <img src={image} alt="" style={s.featuredImage} /> : <span style={s.featuredImageFallback}>{rubro?.emoji || '🛠️'}</span>}
           <span style={s.sponsoredLabel}>✦ DESTACADO</span>
@@ -549,17 +569,6 @@ export default function Services({ currentUser, onNavigate, onCrear }) {
             </section>
           )}
 
-          {!loading && !error && featured.length === 0 && category === 'Todos' && !search && (
-            <div style={s.monetizationCard}>
-              <span style={s.monetizationStar}>✦</span>
-              <span style={s.monetizationCopy}>
-                <strong>Destaca tu servicio</strong>
-                <small>Más visibilidad entre vecinos de tu barrio.</small>
-              </span>
-              <span style={s.comingSoon}>Próximamente</span>
-            </div>
-          )}
-
           {!loading && !error && regular.length > 0 && (
             <div style={s.regularHeading}>Servicios del barrio</div>
           )}
@@ -574,6 +583,17 @@ export default function Services({ currentUser, onNavigate, onCrear }) {
             <div style={s.list}>
               {regular.map(renderCard)}
             </div>
+          )}
+
+          {!loading && !error && (
+            <button type="button" style={s.monetizationCard} onClick={() => openWhatsApp('Hola El Barrio, quiero destacar mi servicio.')}>
+              <span style={s.monetizationStar}><ThumbUpIcon size={16} color="#fff" /></span>
+              <span style={s.monetizationCopy}>
+                <strong style={s.monetizationTitle}>¡Destaca tu servicio!</strong>
+                <small style={s.monetizationText}>Consulta planes para llegar a más vecinos.</small>
+              </span>
+              <span style={s.highlightAction}>Contactar →</span>
+            </button>
           )}
         </div>
       </div>
@@ -801,22 +821,22 @@ const s = {
     gap: 3, color: C.verde, fontSize: 10.5, fontWeight: 700,
   },
   monetizationCard: {
-    marginTop: 14, padding: '11px 12px', borderRadius: 14,
-    border: '1px dashed #d7bb73', background: '#fffdf6',
+    width: '100%', minHeight: 72, margin: '16px 0 82px', padding: '11px 12px', borderRadius: 14,
+    border: '1px solid rgba(27,158,117,.24)', background: 'rgba(27,158,117,.10)',
     display: 'flex', alignItems: 'center', gap: 9,
+    textAlign: 'left', fontFamily: T.font, cursor: 'pointer', color: C.texto,
   },
   monetizationStar: {
-    width: 30, height: 30, borderRadius: '50%', background: '#fef3c7', color: '#b7791f',
+    width: 30, height: 30, borderRadius: 9, background: C.verde, color: '#fff',
     display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
   },
   monetizationCopy: {
     flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 1,
-    fontSize: 12.5, color: C.texto,
+    color: C.texto,
   },
-  comingSoon: {
-    padding: '5px 7px', borderRadius: 999, background: '#fef3c7', color: '#8a6014',
-    fontSize: 9.5, fontWeight: 600, flexShrink: 0,
-  },
+  monetizationTitle: { fontSize: 13, fontWeight: 800 },
+  monetizationText: { color: C.textoTenue, fontSize: 10.5, lineHeight: 1.35 },
+  highlightAction: { minHeight: 34, paddingLeft: 11, borderLeft: '1px solid rgba(27,158,117,.28)', display: 'flex', alignItems: 'center', color: C.verdeOsc, fontSize: 10.5, fontWeight: 800, flexShrink: 0 },
   regularHeading: { paddingTop: 16, fontSize: 15, fontWeight: 600, color: C.texto },
 
   /* ── CARD ── */
