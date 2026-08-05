@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { DIAS_SEMANA, horarioVacio } from '../lib/horarios'
 import MiniMap from './MiniMap'
+import { prepareImageUpload } from '../../shared/imageUpload'
 
 const VERDE = '#16a34a'
 
@@ -101,9 +102,10 @@ function CommerceForm({ commerce, neighborhoodId, onClose, onSaved }) {
   const subir = async (file, prefijo) => {
     const ext = file.name.split('.').pop()
     const fileName = `${prefijo}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`
-    const { error: upErr } = await supabase.storage.from('posts').upload(fileName, file)
+    const prepared = await prepareImageUpload(file, fileName)
+    const { error: upErr } = await supabase.storage.from('posts').upload(prepared.path, prepared.file, { contentType: prepared.file.type })
     if (upErr) throw new Error('No se pudo subir la imagen. Intenta de nuevo.')
-    const { data } = supabase.storage.from('posts').getPublicUrl(fileName)
+    const { data } = supabase.storage.from('posts').getPublicUrl(prepared.path)
     return data.publicUrl
   }
 

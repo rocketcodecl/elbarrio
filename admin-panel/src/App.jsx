@@ -18,6 +18,7 @@ import HomeCarouselManager from './screens/HomeCarouselManager.jsx'
 import ContactManager from './screens/ContactManager.jsx'
 import CategoryManager from './screens/CategoryManager.jsx'
 import PostManager from './screens/PostManager.jsx'
+import UsageManager from './screens/UsageManager.jsx'
 
 const ADMIN_ROLE = 'admin'
 
@@ -144,7 +145,8 @@ export default function App() {
       {activeSection === 'portada' && <HomeCarouselManager profile={profile} />}
       {activeSection === 'categorias' && <CategoryManager profile={profile} />}
       {activeSection === 'publicaciones' && <PostManager profile={profile} />}
-      {!['dashboard', 'comercios', 'servicios', 'eventos', 'farmacias', 'noticias', 'incidentes', 'usuarios', 'espera', 'invitaciones', 'contenido', 'notificaciones', 'consultas', 'portada', 'categorias', 'publicaciones'].includes(activeSection) && (
+      {activeSection === 'uso' && <UsageManager />}
+      {!['dashboard', 'comercios', 'servicios', 'eventos', 'farmacias', 'noticias', 'incidentes', 'usuarios', 'espera', 'invitaciones', 'contenido', 'notificaciones', 'consultas', 'portada', 'categorias', 'publicaciones', 'uso'].includes(activeSection) && (
         <section className="placeholder-module"><span>🚧</span><h1>Módulo en preparación</h1><p>Lo construiremos en una siguiente fase.</p></section>
       )}
     </AdminShell>

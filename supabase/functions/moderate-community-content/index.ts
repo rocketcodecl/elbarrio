@@ -136,6 +136,25 @@ async function logDecision(args: {
   }
 }
 
+async function logAiUsage(data: Record<string, unknown>, success: boolean) {
+  const supabaseUrl = Deno.env.get('SUPABASE_URL')
+  const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
+  if (!supabaseUrl || !serviceKey) return
+  const usage = (data.usage || {}) as Record<string, number>
+  try {
+    await fetch(`${supabaseUrl}/rest/v1/service_usage_events`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${serviceKey}`, apikey: serviceKey, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+      body: JSON.stringify({
+        service: 'openrouter', operation: 'content_moderation', success,
+        cost_usd: Number.isFinite(usage.cost) ? usage.cost : null,
+        input_tokens: Number.isFinite(usage.prompt_tokens) ? usage.prompt_tokens : null,
+        output_tokens: Number.isFinite(usage.completion_tokens) ? usage.completion_tokens : null,
+      }),
+    })
+  } catch { /* las métricas nunca bloquean la moderación */ }
+}
+
 Deno.serve(async req => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
   if (req.method !== 'POST') return jsonResponse({ error: { message: 'Método no permitido.' } }, 405)
@@ -235,8 +254,11 @@ Deno.serve(async req => {
   }
 
   if (!upstream.ok) {
+    await logAiUsage(data, false)
     return jsonResponse({ allowed: true, decision: 'allow', categories: [], degraded: true })
   }
+
+  await logAiUsage(data, true)
 
   const choices = data.choices as Array<{ message?: { content?: unknown } }> | undefined
   const rawContent = choices?.[0]?.message?.content

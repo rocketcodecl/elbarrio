@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabase.js";
+import { prepareImageUpload } from "../../../shared/imageUpload.js";
 
 const RUBROS = {
   gasfiter: ["🔧", "Gasfitería"],
@@ -114,11 +115,12 @@ export default function ServiceEditor({
       const path = `service-admin-${
         profile?.id || "admin"
       }-${Date.now()}-${Math.random().toString(36).slice(2)}.${extension}`;
+      const prepared = await prepareImageUpload(file, path)
       const { error: uploadError } = await supabase.storage
         .from("posts")
-        .upload(path, file, { cacheControl: "3600" });
+        .upload(prepared.path, prepared.file, { cacheControl: "3600", contentType: prepared.file.type });
       if (uploadError) throw uploadError;
-      const { data } = supabase.storage.from("posts").getPublicUrl(path);
+      const { data } = supabase.storage.from("posts").getPublicUrl(prepared.path);
       set("image", data?.publicUrl || "");
       setImageChanged(true);
     } catch (uploadError) {

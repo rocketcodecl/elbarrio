@@ -113,5 +113,9 @@ Deno.serve(async request => {
     }
   }
   if (invalidIds.length) await serviceClient.from('push_device_tokens').update({ is_active: false }).in('id', invalidIds)
+  await serviceClient.from('service_usage_events').insert({
+    service: 'firebase', operation: 'push_delivery', success: failed === 0,
+    quantity: sent, metadata: { campaign_id: campaign.id, devices: devices.length, failed },
+  })
   return respond({ sent, failed, devices: devices.length })
 })

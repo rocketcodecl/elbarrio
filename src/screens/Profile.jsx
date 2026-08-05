@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import Stepper from '../components/Stepper'
+import { prepareImageUpload } from '../../shared/imageUpload'
 
 // ============================================================
 // MODO DESARROLLO: no se consulta una whitelist de RUTs porque
@@ -205,14 +206,15 @@ function Profile({ onFinish, onBack, editMode = false }) {
         const fileExt = avatarFile.name.split('.').pop()
         const fileName = `${user.id}-${Date.now()}.${fileExt}`
 
+        const prepared = await prepareImageUpload(avatarFile, fileName, { maxWidth: 900, maxHeight: 900, quality: 0.84 })
         const { error: uploadError } = await supabase.storage
           .from('avatars')
-          .upload(fileName, avatarFile, { upsert: true })
+          .upload(prepared.path, prepared.file, { upsert: true, contentType: prepared.file.type })
 
         if (!uploadError) {
           const { data: urlData } = supabase.storage
             .from('avatars')
-            .getPublicUrl(fileName)
+            .getPublicUrl(prepared.path)
           avatarUrl = urlData.publicUrl
         }
       }

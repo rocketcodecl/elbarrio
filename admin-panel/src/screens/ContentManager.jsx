@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase.js'
+import { prepareImageUpload } from '../../../shared/imageUpload.js'
 
 const ASSET = 'https://elbarrio.lat/el-barrio/community-assets/about-hero.jpg'
 const ABOUT_DEFAULTS = {
@@ -65,9 +66,10 @@ export default function ContentManager({ profile }) {
     try {
       const extension = (file.name.split('.').pop() || 'jpg').toLowerCase()
       const path = `app-content/about-${key}-${profile?.id || 'admin'}-${Date.now()}.${extension}`
-      const { error: uploadError } = await supabase.storage.from('posts').upload(path, file, { cacheControl: '3600' })
+      const prepared = await prepareImageUpload(file, path)
+      const { error: uploadError } = await supabase.storage.from('posts').upload(prepared.path, prepared.file, { cacheControl: '3600', contentType: prepared.file.type })
       if (uploadError) throw uploadError
-      const url = supabase.storage.from('posts').getPublicUrl(path).data?.publicUrl
+      const url = supabase.storage.from('posts').getPublicUrl(prepared.path).data?.publicUrl
       if (!url) throw new Error('No pudimos obtener la URL de la imagen.')
       if (faceIndex == null) setAbout(current => ({ ...current, heroImage: url }))
       else setAbout(current => ({ ...current, faces: current.faces.map((face, index) => index === faceIndex ? { ...face, image: url } : face) }))

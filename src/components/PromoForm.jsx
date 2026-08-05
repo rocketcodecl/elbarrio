@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { supabase } from '../lib/supabase'
+import { prepareImageUpload } from '../../shared/imageUpload'
 
 const VERDE = '#16a34a'
 
@@ -77,13 +78,14 @@ function PromoForm({ promo, commerce, neighborhoodId, onClose, onSaved }) {
         const ext = imgFile.name.split('.').pop()
         const fileName = `promo-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`
 
+        const prepared = await prepareImageUpload(imgFile, fileName)
         const { error: upErr } = await supabase.storage
           .from('posts')
-          .upload(fileName, imgFile)
+          .upload(prepared.path, prepared.file, { contentType: prepared.file.type })
 
         if (upErr) throw new Error('No se pudo subir la foto. Intenta de nuevo.')
 
-        const { data } = supabase.storage.from('posts').getPublicUrl(fileName)
+        const { data } = supabase.storage.from('posts').getPublicUrl(prepared.path)
         imageUrl = data.publicUrl
       }
 

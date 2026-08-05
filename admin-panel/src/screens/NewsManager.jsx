@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { supabase } from '../lib/supabase.js'
 import NewsCategoryManager, { NEWS_CATEGORY_ICONS, newsCategoryKey } from './NewsCategoryManager.jsx'
+import { prepareImageUpload } from '../../../shared/imageUpload.js'
 
 const DEFAULT_CATEGORIES = [
   { key: 'general', icon: '📰', name: 'General' },
@@ -81,9 +82,10 @@ function NewsEditor({ news, profile, categories, onCategoryCreated, onBack, onSa
       for (const file of files) {
         const extension = (file.name.split('.').pop() || 'jpg').toLowerCase()
         const path = `news-${profile?.id || 'admin'}-${Date.now()}-${Math.random().toString(36).slice(2)}.${extension}`
-        const { error: uploadError } = await supabase.storage.from('posts').upload(path, file, { cacheControl: '3600' })
+        const prepared = await prepareImageUpload(file, path)
+        const { error: uploadError } = await supabase.storage.from('posts').upload(prepared.path, prepared.file, { cacheControl: '3600', contentType: prepared.file.type })
         if (uploadError) throw uploadError
-        const { data } = supabase.storage.from('posts').getPublicUrl(path)
+        const { data } = supabase.storage.from('posts').getPublicUrl(prepared.path)
         if (data?.publicUrl) uploaded.push(data.publicUrl)
       }
       setDraft(current => ({ ...current, images: [...current.images, ...uploaded] }))

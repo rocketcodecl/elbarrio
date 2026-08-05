@@ -5,6 +5,7 @@ import { describirFoto } from '../lib/ia'
 import { moderatePublicContent } from '../lib/moderation'
 import MiniMap from '../components/MiniMap'
 import { getContentCategories } from '../lib/contentCategories'
+import { prepareImageUpload } from '../../shared/imageUpload'
 
 /* ============================================================
    CreatePost.jsx — v2
@@ -765,11 +766,12 @@ function CreatePost({ onClose, onPublished, startWith, existingPost = null }) {
         }
         const ext = img.name.split('.').pop()
         const fileName = `${user.id}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`
+        const prepared = await prepareImageUpload(img, fileName)
         const { error: upErr } = await supabase.storage
           .from('posts')
-          .upload(fileName, img)
+          .upload(prepared.path, prepared.file, { contentType: prepared.file.type })
         if (upErr) throw new Error('No se pudo subir una de las fotos. Intenta de nuevo.')
-        const { data: urlData } = supabase.storage.from('posts').getPublicUrl(fileName)
+        const { data: urlData } = supabase.storage.from('posts').getPublicUrl(prepared.path)
         urls.push(urlData.publicUrl)
       }
 

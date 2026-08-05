@@ -25,6 +25,25 @@ function jsonResponse(body: unknown, status = 200) {
   })
 }
 
+async function logUsage(data: Record<string, unknown>, success: boolean) {
+  const supabaseUrl = Deno.env.get('SUPABASE_URL')
+  const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
+  if (!supabaseUrl || !serviceKey) return
+  const usage = (data.usage || {}) as Record<string, number>
+  try {
+    await fetch(`${supabaseUrl}/rest/v1/service_usage_events`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${serviceKey}`, apikey: serviceKey, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+      body: JSON.stringify({
+        service: 'openrouter', operation: 'image_analysis', success,
+        cost_usd: Number.isFinite(usage.cost) ? usage.cost : null,
+        input_tokens: Number.isFinite(usage.prompt_tokens) ? usage.prompt_tokens : null,
+        output_tokens: Number.isFinite(usage.completion_tokens) ? usage.completion_tokens : null,
+      }),
+    })
+  } catch { /* las métricas nunca bloquean la IA */ }
+}
+
 async function hasAuthenticatedUser(req: Request) {
   const authorization = req.headers.get('Authorization')
   const supabaseUrl = Deno.env.get('SUPABASE_URL')
@@ -128,11 +147,13 @@ Deno.serve(async (req) => {
 
   if (!upstream.ok) {
     const upstreamError = data as { error?: { message?: string } }
+    await logUsage(data as Record<string, unknown>, false)
     return jsonResponse(
       { error: { message: upstreamError?.error?.message || `OpenRouter respondió ${upstream.status}.` } },
       upstream.status,
     )
   }
 
+  await logUsage(data as Record<string, unknown>, true)
   return jsonResponse(data)
 })

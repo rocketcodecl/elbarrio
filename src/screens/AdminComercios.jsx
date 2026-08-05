@@ -10,6 +10,7 @@ import { supabase } from '../lib/supabase'
 import { C, T, S, COMERCIOS, COMERCIOS_CATS, iniciales, hace } from '../lib/design'
 import { MapContainer, TileLayer, Marker, useMapEvents, useMap } from 'react-leaflet'
 import 'leaflet/dist/leaflet.css'
+import { prepareImageUpload } from '../../shared/imageUpload'
 import L from 'leaflet'
 
 // Fix del icono default de Leaflet (issue conocido con bundlers Vite/Webpack).
@@ -74,9 +75,10 @@ const subirImagen = async (file, carpeta, onToast) => {
   try {
     const ext = (file.name.split('.').pop() || 'jpg').toLowerCase()
     const nombre = `${carpeta}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`
-    const { error } = await supabase.storage.from('commerces').upload(nombre, file)
+    const prepared = await prepareImageUpload(file, nombre)
+    const { error } = await supabase.storage.from('commerces').upload(prepared.path, prepared.file, { contentType: prepared.file.type })
     if (error) throw error
-    const { data: urlData } = supabase.storage.from('commerces').getPublicUrl(nombre)
+    const { data: urlData } = supabase.storage.from('commerces').getPublicUrl(prepared.path)
     return urlData?.publicUrl || null
   } catch (e) {
     const msg = (e && e.message) || String(e)

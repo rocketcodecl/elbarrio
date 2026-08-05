@@ -15,6 +15,7 @@ const NAVIGATION = [
   { id: 'consultas', icon: '💬', label: 'Consultas' },
   { id: 'contenido', icon: '✎', label: 'Contenido de la app', superOnly: true },
   { id: 'notificaciones', icon: '🔔', label: 'Notificaciones' },
+  { id: 'uso', icon: '◔', label: 'Uso y servicios', superOnly: true },
 ]
 
 export default function AdminShell({ activeSection, onSelect, profile, onLogout, children }) {

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase.js'
 import { COMMERCE_CATEGORIES, COMMERCE_CATEGORY_ICONS } from '../lib/design.js'
 import LocationPicker from '../components/LocationPicker.jsx'
+import { prepareImageUpload } from '../../../shared/imageUpload.js'
 
 const DAYS = [
   ['1', 'Lunes'], ['2', 'Martes'], ['3', 'Miércoles'], ['4', 'Jueves'], ['5', 'Viernes'], ['6', 'Sábado'], ['0', 'Domingo'],
@@ -84,9 +85,10 @@ export default function CommerceEditor({ commerce, profile, onBack, onSaved, onD
     if (file.size > 5 * 1024 * 1024) throw new Error('Cada imagen debe pesar menos de 5 MB.')
     const extension = (file.name.split('.').pop() || 'jpg').toLowerCase()
     const path = `${folder}/${Date.now()}-${Math.random().toString(36).slice(2)}.${extension}`
-    const { error: uploadError } = await supabase.storage.from('commerces').upload(path, file, { cacheControl: '3600' })
+    const prepared = await prepareImageUpload(file, path)
+    const { error: uploadError } = await supabase.storage.from('commerces').upload(prepared.path, prepared.file, { cacheControl: '3600', contentType: prepared.file.type })
     if (uploadError) throw uploadError
-    return supabase.storage.from('commerces').getPublicUrl(path).data?.publicUrl || null
+    return supabase.storage.from('commerces').getPublicUrl(prepared.path).data?.publicUrl || null
   }
 
   const uploadSingle = async (event, field, folder) => {

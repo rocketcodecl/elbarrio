@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase.js'
+import { prepareImageUpload } from '../../../shared/imageUpload.js'
 
 const EMPTY = { name: '', description: '', price: '', unit_label: '', image_url: '', is_available: true, is_featured: true, sort_order: 0 }
 
@@ -53,9 +54,10 @@ export default function ProductCatalog({ commerce, onBack }) {
     if (!imageFile) return draft.image_url || null
     const extension = (imageFile.name.split('.').pop() || 'jpg').toLowerCase()
     const path = `products/${commerce.id}/${Date.now()}-${Math.random().toString(36).slice(2)}.${extension}`
-    const { error: uploadError } = await supabase.storage.from('commerces').upload(path, imageFile, { cacheControl: '3600' })
+    const prepared = await prepareImageUpload(imageFile, path, { maxWidth: 1400, maxHeight: 1400 })
+    const { error: uploadError } = await supabase.storage.from('commerces').upload(prepared.path, prepared.file, { cacheControl: '3600', contentType: prepared.file.type })
     if (uploadError) throw uploadError
-    return supabase.storage.from('commerces').getPublicUrl(path).data?.publicUrl || null
+    return supabase.storage.from('commerces').getPublicUrl(prepared.path).data?.publicUrl || null
   }
   const save = async event => {
     event.preventDefault()
