@@ -431,11 +431,9 @@ function Verification({ profile, draft, onDraftChange, isPending, onFinish, onBa
           )}
         </div>
 
-        <div style={s.zoneMapCaption}>
-          <span style={{ ...s.zoneMapDot, ...(addressOutsideActiveZone ? s.zoneMapDotSoon : {}) }} />
-          {addressOutsideActiveZone
-            ? '¡Pronto llegaremos a tu barrio! Por ahora estamos activando solo algunos barrios.'
-            : coords
+        {!addressOutsideActiveZone && <div style={s.zoneMapCaption}>
+          <span style={s.zoneMapDot} />
+          {coords
             ? 'El marcador muestra tu ubicación actual dentro de la zona.'
             : addressLookupState === 'loading'
             ? 'Buscando tu dirección en el mapa…'
@@ -446,33 +444,7 @@ function Verification({ profile, draft, onDraftChange, isPending, onFinish, onBa
                 : addressLookupState === 'unavailable'
                   ? 'No pudimos ubicar la dirección ahora. Puedes continuar con la confirmación GPS.'
                   : 'Completa dirección y comuna para ubicarla dentro de la zona.'}
-        </div>
-
-        {addressOutsideActiveZone && (
-          <section style={s.waitlistCard} aria-live="polite">
-            <div style={s.waitlistContent}>
-              <div style={s.waitlistText}>Déjanos tu email y te avisamos cuando lleguemos.</div>
-              {waitlistSaved ? (
-                <div style={s.waitlistSuccess}>✓ Listo, te avisaremos cuando lleguemos.</div>
-              ) : (
-                <div style={s.waitlistForm}>
-                  <input
-                    type="email"
-                    value={waitlistEmail}
-                    onChange={(event) => setWaitlistEmail(event.target.value)}
-                    placeholder="tu@email.com"
-                    aria-label="Email para aviso de nueva zona"
-                    className="waitlist-compact-control"
-                    style={s.waitlistInput}
-                  />
-                  <button type="button" onClick={handleWaitlist} disabled={waitlistLoading} className="waitlist-compact-control" style={s.waitlistButton}>
-                    {waitlistLoading ? 'Guardando…' : 'Avísenme'}
-                  </button>
-                </div>
-              )}
-            </div>
-          </section>
-        )}
+        </div>}
 
         <section style={s.zoneMapCard} aria-label="Mapa de cobertura del barrio">
           <div style={s.zoneMapHeader}>
@@ -492,7 +464,34 @@ function Verification({ profile, draft, onDraftChange, isPending, onFinish, onBa
               zoom={16}
             />
             {addressOutsideActiveZone && (
-              <div style={s.waitlistBackdrop} aria-hidden="true" />
+              <div style={s.waitlistBackdrop} aria-live="polite">
+                <section style={s.waitlistCard}>
+                  <div style={s.waitlistFace} aria-hidden="true">😔</div>
+                  <div style={s.waitlistTitle}>¡Pronto llegaremos a tu barrio!</div>
+                  <div style={s.waitlistText}>Por ahora estamos activando solo algunos barrios.</div>
+                  {waitlistSaved ? (
+                    <div style={s.waitlistSuccess}>✓ Listo, te avisaremos cuando lleguemos.</div>
+                  ) : (
+                    <div style={s.waitlistContent}>
+                      <div style={s.waitlistPrompt}>Déjanos tu email y te avisamos cuando lleguemos.</div>
+                      <div style={s.waitlistForm}>
+                        <input
+                          type="email"
+                          value={waitlistEmail}
+                          onChange={(event) => setWaitlistEmail(event.target.value)}
+                          placeholder="tu@email.com"
+                          aria-label="Email para aviso de nueva zona"
+                          className="waitlist-compact-control"
+                          style={s.waitlistInput}
+                        />
+                        <button type="button" onClick={handleWaitlist} disabled={waitlistLoading} className="waitlist-compact-control" style={s.waitlistButton}>
+                          {waitlistLoading ? 'Guardando…' : 'Avísenme'}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </section>
+              </div>
             )}
           </div>
           <div style={s.zoneMapInstruction}>Acerca el mapa con dos dedos para ver las calles que delimitan tu zona.</div>
@@ -813,23 +812,30 @@ const s = {
     inset: 0,
     zIndex: 1200,
     borderRadius: 12,
-    background: 'rgba(238, 243, 239, .34)',
-    backdropFilter: 'blur(7px) saturate(.75)',
-    WebkitBackdropFilter: 'blur(7px) saturate(.75)',
+    display: 'grid',
+    placeItems: 'center',
+    padding: 14,
+    background: 'rgba(226, 232, 228, .46)',
+    backdropFilter: 'blur(6px) saturate(.75)',
+    WebkitBackdropFilter: 'blur(6px) saturate(.75)',
     pointerEvents: 'auto',
     touchAction: 'none',
   },
   waitlistCard: {
     width: '100%',
-    padding: '7px 10px 8px',
+    padding: '14px 12px 12px',
     border: '1px solid #d1fae5',
-    borderRadius: 10,
-    background: '#f0fdf4',
-    boxShadow: '0 3px 10px rgba(15, 95, 54, .05)',
+    borderRadius: 14,
+    background: 'rgba(240, 253, 244, .96)',
+    boxShadow: '0 8px 24px rgba(15, 95, 54, .14)',
+    textAlign: 'center',
   },
-  waitlistContent: { minWidth: 0 },
-  waitlistText: { color: '#48725a', fontSize: 9.5, lineHeight: 1.35, textAlign: 'left' },
-  waitlistForm: { display: 'flex', alignItems: 'center', gap: 6, marginTop: 5 },
+  waitlistFace: { fontSize: 27, lineHeight: 1, marginBottom: 6 },
+  waitlistTitle: { color: '#163f2c', fontSize: 16, lineHeight: 1.2, fontWeight: 800 },
+  waitlistText: { marginTop: 4, color: '#48725a', fontSize: 11, lineHeight: 1.4 },
+  waitlistContent: { minWidth: 0, marginTop: 11, paddingTop: 10, borderTop: '1px solid #ccebd8' },
+  waitlistPrompt: { color: '#315d45', fontSize: 10, lineHeight: 1.35, textAlign: 'left' },
+  waitlistForm: { display: 'flex', alignItems: 'center', gap: 6, marginTop: 6 },
   waitlistInput: {
     flex: 1, minWidth: 0, height: 36, padding: '0 10px',
     border: '1px solid #d1d5db', borderRadius: 9, outline: 'none',

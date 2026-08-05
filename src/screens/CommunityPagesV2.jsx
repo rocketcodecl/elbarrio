@@ -185,8 +185,30 @@ export function InviteNeighbors({ onNavigate, profile }) {
     return()=>{active=false}
   },[profile?.id])
   const code=data?.invite_code||profile?.invite_code||''
-  const url=code?new URL(`${import.meta.env.BASE_URL}?invite=${encodeURIComponent(code)}`,window.location.origin).toString():''
-  const copy=async()=>{if(!url)return;await navigator.clipboard?.writeText(url);setCopied(true);setTimeout(()=>setCopied(false),1800)}
+  const publicAppUrl='https://elbarrio.lat/el-barrio/'
+  const url=code?new URL(`?invite=${encodeURIComponent(code)}`,publicAppUrl).toString():''
+  const copy=async()=>{
+    if(!url)return
+    let didCopy=false
+    try{
+      if(navigator.clipboard?.writeText){
+        await navigator.clipboard.writeText(url)
+        didCopy=true
+      }
+    }catch{/* En HTTP/IP local, Clipboard API puede estar bloqueada. */}
+    if(!didCopy){
+      const field=document.createElement('textarea')
+      field.value=url
+      field.setAttribute('readonly','')
+      field.style.position='fixed'
+      field.style.opacity='0'
+      document.body.appendChild(field)
+      field.select()
+      didCopy=document.execCommand('copy')
+      field.remove()
+    }
+    if(didCopy){setCopied(true);setTimeout(()=>setCopied(false),1800)}
+  }
   const message=`Hola, te invito a El Barrio, una red privada para conectar con quienes vivimos cerca. Tu dirección se verifica de forma segura y nunca se muestra públicamente.`
   const share=async()=>navigator.share&&url?navigator.share({title:'El Barrio',text:message,url}):copy()
   const verified=Number(data?.verified_count||0);const started=Number(data?.started_count||0);const target=5;const progress=Math.min(100,(verified/target)*100)

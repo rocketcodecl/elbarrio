@@ -128,7 +128,7 @@ Deno.serve(async req => {
     can_publish_events: false,
     is_superadmin: false,
     role: 'vecino',
-    account_status: 'suspended',
+    account_status: 'deleted',
   }).eq('id', profile.id)
   if (anonymizeError) return fail(`profile: ${anonymizeError.message}`)
 

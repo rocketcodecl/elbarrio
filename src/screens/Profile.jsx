@@ -20,6 +20,17 @@ function Profile({ onFinish, onBack, editMode = false }) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
+  const isUsablePersonName = (value, email = '') => {
+    const candidate = String(value || '').trim()
+    if (!candidate || candidate.includes('@')) return false
+
+    const normalizedCandidate = candidate.toLocaleLowerCase('es-CL')
+    const normalizedEmail = String(email || '').trim().toLocaleLowerCase('es-CL')
+    const emailLocalPart = normalizedEmail.split('@')[0]
+
+    return normalizedCandidate !== normalizedEmail && normalizedCandidate !== emailLocalPart
+  }
+
   // Formatear RUT: 123456789 → 12.345.678-9
   const formatRut = (value) => {
     let cleaned = value.replace(/[^0-9kK]/g, '').toUpperCase()
@@ -84,10 +95,20 @@ function Profile({ onFinish, onBack, editMode = false }) {
         return
       }
 
-      if (existingProfile?.full_name) {
-        const nameParts = existingProfile.full_name.trim().split(/\s+/).filter(Boolean)
+      const googleName = user.user_metadata?.full_name || user.user_metadata?.name || ''
+      const personName = isUsablePersonName(existingProfile?.full_name, user.email)
+        ? existingProfile.full_name
+        : isUsablePersonName(googleName, user.email)
+          ? googleName
+          : ''
+
+      if (personName) {
+        const nameParts = personName.trim().split(/\s+/).filter(Boolean)
         setFirstName(nameParts[0] || '')
         setLastName(nameParts.slice(1).join(' '))
+      } else {
+        setFirstName('')
+        setLastName('')
       }
       if (existingProfile?.rut) {
         const formattedRut = formatRut(existingProfile.rut)
@@ -97,7 +118,8 @@ function Profile({ onFinish, onBack, editMode = false }) {
       if (existingProfile?.phone) {
         setPhone(existingProfile.phone.replace(/\D/g, '').slice(-9))
       }
-      if (existingProfile?.avatar_url) setAvatarPreview(existingProfile.avatar_url)
+      const accountAvatar = user.user_metadata?.avatar_url || user.user_metadata?.picture || null
+      setAvatarPreview(existingProfile?.avatar_url || accountAvatar)
     }
 
     loadExistingProfile()
@@ -260,7 +282,12 @@ function Profile({ onFinish, onBack, editMode = false }) {
       <div style={styles.avatarSection}>
         <div style={styles.avatarWrapper}>
           {avatarPreview ? (
-            <img src={avatarPreview} alt="Avatar" style={styles.avatarImg} />
+            <img
+              src={avatarPreview}
+              alt="Foto de perfil"
+              style={styles.avatarImg}
+              onError={() => setAvatarPreview(null)}
+            />
           ) : (
             <div style={styles.avatarPlaceholder}>
               {firstName ? (

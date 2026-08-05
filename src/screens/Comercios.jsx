@@ -501,7 +501,7 @@ function CardCompacta({ c, userCoords, expanded, onToggle }) {
    · Horario al lado del nombre (resumen, sin dropdown semanal)
    ════════════════════════════════════════════════════════════ */
 function ComercioDetalle({ c, userCoords, profile, onClose, onEditar, esAdmin, closing = false }) {
-  const [mapaOpen, setMapaOpen] = useState(false)
+  const [mapaOpen, setMapaOpen] = useState(true)
   const [lightbox, setLightbox] = useState(null)
   const [favorito, setFavorito] = useState(false)
   const [favoriteCount, setFavoriteCount] = useState(Number(c.favorites_count) || 0)

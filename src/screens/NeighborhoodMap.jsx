@@ -29,6 +29,7 @@ export default function NeighborhoodMap({ currentUser, neighborhoodId, onNavigat
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [mapRevision, setMapRevision] = useState(0)
+  const [dataRevision, setDataRevision] = useState(0)
 
   useEffect(() => {
     let active = true
@@ -59,7 +60,24 @@ export default function NeighborhoodMap({ currentUser, neighborhoodId, onNavigat
     }
     loadMapItems()
     return () => { active = false }
-  }, [currentUser?.id, neighborhoodId])
+  }, [currentUser?.id, neighborhoodId, dataRevision])
+
+  useEffect(() => {
+    if (!neighborhoodId) return undefined
+    const refresh = () => setDataRevision(value => value + 1)
+    const channel = supabase
+      .channel(`neighborhood-map-live-${neighborhoodId}`)
+      .on('postgres_changes', {
+        event: '*', schema: 'public', table: 'incident_reports',
+        filter: `neighborhood_id=eq.${neighborhoodId}`,
+      }, refresh)
+      .on('postgres_changes', {
+        event: '*', schema: 'public', table: 'commerces',
+        filter: `neighborhood_id=eq.${neighborhoodId}`,
+      }, refresh)
+      .subscribe()
+    return () => { supabase.removeChannel(channel) }
+  }, [neighborhoodId])
 
   useEffect(() => {
     if (!mapBoxRef.current || mapRef.current) return

@@ -2,6 +2,10 @@
 
 ## Estado actual
 
+- Auditoría remota del 5 de agosto validó con datos QA reversibles: verificar/autorizar/suspender/reactivar y eliminar usuarios, crear/editar/pausar/cancelar eventos, moderar servicios, cerrar incidentes, crear/editar/eliminar noticias y farmacias, administrar categorías, leer espera/invitaciones/consultas, guardar Privacidad/Nosotros y ejecutar ocultar/cerrar/retirar/restaurar con siete registros de trazabilidad. Los datos temporales fueron eliminados o quedaron retirados y anonimizados según el diseño de auditoría.
+- `202608050002_profile_privilege_escalation_guard.sql` está aplicada y validada: bloquea que una sesión vecina modifique directamente `role`, `is_superadmin`, `can_publish_events`, `account_status` o campos de suspensión. Las acciones legítimas del panel continúan pasando por RPC administrativas SECURITY DEFINER.
+- Usuarios incorpora eliminación segura visible solo al superadministrador. `202608050001_superadmin_account_deletion.sql` está aplicada, `admin-delete-user` y `delete-my-account` están desplegadas y la eliminación administrativa fue validada con una cuenta QA real.
+
 - El módulo de Notificaciones complementa cada campaña interna con push Android mediante la Edge Function segura `send-push-notification`. El panel solo entrega el `campaign_id`; la función valida al administrador y reutiliza los destinatarios persistidos antes de consultar tokens privados. `202608040003_android_push_notifications.sql` fue ejecutada con resultado `Success`, la credencial Firebase quedó como secreto, la función fue desplegada y rechaza solicitudes anónimas con HTTP 401. El build fue publicado en `https://admin.elbarrio.lat/`; `index-CeQrMynX.js` e `index-BgrMY9nC.css` respondieron HTTP 200. Falta probar una entrega real con el Android registrado.
 - La primera prueba del módulo como superadministrador reveló una referencia `id` ambigua en `admin_super_list_notification_campaigns`; `202608040004_notification_rpc_ambiguity_fix.sql` reemplazó la RPC calificando `neighborhood.id` y fue ejecutada con resultado `Success` según confirmación manual del usuario.
 

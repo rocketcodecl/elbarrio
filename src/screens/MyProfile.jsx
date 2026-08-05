@@ -113,23 +113,26 @@ function DetailSheet({ section, posts, favorites, deals, onClose, onNavigate }) 
               )
             }
             if (section === 'favorites') {
+              const isMarketplacePost = item.favoriteKind === 'post'
               return (
                 <button
                   type="button"
                   className="profile-favorite-card"
                   key={item.id}
-                  onClick={() => onNavigate?.('comercios', { commerceId: item.id })}
-                  aria-label={`Abrir ${item.name || 'comercio favorito'}`}
+                  onClick={() => isMarketplacePost
+                    ? onNavigate?.('productdetail', { postId: item.id })
+                    : onNavigate?.('comercios', { commerceId: item.id })}
+                  aria-label={`Abrir ${item.title || item.name || 'favorito'}`}
                 >
                   <span className="profile-favorite-cover">
-                    {item.cover_url || item.logo_url
-                      ? <img src={item.cover_url || item.logo_url} alt="" />
-                      : <span aria-hidden="true">🏪</span>}
+                    {item.images?.[0] || item.cover_url || item.logo_url
+                      ? <img src={item.images?.[0] || item.cover_url || item.logo_url} alt="" />
+                      : <span aria-hidden="true">{isMarketplacePost ? '📦' : '🏪'}</span>}
                   </span>
                   <div className="profile-favorite-copy">
-                    <small>Comercio guardado</small>
-                    <strong>{item.name}</strong>
-                    <span>{item.category || 'Comercio del barrio'}</span>
+                    <small>{isMarketplacePost ? 'Publicación guardada' : 'Comercio guardado'}</small>
+                    <strong>{item.title || item.name}</strong>
+                    <span>{TYPE_LABELS[item.type] || item.category || (isMarketplacePost ? 'Mercado' : 'Comercio del barrio')}</span>
                   </div>
                   <span className="profile-favorite-heart" aria-label="Favorito">♥</span>
                 </button>
@@ -184,9 +187,10 @@ export default function MyProfile({
         return
       }
 
-      const [postResult, favoriteResult, dealResult, neighborhoodResult] = await Promise.all([
+      const [postResult, favoriteResult, postFavoriteResult, dealResult, neighborhoodResult] = await Promise.all([
         supabase.from('posts').select('id, title, type, status, images, created_at').eq('author_id', loadedProfile.id).order('created_at', { ascending: false }).limit(40),
         supabase.from('commerce_favorites').select('commerce_id').eq('profile_id', loadedProfile.id),
+        supabase.from('post_likes').select('post_id').eq('user_id', currentUser.id),
         supabase.from('marketplace_deals').select('id, post_id, buyer_id, seller_id, status, updated_at').or(`buyer_id.eq.${loadedProfile.id},seller_id.eq.${loadedProfile.id}`).order('updated_at', { ascending: false }).limit(40),
         loadedProfile.neighborhood_id
           ? supabase.from('neighborhoods').select('name').eq('id', loadedProfile.neighborhood_id).maybeSingle()
@@ -195,12 +199,16 @@ export default function MyProfile({
       if (!active) return
       const loadedPosts = postResult.data || []
       const favoriteIds = [...new Set((favoriteResult.data || []).map(item => item.commerce_id).filter(Boolean))]
+      const favoritePostIds = [...new Set((postFavoriteResult.data || []).map(item => item.post_id).filter(Boolean))]
       const loadedDeals = dealResult.data || []
       const dealPostIds = [...new Set(loadedDeals.map(item => item.post_id).filter(Boolean))]
 
-      const [favoriteCommerceResult, dealPostsResult] = await Promise.all([
+      const [favoriteCommerceResult, favoritePostsResult, dealPostsResult] = await Promise.all([
         favoriteIds.length
           ? supabase.from('commerces').select('id, name, category, cover_url, logo_url').in('id', favoriteIds)
+          : Promise.resolve({ data: [] }),
+        favoritePostIds.length
+          ? supabase.from('posts').select('id, title, type, category, images').in('id', favoritePostIds)
           : Promise.resolve({ data: [] }),
         dealPostIds.length
           ? supabase.from('posts').select('id, title, type, images').in('id', dealPostIds)
@@ -209,7 +217,10 @@ export default function MyProfile({
       if (!active) return
       const dealPosts = new Map((dealPostsResult.data || []).map(item => [item.id, item]))
       setPosts(loadedPosts)
-      setFavorites(favoriteCommerceResult.data || [])
+      setFavorites([
+        ...(favoritePostsResult.data || []).map(item => ({ ...item, favoriteKind: 'post' })),
+        ...(favoriteCommerceResult.data || []).map(item => ({ ...item, favoriteKind: 'commerce' })),
+      ])
       setDeals(loadedDeals.map(item => ({
         ...item,
         role: item.seller_id === loadedProfile.id ? 'seller' : 'buyer',

@@ -76,7 +76,9 @@ export default function EventDetail({ postId, neighborhoodId, onNavigate }) {
     try {
       if (navigator.share) await navigator.share(data)
       else await navigator.clipboard.writeText(window.location.href)
-    } catch {}
+    } catch {
+      // El usuario puede cancelar la hoja nativa de compartir.
+    }
   }
 
   if (loading) return <div style={s.center}>Cargando evento…</div>
@@ -85,6 +87,12 @@ export default function EventDetail({ postId, neighborhoodId, onNavigate }) {
   const category = categories[event.category] || CATEGORY[event.category] || CATEGORY.otros
   const image = event.images?.[0]
   const hasMap = event.lat != null && event.lng != null
+  const directionsQuery = hasMap
+    ? `${event.lat},${event.lng}`
+    : event.location_text
+  const directionsUrl = directionsQuery
+    ? `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(directionsQuery)}`
+    : null
   const ticketPrices = Array.isArray(event.event_ticket_prices) && event.event_ticket_prices.length
     ? event.event_ticket_prices
     : event.event_entry_type === 'paid' && event.event_price != null
@@ -130,6 +138,7 @@ export default function EventDetail({ postId, neighborhoodId, onNavigate }) {
           <h2 style={s.sectionTitle}>Ubicación</h2>
           {hasMap ? <div style={s.map}><MiniMap lat={event.lat} lng={event.lng} height={190} zoom={16} /></div> : <div style={s.noMap}><Pin /> El organizador aún no fijó el punto en el mapa.</div>}
           <div style={s.mapCaption}>{event.location_text || 'Lugar por confirmar'}</div>
+          {directionsUrl && <a href={directionsUrl} target="_blank" rel="noreferrer" style={s.directionsLink}><Pin /> Cómo llegar</a>}
         </section>
         <div style={{ height: 104, flexShrink: 0 }} />
       </div>
@@ -167,4 +176,5 @@ const s = {
   map: { marginTop: 13, borderRadius: 15, overflow: 'hidden', border: `1px solid ${C.borde}` },
   noMap: { marginTop: 13, height: 115, borderRadius: 15, background: '#e9eef5', color: C.textoSuave, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7, fontSize: 12.5 },
   mapCaption: { textAlign: 'center', marginTop: 9, fontSize: 11.5, color: C.textoSuave },
+  directionsLink: { marginTop: 12, minHeight: 44, borderRadius: 12, background: C.verde, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, fontSize: 13.5, fontWeight: 600, textDecoration: 'none' },
 }

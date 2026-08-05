@@ -524,9 +524,9 @@ export default function Noticias({ currentUser, onNavigate }) {
         const official = esNoticiaOficial(selectedNews)
         const images = getImages(selectedNews)
         const source = getSource(selectedNews)
-        return <div style={s.modalOverlay} role="dialog" aria-modal="true" aria-label={selectedNews.title || 'Noticia completa'} onClick={() => setSelectedNews(null)}>
+        return <div style={s.modalOverlay} role="dialog" aria-modal="true" aria-label={selectedNews.title || 'Noticia'} onClick={() => setSelectedNews(null)}>
           <article className="noticias-modal-sheet" style={s.modalSheet} onClick={event => event.stopPropagation()}>
-            <header style={s.modalHeader}><button type="button" style={s.modalClose} onClick={() => setSelectedNews(null)} aria-label="Cerrar">×</button><span>Noticia completa</span><i /></header>
+            <header style={s.modalHeader}><button type="button" style={s.modalClose} onClick={() => setSelectedNews(null)} aria-label="Cerrar">×</button><span aria-hidden="true" /><i /></header>
             <div style={s.modalScroll}>
               {images.length > 0 && <div style={s.modalCarousel} onTouchStart={onModalImageTouchStart} onTouchEnd={event => onModalImageTouchEnd(event, images.length)}><img key={`${images[modalImageIndex]}-${modalImageIndex}`} className="noticias-modal-image" src={images[modalImageIndex]} alt="" style={s.modalCover} draggable="false" />{images.length > 1 && <div style={s.modalDots}>{images.map((_, index) => <button key={index} type="button" aria-label={`Ver imagen ${index + 1}`} style={{ ...s.modalDot, ...(index === modalImageIndex ? s.modalDotActive : {}) }} onClick={() => setModalImageIndex(index)} />)}</div>}</div>}
               <div style={s.modalBody}>
@@ -751,7 +751,7 @@ const s = {
   modalClose: { width: 36, height: 36, borderRadius: '50%', border: `1px solid ${C.borde}`, background: C.fondo, color: C.texto, fontSize: 24, lineHeight: 1, cursor: 'pointer' },
   modalScroll: { minHeight: 0, overflowY: 'auto', WebkitOverflowScrolling: 'touch' },
   modalCarousel: { position: 'relative', flexShrink: 0, background: '#e9efeb', touchAction: 'pan-y', userSelect: 'none' },
-  modalCover: { width: '100%', aspectRatio: '16 / 9', display: 'block', objectFit: 'cover' },
+  modalCover: { width: '100%', height: 'auto', display: 'block', objectFit: 'contain' },
   modalDots: { position: 'absolute', left: 0, right: 0, bottom: 10, display: 'flex', justifyContent: 'center', gap: 5 },
   modalDot: { width: 7, height: 7, padding: 0, border: '1px solid rgba(255,255,255,.9)', borderRadius: '50%', background: 'rgba(255,255,255,.5)', boxShadow: '0 1px 4px rgba(0,0,0,.25)' },
   modalDotActive: { width: 18, borderRadius: 999, background: '#fff' },

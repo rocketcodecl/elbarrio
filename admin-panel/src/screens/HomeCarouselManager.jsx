@@ -62,7 +62,7 @@ export default function HomeCarouselManager({ profile }) {
   }
 
   return <div className="home-carousel-manager">
-    <header className="page-heading"><div><p className="eyebrow">Primera impresión</p><h1>Portada de Inicio</h1><p>Selecciona hasta quince contenidos con fotografía. La app mezclará el conjunto y mostrará cinco por sesión.</p></div><span className="status-pill">{selected.length}/15 seleccionados</span></header>
+    <header className="page-heading"><div><p className="eyebrow">Primera impresión</p><h1>Portada de Inicio</h1><p>Selecciona hasta quince contenidos con fotografía. La app mezclará el conjunto y mostrará hasta diez por sesión.</p></div><span className="status-pill">{selected.length}/15 seleccionados</span></header>
     {error && <div className="admin-message error">{error}</div>}{notice && <div className="admin-message success">{notice}</div>}
     {isSuperadmin && <label className="field home-carousel-neighborhood">Barrio<select value={neighborhoodId} onChange={event => setNeighborhoodId(event.target.value)}><option value="">Selecciona un barrio</option>{neighborhoods.map(item => <option key={item.id} value={item.id}>{item.name}{item.uv_code ? ` · UV ${item.uv_code}` : ''}</option>)}</select></label>}
     {neighborhoodId && <div className="home-carousel-layout">

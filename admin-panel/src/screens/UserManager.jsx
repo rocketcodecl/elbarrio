@@ -11,6 +11,7 @@ const FILTERS = [
   ['actors', 'Actores autorizados'],
   ['admins', 'Administradores'],
   ['suspended', 'Suspendidos'],
+  ['deleted', 'Eliminados'],
 ]
 
 const ACTION_LABELS = {
@@ -35,6 +36,7 @@ const profileMarker = L.divIcon({ className: 'admin-map-marker', html: '<span></
 
 const isVerified = user => user.verification_status === 'verified' || user.verified === true || Boolean(user.verified_at)
 const isSuspended = user => user.account_status === 'suspended'
+const isDeleted = user => user.account_status === 'deleted'
 const dateLabel = value => value
   ? new Date(value).toLocaleString('es-CL', { dateStyle: 'medium', timeStyle: 'short' })
   : 'Sin registro'
@@ -62,6 +64,7 @@ function profileCoordinates(user) {
 }
 
 function UserBadges({ user }) {
+  if (isDeleted(user)) return <div className="user-badges"><span className="user-badge deleted">Eliminado</span></div>
   return <div className="user-badges">
     {isSuspended(user) && <span className="user-badge suspended">Suspendido</span>}
     {user.is_superadmin
@@ -101,6 +104,9 @@ export default function UserManager({ profile }) {
   const [notice, setNotice] = useState('')
   const [notificationDraft, setNotificationDraft] = useState({ title: '', body: '' })
   const [notificationSaving, setNotificationSaving] = useState(false)
+  const [deleteOpen, setDeleteOpen] = useState(false)
+  const [deletePhrase, setDeletePhrase] = useState('')
+  const [deleting, setDeleting] = useState(false)
 
   const selected = users.find(user => user.id === selectedId) || null
   const selectedCoordinates = profileCoordinates(selected)
@@ -133,6 +139,7 @@ export default function UserManager({ profile }) {
     setLoading(false)
   }, [isSuperadmin, neighborhoodId])
 
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- carga inicial remota del directorio
   useEffect(() => { loadUsers() }, [loadUsers])
 
   const loadHistory = useCallback(async profileId => {
@@ -154,10 +161,12 @@ export default function UserManager({ profile }) {
     setHistoryLoading(false)
   }, [])
 
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- carga remota asociada a la selección
   useEffect(() => { loadHistory(selectedId) }, [loadHistory, selectedId])
 
   useEffect(() => {
     if (!selectedId) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- limpia el detalle cuando no existe selección
       setActivity([])
       setNeighborhood(null)
       return
@@ -183,12 +192,13 @@ export default function UserManager({ profile }) {
   const filtered = useMemo(() => {
     const needle = query.trim().toLowerCase()
     return users.filter(user => {
-      const matchesFilter = filter === 'all'
+      const matchesFilter = (filter === 'all' && !isDeleted(user))
         || (filter === 'pending' && !isVerified(user))
         || (filter === 'verified' && isVerified(user))
         || (filter === 'actors' && user.can_publish_events === true)
         || (filter === 'admins' && user.role === 'admin')
         || (filter === 'suspended' && isSuspended(user))
+        || (filter === 'deleted' && isDeleted(user))
       const matchesText = !needle || [user.full_name, user.email, user.rut, user.address, user.comuna, user.barrio]
         .some(value => String(value || '').toLowerCase().includes(needle))
       return matchesFilter && matchesText
@@ -196,14 +206,21 @@ export default function UserManager({ profile }) {
   }, [filter, query, users])
 
   const stats = useMemo(() => ({
-    total: users.length,
-    pending: users.filter(user => !isVerified(user)).length,
-    actors: users.filter(user => user.can_publish_events).length,
+    total: users.filter(user => !isDeleted(user)).length,
+    pending: users.filter(user => !isDeleted(user) && !isVerified(user)).length,
+    actors: users.filter(user => !isDeleted(user) && user.can_publish_events).length,
     suspended: users.filter(isSuspended).length,
   }), [users])
 
+  const selectUser = profileId => {
+    setDeleteOpen(false)
+    setDeletePhrase('')
+    setSelectedId(profileId)
+  }
+
   const manage = async action => {
     if (!selected) return
+    if (isDeleted(selected)) return setError('Esta cuenta fue eliminada y no admite nuevos cambios administrativos.')
     const destructive = ['remove_admin', 'remove_superadmin', 'revoke_actor', 'suspend'].includes(action)
     if (destructive && !window.confirm(`¿Confirmas esta acción para ${selected.full_name || 'este usuario'}?`)) return
     setChanging(action)
@@ -226,6 +243,7 @@ export default function UserManager({ profile }) {
   const sendNotification = async event => {
     event.preventDefault()
     if (!selected || notificationSaving) return
+    if (isDeleted(selected)) return setError('No puedes enviar notificaciones a una cuenta eliminada.')
     const title = notificationDraft.title.trim()
     const body = notificationDraft.body.trim()
     if (!title || !body) return setError('Completa el título y el mensaje de la notificación.')
@@ -243,6 +261,28 @@ export default function UserManager({ profile }) {
     window.setTimeout(() => setNotice(''), 2600)
   }
 
+  const deleteSelectedAccount = async event => {
+    event.preventDefault()
+    if (!selected || !isSuperadmin || isSelf || deleting || deletePhrase !== 'ELIMINAR') return
+    setDeleting(true)
+    setError('')
+    const deletedName = selected.full_name || 'el usuario'
+    const { data, error: deleteError } = await supabase.functions.invoke('admin-delete-user', {
+      body: { target_profile_id: selected.id, confirmation: deletePhrase },
+    })
+    setDeleting(false)
+    if (deleteError || !data?.deleted) {
+      setError(data?.error?.message || deleteError?.message || 'No fue posible eliminar esta cuenta.')
+      return
+    }
+    setDeleteOpen(false)
+    setDeletePhrase('')
+    setNotice(`Cuenta de ${deletedName} eliminada y anonimizada`)
+    window.setTimeout(() => setNotice(''), 3200)
+    const nextActiveId = users.find(user => user.id !== selected.id && !isDeleted(user))?.id
+    await loadUsers(nextActiveId)
+  }
+
   return <div className="user-manager">
     <section className="page-heading commerce-page-heading">
       <div><p className="eyebrow">Comunidad y permisos</p><h1>Usuarios</h1><p>Verifica vecinos, autoriza actores y protege el acceso a El Barrio.</p></div>
@@ -257,7 +297,7 @@ export default function UserManager({ profile }) {
         <div className="user-tools"><label className="admin-search"><span>⌕</span><input value={query} onChange={event => setQuery(event.target.value)} placeholder="Nombre, correo, RUT o barrio…" /></label><div className="filter-row">{FILTERS.map(([value, label]) => <button key={value} type="button" className={filter === value ? 'is-active' : ''} onClick={() => setFilter(value)}>{label}</button>)}</div></div>
         {loading && <div className="panel-loading">Cargando usuarios…</div>}
         {!loading && filtered.length === 0 && <div className="panel-empty"><span>👥</span><strong>Sin usuarios en este filtro</strong><small>Prueba otra búsqueda o estado.</small></div>}
-        {!loading && <div className="user-list">{filtered.map(user => <button key={user.id} type="button" className={`user-list-item ${selectedId === user.id ? 'is-selected' : ''}`} onClick={() => setSelectedId(user.id)}>
+        {!loading && <div className="user-list">{filtered.map(user => <button key={user.id} type="button" className={`user-list-item ${selectedId === user.id ? 'is-selected' : ''}`} onClick={() => selectUser(user.id)}>
           {user.avatar_url ? <img src={user.avatar_url} alt="" /> : <span className="user-avatar-fallback">{initials(user.full_name)}</span>}
           <span className="user-list-copy"><strong>{user.full_name || 'Vecino sin nombre'}</strong><small>{user.email || user.rut || 'Sin datos de contacto'}</small><UserBadges user={user} /></span>
         </button>)}</div>}
@@ -278,7 +318,7 @@ export default function UserManager({ profile }) {
 
             <section className="user-info-card user-permissions-card"><h3>Permisos</h3><div className="permission-row"><span>📅</span><div><strong>Publicación de eventos</strong><small>Para juntas de vecinos, municipalidades y actores autorizados.</small></div>{selected.can_publish_events ? <button type="button" disabled={!!changing} onClick={() => manage('revoke_actor')}>Retirar</button> : <button className="positive" type="button" disabled={!!changing || !isVerified(selected) || isSuspended(selected)} onClick={() => manage('approve_actor')}>Autorizar</button>}</div>{isSuperadmin && <><div className="permission-row"><span>🛡️</span><div><strong>Administración territorial</strong><small>Permite administrar únicamente el barrio asignado.</small></div>{selected.role === 'admin' ? <button type="button" disabled={!!changing || isSelf || selected.is_superadmin} onClick={() => manage('remove_admin')}>{isSelf ? 'Tu cuenta' : selected.is_superadmin ? 'Nivel supremo activo' : 'Retirar'}</button> : <button className="positive" type="button" disabled={!!changing || isSuspended(selected)} onClick={() => manage('assign_admin')}>Hacer admin</button>}</div><div className="permission-row"><span>👑</span><div><strong>Superadministración</strong><small>Entrega alcance global y control sobre otros administradores.</small></div>{selected.is_superadmin ? <button type="button" disabled={!!changing || isSelf} onClick={() => manage('remove_superadmin')}>{isSelf ? 'Tu cuenta' : 'Retirar nivel'}</button> : <button className="positive" type="button" disabled={!!changing || isSuspended(selected)} onClick={() => manage('assign_superadmin')}>Hacer supremo</button>}</div></>}</section>
 
-            <section className="user-info-card user-account-card"><h3>Estado de la cuenta</h3>{isSuspended(selected) ? <div className="account-state suspended"><strong>Cuenta suspendida</strong><p>El usuario no puede utilizar la aplicación.</p>{selected.suspended_at && <small>Desde {dateLabel(selected.suspended_at)}</small>}<button type="button" disabled={!!changing} onClick={() => manage('reactivate')}>Reactivar usuario</button></div> : <div className="account-state active"><strong>Cuenta activa</strong><p>El usuario puede ingresar y usar las funciones habilitadas.</p><button type="button" disabled={!!changing || isSelf} onClick={() => manage('suspend')}>{isSelf ? 'No puedes suspenderte' : 'Suspender usuario'}</button></div>}</section>
+            <section className="user-info-card user-account-card"><h3>Estado de la cuenta</h3>{isDeleted(selected) ? <div className="account-state deleted"><strong>Cuenta eliminada</strong><p>El acceso fue revocado y los datos personales quedaron anonimizados.</p>{selected.suspended_at && <small>Desde {dateLabel(selected.suspended_at)}</small>}</div> : isSuspended(selected) ? <div className="account-state suspended"><strong>Cuenta suspendida</strong><p>El usuario no puede utilizar la aplicación.</p>{selected.suspended_at && <small>Desde {dateLabel(selected.suspended_at)}</small>}<button type="button" disabled={!!changing} onClick={() => manage('reactivate')}>Reactivar usuario</button></div> : <div className="account-state active"><strong>Cuenta activa</strong><p>El usuario puede ingresar y usar las funciones habilitadas.</p><button type="button" disabled={!!changing || isSelf} onClick={() => manage('suspend')}>{isSelf ? 'No puedes suspenderte' : 'Suspender usuario'}</button></div>}{isSuperadmin && !isDeleted(selected) && <div className="user-delete-zone"><strong>Eliminar cuenta definitivamente</strong><p>Revoca el acceso y anonimiza RUT, contacto, dirección, GPS y fotografía. Las conversaciones y publicaciones permanecen sin identidad pública.</p>{isSelf ? <small>No puedes eliminar tu propia cuenta desde el panel.</small> : selected.is_superadmin ? <small>Primero retira el nivel de superadministrador.</small> : selected.role === 'admin' ? <small>Primero retira sus permisos de administrador territorial.</small> : !deleteOpen ? <button type="button" className="user-delete-start" onClick={() => setDeleteOpen(true)}>Eliminar cuenta</button> : <form onSubmit={deleteSelectedAccount}><label>Escribe <b>ELIMINAR</b><input value={deletePhrase} onChange={event => setDeletePhrase(event.target.value.toUpperCase())} autoComplete="off" /></label><div><button type="button" onClick={() => { setDeleteOpen(false); setDeletePhrase('') }}>Cancelar</button><button type="submit" className="user-delete-confirm" disabled={deletePhrase !== 'ELIMINAR' || deleting}>{deleting ? 'Eliminando…' : 'Eliminar definitivamente'}</button></div></form>}</div>}</section>
 
             <section className="user-info-card user-notification-card"><div className="user-card-heading"><h3>Enviar notificación</h3><span>🔔 Interna</span></div><p>Se mostrará inmediatamente en la campana de {selected.full_name || 'este vecino'}.</p><form onSubmit={sendNotification}><label>Título<input maxLength="90" value={notificationDraft.title} onChange={event => setNotificationDraft(current => ({ ...current, title: event.target.value }))} placeholder="Ej: Información importante" /></label><label>Mensaje<textarea rows="4" maxLength="300" value={notificationDraft.body} onChange={event => setNotificationDraft(current => ({ ...current, body: event.target.value }))} placeholder="Escribe un mensaje claro y breve…" /></label><button type="submit" disabled={notificationSaving}>{notificationSaving ? 'Enviando…' : 'Enviar notificación'}</button></form></section>
 

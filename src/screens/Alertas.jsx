@@ -108,6 +108,7 @@ function Alertas({ currentUser, onNavigate, onCrear }) {
   const [cargando, setCargando] = useState(true)
   const [error, setError] = useState('')
   const [userCoords, setUserCoords] = useState(null)
+  const [neighborhoodId, setNeighborhoodId] = useState(null)
 
   useEffect(() => {
     getContentCategories('incident', CATS.slice(1)).then(items => setCategories([
@@ -146,6 +147,7 @@ function Alertas({ currentUser, onNavigate, onCrear }) {
         setError('No pudimos confirmar tu barrio. Intenta nuevamente.')
         return
       }
+      setNeighborhoodId(p.neighborhood_id)
 
       // Las alertas `active` son visibles para todo el barrio. Cada autor
       // también puede ver sus propios reportes `pendiente`, claramente
@@ -182,7 +184,19 @@ function Alertas({ currentUser, onNavigate, onCrear }) {
     }
   }
 
-  useEffect(() => { cargar() }, [currentUser?.id])
+  useEffect(() => { Promise.resolve().then(cargar) }, [currentUser?.id]) // eslint-disable-line react-hooks/exhaustive-deps -- recarga al cambiar de sesión
+
+  useEffect(() => {
+    if (!neighborhoodId) return undefined
+    const channel = supabase
+      .channel(`alerts-live-${neighborhoodId}`)
+      .on('postgres_changes', {
+        event: '*', schema: 'public', table: 'incident_reports',
+        filter: `neighborhood_id=eq.${neighborhoodId}`,
+      }, cargar)
+      .subscribe()
+    return () => { supabase.removeChannel(channel) }
+  }, [neighborhoodId]) // eslint-disable-line react-hooks/exhaustive-deps -- recarga la lista del barrio activo
 
   const nav = onNavigate || (() => {})
   const crear = onCrear || (() => {})

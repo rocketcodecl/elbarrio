@@ -1,5 +1,20 @@
 # SQL preparado para el cierre del MVP
 
+## Eliminación de cuentas desde superadministración — pendiente de aplicar
+
+1. Ejecutar completa en Supabase SQL Editor:
+
+   `supabase/migrations/202608050001_superadmin_account_deletion.sql`
+
+2. Confirmar `Success. No rows returned`.
+3. Desplegar después las funciones:
+
+   `supabase functions deploy admin-delete-user --no-verify-jwt`
+
+   `supabase functions deploy delete-my-account --no-verify-jwt`
+
+Ambas funciones validan internamente la sesión. `admin-delete-user` exige además una cuenta activa con `role='admin'` e `is_superadmin=true`. No desplegar la función administrativa antes de confirmar la migración.
+
 ## Estado
 
 `202607300004_content_moderation_events.sql` fue ejecutada con resultado `Success` el 30 de julio de 2026. La tabla fue reconocida posteriormente por PostgREST y rechazó una lectura anónima con HTTP 401, mientras el control sobre una tabla inexistente respondió HTTP 404.

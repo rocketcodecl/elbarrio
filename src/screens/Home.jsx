@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import { supabase } from '../lib/supabase'
 import {
   C, T, TIPOS, REPORTES, FARMACIAS,
@@ -366,13 +366,42 @@ const haversine = (lat1, lng1, lat2, lng2) => {
   return Math.round(R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)))
 }
 
-const mezclarPortada = (items, limit = 5) => {
+const mezclarPortada = (items, limit = 10) => {
   const copy = [...items]
   for (let index = copy.length - 1; index > 0; index -= 1) {
     const target = Math.floor(Math.random() * (index + 1))
     ;[copy[index], copy[target]] = [copy[target], copy[index]]
   }
   return copy.slice(0, limit)
+}
+
+// Elige actividad relevante sin convertir el feed en un ranking rígido.
+// Primero prioriza una mezcla de publicaciones recientes y vistas; luego
+// cambia su orden en cada carga para que Inicio se sienta vivo.
+const mezclarActividadRelevante = (items, limit = 30) => {
+  const unique = [...new Map(items.map(item => [item.id, item])).values()]
+  const recent = [...unique]
+    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+    .slice(0, Math.max(18, limit))
+  const viewed = [...unique]
+    .sort((a, b) => Number(b.views_count || 0) - Number(a.views_count || 0))
+    .slice(0, Math.max(18, limit))
+  const relevant = [...new Map([...recent, ...viewed].map(item => [item.id, item])).values()]
+  const shuffled = mezclarPortada(relevant, relevant.length)
+  const visible = []
+  const deferred = []
+  let alertCount = 0
+
+  // Las alertas siguen presentes y urgentes, pero no pueden monopolizar la
+  // primera pantalla cuando también hay actividad real de vecinos o Mercado.
+  shuffled.forEach((item) => {
+    if (item.__incident && alertCount >= 2) deferred.push(item)
+    else {
+      visible.push(item)
+      if (item.__incident) alertCount += 1
+    }
+  })
+  return [...visible, ...deferred].slice(0, limit)
 }
 
 function Home({ currentUser, onNavigate, onCrear }) {
@@ -510,6 +539,20 @@ function Home({ currentUser, onNavigate, onCrear }) {
     cargar(cache?.profile?.neighborhood_id)
   }, [currentUser?.id]) // eslint-disable-line react-hooks/exhaustive-deps -- hidrata una vez por usuario
 
+  // Las alertas son urgentes: cualquier alta, cierre o actualización de otro
+  // vecino debe reflejarse sin exigir salir de Inicio ni refrescar manualmente.
+  useEffect(() => {
+    if (!profile?.neighborhood_id) return undefined
+    const channel = supabase
+      .channel(`home-incidents-${profile.neighborhood_id}`)
+      .on('postgres_changes', {
+        event: '*', schema: 'public', table: 'incident_reports',
+        filter: `neighborhood_id=eq.${profile.neighborhood_id}`,
+      }, () => cargar(profile.neighborhood_id))
+      .subscribe()
+    return () => { supabase.removeChannel(channel) }
+  }, [profile?.neighborhood_id]) // eslint-disable-line react-hooks/exhaustive-deps -- recarga el barrio activo
+
   // GPS del usuario: pedimos una vez al montar el Home.
   // Si lo acepta, guardamos las coords para (a) calcular distancia a cada
   // alerta y (b) refrescar el clima con la ubicación EXACTA del usuario
@@ -637,7 +680,7 @@ function Home({ currentUser, onNavigate, onCrear }) {
       }
       const spotlightEvent = spotlightRes.error ? null : spotlightRes.data
       const carouselPool = carouselRes.error ? [] : (carouselRes.data || []).filter(item => item.images?.[0])
-      const carouselItems = mezclarPortada(carouselPool, 5)
+      const carouselItems = mezclarPortada(carouselPool, 10)
 
       // Si el profile refrescado trae datos nuevos, los usamos.
       const profileFresco = profileRes?.data || p
@@ -679,9 +722,12 @@ function Home({ currentUser, onNavigate, onCrear }) {
       const ventas = todos.filter((x) => x.type === 'sell').slice(0, 10)
       const regalos = todos.filter((x) => x.type === 'gift' || x.type === 'trade').slice(0, 10)
       const eventos = todos.filter((x) => x.type === 'event').slice(0, 10)
-      // Las publicaciones generales y noticias editoriales forman la base de
-      // Actividad; las alertas vecinales activas se incorporan más abajo.
-      const actividad = todos.filter((x) => x.type === 'general' || (x.type === 'news' && x.show_in_activity === true)).slice(0, 20)
+      // Actividad también descubre publicaciones de Mercado. La selección
+      // final mezcla contenidos recientes y vistos para evitar un orden fijo.
+      const actividad = todos.filter((x) =>
+        ['general', 'sell', 'gift', 'trade'].includes(x.type)
+        || (x.type === 'news' && x.show_in_activity === true)
+      ).slice(0, 40)
 
       setPedidos(pedidosActivos)
       setVentas(ventas)
@@ -799,26 +845,28 @@ function Home({ currentUser, onNavigate, onCrear }) {
   const nav = onNavigate || (() => {})
   const crear = onCrear || (() => {})
 
-  // Pedidos y alertas de vecinos son actividad del barrio. Las alertas
-  // conservan su id real para abrir su detalle, pero adoptan el formato del feed.
-  const alertasActividad = alertasVecinales.map((alerta) => ({
-    ...alerta,
-    id: `incident-${alerta.id}`,
-    incidentId: alerta.id,
-    type: 'alert',
-    title: alerta.title || alerta.description?.slice(0, 60) || 'Alerta vecinal',
-    content: alerta.description || null,
-    author: alerta.reporter || null,
-    __incident: true,
-  }))
-  const eventosActividad = eventos.filter((evento) => evento.show_in_activity === true)
-  const eventoDestacado = eventoPortada
-  const eventosActividadSecundarios = eventoDestacado
-    ? eventosActividad.filter(evento => evento.id !== eventoDestacado.id)
-    : eventosActividad
-  const actividadBarrio = [...pedidos, ...alertasActividad, ...eventosActividadSecundarios, ...actividad].sort((a, b) =>
-    new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-  )
+  // Pedidos, alertas, eventos y Mercado comparten Actividad. Se calcula solo
+  // cuando cambian sus datos para que las tarjetas no salten durante un render.
+  const actividadBarrio = useMemo(() => {
+    const alertasActividad = alertasVecinales.map((alerta) => ({
+      ...alerta,
+      id: `incident-${alerta.id}`,
+      incidentId: alerta.id,
+      type: 'alert',
+      title: alerta.title || alerta.description?.slice(0, 60) || 'Alerta vecinal',
+      content: alerta.description || null,
+      author: alerta.reporter || null,
+      __incident: true,
+    }))
+    const eventosActividad = eventos.filter((evento) => evento.show_in_activity === true)
+    const eventosSecundarios = eventoPortada
+      ? eventosActividad.filter(evento => evento.id !== eventoPortada.id)
+      : eventosActividad
+    return mezclarActividadRelevante(
+      [...pedidos, ...alertasActividad, ...eventosSecundarios, ...actividad],
+      30,
+    )
+  }, [pedidos, alertasVecinales, eventos, eventoPortada, actividad])
 
   const filtrados = actividadBarrio
 
@@ -851,12 +899,12 @@ function Home({ currentUser, onNavigate, onCrear }) {
   // Portada útil y cercana: máximo tres contenidos reales con fotografía.
   // El evento elegido desde el panel conserva prioridad; los demás espacios
   // se completan con información editorial y un descubrimiento del Mercado.
-  const eventoParaTi = [eventoDestacado, ...eventos]
+  const eventoParaTi = [eventoPortada, ...eventos]
     .filter((item, index, list) => item?.images?.[0] && list.findIndex(candidate => candidate?.id === item.id) === index)
     .filter(item => !item.starts_at || new Date(item.starts_at).getTime() >= Date.now())
     .sort((a, b) => {
-      if (a.id === eventoDestacado?.id) return -1
-      if (b.id === eventoDestacado?.id) return 1
+      if (a.id === eventoPortada?.id) return -1
+      if (b.id === eventoPortada?.id) return 1
       return new Date(a.starts_at || a.created_at).getTime() - new Date(b.starts_at || b.created_at).getTime()
     })[0]
   const datoParaTi = actividad.find(item => item.type === 'news' && item.images?.[0])
@@ -882,7 +930,7 @@ function Home({ currentUser, onNavigate, onCrear }) {
     },
   ].filter(Boolean)
   const paraTi = (portadaSeleccionada.length ? portadaSeleccionada : paraTiAutomatico)
-    .slice(0, 5)
+    .slice(0, 10)
     .map(item => {
       if (item.portadaAction) return item
       if (item.type === 'event') return { ...item, portadaLabel: 'PANORAMA', portadaMeta: fechaEventoPortada(item.starts_at, item.ends_at), portadaAction: () => nav('eventdetail', { postId: item.id }) }

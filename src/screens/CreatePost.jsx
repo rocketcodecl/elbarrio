@@ -124,6 +124,13 @@ const IcoCamara = ({ size = 22 }) => (
     <circle cx="12" cy="13" r="4" />
   </Ico>
 )
+const IcoImagen = ({ size = 22 }) => (
+  <Ico size={size}>
+    <rect x="3" y="3" width="18" height="18" rx="2" />
+    <circle cx="8.5" cy="8.5" r="1.5" />
+    <polyline points="21 15 16 10 5 21" />
+  </Ico>
+)
 const IcoChevron = ({ size = 18 }) => (
   <Ico size={size}>
     <polyline points="9 18 15 12 9 6" />
@@ -320,6 +327,7 @@ function CreatePost({ onClose, onPublished, startWith, existingPost = null }) {
   const [alertSeverity, setAlertSeverity] = useState(existingPost?.severity || '')
   const [alertLocation, setAlertLocation] = useState(existingPost?.location_text || '')
   const alertPriorityRef = useRef(null)
+  const publishInFlightRef = useRef(false)
   const [mapaAbierto, setMapaAbierto] = useState(false)
   const [pinCoords, setPinCoords] = useState(() => {
     const lat = existingPost?.latitude ?? existingPost?.lat
@@ -428,6 +436,7 @@ function CreatePost({ onClose, onPublished, startWith, existingPost = null }) {
     if (files.length === 0) return
     if (images.length + files.length > 4) {
       setError('Máximo 4 fotos')
+      e.target.value = ''
       return
     }
     setImages([...images, ...files])
@@ -436,6 +445,8 @@ function CreatePost({ onClose, onPublished, startWith, existingPost = null }) {
       reader.onloadend = () => setPreviews((prev) => [...prev, reader.result])
       reader.readAsDataURL(file)
     })
+    // Permite volver a elegir o fotografiar el mismo archivo si fue eliminado.
+    e.target.value = ''
   }
 
   const removeImage = (i) => {
@@ -683,6 +694,7 @@ function CreatePost({ onClose, onPublished, startWith, existingPost = null }) {
 
   /* ---------- PUBLICAR ---------- */
   const handlePublish = async () => {
+    if (publishInFlightRef.current) return
     setError('')
     const t = selectedType.id
 
@@ -722,6 +734,7 @@ function CreatePost({ onClose, onPublished, startWith, existingPost = null }) {
       if (eventEntryType === 'paid' && !eventPrice) return setError('Indica el valor de la entrada')
     }
 
+    publishInFlightRef.current = true
     setStep('publishing')
 
     try {
@@ -885,6 +898,7 @@ function CreatePost({ onClose, onPublished, startWith, existingPost = null }) {
       setStep('success')
       setTimeout(() => { onPublished?.(selectedType.id); onClose?.() }, 1400)
     } catch (err) {
+      publishInFlightRef.current = false
       console.error('[CreatePost] No se pudo publicar:', err)
       const typeName = {
         sell: 'esta venta',
@@ -1987,7 +2001,13 @@ function Fotos({ images, previews, onUpload, onRemove, required, first, hint, va
           )}
           <input id="upload-event-banner" type="file" accept="image/*" onChange={onUpload} style={{ display: 'none' }} />
         </label>
-        {preview && <button type="button" onClick={() => onRemove(0)} style={s.eventBannerRemove}>Quitar imagen</button>}
+        <div style={s.eventBannerActions}>
+          <label htmlFor="capture-event-banner" style={s.eventBannerCameraAction}>
+            <IcoCamara size={16} /> Tomar foto
+            <input id="capture-event-banner" type="file" accept="image/*" capture="environment" onChange={onUpload} style={{ display: 'none' }} />
+          </label>
+          {preview && <button type="button" onClick={() => onRemove(0)} style={s.eventBannerRemove}>Quitar imagen</button>}
+        </div>
         {hint && <div style={{ ...s.photoHint, marginTop: 8 }}>{hint}</div>}
       </div>
     )
@@ -2010,9 +2030,23 @@ function Fotos({ images, previews, onUpload, onRemove, required, first, hint, va
           </div>
         ))}
         {images.length < 4 && (
+          <label htmlFor="capture-image" style={{ ...s.photoAdd, borderColor: C.verdeSuave, background: C.verdeBg }}>
+            <span style={{ color: C.verde }}><IcoCamara /></span>
+            <span style={{ ...s.photoAddText, color: C.verdeOsc }}>Cámara</span>
+            <input
+              id="capture-image"
+              type="file"
+              accept="image/*"
+              capture="environment"
+              onChange={onUpload}
+              style={{ display: 'none' }}
+            />
+          </label>
+        )}
+        {images.length < 4 && (
           <label htmlFor="upload-images" style={s.photoAdd}>
-            <span style={{ color: C.textoTenue }}><IcoCamara /></span>
-            <span style={s.photoAddText}>Agregar</span>
+            <span style={{ color: C.textoTenue }}><IcoImagen /></span>
+            <span style={s.photoAddText}>Galería</span>
             <input
               id="upload-images"
               type="file"
@@ -2447,9 +2481,11 @@ const s = {
     color: '#fff', fontSize: 11.5, fontWeight: 600, whiteSpace: 'nowrap',
   },
   eventBannerRemove: {
-    marginTop: 7, padding: 0, border: 'none', background: 'none', color: C.rojo,
+    padding: '8px 11px', border: 'none', background: 'none', color: C.rojo,
     fontSize: 11.5, fontWeight: 600, cursor: 'pointer',
   },
+  eventBannerActions: { marginTop: 7, display: 'flex', alignItems: 'center', gap: 8 },
+  eventBannerCameraAction: { minHeight: 34, padding: '0 12px', borderRadius: 10, background: C.verdeBg, border: `1px solid ${C.verdeSuave}`, color: C.verdeOsc, display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 11.5, fontWeight: 600, cursor: 'pointer' },
 
   /* --- IA: botón de autocompletar desde la foto --- */
   aiButton: {
