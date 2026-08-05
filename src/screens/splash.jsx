@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react'
-import logoHorizontal from '../../landing-page/assets/logo-w.png'
 
 export default function Splash({ onFinish }) {
   const [leaving, setLeaving] = useState(false)
@@ -63,7 +62,7 @@ export default function Splash({ onFinish }) {
           <img className="splash-isotipo-dots" src={`${import.meta.env.BASE_URL}isotipo.png`} alt="" aria-hidden="true" style={{ ...styles.isotipoLayer, clipPath: 'inset(0 0 68% 0)' }} />
         </div>
         <div style={styles.wordmarkWrapper}>
-          <img src={logoHorizontal} alt="El Barrio" style={styles.wordmark} />
+          <img src={`${import.meta.env.BASE_URL}logo-w.png`} alt="El Barrio" style={styles.wordmark} />
         </div>
         <div style={styles.pillars} aria-label="Confianza, Seguridad y Cercanía">
           <span className="splash-pillar">CONFIANZA</span>

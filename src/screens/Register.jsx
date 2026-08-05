@@ -310,16 +310,21 @@ function GoogleIcon() {
 
 const styles = {
   container: {
-    minHeight: '100%',
+    height: '100%',
+    minHeight: 0,
     background: '#FAFAF7',
     padding: '0 24px 40px',
     display: 'flex',
     flexDirection: 'column',
+    overflowY: 'auto',
+    overflowX: 'hidden',
+    WebkitOverflowScrolling: 'touch',
+    boxSizing: 'border-box',
   },
   header: {
     display: 'flex',
     alignItems: 'center',
-    paddingTop: 50,
+    paddingTop: 'calc(env(safe-area-inset-top, 0px) + 18px)',
     paddingBottom: 20,
   },
   backButton: {

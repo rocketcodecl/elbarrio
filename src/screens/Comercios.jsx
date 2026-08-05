@@ -645,16 +645,6 @@ function ComercioDetalle({ c, userCoords, profile, onClose, onEditar, esAdmin, c
     setReviewOpen(false)
   }
 
-  // Scroll automático al mapa cuando se abre el dropdown
-  useEffect(() => {
-    if (mapaOpen && mapaRef.current) {
-      const t = setTimeout(() => {
-        mapaRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' })
-      }, 80)
-      return () => clearTimeout(t)
-    }
-  }, [mapaOpen])
-
   // AUTO-SCROLL del carrusel de galería cuando hay más de 3 thumbnails.
   // Avanza 1 item cada 2.4s. Al llegar al final vuelve al inicio (loop).
   // Se pausa al hacer hover para que el user pueda mirar una foto tranquilo.

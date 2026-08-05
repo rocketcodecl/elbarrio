@@ -31,6 +31,15 @@ const CSS = `
 }
 .onboarding-photo { animation: onboarding-photo-in .7s ease-out both; }
 .onboarding-copy { animation: onboarding-copy-in .48s ease-out both; }
+@media (max-height: 700px) {
+  .onboarding-header { padding-top: calc(env(safe-area-inset-top, 0px) + 10px) !important; }
+  .onboarding-skip { min-height: 34px !important; padding-inline: 14px !important; }
+  .onboarding-copy { padding: 0 20px calc(env(safe-area-inset-bottom, 0px) + 14px) !important; }
+  .onboarding-dots { min-height: 16px !important; margin-bottom: 8px !important; }
+  .onboarding-title { font-size: 24px !important; line-height: 1.12 !important; }
+  .onboarding-subtitle { margin: 7px 0 12px !important; font-size: 13px !important; line-height: 1.4 !important; }
+  .onboarding-next { min-height: 46px !important; }
+}
 @media (prefers-reduced-motion: reduce) {
   .onboarding-photo, .onboarding-copy { animation: none; }
 }
@@ -65,12 +74,12 @@ export default function Onboarding({ onFinish }) {
       />
       <div style={styles.scrim} />
 
-      <header style={styles.header}>
-        <button type="button" style={styles.skip} onClick={onFinish}>Saltar</button>
+      <header className="onboarding-header" style={styles.header}>
+        <button className="onboarding-skip" type="button" style={styles.skip} onClick={onFinish}>Saltar</button>
       </header>
 
       <main key={currentSlide} className="onboarding-copy" style={styles.content}>
-        <div style={styles.dotsRow}>
+        <div className="onboarding-dots" style={styles.dotsRow}>
           <div style={styles.dots} aria-label={`Página ${currentSlide + 1} de ${slides.length}`}>
             {slides.map((_, index) => (
               <span key={index} style={{ ...styles.dot, ...(index === currentSlide ? styles.dotActive : {}) }} />
@@ -78,9 +87,9 @@ export default function Onboarding({ onFinish }) {
           </div>
         </div>
 
-        <h1 style={styles.title}>{slide.title}</h1>
-        <p style={{ ...styles.subtitle, ...(currentSlide === 2 ? styles.subtitleCompact : {}) }}>{slide.subtitle}</p>
-        <button type="button" style={styles.button} onClick={handleNext}>
+        <h1 className="onboarding-title" style={styles.title}>{slide.title}</h1>
+        <p className="onboarding-subtitle" style={{ ...styles.subtitle, ...(currentSlide === 2 ? styles.subtitleCompact : {}) }}>{slide.subtitle}</p>
+        <button className="onboarding-next" type="button" style={styles.button} onClick={handleNext}>
           {isLastSlide ? 'Comenzar' : 'Siguiente'}
         </button>
       </main>

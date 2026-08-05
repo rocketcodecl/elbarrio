@@ -684,6 +684,8 @@ export default function ChatConversation({ postId, sellerId, currentUser, previe
 const s = {
   wrap: {
     width: '100%',
+    maxWidth: '100%',
+    minWidth: 0,
     height: '100%',
     backgroundColor: '#fff',
     fontFamily: '"Plus Jakarta Sans", system-ui, -apple-system, sans-serif',
@@ -859,7 +861,11 @@ const s = {
 
   bottomBar: {
     flexShrink: 0,
-    padding: '10px 12px 22px',
+    width: '100%',
+    maxWidth: '100%',
+    minWidth: 0,
+    boxSizing: 'border-box',
+    padding: '10px 12px calc(12px + env(safe-area-inset-bottom, 0px))',
     borderTop: '1px solid #eee',
     backgroundColor: '#fff'
   },
@@ -941,7 +947,10 @@ const s = {
   inputRow: {
     display: 'flex',
     alignItems: 'flex-end',
-    gap: 8
+    gap: 8,
+    width: '100%',
+    maxWidth: '100%',
+    minWidth: 0,
   },
   plusBtn: {
     width: 32, height: 32,
@@ -956,13 +965,15 @@ const s = {
   },
   input: {
     flex: 1,
+    width: 0,
+    minWidth: 0,
     minHeight: 40,
     maxHeight: 100,
     padding: '10px 12px',
     borderRadius: 12,
     border: '1px solid #e5e5e5',
     backgroundColor: '#fafafa',
-    fontSize: 14,
+    fontSize: 16,
     fontFamily: 'inherit',
     outline: 'none',
     resize: 'none',
