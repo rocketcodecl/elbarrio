@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { supabase } from './lib/supabase'
 import { App as CapacitorApp } from '@capacitor/app'
 import { finishNativeAuth, isNativeApp } from './lib/mobileAuth'
+import { setupPushNotifications } from './lib/pushNotifications'
 import { C, T } from './lib/design'
 import './App.css'
 
@@ -34,6 +35,7 @@ import Events from './screens/Events'
 import EventDetail from './screens/EventDetail'
 import Notifications from './screens/Notifications'
 import AlertaDetail from './screens/AlertaDetail'
+import NeighborhoodMap from './screens/NeighborhoodMap'
 
 /* ── TASK 62: pantallas nuevas (SellerProfile, Noticias) ── */
 import SellerProfile from './screens/SellerProfile'
@@ -63,7 +65,8 @@ const isPasswordRecoveryUrl = () => {
 
 export default function App() {
   /* ── LOGIN FLOW STATE ── */
-  const [currentScreen, setCurrentScreen] = useState('splash')
+  const [currentScreen, setCurrentScreen] = useState('onboarding')
+  const [bootSplashVisible, setBootSplashVisible] = useState(true)
   const [loading, setLoading] = useState(true)
   const [user, setUser] = useState(null)
   const [profile, setProfile] = useState(null)
@@ -113,7 +116,7 @@ export default function App() {
     if (!session?.user) {
       setUser(null)
       setProfile(null)
-      setCurrentScreen('splash')
+      setCurrentScreen('onboarding')
       setLoading(false)
       return
     }
@@ -242,7 +245,8 @@ export default function App() {
     setVerificationDraft(null)
     setPasswordRecovery(false)
     setActiveTab('inicio')
-    setCurrentScreen('splash')
+    setCurrentScreen('onboarding')
+    setBootSplashVisible(true)
     historyRef.current = []
     prevTabRef.current = 'inicio'
   }, [])
@@ -322,7 +326,7 @@ export default function App() {
       return
     }
 
-    const subScreens = ['post', 'productdetail', 'servicedetail', 'eventdetail', 'chatconversation', 'dealdone', 'alerta', 'notificaciones', 'sellerprofile', 'noticias', 'admin', 'adminfarmacias', 'admincomercios', 'adminusuarios', 'adminincidentes', 'settings', 'editprofile', 'about', 'terms', 'privacy', 'prohibited', 'invite', 'contact', 'deleteaccount']
+    const subScreens = ['post', 'productdetail', 'servicedetail', 'eventdetail', 'chatconversation', 'dealdone', 'alerta', 'notificaciones', 'mapa', 'sellerprofile', 'noticias', 'admin', 'adminfarmacias', 'admincomercios', 'adminusuarios', 'adminincidentes', 'settings', 'editprofile', 'about', 'terms', 'privacy', 'prohibited', 'invite', 'contact', 'deleteaccount']
     if (subScreens.includes(lower)) {
       setNavigationMotion('forward')
       historyRef.current.push({ screen: currentScreen, tab: activeTabRef.current, params })
@@ -354,6 +358,8 @@ export default function App() {
       setCurrentScreen('alertaDetail')
     } else if (lower === 'notificaciones') {
       setCurrentScreen('notificaciones')
+    } else if (lower === 'mapa') {
+      setCurrentScreen('neighborhoodMap')
     } else if (lower === 'sellerprofile') {
       setCurrentScreen('sellerProfile')
     } else if (lower === 'noticias') {
@@ -412,6 +418,22 @@ export default function App() {
     window.addEventListener('popstate', handleBrowserBack)
     return () => window.removeEventListener('popstate', handleBrowserBack)
   }, [performInternalBack])
+
+  useEffect(() => {
+    if (!profile?.id || !isNativeApp()) return undefined
+    let disposed = false
+    let cleanup = () => {}
+    setupPushNotifications({
+      onOpen: data => {
+        if (data?.screen === 'notificaciones') onNavigate('notificaciones')
+        else onNavigate('notificaciones')
+      },
+    }).then(removeListeners => {
+      if (disposed) removeListeners()
+      else cleanup = removeListeners
+    }).catch(error => console.warn('[push] inicialización falló:', error?.message || error))
+    return () => { disposed = true; cleanup() }
+  }, [profile?.id, onNavigate])
 
   /* ── CREAR (post / commerce) ── */
   const onCrear = useCallback((type = null) => {
@@ -518,7 +540,7 @@ export default function App() {
 
   /* ── SCREEN RENDER ── */
   const flowScreens = ['splash', 'onboarding', 'register', 'profile', 'verification', 'complete']
-  const modalScreens = ['productDetail', 'serviceDetail', 'chatConversation', 'dealDone', 'alertaDetail', 'notificaciones', 'sellerProfile', 'noticiasScreen', 'admin', 'adminFarmacias', 'adminComercios', 'adminUsuarios', 'adminIncidentes', 'settings', 'editProfile', 'about', 'terms', 'privacy', 'prohibited', 'invite', 'contact', 'deleteAccount']
+  const modalScreens = ['productDetail', 'serviceDetail', 'chatConversation', 'dealDone', 'alertaDetail', 'notificaciones', 'neighborhoodMap', 'sellerProfile', 'noticiasScreen', 'admin', 'adminFarmacias', 'adminComercios', 'adminUsuarios', 'adminIncidentes', 'settings', 'editProfile', 'about', 'terms', 'privacy', 'prohibited', 'invite', 'contact', 'deleteAccount']
   const isModalScreen = modalScreens.includes(currentScreen)
   const isCommunityScreen = ['settings', 'editProfile', 'about', 'terms', 'privacy', 'prohibited', 'invite', 'contact', 'deleteAccount'].includes(currentScreen)
   const isMainApp = !flowScreens.includes(currentScreen) && !isModalScreen
@@ -527,6 +549,10 @@ export default function App() {
     : `${currentScreen}-${params?.postId || params?.id || params?.sellerId || ''}-${detailRevision}`
 
   const renderScreen = () => {
+    if (bootSplashVisible) {
+      return <Splash onFinish={() => setBootSplashVisible(false)} />
+    }
+
     if (loading) {
       return (
         <div style={{
@@ -676,6 +702,9 @@ export default function App() {
     }
     if (currentScreen === 'notificaciones') {
       return <Notifications currentUser={{ ...user, profileId: profile?.id }} onNavigate={onNavigate} />
+    }
+    if (currentScreen === 'neighborhoodMap') {
+      return <NeighborhoodMap currentUser={user} neighborhoodId={profile?.neighborhood_id} onNavigate={onNavigate} />
     }
     if (currentScreen === 'sellerProfile') {
       return (

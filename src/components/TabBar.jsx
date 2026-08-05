@@ -13,7 +13,7 @@ import { C, T, TIPOS } from '../lib/design'
   REGLA DE ORO: cada cosa se crea donde se ve, pero el "+" es el atajo
   universal. Cada opción aterriza en SU tabla:
     · Pedir ayuda                    → posts (type='request')
-    · Vender/Regalar/Trueque/Publicar → posts
+    · Vender/Regalar/Trueque          → posts
     · Alerta                          → incident_reports (reporte de vecino)
     · Evento                          → events
   La Alerta del vecino NUNCA es un aviso oficial. Esa distinción es
@@ -74,7 +74,6 @@ const CREAR = [
   { id: 'trade',   ...TIPOS.trade },
   { id: 'alert',   ...TIPOS.alert },
   { id: 'event',   ...TIPOS.event },
-  { id: 'general', ...TIPOS.general },
 ]
 
 function TabBar({ activeTab, onChangeTab, onCrear, noLeidos = 0, showCreateButton = true }) {

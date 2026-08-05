@@ -28,7 +28,7 @@ function Register({ existingAccount = false, initialEmail = '', recoveryMode = f
       })
       if (resetError) throw resetError
       try { localStorage.setItem(PASSWORD_RECOVERY_KEY, 'true') } catch { /* la ruta sigue disponible */ }
-      setNotice('Si te registraste con contraseña, revisa tu correo.\nSi te registraste con Google, ingresa con tu cuenta de Google.')
+      setNotice('Te hemos enviado un correo con el link de recuperación.\nSi te registraste con Google, ingresa con esa cuenta.')
     } catch (err) {
       setError(err.message || 'No pudimos enviar el correo de recuperación.')
     } finally {

@@ -9,5 +9,10 @@
   "ios": {
     "backgroundColor": "#f7faf7",
     "contentInset": "automatic"
+  },
+  "plugins": {
+    "PushNotifications": {
+      "presentationOptions": ["badge", "sound", "alert"]
+    }
   }
 }

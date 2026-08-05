@@ -1,19 +1,26 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
+import logoHorizontal from '../../landing-page/assets/logo-w.png'
 
 export default function Splash({ onFinish }) {
+  const [leaving, setLeaving] = useState(false)
+
   useEffect(() => {
     ;['comunidad.webp', 'confianza.webp', 'informado.webp'].forEach(file => {
       const image = new Image()
       image.src = `${import.meta.env.BASE_URL}onboarding/${file}`
     })
-    const timer = setTimeout(() => {
+    const exitTimer = setTimeout(() => setLeaving(true), 2650)
+    const finishTimer = setTimeout(() => {
       onFinish()
-    }, 2500)
-    return () => clearTimeout(timer)
+    }, 3000)
+    return () => {
+      clearTimeout(exitTimer)
+      clearTimeout(finishTimer)
+    }
   }, [onFinish])
 
   return (
-    <div style={styles.container}>
+    <div className={leaving ? 'splash-screen splash-screen--leaving' : 'splash-screen'} style={styles.container}>
       <style>{`
         @keyframes splashBaseEnter {
           0% { opacity: 0; transform: scale(.88); }
@@ -29,21 +36,40 @@ export default function Splash({ onFinish }) {
           from { opacity: 0; transform: translateY(10px); }
           to { opacity: 1; transform: translateY(0); }
         }
+        @keyframes splashExit {
+          0% { opacity: 1; transform: scale(1); filter: brightness(1); }
+          55% { opacity: 1; transform: scale(1.035); filter: brightness(1.12); }
+          100% { opacity: 0; transform: scale(1.08); filter: brightness(1.18); }
+        }
+        .splash-screen { transform-origin: center; }
+        .splash-screen--leaving { animation: splashExit .35s cubic-bezier(.4,0,.2,1) both; }
         .splash-isotipo-base { animation: splashBaseEnter .48s ease-out both; }
         .splash-isotipo-dots { animation: splashDotsRise 1.08s cubic-bezier(.22,1,.36,1) .16s both; }
-        .splash-copy { animation: splashCopyEnter .5s ease-out .42s both; }
+        .splash-pillar { position: absolute; opacity: 0; animation: splashPillar 3s ease-in-out both; }
+        .splash-pillar:nth-child(2) { animation-delay: 1s; }
+        .splash-pillar:nth-child(3) { animation-delay: 2s; }
+        @keyframes splashPillar {
+          0% { opacity: 0; transform: translateY(7px); }
+          10%, 26% { opacity: 1; transform: translateY(0); }
+          33%, 100% { opacity: 0; transform: translateY(-5px); }
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .splash-screen--leaving { animation: none; opacity: 0; }
+        }
       `}</style>
       <div style={styles.logoBox}>
         <div style={styles.iconWrapper}>
           <img className="splash-isotipo-base" src={`${import.meta.env.BASE_URL}isotipo.png`} alt="" style={{ ...styles.isotipoLayer, clipPath: 'inset(32% 0 0 0)' }} />
-          <img className="splash-isotipo-dots" src={`${import.meta.env.BASE_URL}isotipo.png`} alt="" style={{ ...styles.isotipoLayer, clipPath: 'inset(0 0 68% 0)' }} />
+          <img className="splash-isotipo-dots" src={`${import.meta.env.BASE_URL}isotipo.png`} alt="" aria-hidden="true" style={{ ...styles.isotipoLayer, clipPath: 'inset(0 0 68% 0)' }} />
         </div>
-        <div className="splash-copy" style={styles.textWrapper}>
-          <span style={styles.text}>el barrio</span>
+        <div style={styles.wordmarkWrapper}>
+          <img src={logoHorizontal} alt="El Barrio" style={styles.wordmark} />
         </div>
-      </div>
-      <div style={styles.tagline} className="splash-copy">
-        Tu comunidad, en un solo lugar
+        <div style={styles.pillars} aria-label="Confianza, Seguridad y Cercanía">
+          <span className="splash-pillar">CONFIANZA</span>
+          <span className="splash-pillar">SEGURIDAD</span>
+          <span className="splash-pillar">CERCANÍA</span>
+        </div>
       </div>
     </div>
   )
@@ -63,7 +89,7 @@ const styles = {
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
-    gap: '2px',
+    gap: '3px',
   },
   iconWrapper: {
     width: '150px',
@@ -78,21 +104,32 @@ const styles = {
     width: '92px', height: '92px', objectFit: 'contain',
     filter: 'brightness(0) invert(1)',
   },
-  textWrapper: {
-    display: 'flex',
-    alignItems: 'center',
+  wordmarkWrapper: {
+    position: 'relative',
+    width: '194px',
+    height: '44px',
+    overflow: 'hidden',
   },
-  text: {
-    fontSize: '38px',
-    fontWeight: 800,
-    letterSpacing: '-1px',
-    color: '#fff',
-  },
-  tagline: {
+  wordmark: {
     position: 'absolute',
-    bottom: '80px',
-    fontSize: '14px',
-    color: 'rgba(255,255,255,.86)', opacity: 1,
-    fontWeight: 500,
+    width: '247px',
+    height: '44px',
+    maxWidth: 'none',
+    objectFit: 'fill',
+    left: '-53px',
+    top: 0,
+  },
+  pillars: {
+    position: 'relative',
+    width: '100%',
+    height: '24px',
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'center',
+    color: 'rgba(255,255,255,.9)',
+    marginTop: '8px',
+    fontSize: '12px',
+    fontWeight: 700,
+    letterSpacing: '1.5px',
   },
 }

@@ -333,7 +333,7 @@ function HomeDiscoveryCarousel({ items }) {
             type="button"
             key={`${item.portadaLabel}-${item.id}`}
             className="home-featured-card"
-            style={{ ...s.paraTiCard, backgroundImage: `linear-gradient(180deg, rgba(27,158,117,0) 25%, rgba(27,158,117,.68) 58%, #1B9E75 82%, #1B9E75 100%), url("${item.images[0]}")` }}
+            style={{ ...s.paraTiCard, backgroundImage: `linear-gradient(180deg, rgba(27,158,117,0) 34%, rgba(27,158,117,.48) 64%, rgba(27,158,117,.82) 86%, rgba(27,158,117,.9) 100%), url("${item.images[0]}")` }}
             onClick={item.portadaAction}
           >
             <span style={s.paraTiBadge}>{item.portadaLabel}</span>
@@ -951,11 +951,14 @@ function Home({ currentUser, onNavigate, onCrear }) {
                 {barrio?.name || 'Mi barrio'}
                 {barrio?.city ? `, ${barrio.city}` : ''}
               </span>
-              {barrio?.is_beta && <span style={s.beta}>BETA</span>}
             </div>
           </div>
 
           <div style={s.headerBtns}>
+            <span style={s.headerDivider} aria-hidden="true" />
+            <button style={s.iconBtn} onClick={() => nav('mapa')} aria-label="Mapa del barrio">
+              <span aria-hidden="true" style={{ fontSize: 21, lineHeight: 1, transform: 'translateY(-1px)' }}>📍</span>
+            </button>
             <button style={s.iconBtn} onClick={() => nav('notificaciones')} aria-label="Notificaciones">
               🔔
               {noLeidos > 0 && (
@@ -1335,6 +1338,7 @@ const s = {
   },
 
   headerBtns: { display: 'flex', alignItems: 'center', gap: 7, flexShrink: 0 },
+  headerDivider: { width: 1, height: 29, background: C.borde, margin: '0 2px 0 1px', flexShrink: 0 },
   iconBtn: {
     position: 'relative', width: 40, height: 40, borderRadius: '50%',
     background: C.fondo, border: `1px solid ${C.borde}`,

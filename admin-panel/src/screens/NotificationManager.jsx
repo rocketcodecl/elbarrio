@@ -66,6 +66,8 @@ export default function NotificationManager({ profile }) {
     setHistory(historyResult.data || [])
   }, [isSuperadmin, targetNeighborhoodId])
 
+  // La carga pertenece al ciclo de vida de la pantalla y sincroniza datos remotos.
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { load() }, [load])
 
   const send = async event => {
@@ -89,13 +91,26 @@ export default function NotificationManager({ profile }) {
       p_body: cleanBody,
     }
     const { data, error: sendError } = await supabase.rpc(rpcName, rpcArgs)
-    setSending(false)
-    if (sendError) return setError(`No fue posible enviar la notificación: ${sendError.message}`)
+    if (sendError) {
+      setSending(false)
+      return setError(`No fue posible enviar la notificación: ${sendError.message}`)
+    }
     const sent = Number(data?.recipient_count ?? recipientCount)
+    const campaignId = data?.campaign_id
+    let pushNotice = ''
+    if (campaignId) {
+      const { data: pushResult, error: pushError } = await supabase.functions.invoke('send-push-notification', {
+        body: { campaign_id: campaignId },
+      })
+      if (pushError) pushNotice = ' La notificación interna fue enviada, pero el push no pudo salir.'
+      else if (Number(pushResult?.devices || 0) > 0) pushNotice = ` Push entregado a ${Number(pushResult.sent || 0)} dispositivo(s).`
+      else pushNotice = ' Ningún teléfono ha activado push todavía.'
+    }
     setTitle('')
     setBody('')
     await load()
-    setNotice(`Notificación enviada correctamente a ${sent} ${sent === 1 ? 'persona' : 'personas'}.`)
+    setSending(false)
+    setNotice(`Notificación enviada correctamente a ${sent} ${sent === 1 ? 'persona' : 'personas'}.${pushNotice}`)
   }
 
   return (
@@ -122,7 +137,7 @@ export default function NotificationManager({ profile }) {
             </button>)}
           </div>
 
-          <div className="notification-section-heading"><span>2</span><div><h2>Escribe el mensaje</h2><p>Se mostrará dentro de la campana de notificaciones de la aplicación.</p></div></div>
+          <div className="notification-section-heading"><span>2</span><div><h2>Escribe el mensaje</h2><p>Se mostrará en el teléfono y dentro de la campana de la aplicación.</p></div></div>
           <div className="notification-fields">
             <label>Título <input value={title} maxLength={90} onChange={event => setTitle(event.target.value)} placeholder="Ej.: Corte programado de agua" /></label>
             <label>Mensaje <textarea value={body} maxLength={300} rows={5} onChange={event => setBody(event.target.value)} placeholder="Explica la información de forma breve y clara…" /></label>

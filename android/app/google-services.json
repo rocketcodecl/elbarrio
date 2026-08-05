@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "110615949163",
+    "project_id": "el-barrio-lat",
+    "storage_bucket": "el-barrio-lat.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:110615949163:android:774126a0da48fa4bd4e62e",
+        "android_client_info": {
+          "package_name": "lat.elbarrio.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA04nbpj0EObXQ9MY7oi2yp4l6lWPF7e3g"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
