@@ -7,6 +7,10 @@ const AUDIENCES = [
   { id: 'commerces', icon: '🏪', name: 'Comercios', description: 'Perfiles comerciales o dueños de un comercio.' },
   { id: 'actors', icon: '📣', name: 'Actores autorizados', description: 'Juntas, municipalidades y actores habilitados.' },
 ]
+const CATEGORIES = [
+  ['general_push', 'Información general'], ['urgent_alerts', 'Alerta urgente'],
+  ['event_reminders', 'Evento'], ['community_digest', 'Resumen del barrio'], ['marketplace', 'Mercado'], ['commerce_promotions', 'Promoción local'],
+]
 
 const dateLabel = value => value
   ? new Date(value).toLocaleString('es-CL', { dateStyle: 'medium', timeStyle: 'short' })
@@ -17,6 +21,7 @@ export default function NotificationManager({ profile }) {
   const [audience, setAudience] = useState('all')
   const [title, setTitle] = useState('')
   const [body, setBody] = useState('')
+  const [category, setCategory] = useState('general_push')
   const [counts, setCounts] = useState({})
   const [history, setHistory] = useState([])
   const [loading, setLoading] = useState(true)
@@ -99,6 +104,11 @@ export default function NotificationManager({ profile }) {
     const campaignId = data?.campaign_id
     let pushNotice = ''
     if (campaignId) {
+      const { error: categoryError } = await supabase.rpc('admin_set_notification_category', { p_campaign_id: campaignId, p_preference_key: category })
+      if (categoryError) {
+        setSending(false)
+        return setError(`La notificación interna salió, pero no pudimos categorizar el push: ${categoryError.message}`)
+      }
       const { data: pushResult, error: pushError } = await supabase.functions.invoke('send-push-notification', {
         body: { campaign_id: campaignId },
       })
@@ -139,6 +149,7 @@ export default function NotificationManager({ profile }) {
 
           <div className="notification-section-heading"><span>2</span><div><h2>Escribe el mensaje</h2><p>Se mostrará en el teléfono y dentro de la campana de la aplicación.</p></div></div>
           <div className="notification-fields">
+            <label>Tipo de aviso <select value={category} onChange={event => setCategory(event.target.value)}>{CATEGORIES.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
             <label>Título <input value={title} maxLength={90} onChange={event => setTitle(event.target.value)} placeholder="Ej.: Corte programado de agua" /></label>
             <label>Mensaje <textarea value={body} maxLength={300} rows={5} onChange={event => setBody(event.target.value)} placeholder="Explica la información de forma breve y clara…" /></label>
             <div className="notification-send-summary"><span>🔔</span><div><strong>{selectedAudience.name}</strong><small>{recipientCount} {recipientCount === 1 ? 'destinatario' : 'destinatarios'}</small></div><button type="submit" disabled={sending || loading || !recipientCount}>{sending ? 'Enviando…' : 'Revisar y enviar'}</button></div>

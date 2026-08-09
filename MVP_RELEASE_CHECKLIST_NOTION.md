@@ -2,7 +2,7 @@
 Actualizado: 1 de agosto de 2026
 
 ## OBJETIVO
-Publicar El Barrio como aplicación real para iPhone y Android, manteniendo funcionando la versión web, el panel administrativo y la landing.
+Publicar El Barrio como aplicación real para iPhone y Android, manteniendo funcionando la versión web y el panel administrativo.
 
 ## ORDEN GENERAL
 Auditoría → App nativa → Push → Cumplimiento → Beta → Tiendas → Lanzamiento
@@ -159,9 +159,6 @@ Auditoría → App nativa → Push → Cumplimiento → Beta → Tiendas → Lan
 
 - [ ] Publicar la app web acumulada en el servidor.
 - [ ] Publicar el panel administrativo acumulado.
-- [ ] Publicar la landing nueva.
-- [ ] Configurar cms.elbarrio.lat.
-- [ ] Instalar y proteger el CMS de la landing.
 - [ ] Activar HTTPS en todos los dominios y subdominios.
 - [ ] Verificar redirecciones antiguas.
 - [ ] Confirmar respaldos antes de cada publicación.

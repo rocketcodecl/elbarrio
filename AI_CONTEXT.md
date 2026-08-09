@@ -3,7 +3,12 @@
 > Contexto operativo breve para trabajar sobre el estado vigente del proyecto.
 > Debe actualizarse cuando cambien la arquitectura, la navegación, una decisión de producto importante o el estado de una funcionalidad.
 
-## Estado de continuidad — 5 de agosto de 2026
+## Estado de continuidad — 9 de agosto de 2026
+
+- Punto de retorno previo al bloque competitivo: tag remoto `pre-mejoras-competitivas-20260809` sobre `ec5084f`.
+- Núcleo competitivo aplicado en Supabase mediante `202608090005_competitive_community_core.sql`, `202608090006_event_follow_reminders.sql` y `202608090007_notification_campaign_categories.sql`. La auditoría `supabase/COMPETITIVE_CORE_AUDIT.sql` confirmó todas sus tablas, columnas y funciones con estado `OK`.
+- La app incorpora reporte y bloqueo de contenido, evaluación de tratos cerrados, actores oficiales, feed de Inicio diversificado por actualidad/interacción, impacto comunitario, eventos recurrentes/seguidos, recordatorios internos deduplicados y buscador global visible desde Perfil. Los bloqueos se respetan en Inicio, Mercado, Servicios, Alertas y búsqueda.
+- Las preferencias de notificaciones se administran desde Perfil. Las campañas del panel se clasifican y el push respeta la categoría elegida; `send-push-notification` fue redesplegada. El panel incorpora bandeja de reportes e identidad oficial de perfiles.
 
 - Cierre operativo de la jornada: commit `13d60a6` está publicado en `origin/main` sobre `b572f71`. Incluye los últimos ajustes móviles/iOS y corrige el menú del panel para que tenga desplazamiento vertical. `ios/build-device/` sigue siendo un artefacto local y no debe incorporarse por accidente.
 - Panel real verificado el 5 de agosto en `https://admin.elbarrio.lat/`: sirve `assets/index-9L1rT6mT.js`, el bundle contiene literalmente “Uso y servicios” y el módulo está al final del menú, visible solo con `profiles.is_superadmin=true`. El menú ahora permite scroll en pantallas de poca altura. Si no aparece, primero hacer recarga forzada y confirmar el rol; no volver a afirmar que falta el despliegue sin verificar el bundle.
@@ -68,12 +73,11 @@
 - Las instrucciones y el registro de la migración de auditoría están en `supabase/MVP_CIERRE_INSTRUCCIONES.md`. No se cargaron datos simulados.
 - La Edge Function `moderate-community-content` está desplegada y validada en red: el preflight responde HTTP 200 y una solicitud sin sesión responde HTTP 401.
 - La migración `202607300004_content_moderation_events.sql` fue aplicada el 30 de julio de 2026 según confirmación manual. PostgREST reconoce la tabla y rechaza el acceso anónimo con HTTP 401, como corresponde a sus permisos.
-- La landing pública no pertenece a este repositorio. `supabase/.temp/` continúa fuera de los commits.
 - La aplicación de vecinos y el panel administrativo comparten el mismo proyecto Supabase.
 - El último cierre funcional corrigió identidad de perfiles, estados de carga, contenido simulado y aislamiento territorial en feeds, detalles y perfiles públicos activos.
 - La aplicación principal y el panel compilan correctamente después de estos cambios.
 - La migración `202607290015_admin_broadcast_notifications.sql` está aplicada y validada en Supabase: se comprobó el envío individual y el envío masivo a todo el barrio.
-- Las migraciones `202607300002_post_publishing_policies.sql` y `202607300003_marketplace_deals.sql` están aplicadas y validadas mediante transacciones reversibles. El historial remoto de migraciones figura vacío aunque las estructuras existen: no ejecutar `supabase db push` hasta reconciliarlo, porque intentaría aplicar todos los archivos antiguos.
+- Las migraciones `202607300002_post_publishing_policies.sql` y `202607300003_marketplace_deals.sql` están aplicadas y validadas. El historial remoto fue reconciliado el 9 de agosto; antes de cada `db push` sigue siendo obligatorio ejecutar `--dry-run` y confirmar que solo aparezcan migraciones nuevas esperadas.
 - No asumir que una migración está aplicada solo porque existe en el repositorio. Confirmar siempre su ejecución con el usuario.
 - Antes de continuar, revisar `git status`, este archivo y el código específico de la siguiente tarea. No reconstruir ni sustituir módulos existentes sin autorización.
 
@@ -187,11 +191,6 @@ El botón de creación abre `CreatePost.jsx`, salvo la creación de comercios, q
 
 ## Decisiones tomadas
 
-
-- La landing usa `#1b9e75` como único verde de marca visible. Su narrativa principal, comercios y servicios funcionan mediante escenas de scroll con interfaces móviles rectas y proporciones contenidas.
-- Los cuatro videos narrativos de la landing son archivos MP4 independientes (`scene-distancia`, `scene-pregunta`, `scene-encuentro`, `scene-comunidad`) reemplazables desde el CMS; actualmente contienen material demostrativo.
-- Las pantallas del teléfono de la historia y los paneles visuales de Comercios y Servicios dejaron de construirse como interfaces HTML: ahora son imágenes reemplazables desde el CMS (`screen-inicio`, `screen-servicios`, `screen-mercado`, `screen-eventos` y cuatro imágenes independientes por cada relato comercial y de servicios). Estas últimas cambian con un fade según el paso activo.
-- El formulario de acceso anticipado y su almacenamiento son independientes de Supabase.
 
 - `Home.jsx` es el feed principal y controla el tab Inicio.
 - Inicio conserva intacta la franja de clima y farmacia. Inmediatamente debajo muestra “Para ti, cerca de casa”: un carrusel de hasta cinco tarjetas reales con fotografía, ordenadas desde el panel mediante `posts.home_carousel_order`. No incorpora alertas, no inventa contenido y omite material sin imagen; mientras la migración no esté aplicada o no exista selección, conserva el armado automático aprobado como respaldo. El evento elegido se retira de la lista inmediata de Actividad para evitar duplicación.
@@ -317,10 +316,6 @@ El botón de creación abre `CreatePost.jsx`, salvo la creación de comercios, q
 
 ## Funcionalidades terminadas
 
-- La propuesta comercial de la landing muestra interfaces premium distintas para descubrimiento, ficha comercial, reputación y visibilidad destacada. Existe además una sección propia para servicios con perfil profesional, reputación vecinal, solicitudes cercanas, contacto y visibilidad destacada; comercios y servicios se presentan como vías centrales de monetización y no como contenido secundario.
-- El hero y el manifiesto inicial forman una sola experiencia de scrollytelling: el teléfono y la promesa aparecen sobre un escenario audiovisual fijo; al avanzar, el teléfono cede espacio a cuatro escenas narrativas y cada scroll cambia a un video o imagen local diferente con transición suave. No deben volver a separarse en bloques audiovisuales redundantes.
-- La propuesta para prestadores de servicios replica el sistema de scrollytelling de comercios, invertido: escenas de texto a la izquierda y escenario visual sticky con perfil profesional a la derecha. El cierre incluye una lista de acceso anticipado con perfiles de vecino, comercio y servicio, y un footer de producto digital con origen en Santiago.
-- Despliegue definido para la landing: `elbarrio.lat` y `cms.elbarrio.lat` son instalaciones físicamente independientes. El CMS publica por HTTPS hacia `https://elbarrio.lat/publish.php` usando una clave aleatoria incluida solamente en los dos ZIP emparejados. Ya no depende de carpetas compartidas ni de permisos cruzados en Plesk.
 - Alta y verificación territorial refinadas: Nombre y Apellido separados sin migración, copy de privacidad coherente, scroll interno, mapa del polígono MVP, geocodificación automática de dirección y marcador previo al GPS.
 - Inicio incorpora una portada editorial real para el próximo evento elegido desde el panel, sin datos simulados ni duplicación inmediata en Actividad. Mi perfil amplía las tarjetas de favoritos y el Modo accesible conserva cuadrados los controles circulares.
 - Pulido UX/UI final de la app vecinal: subpantallas superiores de Perfil, buscador permanente y jerarquía real en Servicios, detalle con métricas reales y CTA dominante, menú Crear adaptable, safe areas, reducción de movimiento, Chat con recuperación y Home con caché más aviso de actualización fallida.

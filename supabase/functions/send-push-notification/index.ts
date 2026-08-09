@@ -73,7 +73,7 @@ Deno.serve(async request => {
   const { data: admin } = await serviceClient.from('profiles').select('id, role, is_superadmin, neighborhood_id, account_status').eq('user_id', userData.user.id).maybeSingle()
   if (!admin || admin.role !== 'admin' || admin.account_status === 'suspended') return respond({ error: { message: 'Acceso administrativo requerido.' } }, 403)
 
-  const { data: campaign } = await serviceClient.from('notification_campaigns').select('id, admin_profile_id, neighborhood_id, title, body').eq('id', campaignId).maybeSingle()
+  const { data: campaign } = await serviceClient.from('notification_campaigns').select('id, admin_profile_id, neighborhood_id, title, body, preference_key').eq('id', campaignId).maybeSingle()
   if (!campaign || campaign.admin_profile_id !== admin.id || (!admin.is_superadmin && campaign.neighborhood_id !== admin.neighborhood_id)) {
     return respond({ error: { message: 'Campaña no autorizada.' } }, 403)
   }
@@ -83,7 +83,21 @@ Deno.serve(async request => {
   const profileIds = [...new Set((recipients || []).map(row => row.user_id).filter(Boolean))]
   if (!profileIds.length) return respond({ sent: 0, failed: 0, devices: 0 })
 
-  const { data: devices, error: devicesError } = await serviceClient.from('push_device_tokens').select('id, token').in('profile_id', profileIds).eq('platform', 'android').eq('is_active', true)
+  const preferenceKey = ['general_push','urgent_alerts','event_reminders','community_digest','marketplace','commerce_promotions'].includes(campaign.preference_key)
+    ? campaign.preference_key
+    : 'general_push'
+  // Cada campaña respeta la categoría elegida en el panel. Si el vecino aún
+  // no tiene una fila de preferencias, se mantienen los valores por defecto.
+  const { data: disabledPreferences } = await serviceClient
+    .from('notification_preferences')
+    .select('profile_id')
+    .in('profile_id', profileIds)
+    .eq(preferenceKey, false)
+  const disabledIds = new Set((disabledPreferences || []).map(row => row.profile_id))
+  const pushProfileIds = profileIds.filter(id => !disabledIds.has(id))
+  if (!pushProfileIds.length) return respond({ sent: 0, failed: 0, devices: 0, opted_out: profileIds.length })
+
+  const { data: devices, error: devicesError } = await serviceClient.from('push_device_tokens').select('id, token').in('profile_id', pushProfileIds).eq('platform', 'android').eq('is_active', true)
   if (devicesError) return respond({ error: { message: 'No fue posible consultar los dispositivos.' } }, 500)
   if (!devices?.length) return respond({ sent: 0, failed: 0, devices: 0 })
 
@@ -115,7 +129,7 @@ Deno.serve(async request => {
   if (invalidIds.length) await serviceClient.from('push_device_tokens').update({ is_active: false }).in('id', invalidIds)
   await serviceClient.from('service_usage_events').insert({
     service: 'firebase', operation: 'push_delivery', success: failed === 0,
-    quantity: sent, metadata: { campaign_id: campaign.id, devices: devices.length, failed },
+    quantity: sent, metadata: { campaign_id: campaign.id, preference_key: preferenceKey, devices: devices.length, failed },
   })
   return respond({ sent, failed, devices: devices.length })
 })
