@@ -2,6 +2,7 @@ import { useEffect, useState, useRef, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
 import { C, T, S, TIPOS, CATEGORIAS, iniciales, hace, plata, distancia } from '../lib/design'
 import { moderatePublicContent } from '../lib/moderation'
+import TrustActions from '../components/TrustActions'
 
 // ============================================================
 // ProductDetail.jsx — v2
@@ -287,7 +288,8 @@ export default function ProductDetail({ postId, currentUser, onNavigate, onEdit 
         author:profiles!author_id (
           id, full_name, avatar_url, reputation_score,
           badge_founder, badge_trusted_seller, member_since,
-          lat, lng, total_sales, total_gifts
+          lat, lng, total_sales, total_gifts, is_official_actor,
+          official_actor_type, official_actor_name, completed_interactions_count
         )
       `)
       .eq('id', postId)
@@ -786,6 +788,7 @@ export default function ProductDetail({ postId, currentUser, onNavigate, onEdit 
               <div style={s.sellerNameRow}>
                 <span style={s.sellerName}>{post.author?.full_name || 'Vecino'}</span>
                 {post.author?.badge_founder && <Icon.Verified size={13} />}
+                {post.author?.is_official_actor && <span style={s.officialBadge}>✓ OFICIAL</span>}
                 {post.author?.badge_trusted_seller && (
                   <span style={s.sellerBadge}>Vendedor confiable</span>
                 )}
@@ -799,6 +802,8 @@ export default function ProductDetail({ postId, currentUser, onNavigate, onEdit 
             </div>
             <Icon.ChevronRight />
           </div>
+
+          {!isOwn && <div style={s.trustStrip}><span>Identidad vecinal verificada · {post.author?.completed_interactions_count || 0} interacciones completadas</span><TrustActions contentType="post" contentId={post.id} authorId={post.author_id} compact onBlocked={() => nav('back')} /></div>}
 
           {/* Descripción */}
           <section style={s.section}>
@@ -1255,6 +1260,8 @@ const s = {
     backgroundColor: C.verdeSuave, color: C.verdeOsc,
     borderRadius: 6,
   },
+  officialBadge: { padding: '3px 6px', borderRadius: 999, background: '#e6f7f0', color: '#117653', fontSize: 8, fontWeight: 800, letterSpacing: '.03em' },
+  trustStrip: { minHeight: 42, marginTop: 9, padding: '7px 9px 7px 12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, border: `1px solid ${C.borde}`, borderRadius: 12, background: '#f8fbf9', color: C.textoSuave, fontSize: 9.5, lineHeight: 1.35 },
   sellerRepRow: { display: 'flex', alignItems: 'center', gap: 4 },
   sellerRepText: { fontSize: 11.5, color: C.textoSuave, fontWeight: 500 },
 

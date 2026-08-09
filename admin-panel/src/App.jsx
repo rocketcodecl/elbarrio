@@ -20,6 +20,7 @@ import CategoryManager from './screens/CategoryManager.jsx'
 import PostManager from './screens/PostManager.jsx'
 import UsageManager from './screens/UsageManager.jsx'
 import UserContentManager from './screens/UserContentManager.jsx'
+import ReportManager from './screens/ReportManager.jsx'
 
 const ADMIN_ROLE = 'admin'
 
@@ -148,7 +149,8 @@ export default function App() {
       {activeSection === 'publicaciones' && <PostManager profile={profile} />}
       {activeSection === 'uso' && <UsageManager />}
       {activeSection === 'contenido-usuarios' && <UserContentManager />}
-      {!['dashboard', 'comercios', 'servicios', 'eventos', 'farmacias', 'noticias', 'incidentes', 'usuarios', 'espera', 'invitaciones', 'contenido', 'notificaciones', 'consultas', 'portada', 'categorias', 'publicaciones', 'contenido-usuarios', 'uso'].includes(activeSection) && (
+      {activeSection === 'reportes' && <ReportManager onNavigate={setActiveSection} />}
+      {!['dashboard', 'comercios', 'servicios', 'eventos', 'farmacias', 'noticias', 'incidentes', 'usuarios', 'espera', 'invitaciones', 'contenido', 'notificaciones', 'consultas', 'portada', 'categorias', 'publicaciones', 'contenido-usuarios', 'reportes', 'uso'].includes(activeSection) && (
         <section className="placeholder-module"><span>🚧</span><h1>Módulo en preparación</h1><p>Lo construiremos en una siguiente fase.</p></section>
       )}
     </AdminShell>

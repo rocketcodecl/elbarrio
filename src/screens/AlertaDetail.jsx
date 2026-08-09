@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import MiniMap from '../components/MiniMap'
+import TrustActions from '../components/TrustActions'
 import { C, T, S, TIPOS, REPORTES, iniciales, hace, distancia } from '../lib/design'
 import { moderatePublicContent } from '../lib/moderation'
 
@@ -182,7 +183,7 @@ function AlertaDetail({ alertId, currentUser, onNavigate, onEdit }) {
     try {
       const { data, error } = await supabase
         .from('incident_reports')
-        .select('*, reporter:profiles!reporter_id (id, user_id, full_name, avatar_url, badge_founder, verified)')
+        .select('*, reporter:profiles!reporter_id (id, user_id, full_name, avatar_url, badge_founder, verified, is_official_actor, official_actor_name)')
         .eq('id', alertId)
         .eq('neighborhood_id', neighborhoodId)
         .single()
@@ -578,11 +579,12 @@ function AlertaDetail({ alertId, currentUser, onNavigate, onEdit }) {
               )}
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={s.autorNombre}>
-                  {autor.full_name || 'Vecino del barrio'}
+                  {autor.official_actor_name || autor.full_name || 'Vecino del barrio'}
                   {autor.verified && <span style={s.verifiedDot}>✓</span>}
                 </div>
-                <div style={s.autorSub}>Reportó esta alerta · {hace(alert.created_at)}</div>
+                <div style={s.autorSub}>{autor.is_official_actor ? 'Actor oficial' : 'Reportó esta alerta'} · {hace(alert.created_at)}</div>
               </div>
+              {!esAutor && <TrustActions contentType="incident" contentId={alert.id} authorId={alert.reporter_id} compact onBlocked={() => nav('alertas')} />}
             </div>
           </div>
 

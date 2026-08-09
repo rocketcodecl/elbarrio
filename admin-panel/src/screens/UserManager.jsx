@@ -25,7 +25,14 @@ const ACTION_LABELS = {
   suspend: 'Suspendió la cuenta',
   reactivate: 'Reactivó la cuenta',
   edit_profile: 'Editó los datos del perfil',
+  official_actor: 'Actualizó la identidad oficial',
 }
+
+const OFFICIAL_TYPES = [
+  ['junta_vecinos', 'Junta de vecinos'], ['municipalidad', 'Municipalidad'],
+  ['seguridad', 'Seguridad'], ['bomberos', 'Bomberos'], ['salud', 'Salud'],
+  ['colegio', 'Colegio'], ['organizacion', 'Organización local'],
+]
 
 const ACTIVITY_LABELS = {
   sale: ['🏷️', 'Venta'], gift: ['🎁', 'Regalo'], trade: ['🔄', 'Trueque'],
@@ -72,6 +79,7 @@ function UserBadges({ user }) {
       ? <span className="user-badge admin">Superadministrador</span>
       : user.role === 'admin' && <span className="user-badge admin">Administrador</span>}
     {user.can_publish_events && <span className="user-badge actor">Actor autorizado</span>}
+    {user.is_official_actor && <span className="user-badge actor">✓ Actor oficial</span>}
     {isVerified(user) ? <span className="user-badge verified">✓ Verificado</span> : <span className="user-badge pending">Por verificar</span>}
   </div>
 }
@@ -112,6 +120,8 @@ export default function UserManager({ profile }) {
   const [profileSaving, setProfileSaving] = useState(false)
   const [neighborhoodOptions, setNeighborhoodOptions] = useState([])
   const [profileDraft, setProfileDraft] = useState({ full_name: '', email: '', phone: '', rut: '', address: '', comuna: '', bio: '', user_type: '', neighborhood_id: '', new_password: '', reason: '' })
+  const [officialDraft, setOfficialDraft] = useState({ enabled: false, type: 'organizacion', name: '', reason: '' })
+  const [officialSaving, setOfficialSaving] = useState(false)
 
   const selected = users.find(user => user.id === selectedId) || null
   const selectedCoordinates = profileCoordinates(selected)
@@ -131,6 +141,12 @@ export default function UserManager({ profile }) {
       neighborhood_id: selected.neighborhood_id || '', new_password: '', reason: '',
     })
     setProfileEditing(false)
+    setOfficialDraft({
+      enabled: selected.is_official_actor === true,
+      type: selected.official_actor_type || 'organizacion',
+      name: selected.official_actor_name || '',
+      reason: '',
+    })
   }, [selected])
 
   const loadUsers = useCallback(async preferredId => {
@@ -325,6 +341,26 @@ export default function UserManager({ profile }) {
     await loadUsers(selected.id); await loadHistory(selected.id)
   }
 
+  const saveOfficialActor = async event => {
+    event.preventDefault()
+    if (!selected || !isSuperadmin || officialSaving) return
+    if (officialDraft.enabled && !officialDraft.name.trim()) return setError('Indica el nombre público de la institución.')
+    if (officialDraft.reason.trim().length < 3) return setError('Indica brevemente el motivo del cambio.')
+    setOfficialSaving(true); setError('')
+    const { error: officialError } = await supabase.rpc('admin_set_official_actor', {
+      p_profile_id: selected.id,
+      p_enabled: officialDraft.enabled,
+      p_type: officialDraft.enabled ? officialDraft.type : null,
+      p_name: officialDraft.enabled ? officialDraft.name.trim() : null,
+      p_reason: officialDraft.reason.trim(),
+    })
+    setOfficialSaving(false)
+    if (officialError) return setError(`No fue posible actualizar la identidad oficial: ${officialError.message}`)
+    setNotice(officialDraft.enabled ? 'Identidad oficial activada' : 'Identidad oficial retirada')
+    window.setTimeout(() => setNotice(''), 2800)
+    await loadUsers(selected.id); await loadHistory(selected.id)
+  }
+
   return <div className="user-manager">
     <section className="page-heading commerce-page-heading">
       <div><p className="eyebrow">Comunidad y permisos</p><h1>Usuarios</h1><p>Verifica vecinos, autoriza actores y protege el acceso a El Barrio.</p></div>
@@ -361,6 +397,8 @@ export default function UserManager({ profile }) {
             <section className="user-info-card user-location-card"><h3>Ubicación registrada</h3><div className="user-location-status"><span>{isVerified(selected) && selected.neighborhood_id ? '✓' : '!'}</span><div><strong>{isVerified(selected) && selected.neighborhood_id ? 'GPS verificado en el barrio' : 'Ubicación todavía no verificada'}</strong><small>{neighborhood ? `${neighborhood.name}${neighborhood.uv_code ? ` · Unidad Vecinal ${neighborhood.uv_code}` : ''}` : selected.address || 'Sin dirección registrada'}</small></div></div><ProfileMap user={selected} />{selectedCoordinates && <p className="user-map-coordinates">{selectedCoordinates.source}: {selectedCoordinates.lat.toFixed(6)}, {selectedCoordinates.lng.toFixed(6)}</p>}</section>
 
             <section className="user-info-card user-permissions-card"><h3>Permisos</h3><div className="permission-row"><span>📅</span><div><strong>Publicación de eventos</strong><small>Para juntas de vecinos, municipalidades y actores autorizados.</small></div>{selected.can_publish_events ? <button type="button" disabled={!!changing} onClick={() => manage('revoke_actor')}>Retirar</button> : <button className="positive" type="button" disabled={!!changing || !isVerified(selected) || isSuspended(selected)} onClick={() => manage('approve_actor')}>Autorizar</button>}</div>{isSuperadmin && <><div className="permission-row"><span>🛡️</span><div><strong>Administración territorial</strong><small>Permite administrar únicamente el barrio asignado.</small></div>{selected.role === 'admin' ? <button type="button" disabled={!!changing || isSelf || selected.is_superadmin} onClick={() => manage('remove_admin')}>{isSelf ? 'Tu cuenta' : selected.is_superadmin ? 'Nivel supremo activo' : 'Retirar'}</button> : <button className="positive" type="button" disabled={!!changing || isSuspended(selected)} onClick={() => manage('assign_admin')}>Hacer admin</button>}</div><div className="permission-row"><span>👑</span><div><strong>Superadministración</strong><small>Entrega alcance global y control sobre otros administradores.</small></div>{selected.is_superadmin ? <button type="button" disabled={!!changing || isSelf} onClick={() => manage('remove_superadmin')}>{isSelf ? 'Tu cuenta' : 'Retirar nivel'}</button> : <button className="positive" type="button" disabled={!!changing || isSuspended(selected)} onClick={() => manage('assign_superadmin')}>Hacer supremo</button>}</div></>}</section>
+
+            {isSuperadmin && <section className="user-info-card"><h3>Identidad oficial</h3><p className="user-muted">Distingue instituciones verificadas sin entregarles permisos administrativos.</p><form className="official-actor-form" onSubmit={saveOfficialActor}><label className="official-actor-toggle"><input type="checkbox" checked={officialDraft.enabled} onChange={event => setOfficialDraft(draft => ({ ...draft, enabled: event.target.checked }))} /> Mostrar como actor oficial</label>{officialDraft.enabled && <div className="user-edit-grid"><label>Tipo<select value={officialDraft.type} onChange={event => setOfficialDraft(draft => ({ ...draft, type: event.target.value }))}>{OFFICIAL_TYPES.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label><label>Nombre público<input value={officialDraft.name} onChange={event => setOfficialDraft(draft => ({ ...draft, name: event.target.value }))} placeholder="Ej: Seguridad Las Condes" /></label></div>}<label>Motivo del cambio<input value={officialDraft.reason} onChange={event => setOfficialDraft(draft => ({ ...draft, reason: event.target.value }))} placeholder="Quedará en la auditoría" required /></label><button className="user-primary-action" type="submit" disabled={officialSaving}>{officialSaving ? 'Guardando…' : 'Guardar identidad oficial'}</button></form></section>}
 
             <section className="user-info-card user-account-card"><h3>Estado de la cuenta</h3>{isDeleted(selected) ? <div className="account-state deleted"><strong>Cuenta eliminada</strong><p>El acceso fue revocado y los datos personales quedaron anonimizados.</p>{selected.suspended_at && <small>Desde {dateLabel(selected.suspended_at)}</small>}</div> : isSuspended(selected) ? <div className="account-state suspended"><strong>Cuenta suspendida</strong><p>El usuario no puede utilizar la aplicación.</p>{selected.suspended_at && <small>Desde {dateLabel(selected.suspended_at)}</small>}<button type="button" disabled={!!changing} onClick={() => manage('reactivate')}>Reactivar usuario</button></div> : <div className="account-state active"><strong>Cuenta activa</strong><p>El usuario puede ingresar y usar las funciones habilitadas.</p><button type="button" disabled={!!changing || isSelf} onClick={() => manage('suspend')}>{isSelf ? 'No puedes suspenderte' : 'Suspender usuario'}</button></div>}{isSuperadmin && !isDeleted(selected) && <div className="user-delete-zone"><strong>Eliminar cuenta definitivamente</strong><p>Revoca el acceso y anonimiza RUT, contacto, dirección, GPS y fotografía. Las conversaciones y publicaciones permanecen sin identidad pública.</p>{isSelf ? <small>No puedes eliminar tu propia cuenta desde el panel.</small> : selected.is_superadmin ? <small>Primero retira el nivel de superadministrador.</small> : selected.role === 'admin' ? <small>Primero retira sus permisos de administrador territorial.</small> : !deleteOpen ? <button type="button" className="user-delete-start" onClick={() => setDeleteOpen(true)}>Eliminar cuenta</button> : <form onSubmit={deleteSelectedAccount}><label>Escribe <b>ELIMINAR</b><input value={deletePhrase} onChange={event => setDeletePhrase(event.target.value.toUpperCase())} autoComplete="off" /></label><div><button type="button" onClick={() => { setDeleteOpen(false); setDeletePhrase('') }}>Cancelar</button><button type="submit" className="user-delete-confirm" disabled={deletePhrase !== 'ELIMINAR' || deleting}>{deleting ? 'Eliminando…' : 'Eliminar definitivamente'}</button></div></form>}</div>}</section>
 

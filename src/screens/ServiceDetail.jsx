@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { C, T, RUBROS, hace, iniciales, plata } from '../lib/design'
 import { moderatePublicContent } from '../lib/moderation'
+import TrustActions from '../components/TrustActions'
 
 const Icon = ({ children, size = 20 }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">{children}</svg>
@@ -52,7 +53,8 @@ export default function ServiceDetail({ postId, currentUser, onNavigate, onEdit 
         *,
         author:profiles!author_id (
           id, full_name, avatar_url, reputation_score,
-          badge_founder, badge_trusted_seller, verified, verification_status
+          badge_founder, badge_trusted_seller, verified, verification_status,
+          is_official_actor, official_actor_type, official_actor_name, completed_interactions_count
         )
       `)
       .eq('id', postId)
@@ -206,7 +208,7 @@ export default function ServiceDetail({ postId, currentUser, onNavigate, onEdit 
         <main style={s.main}>
           <button type="button" style={s.providerCard} onClick={() => nav('sellerprofile', { sellerId: service.author_id })}>
             {author.avatar_url ? <img src={author.avatar_url} alt="" style={s.avatar} /> : <span style={s.avatarFallback}>{iniciales(author.full_name)}</span>}
-            <span style={s.providerCopy}><small style={s.providerLabel}>{category.emoji} {category.label}</small><strong style={s.providerName}>{author.full_name || 'Vecino del barrio'}</strong><em style={s.providerState}>{verified ? <><Check /> Perfil verificado</> : 'Vecino del barrio'}</em></span>
+            <span style={s.providerCopy}><small style={s.providerLabel}>{author.is_official_actor ? '✓ ACTOR OFICIAL' : `${category.emoji} ${category.label}`}</small><strong style={s.providerName}>{author.official_actor_name || author.full_name || 'Vecino del barrio'}</strong><em style={s.providerState}>{verified ? <><Check /> Perfil verificado</> : 'Vecino del barrio'}{Number(author.completed_interactions_count) > 0 ? ` · ${author.completed_interactions_count} interacciones cerradas` : ''}</em></span>
             <span style={s.chevron}>›</span>
           </button>
 
@@ -255,6 +257,7 @@ export default function ServiceDetail({ postId, currentUser, onNavigate, onEdit 
           <section style={s.trustCard}>
             <span style={s.trustIcon}>✓</span>
             <span style={s.trustCopy}><strong style={s.trustTitle}>Contacto dentro de el barrio</strong><small style={s.trustText}>Conversa primero por chat y coordina los detalles antes de contratar.</small></span>
+            {!isOwn && <TrustActions contentType="post" contentId={service.id} authorId={service.author_id} compact onBlocked={() => nav('back')} />}
           </section>
         </main>
       </div>

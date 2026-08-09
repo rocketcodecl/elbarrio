@@ -532,6 +532,7 @@ export default function SellerProfile({ sellerId, currentUser, onNavigate }) {
                 <IcoCheck size={11} /> Verificado
               </span>
             )}
+            {seller.is_official_actor && <span style={s.badgeVerified}><IcoCheck size={11} /> {seller.official_actor_name || 'Actor oficial'}</span>}
             {isFounder && (
               <span style={s.badgeFounder}>
                 <IcoMedalla size={12} /> Vecino Fundador{founderNumber ? ` #${founderNumber}` : ''}
