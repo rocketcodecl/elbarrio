@@ -125,7 +125,7 @@ git commit -m "Descripción clara del cambio"
 git push origin main
 ```
 
-No agregar contraseñas, llaves de firma, `.env`, certificados ni perfiles privados. No incluir cambios de `landing-page/` en un commit de la app o del panel.
+No agregar contraseñas, llaves de firma, `.env`, certificados ni perfiles privados.
 
 ## Publicación web y panel
 

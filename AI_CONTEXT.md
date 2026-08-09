@@ -5,7 +5,7 @@
 
 ## Estado de continuidad — 5 de agosto de 2026
 
-- Cierre operativo de la jornada: commit `13d60a6` está publicado en `origin/main` sobre `b572f71`. Incluye los últimos ajustes móviles/iOS y corrige el menú del panel para que tenga desplazamiento vertical. No se incluyeron las eliminaciones locales de `landing-page/` ni `ios/build-device/`; deben tratarse como cambios ajenos/no confirmados y no incorporarse por accidente.
+- Cierre operativo de la jornada: commit `13d60a6` está publicado en `origin/main` sobre `b572f71`. Incluye los últimos ajustes móviles/iOS y corrige el menú del panel para que tenga desplazamiento vertical. `ios/build-device/` sigue siendo un artefacto local y no debe incorporarse por accidente.
 - Panel real verificado el 5 de agosto en `https://admin.elbarrio.lat/`: sirve `assets/index-9L1rT6mT.js`, el bundle contiene literalmente “Uso y servicios” y el módulo está al final del menú, visible solo con `profiles.is_superadmin=true`. El menú ahora permite scroll en pantallas de poca altura. Si no aparece, primero hacer recarga forzada y confirmar el rol; no volver a afirmar que falta el despliegue sin verificar el bundle.
 - Release Android final regenerado después del último `cap sync`: Gradle terminó con `BUILD SUCCESSFUL`. Entregables locales ignorados por Git: `release/android/el-barrio-1.0.0/el-barrio-1.0.0-release.apk` (SHA-256 `54c4b7ac73f59ec47a0e560efadc21a364b73baf57f5d92f25b9a674739fda18`) y `el-barrio-1.0.0-release.aab` (SHA-256 `84c863846aa50052fe8555ed3139b26e4cca629ba370278b1da44080a34eb302`). El APK es para pruebas/instalación directa; el AAB es el archivo para Google Play.
 - “Uso y servicios” muestra métricas disponibles de Supabase Storage y estado/muestras de integraciones. No debe describirse como facturación exacta en tiempo real: OpenRouter, Resend y Firebase dependen de lo que sus APIs/secretos permitan consultar. La retención y limpieza son deliberadamente seguras y diferidas; nunca borrar archivos de Storage por inferencia.
@@ -33,7 +33,6 @@
 - Cierre de continuidad móvil verificado el 4 de agosto de 2026: app y panel compilan, Capacitor sincroniza Android/iOS y el APK Android debug vigente fue generado correctamente en `android/app/build/outputs/apk/debug/app-debug.apk`. `npm run mobile:android:apk` reproduce el APK utilizando el Java incluido en Android Studio. Xcode 26.5 quedó instalado y activo en `/Applications/Xcode.app/Contents/Developer`; el proyecto iOS compiló con `BUILD SUCCEEDED`, se instaló y abrió correctamente en el simulador iPhone 17 Pro Max como `lat.elbarrio.app`. El procedimiento autónomo completo quedó en `MOBILE_RELEASE_GUIDE.md`.
 - La prueba nativa en iPhone 17 Pro Max detectó y corrigió un desplazamiento horizontal persistente de 16 px causado por el desborde del feed y sus carruseles en WKWebView. Los contenedores raíz ya usan recorte horizontal no desplazable y el feed de Inicio conserva desplazamiento únicamente vertical; una captura posterior confirmó saludo, tarjetas, secciones y TabBar dentro de ambos bordes.
 
-- Landing pública reconstruida desde cero el 4 de agosto de 2026 sobre una única arquitectura responsive, sin una versión móvil paralela ni CSS acumulado. Mantiene el contenido de `dg.jpg`: el hero desarrolla tres escenas dentro de un escenario fijo y las seis áreas cambian texto, imagen y funciones dentro de un segundo escenario fijo. Después presenta acciones, verificación interactiva, pasos, confianza, comercios, FAQ desplegable y formulario de espera. El CMS vive en `landing-page/admin/`, comparte `landing-page/content/site.json` con la web y permite editar textos, tamaños, video e imágenes sin usar Supabase.
 
 - Auditoría local de cierre iniciada el 1 de agosto: la aplicación y el panel compilan en producción. Google OAuth fue validado manualmente con alta, cierre de sesión y reingreso. El informe vigente está en `MVP_RELEASE_AUDIT.md` y la comprobación remota de Supabase, que no modifica datos, está en `supabase/MVP_RELEASE_AUDIT.sql`.
 - La consulta `supabase/MVP_RELEASE_AUDIT.sql` fue ejecutada el 1 de agosto de 2026 y todas las tablas, columnas, funciones y verificaciones RLS incluidas devolvieron `OK`. Esto certifica las estructuras operativas consultadas, pero no reconcilia el historial remoto de migraciones; `supabase db push` continúa prohibido.
@@ -69,7 +68,7 @@
 - Las instrucciones y el registro de la migración de auditoría están en `supabase/MVP_CIERRE_INSTRUCCIONES.md`. No se cargaron datos simulados.
 - La Edge Function `moderate-community-content` está desplegada y validada en red: el preflight responde HTTP 200 y una solicitud sin sesión responde HTTP 401.
 - La migración `202607300004_content_moderation_events.sql` fue aplicada el 30 de julio de 2026 según confirmación manual. PostgREST reconoce la tabla y rechaza el acceso anónimo con HTTP 401, como corresponde a sus permisos.
-- `landing-page/` contiene ahora la landing pública independiente y debe versionarse como producto propio. `supabase/.temp/` continúa fuera de los commits.
+- La landing pública no pertenece a este repositorio. `supabase/.temp/` continúa fuera de los commits.
 - La aplicación de vecinos y el panel administrativo comparten el mismo proyecto Supabase.
 - El último cierre funcional corrigió identidad de perfiles, estados de carga, contenido simulado y aislamiento territorial en feeds, detalles y perfiles públicos activos.
 - La aplicación principal y el panel compilan correctamente después de estos cambios.
@@ -84,7 +83,6 @@
 - `android/` e `ios/` son los proyectos nativos generados por Capacitor. Ambos consumen el mismo build de React desde `dist/`; después de cada cambio de la app debe ejecutarse `npm run mobile:sync` antes de compilar en Android Studio o Xcode.
 - `capacitor.config.json` define la aplicación nativa `lat.elbarrio.app`. `src/lib/mobileAuth.js` adapta Google OAuth y recuperación de contraseña al callback nativo, manteniendo el flujo web existente.
 - Existe una aplicación web administrativa independiente en `admin-panel/`, conectada al mismo Supabase y orientada al uso desde computador.
-- Existe una landing pública independiente en `landing-page/`, construida con HTML, CSS y JavaScript estáticos para desplegarse directamente sin afectar la aplicación ni el panel.
 - La interfaz se presenta dentro de un marco de teléfono en escritorio y ocupa la pantalla disponible en móvil.
 - `src/main.jsx` monta `src/App.jsx`.
 - `App.jsx` funciona como orquestador: controla autenticación, navegación, tabs, historial interno, overlays y usuario activo.
@@ -189,12 +187,10 @@ El botón de creación abre `CreatePost.jsx`, salvo la creación de comercios, q
 
 ## Decisiones tomadas
 
-- El CMS de la landing controla navegación, portada, relato inicial, historia de Marta, narrativa de comercios y servicios, cierre/formulario, footer, tamaños, imágenes y videos. Los textos narrativos públicos usan `data-content` y se cargan desde `landing-page/content/site.json`.
 
 - La landing usa `#1b9e75` como único verde de marca visible. Su narrativa principal, comercios y servicios funcionan mediante escenas de scroll con interfaces móviles rectas y proporciones contenidas.
 - Los cuatro videos narrativos de la landing son archivos MP4 independientes (`scene-distancia`, `scene-pregunta`, `scene-encuentro`, `scene-comunidad`) reemplazables desde el CMS; actualmente contienen material demostrativo.
 - Las pantallas del teléfono de la historia y los paneles visuales de Comercios y Servicios dejaron de construirse como interfaces HTML: ahora son imágenes reemplazables desde el CMS (`screen-inicio`, `screen-servicios`, `screen-mercado`, `screen-eventos` y cuatro imágenes independientes por cada relato comercial y de servicios). Estas últimas cambian con un fade según el paso activo.
-- La landing carga `landing-page/mobile.css` después de los estilos generales. Esa hoja contiene la composición móvil aislada; comparte todos los textos y medios del mismo CMS, mientras escritorio conserva su composición propia.
 - El formulario de acceso anticipado y su almacenamiento son independientes de Supabase.
 
 - `Home.jsx` es el feed principal y controla el tab Inicio.
@@ -321,12 +317,9 @@ El botón de creación abre `CreatePost.jsx`, salvo la creación de comercios, q
 
 ## Funcionalidades terminadas
 
-- Landing pública de El Barrio con navegación responsive, hero audiovisual, apertura de scrollytelling cinematográfico en cuatro actos (distancia, necesidad, respuesta y comunidad) y un segundo scrollytelling dedicado a comercios (invisibilidad, descubrimiento, confianza y crecimiento local). Utiliza dos videos web de Mixkit descargados localmente y acreditados en `landing-page/README.md`. Después continúa con la historia funcional de Marta. La demo de la aplicación es ficticia y no utiliza datos ni pantallas reales. Incluye propuesta para vecinos y comercios y formulario de contacto por correo.
 - La propuesta comercial de la landing muestra interfaces premium distintas para descubrimiento, ficha comercial, reputación y visibilidad destacada. Existe además una sección propia para servicios con perfil profesional, reputación vecinal, solicitudes cercanas, contacto y visibilidad destacada; comercios y servicios se presentan como vías centrales de monetización y no como contenido secundario.
 - El hero y el manifiesto inicial forman una sola experiencia de scrollytelling: el teléfono y la promesa aparecen sobre un escenario audiovisual fijo; al avanzar, el teléfono cede espacio a cuatro escenas narrativas y cada scroll cambia a un video o imagen local diferente con transición suave. No deben volver a separarse en bloques audiovisuales redundantes.
 - La propuesta para prestadores de servicios replica el sistema de scrollytelling de comercios, invertido: escenas de texto a la izquierda y escenario visual sticky con perfil profesional a la derecha. El cierre incluye una lista de acceso anticipado con perfiles de vecino, comercio y servicio, y un footer de producto digital con origen en Santiago.
-- La landing gestiona su propia lista de acceso anticipado sin Supabase: `landing-page/leads.php` guarda nombre, correo, WhatsApp, comuna y tipo de perfil en un archivo protegido del servidor. El CMS emparejado consulta esos registros con su token privado y los muestra en la sección Inscritos.
-- `landing-page/admin/` es un editor PHP independiente para modificar textos y tamaños básicos de la landing. Se instala una sola vez desde `admin/install.php`, guarda credenciales cifradas en `admin/config.php` (ignorado por Git), usa sesión y CSRF, y publica una configuración validada en `landing-page/content/site.json`. No usa Supabase ni comparte autenticación con los otros paneles.
 - Despliegue definido para la landing: `elbarrio.lat` y `cms.elbarrio.lat` son instalaciones físicamente independientes. El CMS publica por HTTPS hacia `https://elbarrio.lat/publish.php` usando una clave aleatoria incluida solamente en los dos ZIP emparejados. Ya no depende de carpetas compartidas ni de permisos cruzados en Plesk.
 - Alta y verificación territorial refinadas: Nombre y Apellido separados sin migración, copy de privacidad coherente, scroll interno, mapa del polígono MVP, geocodificación automática de dirección y marcador previo al GPS.
 - Inicio incorpora una portada editorial real para el próximo evento elegido desde el panel, sin datos simulados ni duplicación inmediata en Actividad. Mi perfil amplía las tarjetas de favoritos y el Modo accesible conserva cuadrados los controles circulares.

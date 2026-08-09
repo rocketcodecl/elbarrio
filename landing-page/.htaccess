@@ -1,4 +1,0 @@
-Options -Indexes
-RewriteEngine On
-RewriteCond %{HTTP_HOST} ^(www\.)?elbarrio\.lat$ [NC]
-RewriteRule ^admin(?:/.*)?$ https://cms.elbarrio.lat/ [R=302,L]
