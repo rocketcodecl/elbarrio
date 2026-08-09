@@ -25,6 +25,8 @@ const initialState = event => ({
   content: event?.content || '',
   starts_at: localDateTime(event?.starts_at),
   ends_at: localDateTime(event?.ends_at),
+  event_recurrence: event?.event_recurrence || 'none',
+  recurrence_until: localDateTime(event?.recurrence_until),
   location_text: event?.location_text || '',
   lat: event?.lat ?? '',
   lng: event?.lng ?? '',
@@ -132,6 +134,8 @@ export default function EventEditor({ event, profile, onBack, onSaved }) {
       content: draft.content.trim(),
       starts_at: new Date(draft.starts_at).toISOString(),
       ends_at: draft.ends_at ? new Date(draft.ends_at).toISOString() : null,
+      event_recurrence: draft.event_recurrence,
+      recurrence_until: draft.event_recurrence !== 'none' && draft.recurrence_until ? new Date(draft.recurrence_until).toISOString() : null,
       location_text: draft.location_text.trim(),
       lat: toNumberOrNull(draft.lat),
       lng: toNumberOrNull(draft.lng),
@@ -209,6 +213,8 @@ export default function EventEditor({ event, profile, onBack, onSaved }) {
             <label className="field field-full">Nombre del evento<input value={draft.title} onChange={e => set('title', e.target.value)} maxLength={120} placeholder="Ej: Feria de emprendedores del barrio" required /></label>
             <label className="field">Desde<input type="datetime-local" value={draft.starts_at} onChange={e => set('starts_at', e.target.value)} required /></label>
             <label className="field">Hasta <small>Opcional</small><input type="datetime-local" value={draft.ends_at} min={draft.starts_at || undefined} onChange={e => set('ends_at', e.target.value)} /></label>
+            <label className="field">Se repite<select value={draft.event_recurrence} onChange={e => set('event_recurrence', e.target.value)}><option value="none">No se repite</option><option value="weekly">Cada semana</option><option value="biweekly">Cada dos semanas</option><option value="monthly">Cada mes</option></select></label>
+            {draft.event_recurrence !== 'none' && <label className="field">Repetir hasta<input type="datetime-local" value={draft.recurrence_until} min={draft.starts_at || undefined} onChange={e => set('recurrence_until', e.target.value)} /></label>}
             <label className="field field-full">Tipo de actividad<select value={draft.category} onChange={e => set('category', e.target.value)}>{categories.map(category => <option value={category.key} key={category.key}>{category.icon} {category.name}</option>)}</select></label>
             <label className="field field-full">Descripción<textarea value={draft.content} onChange={e => set('content', e.target.value)} rows="5" placeholder="Qué se hará, quiénes pueden participar y qué deben llevar…" required /></label>
           </div>

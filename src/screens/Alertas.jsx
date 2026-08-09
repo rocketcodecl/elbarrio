@@ -152,14 +152,14 @@ function Alertas({ currentUser, onNavigate, onCrear }) {
       // Las alertas `active` son visibles para todo el barrio. Cada autor
       // también puede ver sus propios reportes `pendiente`, claramente
       // identificados, mientras espera la revisión administrativa.
-      const res = await supabase
+      const [res, { data: blocks }] = await Promise.all([supabase
         .from('incident_reports')
         .select('*, reporter:profiles!reporter_id (full_name, avatar_url, badge_founder, verified)')
         .eq('neighborhood_id', p.neighborhood_id)
         .or(`status.eq.active,and(status.eq.pendiente,reporter_id.eq.${p.id})`)
         .order('confirms_count', { ascending: false })
         .order('created_at', { ascending: false })
-        .limit(100)
+        .limit(100), supabase.from('user_blocks').select('blocked_id').eq('blocker_id', p.id)])
 
       console.log('[alertas] query result:', res.data?.length, 'rows')
 
@@ -171,7 +171,9 @@ function Alertas({ currentUser, onNavigate, onCrear }) {
 
       // Filtrar expiradas en JS (no rompe si expires_at no existe)
       const ahora = Date.now()
+      const blocked = new Set((blocks || []).map(item => item.blocked_id))
       const activas = (res.data || []).filter((a) => {
+        if (blocked.has(a.reporter_id)) return false
         if (!a.expires_at) return true
         return new Date(a.expires_at).getTime() > ahora
       })

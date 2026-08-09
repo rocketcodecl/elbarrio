@@ -48,6 +48,8 @@ function LineIcon({ name, size = 20 }) {
   )
   const paths = {
     settings: <><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1-2.8 2.8-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.5V21h-4v-.1a1.7 1.7 0 0 0-1-1.5 1.7 1.7 0 0 0-1.9.3l-.1.1L4.2 17l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.5-1H3v-4h.1a1.7 1.7 0 0 0 1.5-1 1.7 1.7 0 0 0-.3-1.9L4.2 7 7 4.2l.1.1a1.7 1.7 0 0 0 1.9.3 1.7 1.7 0 0 0 1-1.5V3h4v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.9-.3l.1-.1L19.8 7l-.1.1a1.7 1.7 0 0 0-.3 1.9 1.7 1.7 0 0 0 1.5 1h.1v4h-.1a1.7 1.7 0 0 0-1.5 1Z" /></>,
+    search: <><circle cx="11" cy="11" r="7" /><path d="m20 20-4-4" /></>,
+    bell: <><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M14 21h-4" /></>,
     post: <><path d="M5 5h14v12H8l-3 3Z" /><path d="M8 9h8M8 13h5" /></>,
     heart: <path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1.1-1.1a5.5 5.5 0 0 0-7.8 7.8L12 21l8.8-8.6a5.5 5.5 0 0 0 0-7.8Z" />,
     deals: <><path d="M4 7h16v12H4Z" /><path d="M8 7V5h8v2M8 12h8" /></>,
@@ -84,14 +86,29 @@ function MenuRow({ icon, tone, title, subtitle, count, danger, onClick, active }
 }
 
 function DetailSheet({ section, posts, favorites, deals, onClose, onNavigate }) {
+  const [reviewing, setReviewing] = useState('')
+  const [reviewMessage, setReviewMessage] = useState('')
   const config = {
     posts: ['Mis publicaciones', posts],
     favorites: ['Mis favoritos', favorites],
     deals: ['Mis compras y ventas', deals],
+    events: ['Eventos guardados', posts],
   }[section]
   if (!config) return null
 
   const [title, items] = config
+  const reviewDeal = async item => {
+    const rawRating = window.prompt('Califica este trato del 1 al 5:')
+    if (rawRating === null) return
+    const rating = Number(rawRating)
+    if (!Number.isInteger(rating) || rating < 1 || rating > 5) return setReviewMessage('La calificación debe ser un número entero entre 1 y 5.')
+    const comment = window.prompt('Comentario opcional sobre la experiencia:')
+    if (comment === null) return
+    setReviewing(item.id); setReviewMessage('')
+    const { error } = await supabase.rpc('submit_deal_review', { p_deal_id: item.id, p_rating: rating, p_comment: comment.trim() || null })
+    setReviewing('')
+    setReviewMessage(error ? error.message : 'Gracias. Tu evaluación quedó registrada.')
+  }
   return (
     <div className="profile-sheet-backdrop">
       <section className="profile-sheet" role="dialog" aria-modal="true" aria-label={title}>
@@ -101,8 +118,13 @@ function DetailSheet({ section, posts, favorites, deals, onClose, onNavigate }) 
           <span aria-hidden="true" />
         </header>
         <div className="profile-sheet-list">
+          {reviewMessage && <div className="profile-sheet-message">{reviewMessage}</div>}
           {items.length === 0 && <div className="profile-sheet-empty">Todavía no hay actividad en esta sección.</div>}
           {items.map(item => {
+            if (section === 'events') {
+              const event = item.event || item
+              return <button type="button" className="profile-activity-row" key={item.event_id || event.id} onClick={() => onNavigate?.('eventdetail', { postId: item.event_id || event.id })}><span>{event.images?.[0] ? <img src={event.images[0]} alt="" /> : '📅'}</span><div><strong>{event.title || 'Evento del barrio'}</strong><small>{event.starts_at ? new Date(event.starts_at).toLocaleDateString('es-CL', { day: 'numeric', month: 'long' }) : 'Fecha por confirmar'}</small></div><LineIcon name="chevron" size={17} /></button>
+            }
             if (section === 'posts') {
               return (
                 <button type="button" className="profile-activity-row" key={item.id} onClick={() => onNavigate?.('productdetail', { postId: item.id })}>
@@ -138,13 +160,14 @@ function DetailSheet({ section, posts, favorites, deals, onClose, onNavigate }) 
                 </button>
               )
             }
-            return (
-              <button type="button" className="profile-activity-row" key={item.id} onClick={() => onNavigate?.('productdetail', { postId: item.post_id })}>
+            return <div className="profile-deal-row" key={item.id}>
+              <button type="button" className="profile-activity-row" onClick={() => onNavigate?.('productdetail', { postId: item.post_id })}>
                 <span>{item.post?.images?.[0] ? <img src={item.post.images[0]} alt="" /> : '🤝'}</span>
                 <div><strong>{item.post?.title || 'Publicación del Mercado'}</strong><small>{item.role === 'seller' ? 'Venta' : 'Compra'} · {DEAL_LABELS[item.status] || item.status}</small></div>
                 <LineIcon name="chevron" size={17} />
               </button>
-            )
+              {item.status === 'completed' && <button type="button" className="profile-review-deal" disabled={reviewing === item.id} onClick={() => reviewDeal(item)}>{reviewing === item.id ? 'Guardando…' : '★ Evaluar trato'}</button>}
+            </div>
           })}
         </div>
       </section>
@@ -165,6 +188,7 @@ export default function MyProfile({
   const [posts, setPosts] = useState([])
   const [favorites, setFavorites] = useState([])
   const [deals, setDeals] = useState([])
+  const [followedEvents, setFollowedEvents] = useState([])
   const [loading, setLoading] = useState(true)
   const [section, setSection] = useState('')
 
@@ -187,7 +211,7 @@ export default function MyProfile({
         return
       }
 
-      const [postResult, favoriteResult, postFavoriteResult, dealResult, neighborhoodResult] = await Promise.all([
+      const [postResult, favoriteResult, postFavoriteResult, dealResult, neighborhoodResult, followedEventsResult] = await Promise.all([
         supabase.from('posts').select('id, title, type, status, images, created_at').eq('author_id', loadedProfile.id).order('created_at', { ascending: false }).limit(40),
         supabase.from('commerce_favorites').select('commerce_id').eq('profile_id', loadedProfile.id),
         supabase.from('post_likes').select('post_id').eq('user_id', currentUser.id),
@@ -195,6 +219,7 @@ export default function MyProfile({
         loadedProfile.neighborhood_id
           ? supabase.from('neighborhoods').select('name').eq('id', loadedProfile.neighborhood_id).maybeSingle()
           : Promise.resolve({ data: null }),
+        supabase.from('event_follows').select('event_id, created_at, event:posts!event_id(id,title,images,starts_at,status)').eq('profile_id', loadedProfile.id).order('created_at', { ascending: false }),
       ])
       if (!active) return
       const loadedPosts = postResult.data || []
@@ -226,6 +251,7 @@ export default function MyProfile({
         role: item.seller_id === loadedProfile.id ? 'seller' : 'buyer',
         post: dealPosts.get(item.post_id),
       })))
+      setFollowedEvents((followedEventsResult.data || []).filter(item => item.event?.status === 'active'))
       setNeighborhoodName(neighborhoodResult.data?.name || loadedProfile.neighborhood_name || loadedProfile.barrio || '')
       setLoading(false)
     }
@@ -302,12 +328,15 @@ export default function MyProfile({
         </section>
 
         <section className="profile-menu">
+          <MenuRow icon="search" tone="#e5f5ef" title="Buscar en El Barrio" subtitle="Publicaciones, servicios, comercios y eventos" onClick={() => onNavigate?.('search')} />
           <MenuRow icon="settings" tone="#e5f5ef" title="Editar mi perfil" onClick={() => onNavigate?.('editprofile')} />
           <MenuRow icon="post" tone="#e5f5ef" title="Mis publicaciones" count={posts.length} onClick={() => setSection('posts')} />
           <MenuRow icon="heart" tone="#f3e8ff" title="Mis favoritos" count={favorites.length} onClick={() => setSection('favorites')} />
           <MenuRow icon="deals" tone="#e7f3f6" title="Mis compras y ventas" count={deals.length} onClick={() => setSection('deals')} />
+          <MenuRow icon="post" tone="#fff7dc" title="Eventos guardados" count={followedEvents.length} onClick={() => setSection('events')} />
           <MenuRow icon="users" tone="#e8f5ec" title="Invitar vecinos" onClick={() => onNavigate?.('invite')} />
           <MenuRow icon="whatsapp" tone="#e4f8ed" title="Hablemos por WhatsApp" onClick={() => openWhatsApp('Hola El Barrio, necesito ayuda.')} />
+          <MenuRow icon="bell" tone="#fff7dc" title="Preferencias de notificaciones" subtitle="Elige qué avisos llegan a tu teléfono" onClick={() => onNavigate?.('notificationpreferences')} />
           <MenuRow
             icon="accessible"
             tone="#fff0e5"
@@ -324,7 +353,7 @@ export default function MyProfile({
         <div className="profile-bottom-space" />
       </div>
 
-      <DetailSheet section={section} posts={posts} favorites={favorites} deals={deals} onClose={() => setSection('')} onNavigate={onNavigate} />
+      <DetailSheet section={section} posts={section === 'events' ? followedEvents : posts} favorites={favorites} deals={deals} onClose={() => setSection('')} onNavigate={onNavigate} />
     </div>
   )
 }
@@ -340,6 +369,7 @@ const PROFILE_CSS = `
 .profile-menu{background:#fff;border:1px solid #dce2de;border-radius:16px;overflow:hidden}.profile-menu-row{width:100%;min-height:64px;padding:9px 14px;display:flex;align-items:center;gap:12px;border-bottom:1px solid #e7ebe8;color:#1d211f;text-align:left}.profile-menu-row:last-child{border:0}.profile-menu-icon{width:36px;height:36px;border-radius:11px;display:grid;place-items:center;flex:0 0 auto;color:#159969}.profile-menu-copy{flex:1;min-width:0}.profile-menu-copy strong{display:block;font-size:14px;font-weight:700}.profile-menu-copy small{display:block;margin-top:2px;color:#7c858d;font-size:10px}.profile-menu-count{font-size:12px;color:#657078}.profile-menu-row>svg{color:#6f7a82}.profile-menu-row.is-danger{color:#ef3340}.profile-switch{width:38px;height:22px;padding:3px;border-radius:999px;background:#cfd6d2;transition:background .2s}.profile-switch i{display:block;width:16px;height:16px;border-radius:50%;background:#fff;transition:transform .2s;box-shadow:0 1px 3px rgba(0,0,0,.2)}.profile-switch.is-on{background:#159969}.profile-switch.is-on i{transform:translateX(16px)}.profile-bottom-space{height:18px}
 .profile-sheet-backdrop{position:absolute;inset:0;z-index:120;background:#f7faf7}.profile-sheet{width:100%;height:100%;min-height:0;background:#f7faf7;display:flex;flex-direction:column;animation:profilePageIn .24s cubic-bezier(.22,1,.36,1)}.profile-sheet header{min-height:var(--screen-header-height);padding:calc(env(safe-area-inset-top, 0px) + 22px) 16px 16px;display:grid;grid-template-columns:38px 1fr 38px;align-items:center;gap:10px;background:#fff;border-bottom:1px solid #e1e7e3;box-sizing:border-box}.profile-sheet header>div{text-align:center}.profile-sheet header>span{width:38px}.profile-sheet header small{display:block;color:#159969;font-size:9px;font-weight:700}.profile-sheet header h2{margin:2px 0 0;font-size:16px;font-weight:600}.profile-sheet header button{width:38px;height:38px;border-radius:50%;display:grid;place-items:center;background:#f7faf7;border:1px solid #dce2de;color:#1d211f}.profile-sheet-list{flex:1;min-height:0;overflow:auto;padding:14px 16px 110px;overscroll-behavior:contain}.profile-activity-row{width:100%;min-height:72px;display:flex;align-items:center;gap:11px;padding:10px 8px;border-bottom:1px solid #e1e7e3;text-align:left;color:#1d211f}.profile-activity-row>span:first-child{width:50px;height:50px;border-radius:12px;overflow:hidden;background:#e5f5ef;display:grid;place-items:center;flex:0 0 auto}.profile-activity-row img{width:100%;height:100%;object-fit:cover}.profile-activity-row div{flex:1;min-width:0}.profile-activity-row strong,.profile-activity-row small{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.profile-activity-row strong{font-size:12px}.profile-activity-row small{margin-top:4px;color:#68727b;font-size:9.5px}.profile-sheet-empty{margin-top:14px;padding:28px 20px;text-align:center;color:#68727b;font-size:12px;line-height:1.5;background:#fff;border:1px solid #dce2de;border-radius:16px}
 .profile-favorite-card{position:relative;width:100%;display:grid;grid-template-columns:96px minmax(0,1fr);min-height:112px;margin-bottom:12px;padding:8px;text-align:left;color:inherit;background:#fff;border:1px solid #dce2de;border-radius:17px;overflow:hidden;box-shadow:0 5px 16px rgba(31,63,46,.06);cursor:pointer}.profile-favorite-card:focus-visible{outline:3px solid #159969;outline-offset:2px}.profile-favorite-cover{width:96px;height:96px;display:grid;place-items:center;overflow:hidden;border-radius:12px;background:#e5f5ef;font-size:30px}.profile-favorite-cover img{width:100%;height:100%;object-fit:cover}.profile-favorite-copy{min-width:0;padding:10px 35px 8px 13px;align-self:center}.profile-favorite-copy small,.profile-favorite-copy strong,.profile-favorite-copy>span{display:block}.profile-favorite-copy small{color:#159969;font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.04em}.profile-favorite-copy strong{margin-top:5px;color:#1d211f;font-size:15px;line-height:1.25;white-space:normal}.profile-favorite-copy>span{margin-top:6px;color:#68727b;font-size:11px;line-height:1.35}.profile-favorite-heart{position:absolute;top:13px;right:13px;color:#8b5cf6;font-size:18px;line-height:1}
+.profile-sheet-message{margin-bottom:10px;padding:10px 12px;border-radius:11px;background:#e8f7f1;color:#116e50;font-size:11px;font-weight:700}.profile-deal-row{margin-bottom:8px;border-bottom:1px solid #e1e7e3}.profile-deal-row .profile-activity-row{border-bottom:0}.profile-review-deal{margin:0 8px 10px 69px;padding:7px 11px;border:1px solid #b9dfd0;border-radius:9px;background:#eff9f5;color:#147653;font-size:10px;font-weight:800}
 @keyframes profilePageIn{from{transform:translate3d(36px,0,0);opacity:.72}to{transform:translate3d(0,0,0);opacity:1}}
 @media(max-width:500px){.profile-scroll{padding-top:max(28px,env(safe-area-inset-top))}}
 @media(prefers-reduced-motion:reduce){.profile-sheet,.profile-progress i,.profile-switch,.profile-switch i{animation:none;transition:none}}

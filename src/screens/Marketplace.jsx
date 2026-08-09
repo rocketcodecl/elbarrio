@@ -243,6 +243,7 @@ export default function Marketplace({ currentUser, onNavigate, onCrear }) {
 
   const nav = onNavigate || (() => {})
   const neighborhoodId = currentUser?.neighborhoodId
+  const currentProfileId = currentUser?.profileId
 
   useEffect(() => { getContentCategories('marketplace', CATEGORIAS).then(setCategories) }, [])
 
@@ -273,18 +274,22 @@ export default function Marketplace({ currentUser, onNavigate, onCrear }) {
       .order('created_at', { ascending: false })
       .limit(60)
 
-    const { data, error } = await query
+    const [{ data, error }, { data: blocks }] = await Promise.all([
+      query,
+      currentProfileId ? supabase.from('user_blocks').select('blocked_id').eq('blocker_id', currentProfileId) : Promise.resolve({ data: [] }),
+    ])
     if (error) {
       console.error('Error marketplace:', error)
       setPosts([])
       setLoadError('No pudimos cargar las publicaciones de tu barrio.')
     } else {
-      setPosts(data || [])
+      const blocked = new Set((blocks || []).map(item => item.blocked_id))
+      setPosts((data || []).filter(item => !blocked.has(item.author_id)))
     }
     setNewFromRT(0)
     setLoading(false)
     setRefreshing(false)
-  }, [neighborhoodId])
+  }, [currentProfileId, neighborhoodId])
 
   useEffect(() => {
     fetchMarketplace()

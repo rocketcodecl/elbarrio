@@ -34,6 +34,8 @@ import ServiceDetail from './screens/ServiceDetail'
 import Events from './screens/Events'
 import EventDetail from './screens/EventDetail'
 import Notifications from './screens/Notifications'
+import NotificationPreferences from './screens/NotificationPreferences'
+import Search from './screens/Search'
 import AlertaDetail from './screens/AlertaDetail'
 import NeighborhoodMap from './screens/NeighborhoodMap'
 
@@ -326,7 +328,7 @@ export default function App() {
       return
     }
 
-    const subScreens = ['post', 'productdetail', 'servicedetail', 'eventdetail', 'chatconversation', 'dealdone', 'alerta', 'notificaciones', 'mapa', 'sellerprofile', 'noticias', 'admin', 'adminfarmacias', 'admincomercios', 'adminusuarios', 'adminincidentes', 'settings', 'editprofile', 'about', 'terms', 'privacy', 'prohibited', 'invite', 'contact', 'deleteaccount']
+    const subScreens = ['post', 'productdetail', 'servicedetail', 'eventdetail', 'chatconversation', 'dealdone', 'alerta', 'notificaciones', 'notificationpreferences', 'search', 'mapa', 'sellerprofile', 'noticias', 'admin', 'adminfarmacias', 'admincomercios', 'adminusuarios', 'adminincidentes', 'settings', 'editprofile', 'about', 'terms', 'privacy', 'prohibited', 'invite', 'contact', 'deleteaccount']
     if (subScreens.includes(lower)) {
       setNavigationMotion('forward')
       historyRef.current.push({ screen: currentScreen, tab: activeTabRef.current, params })
@@ -358,6 +360,10 @@ export default function App() {
       setCurrentScreen('alertaDetail')
     } else if (lower === 'notificaciones') {
       setCurrentScreen('notificaciones')
+    } else if (lower === 'notificationpreferences') {
+      setCurrentScreen('notificationPreferences')
+    } else if (lower === 'search') {
+      setCurrentScreen('search')
     } else if (lower === 'mapa') {
       setCurrentScreen('neighborhoodMap')
     } else if (lower === 'sellerprofile') {
@@ -670,6 +676,7 @@ export default function App() {
         <EventDetail
           postId={params?.postId}
           neighborhoodId={profile?.neighborhood_id}
+          profileId={profile?.id}
           onNavigate={onNavigate}
         />
       )
@@ -703,6 +710,8 @@ export default function App() {
     if (currentScreen === 'notificaciones') {
       return <Notifications currentUser={{ ...user, profileId: profile?.id }} onNavigate={onNavigate} />
     }
+    if (currentScreen === 'notificationPreferences') return <NotificationPreferences profileId={profile?.id} onNavigate={onNavigate} />
+    if (currentScreen === 'search') return <Search currentUser={{ ...user, profileId: profile?.id, neighborhoodId: profile?.neighborhood_id }} onNavigate={onNavigate} />
     if (currentScreen === 'neighborhoodMap') {
       return <NeighborhoodMap currentUser={user} neighborhoodId={profile?.neighborhood_id} onNavigate={onNavigate} />
     }

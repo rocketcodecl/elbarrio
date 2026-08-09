@@ -344,6 +344,10 @@ function CreatePost({ onClose, onPublished, startWith, existingPost = null }) {
   const [eventStartsAt, setEventStartsAt] = useState(
     existingPost?.starts_at ? new Date(existingPost.starts_at).toISOString().slice(0, 16) : ''
   )
+  const [eventRecurrence, setEventRecurrence] = useState(existingPost?.event_recurrence || 'none')
+  const [eventRecurrenceUntil, setEventRecurrenceUntil] = useState(
+    existingPost?.recurrence_until ? new Date(existingPost.recurrence_until).toISOString().slice(0, 10) : ''
+  )
   const [eventEntryType, setEventEntryType] = useState(existingPost?.event_entry_type || 'free')
   const [eventPrice, setEventPrice] = useState(existingPost?.event_price ? Number(existingPost.event_price).toLocaleString('es-CL') : '')
   const [eventPetFriendly, setEventPetFriendly] = useState(existingPost?.event_pet_friendly === true)
@@ -730,6 +734,8 @@ function CreatePost({ onClose, onPublished, startWith, existingPost = null }) {
       if (!eventType) return setError('Elige un tipo de evento')
       if (!eventStartsAt) return setError('Indica la fecha y hora')
       if (new Date(eventStartsAt).getTime() <= Date.now()) return setError('La fecha debe ser futura')
+      if (eventRecurrence !== 'none' && !eventRecurrenceUntil) return setError('Indica hasta cuándo se repite el evento')
+      if (eventRecurrenceUntil && new Date(eventRecurrenceUntil).getTime() < new Date(eventStartsAt).getTime()) return setError('La fecha final debe ser posterior al primer evento')
       if (!alertLocation.trim()) return setError('Indica dónde será')
       if (!content.trim()) return setError('Cuenta de qué se trata')
       if (eventEntryType === 'paid' && !eventPrice) return setError('Indica el valor de la entrada')
@@ -869,6 +875,10 @@ function CreatePost({ onClose, onPublished, startWith, existingPost = null }) {
       } else if (t === 'event') {
         post.category = eventType
         post.starts_at = new Date(eventStartsAt).toISOString()
+        post.event_recurrence = eventRecurrence
+        post.recurrence_until = eventRecurrence !== 'none' && eventRecurrenceUntil
+          ? new Date(`${eventRecurrenceUntil}T23:59:59`).toISOString()
+          : null
         post.location_text = alertLocation.trim()
         post.lat = pinCoords?.lat || null
         post.lng = pinCoords?.lng || null
@@ -1216,6 +1226,15 @@ function CreatePost({ onClose, onPublished, startWith, existingPost = null }) {
               onChange={onTitleChange}
               style={s.input}
             />
+
+            <label style={s.label}>¿Se repite?</label>
+            <select value={eventRecurrence} onChange={(event) => setEventRecurrence(event.target.value)} style={s.input}>
+              <option value="none">No, ocurre una vez</option>
+              <option value="weekly">Cada semana</option>
+              <option value="biweekly">Cada dos semanas</option>
+              <option value="monthly">Cada mes</option>
+            </select>
+            {eventRecurrence !== 'none' && <><label style={s.label}>Repetir hasta</label><input type="date" min={eventStartsAt ? eventStartsAt.slice(0, 10) : new Date().toISOString().slice(0, 10)} value={eventRecurrenceUntil} onChange={(event) => setEventRecurrenceUntil(event.target.value)} style={s.input} /></>}
             <CharCounter value={title.length} max={TITLE_MAX} />
 
             <label style={s.label}>¿Qué pasó?</label>

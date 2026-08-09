@@ -72,13 +72,14 @@ const Icon = {
 const TABS = [
   { id: 'todos',     label: 'Todos',     emoji: '🔎' },
   { id: 'posts',     label: 'Marketplace', emoji: '🏷️' },
+  { id: 'servicios', label: 'Servicios', emoji: '🛠️' },
   { id: 'comercios', label: 'Comercios', emoji: '🏪' },
   { id: 'eventos',   label: 'Eventos',   emoji: '📅' },
   { id: 'vecinos',   label: 'Vecinos',   emoji: '👥' },
 ]
 
 // ---- Tipos de posts que SÍ queremos en búsqueda (excluye alertas y avisos) ----
-const POST_TYPES = ['sell', 'venta', 'vender', 'gift', 'regalo', 'regalar', 'trade', 'trueque', 'intercambio', 'request', 'event']
+const POST_TYPES = ['sell', 'venta', 'vender', 'gift', 'regalo', 'regalar', 'trade', 'trueque', 'intercambio', 'request']
 
 // ---- Sugerencias trending (chips rápidos) ----
 const SUGERENCIAS = [
@@ -110,7 +111,7 @@ export default function Search({ currentUser, onNavigate }) {
   const [debouncedQuery, setDebouncedQuery] = useState('')
   const [activeTab, setActiveTab] = useState('todos')
   const [loading, setLoading] = useState(false)
-  const [results, setResults] = useState({ posts: [], comercios: [], eventos: [], vecinos: [] })
+  const [results, setResults] = useState({ posts: [], servicios: [], comercios: [], eventos: [], vecinos: [] })
   const [recentSearches, setRecentSearches] = useState([])
   const [hasSearched, setHasSearched] = useState(false)
   const inputRef = useRef(null)
@@ -135,7 +136,7 @@ export default function Search({ currentUser, onNavigate }) {
     if (!q) {
       setDebouncedQuery('')
       setHasSearched(false)
-      setResults({ posts: [], comercios: [], eventos: [], vecinos: [] })
+      setResults({ posts: [], servicios: [], comercios: [], eventos: [], vecinos: [] })
       return
     }
     debounceRef.current = setTimeout(() => {
@@ -171,70 +172,69 @@ export default function Search({ currentUser, onNavigate }) {
     if (!q) return
     setLoading(true)
     const like = `%${q}%`
-    const lowerQ = q.toLowerCase()
 
     // Filtramos por barrio del usuario si tiene neighborhood_id
     const { data: { user } } = await supabase.auth.getUser().catch(() => ({ data: { user: null } }))
-    let hoodId = null
-    if (user) {
+    let hoodId = currentUser?.neighborhoodId || null
+    let profileId = currentUser?.profileId || null
+    if (user && (!hoodId || !profileId)) {
       const { data: prof } = await supabase
         .from('profiles')
-        .select('neighborhood_id')
+        .select('id, neighborhood_id')
         .eq('user_id', user.id)
         .maybeSingle()
       hoodId = prof?.neighborhood_id || null
+      profileId = prof?.id || profileId
     }
+    const { data: blockRows } = profileId
+      ? await supabase.from('user_blocks').select('blocked_id').eq('blocker_id', profileId)
+      : { data: [] }
+    const blocked = new Set((blockRows || []).map(item => item.blocked_id))
 
-    // Lanzamos las 4 queries en paralelo
-    const [postsRes, comerciosRes, eventosRes, vecinosRes] = await Promise.all([
+    // Lanzamos las búsquedas en paralelo y acotadas al barrio verificado.
+    let postsQuery = supabase
+      .from('posts')
+      .select(`*, author:profiles!author_id (full_name, avatar_url, reputation_score, badge_founder, badge_trusted_seller)`)
+      .in('type', POST_TYPES).eq('status', 'active').or(`title.ilike.${like},content.ilike.${like}`).order('created_at', { ascending: false }).limit(20)
+    let servicesQuery = supabase
+      .from('posts')
+      .select(`*, author:profiles!author_id (full_name, avatar_url, reputation_score, verification_status)`)
+      .eq('type', 'service').eq('status', 'active').or(`title.ilike.${like},content.ilike.${like}`).order('is_featured', { ascending: false }).limit(15)
+    let commercesQuery = supabase.from('commerces').select('*').eq('is_active', true).or(`name.ilike.${like},description.ilike.${like}`).order('is_premium', { ascending: false }).order('rating', { ascending: false }).limit(10)
+    let eventsQuery = supabase.from('posts').select(`*, author:profiles!author_id (full_name, avatar_url)`).eq('type', 'event').eq('status', 'active').gte('starts_at', new Date().toISOString()).or(`title.ilike.${like},content.ilike.${like}`).order('starts_at', { ascending: true }).limit(10)
+    let neighborsQuery = supabase.from('profiles').select('id, user_id, full_name, avatar_url, reputation_score, badge_founder, badge_trusted_seller, member_since, total_sales, total_gifts, is_official_actor, official_actor_name').not('full_name', 'is', null).ilike('full_name', like).limit(10)
+    if (hoodId) {
+      postsQuery = postsQuery.eq('neighborhood_id', hoodId)
+      servicesQuery = servicesQuery.eq('neighborhood_id', hoodId)
+      commercesQuery = commercesQuery.eq('neighborhood_id', hoodId)
+      eventsQuery = eventsQuery.eq('neighborhood_id', hoodId)
+      neighborsQuery = neighborsQuery.eq('neighborhood_id', hoodId)
+    }
+    const [postsRes, servicesRes, comerciosRes, eventosRes, vecinosRes] = await Promise.all([
       // POSTS (venta/regalo/trueque/pedidos/eventos — no alertas)
-      supabase
-        .from('posts')
-        .select(`*, author:profiles!author_id (full_name, avatar_url, reputation_score, badge_founder, badge_trusted_seller)`)
-        .in('type', POST_TYPES)
-        .eq('status', 'active')
-        .or(`title.ilike.${like},content.ilike.${like}`)
-        .order('created_at', { ascending: false })
-        .limit(20),
+      postsQuery,
+
+      servicesQuery,
 
       // COMERCIOS
-      supabase
-        .from('commerces')
-        .select('*')
-        .eq('is_active', true)
-        .or(`name.ilike.${like},description.ilike.${like}`)
-        .order('is_premium', { ascending: false })
-        .order('rating', { ascending: false })
-        .limit(10),
+      commercesQuery,
 
       // EVENTOS (posts tipo event con starts_at futura)
-      supabase
-        .from('posts')
-        .select(`*, author:profiles!author_id (full_name, avatar_url)`)
-        .eq('type', 'event')
-        .eq('status', 'active')
-        .gte('starts_at', new Date().toISOString())
-        .or(`title.ilike.${like},content.ilike.${like}`)
-        .order('starts_at', { ascending: true })
-        .limit(10),
+      eventsQuery,
 
       // VECINOS (profiles con nombre que coincida)
-      supabase
-        .from('profiles')
-        .select('id, user_id, full_name, avatar_url, reputation_score, badge_founder, badge_trusted_seller, member_since, total_sales, total_gifts')
-        .not('full_name', 'is', null)
-        .ilike('full_name', like)
-        .limit(10),
+      neighborsQuery,
     ])
 
     setResults({
-      posts: postsRes.data || [],
+      posts: (postsRes.data || []).filter(item => !blocked.has(item.author_id)),
+      servicios: (servicesRes.data || []).filter(item => !blocked.has(item.author_id)),
       comercios: comerciosRes.data || [],
       eventos: eventosRes.data || [],
-      vecinos: vecinosRes.data || [],
+      vecinos: (vecinosRes.data || []).filter(item => !blocked.has(item.id)),
     })
     setLoading(false)
-  }, [])
+  }, [currentUser?.neighborhoodId, currentUser?.profileId])
 
   // ---- Disparar búsqueda cuando cambia debouncedQuery ----
   useEffect(() => {
@@ -243,13 +243,14 @@ export default function Search({ currentUser, onNavigate }) {
 
   // ---- Click en resultado ----
   const goPost = (p) => nav('productdetail', { postId: p.id })
-  const goComercio = (c) => nav('comercios') // por ahora: vuelve al directorio filtrado
-  const goEvento = (e) => nav('productdetail', { postId: e.id })
-  const goVecino = (v) => nav('sellerprofile', { userId: v.user_id || v.id })
+  const goServicio = (service) => nav('servicedetail', { postId: service.id })
+  const goComercio = (c) => nav('comercios', { commerceId: c.id })
+  const goEvento = (e) => nav('eventdetail', { postId: e.id })
+  const goVecino = (v) => nav('sellerprofile', { sellerId: v.id || v.user_id })
 
   // ---- Conteo total de resultados ----
   const totalCount =
-    results.posts.length + results.comercios.length +
+    results.posts.length + results.servicios.length + results.comercios.length +
     results.eventos.length + results.vecinos.length
 
   // ============================================================
@@ -303,6 +304,7 @@ export default function Search({ currentUser, onNavigate }) {
               {TABS.map(t => {
                 const count =
                   t.id === 'posts' ? results.posts.length :
+                  t.id === 'servicios' ? results.servicios.length :
                   t.id === 'comercios' ? results.comercios.length :
                   t.id === 'eventos' ? results.eventos.length :
                   t.id === 'vecinos' ? results.vecinos.length :
@@ -366,6 +368,10 @@ export default function Search({ currentUser, onNavigate }) {
                 onSeeAll={activeTab === 'todos' && results.comercios.length > 5 ? () => setActiveTab('comercios') : null}
                 emptyText="No hay comercios que coincidan."
               />
+            )}
+
+            {(activeTab === 'todos' || activeTab === 'servicios') && (
+              <SeccionResultados titulo="Servicios" emoji="🛠️" items={results.servicios} loading={loading} showCount={activeTab === 'todos'} render={(service) => <PostRow key={service.id} post={service} onClick={() => goServicio(service)} />} onSeeAll={activeTab === 'todos' && results.servicios.length > 5 ? () => setActiveTab('servicios') : null} emptyText="No hay servicios que coincidan." />
             )}
 
             {(activeTab === 'todos' || activeTab === 'eventos') && (

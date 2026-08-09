@@ -4,6 +4,7 @@ import {
   C, T, TIPOS, REPORTES, FARMACIAS,
   iniciales, hace, plata, saludo,
 } from '../lib/design'
+import CommunityImpact from '../components/CommunityImpact'
 
 /*
   INICIO — el Radar del barrio.
@@ -380,25 +381,28 @@ const mezclarPortada = (items, limit = 10) => {
 // cambia su orden en cada carga para que Inicio se sienta vivo.
 const mezclarActividadRelevante = (items, limit = 30) => {
   const unique = [...new Map(items.map(item => [item.id, item])).values()]
-  const recent = [...unique]
-    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-    .slice(0, Math.max(18, limit))
-  const viewed = [...unique]
-    .sort((a, b) => Number(b.views_count || 0) - Number(a.views_count || 0))
-    .slice(0, Math.max(18, limit))
-  const relevant = [...new Map([...recent, ...viewed].map(item => [item.id, item])).values()]
-  const shuffled = mezclarPortada(relevant, relevant.length)
+  const now = Date.now()
+  const shuffled = unique.map(item => {
+    const hours = Math.max(0, (now - new Date(item.created_at).getTime()) / 3600000)
+    const freshness = Math.max(0, 42 - Math.log2(hours + 1) * 7)
+    const engagement = Math.min(24, Math.log2(Number(item.views_count || 0) + 1) * 4 + Math.log2(Number(item.comments_count || 0) + 1) * 5)
+    const urgency = item.__incident ? 34 : item.type === 'request' ? 14 : 0
+    return { item, score: freshness + engagement + urgency + Math.random() * 18 }
+  }).sort((a,b)=>b.score-a.score).map(entry=>entry.item)
   const visible = []
   const deferred = []
   let alertCount = 0
+  let lastType = ''
 
   // Las alertas siguen presentes y urgentes, pero no pueden monopolizar la
   // primera pantalla cuando también hay actividad real de vecinos o Mercado.
   shuffled.forEach((item) => {
-    if (item.__incident && alertCount >= 2) deferred.push(item)
+    const kind=item.__incident?'incident':item.type
+    if ((item.__incident && alertCount >= 2) || (kind===lastType && visible.length<12)) deferred.push(item)
     else {
       visible.push(item)
       if (item.__incident) alertCount += 1
+      lastType=kind
     }
   })
   return [...visible, ...deferred].slice(0, limit)
@@ -621,16 +625,16 @@ function Home({ currentUser, onNavigate, onCrear }) {
       // Unificamos pedidos/ventas/regalos/eventos/actividad en UNA sola
       // query a posts con type IN (...) y limit alto. Particionamos en JS.
       const TIPOS_FEED = ['request', 'sell', 'gift', 'trade', 'event', 'news', 'general']
-      const selectPost = '*, author:profiles!author_id (full_name, avatar_url, badge_founder, verified)'
+      const selectPost = '*, author:profiles!author_id (full_name, avatar_url, badge_founder, verified, is_official_actor, official_actor_name)'
 
-      const [profileRes, hoodRes, alertRes, postsRes, msgRes, spotlightRes, carouselRes] = await Promise.all([
+      const [profileRes, hoodRes, alertRes, postsRes, msgRes, spotlightRes, carouselRes, blocksRes] = await Promise.all([
         // Refresca el profile en background si lo teníamos del cache.
         cache ? profilePromise : Promise.resolve({ data: p }),
         supabase.from('neighborhoods').select('*')
           .eq('id', neighborhoodId).maybeSingle(),
 
         supabase.from('incident_reports')
-          .select('*, reporter:profiles!reporter_id (full_name, avatar_url, badge_founder)')
+          .select('*, reporter:profiles!reporter_id (full_name, avatar_url, badge_founder, is_official_actor, official_actor_name)')
           .eq('neighborhood_id', neighborhoodId)
           .eq('status', 'active')
           .order('confirms_count', { ascending: false })
@@ -669,6 +673,7 @@ function Home({ currentUser, onNavigate, onCrear }) {
           .not('home_carousel_order', 'is', null)
           .order('home_carousel_order', { ascending: true })
           .limit(15),
+        supabase.from('user_blocks').select('blocked_id').eq('blocker_id', p.id),
       ])
 
       if (hoodRes.error) throw hoodRes.error
@@ -685,6 +690,9 @@ function Home({ currentUser, onNavigate, onCrear }) {
       // Si el profile refrescado trae datos nuevos, los usamos.
       const profileFresco = profileRes?.data || p
       if (profileFresco && profileFresco !== p) setProfile(profileFresco)
+      supabase.rpc('deliver_my_due_event_reminders').then(({ error: reminderError }) => {
+        if (reminderError) console.warn('[home] recordatorios de eventos no disponibles:', reminderError.message)
+      })
 
       setBarrio(hoodRes.data)
 
@@ -696,8 +704,10 @@ function Home({ currentUser, onNavigate, onCrear }) {
         console.error('[el barrio] Error cargando alertas:', alertRes.error)
         setFeedError('La actividad cargó, pero no pudimos actualizar las alertas.')
       }
+      const blockedIds = new Set((blocksRes.data || []).map(item => item.blocked_id))
       const ahoraMs = Date.now()
       const todasLasAlertas = (alertRes.data || []).filter((a) => {
+        if (blockedIds.has(a.reporter_id)) return false
         if (!a.expires_at) return true
         return new Date(a.expires_at).getTime() > ahoraMs
       })
@@ -708,7 +718,7 @@ function Home({ currentUser, onNavigate, onCrear }) {
       setAlertasVecinales(alertasVecinalesActivas)
 
       // ── Particionar posts por type (en vez de 6 queries) ──
-      const todos = postsRes.data || []
+      const todos = (postsRes.data || []).filter(item => !blockedIds.has(item.author_id))
       const ahora = Date.now()
       const pedidosActivos = todos
         .filter((x) => x.type === 'request' && (!x.needed_by || new Date(x.needed_by).getTime() > ahora))
@@ -1183,6 +1193,8 @@ function Home({ currentUser, onNavigate, onCrear }) {
           </div>
         )}
 
+        {!buscando && <CommunityImpact />}
+
         {/* ══════ ACTIVIDAD DE EL BARRIO (vertical, 10 + "+ ver más") ══════
             Feed principal — publicaciones generales de vecinos.
             Ahora queda ARRIBA de Eventos para que no se pierda. */}
@@ -1238,8 +1250,9 @@ function Home({ currentUser, onNavigate, onCrear }) {
                         </span>
                         <span style={s.postAutorTop}>
                           <span style={s.postAutorSep}>|</span>
-                          <span>Por {(p.author?.full_name || 'Vecino').split(' ')[0]}</span>
+                          <span>Por {(p.author?.official_actor_name || p.author?.full_name || 'Vecino').split(' ')[0]}</span>
                           {p.author?.verified && <span style={s.verificadoMini}>✓</span>}
+                          {p.author?.is_official_actor && <span style={s.verificadoMini}>OFICIAL</span>}
                           {p.author?.badge_founder && <span style={s.fundadorBadge} title="Vecino fundador" aria-label="Vecino fundador">🏅</span>}
                           <span>· {hace(p.created_at)}</span>
                         </span>

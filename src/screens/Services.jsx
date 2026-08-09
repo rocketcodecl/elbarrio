@@ -181,6 +181,7 @@ export default function Services({ currentUser, onNavigate, onCrear }) {
   const [refreshing, setRefreshing] = useState(false)
 
   const nav = onNavigate || (() => {})
+  const currentProfileId = currentUser?.profileId
   const fetchServices = useCallback(async () => {
     if (!SERVICES_CACHE.has(neighborhoodId)) setLoading(true)
     setError(null)
@@ -198,9 +199,13 @@ export default function Services({ currentUser, onNavigate, onCrear }) {
         .eq('status', 'active')
         .eq('neighborhood_id', neighborhoodId)
       q = q.order('created_at', { ascending: false }).limit(40)
-      const { data, error: e } = await q
+      const [{ data, error: e }, { data: blocks }] = await Promise.all([
+        q,
+        currentProfileId ? supabase.from('user_blocks').select('blocked_id').eq('blocker_id', currentProfileId) : Promise.resolve({ data: [] }),
+      ])
       if (e) throw e
-      const nextServices = data || []
+      const blocked = new Set((blocks || []).map(item => item.blocked_id))
+      const nextServices = (data || []).filter(item => !blocked.has(item.author_id))
       const order = nextServices.filter(isFeaturedActive).map(service => service.id)
       for (let index = order.length - 1; index > 0; index -= 1) {
         const randomIndex = Math.floor(Math.random() * (index + 1))
@@ -216,7 +221,7 @@ export default function Services({ currentUser, onNavigate, onCrear }) {
     } finally {
       setLoading(false)
     }
-  }, [neighborhoodId])
+  }, [currentProfileId, neighborhoodId])
 
   useEffect(() => {
     fetchServices()

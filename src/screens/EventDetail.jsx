@@ -30,11 +30,13 @@ const formatSchedule = (startsAt, endsAt) => {
   return `${start}–${end} hrs`
 }
 
-export default function EventDetail({ postId, neighborhoodId, onNavigate }) {
+export default function EventDetail({ postId, neighborhoodId, profileId, onNavigate }) {
   const [event, setEvent] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [categories, setCategories] = useState({})
+  const [following, setFollowing] = useState(false)
+  const [followSaving, setFollowSaving] = useState(false)
   const nav = onNavigate || (() => {})
 
   useEffect(() => {
@@ -70,6 +72,22 @@ export default function EventDetail({ postId, neighborhoodId, onNavigate }) {
     load()
     return () => { active = false }
   }, [postId, neighborhoodId])
+
+  useEffect(() => {
+    if (!postId || !profileId) return
+    supabase.from('event_follows').select('event_id').eq('event_id', postId).eq('profile_id', profileId).maybeSingle().then(({ data }) => setFollowing(!!data))
+  }, [postId, profileId])
+
+  const toggleFollow = async () => {
+    if (!profileId || followSaving) return
+    const next = !following
+    setFollowing(next); setFollowSaving(true)
+    const { error: followError } = next
+      ? await supabase.from('event_follows').upsert({ event_id: postId, profile_id: profileId, reminder_enabled: true })
+      : await supabase.from('event_follows').delete().eq('event_id', postId).eq('profile_id', profileId)
+    setFollowSaving(false)
+    if (followError) setFollowing(!next)
+  }
 
   const share = async () => {
     const data = { title: event?.title || 'Evento del barrio', text: `${event?.title || 'Evento'} en El Barrio`, url: window.location.href }
@@ -112,6 +130,7 @@ export default function EventDetail({ postId, neighborhoodId, onNavigate }) {
         <section style={s.summary}>
           <div style={s.badges}><span style={s.primaryBadge}>{category[1]} {category[0]}</span></div>
           <h1 style={s.title}>{event.title || 'Evento del barrio'}</h1>
+          {event.event_recurrence && event.event_recurrence !== 'none' && <div style={s.recurring}>↻ {event.event_recurrence === 'weekly' ? 'Todas las semanas' : event.event_recurrence === 'biweekly' ? 'Cada dos semanas' : 'Todos los meses'}</div>}
           <div style={s.infoRow}><span style={s.infoIcon}><Calendar /></span><span>{formatSchedule(event.starts_at, event.ends_at)}</span></div>
           <div style={s.infoRow}><span style={s.infoIcon}><Pin /></span><span>{event.location_text || 'Lugar por confirmar'}</span></div>
         </section>
@@ -119,6 +138,7 @@ export default function EventDetail({ postId, neighborhoodId, onNavigate }) {
         <section style={s.section}>
           <h2 style={s.sectionTitle}>Acerca del evento</h2>
           <p style={s.description}>{event.content || 'El organizador todavía no agregó una descripción.'}</p>
+          <button type="button" style={{ ...s.followButton, ...(following ? s.followButtonActive : {}) }} onClick={toggleFollow} disabled={followSaving}>{following ? '✓ Guardado · te avisaremos antes' : '+ Seguir este evento'}</button>
           <div style={s.features}>
             {event.event_entry_type === 'paid'
               ? ticketPrices.map((ticket, index) => <span style={s.featureChip} key={`${ticket.label}-${index}`}>🎟️ {ticket.label || 'Entrada'} · ${Number(ticket.price || 0).toLocaleString('es-CL')}</span>)
@@ -162,11 +182,14 @@ const s = {
   primaryBadge: { padding: '5px 10px', borderRadius: 999, background: C.verdeSuave, color: C.verdeOsc, fontSize: 11, fontWeight: 600 },
   secondaryBadge: { padding: '5px 10px', borderRadius: 999, background: '#eee', color: C.textoSuave, fontSize: 11, fontWeight: 500 },
   title: { margin: '0 0 17px', fontSize: 27, lineHeight: 1.12, fontWeight: 600, color: C.texto, letterSpacing: '-.6px' },
+  recurring: { display: 'inline-flex', margin: '-8px 0 12px', padding: '5px 8px', borderRadius: 999, color: C.verdeOsc, background: C.verdeSuave, fontSize: 10, fontWeight: 700 },
   infoRow: { display: 'flex', alignItems: 'center', gap: 11, marginTop: 9, fontSize: 13, lineHeight: 1.35, color: C.texto },
   infoIcon: { width: 36, height: 36, borderRadius: 10, background: '#f0f4ff', color: C.verde, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
   section: { padding: '24px 20px 0' },
   sectionTitle: { margin: 0, fontSize: 19, fontWeight: 600, color: C.texto },
   description: { margin: '13px 0 0', fontSize: 14.5, lineHeight: 1.65, color: C.textoSuave, whiteSpace: 'pre-wrap' },
+  followButton: { width: '100%', minHeight: 44, marginTop: 15, border: `1.5px solid ${C.verde}`, borderRadius: 12, color: C.verde, background: '#fff', fontSize: 12.5, fontWeight: 700 },
+  followButtonActive: { color: '#fff', background: C.verde },
   features: { display: 'flex', flexWrap: 'wrap', gap: 7, marginTop: 15 },
   featureChip: { padding: '7px 9px', borderRadius: 999, background: '#fff', border: `1px solid ${C.borde}`, color: C.textoSuave, fontSize: 11.5, fontWeight: 500 },
   registrationLink: { display: 'inline-flex', marginTop: 12, color: C.verde, fontSize: 12.5, fontWeight: 600, textDecoration: 'none' },
