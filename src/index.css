@@ -185,6 +185,12 @@ button, input, textarea, select {
   }
 }
 
+/* En iOS el WebView ocupa toda la pantalla y CSS controla una sola vez el
+   safe area. El mínimo protege equipos donde WKWebView informa 0 al arrancar. */
+html.native-ios .phone-frame {
+  --home-header-safe-top: max(env(safe-area-inset-top, 0px), 44px);
+}
+
 /* Botones sin estilo por defecto */
 button {
   border: none;

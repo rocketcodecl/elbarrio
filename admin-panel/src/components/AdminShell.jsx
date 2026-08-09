@@ -2,6 +2,7 @@ const NAVIGATION = [
   { id: 'dashboard', icon: '▦', label: 'Resumen' },
   { id: 'portada', icon: '▤', label: 'Portada de Inicio' },
   { id: 'publicaciones', icon: '◫', label: 'Publicaciones', superOnly: true },
+  { id: 'contenido-usuarios', icon: '◌', label: 'Comentarios y reseñas', superOnly: true },
   { id: 'categorias', icon: '☷', label: 'Categorías', superOnly: true },
   { id: 'comercios', icon: '🏪', label: 'Comercios' },
   { id: 'servicios', icon: '🧰', label: 'Servicios' },

@@ -8,7 +8,7 @@
   },
   "ios": {
     "backgroundColor": "#f7faf7",
-    "contentInset": "automatic"
+    "contentInset": "never"
   },
   "plugins": {
     "PushNotifications": {

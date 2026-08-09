@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { supabase } from '../lib/supabase.js'
 import CommerceEditor from './CommerceEditor.jsx'
 import ProductCatalog from './ProductCatalog.jsx'
+import PromotionCatalog from './PromotionCatalog.jsx'
 
 const commerceImage = commerce => commerce.cover_url || commerce.logo_url || null
 
@@ -104,6 +105,7 @@ export default function CommerceManager({ profile }) {
       />
     )
   }
+  if (view.type === 'promos' && view.commerce) return <PromotionCatalog commerce={view.commerce} onBack={() => returnToList()} />
 
   return (
     <div className="commerce-manager commerce-list-page">
@@ -140,7 +142,7 @@ export default function CommerceManager({ profile }) {
                     <td><span className={`table-status ${commerce.is_active ? 'active' : ''}`}><i />{commerce.is_active ? 'Activo' : 'Inactivo'}</span></td>
                     <td><span className="table-address">{commerce.address || 'Sin dirección'}</span></td>
                     <td><button className="product-count-button" type="button" onClick={() => setView({ type: 'products', commerce })}><strong>{productCounts[commerce.id] || 0}</strong><span>Ver productos</span></button></td>
-                    <td><div className="table-actions"><button type="button" onClick={() => setView({ type: 'edit', commerce })}>Editar</button><button className="table-products-action" type="button" onClick={() => setView({ type: 'products', commerce })}>Productos →</button></div></td>
+                    <td><div className="table-actions"><button type="button" onClick={() => setView({ type: 'edit', commerce })}>Editar</button><button type="button" onClick={() => setView({ type: 'promos', commerce })}>Promociones</button><button className="table-products-action" type="button" onClick={() => setView({ type: 'products', commerce })}>Productos →</button></div></td>
                   </tr>
                 ))}
               </tbody>

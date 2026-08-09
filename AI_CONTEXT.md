@@ -405,6 +405,10 @@ El botón de creación abre `CreatePost.jsx`, salvo la creación de comercios, q
 
 ## Funcionalidades pendientes
 
+- El cierre Ultra Admin del 9 de agosto de 2026 incorporó edición global y auditada de usuarios (incluidos nombre, email de acceso y contraseña), publicaciones, comentarios/reseñas y alertas. `contacto@elbarrio.lat` (`El Barrio`) y la cuenta principal de Fernando fueron verificadas como superadministradores activos. Ver matriz en `admin-panel/ULTRA_ADMIN_AUDIT.md`.
+- Los chats privados, likes, favoritos, reputación e invitaciones no son editables por administración por privacidad e integridad. El Ultra Admin sí puede retirar cualquier contenido público, cerrar/restaurar publicaciones y suspender o eliminar al responsable.
+- La edición de Noticias ya admite URL externa y conserva “Mostrar también en Actividad”; la aplicación muestra el enlace y abre la noticia específica desde el carrusel.
+
 - Agregar `lat.elbarrio.app://auth/callback` a Authentication → URL Configuration → Redirect URLs en Supabase y validar Google OAuth y recuperación de contraseña desde Android real.
 - Instalar Xcode, abrir `ios/App/App.xcworkspace` y validar la compilación gratuita en un iPhone propio. Para TestFlight/App Store se necesita la membresía anual de Apple Developer; el proyecto no debe esperar ese pago para seguir avanzando Android y pruebas locales iOS.
 - Implementar push reales con registro de dispositivo, Firebase Cloud Messaging para Android, APNs para iOS, contador de ícono y apertura directa de la pantalla correspondiente.

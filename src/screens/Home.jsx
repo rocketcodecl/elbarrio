@@ -920,7 +920,7 @@ function Home({ currentUser, onNavigate, onCrear }) {
       ...datoParaTi,
       portadaLabel: 'DATO ÚTIL',
       portadaMeta: datoParaTi.news_source || 'Información para tu barrio',
-      portadaAction: () => nav('noticias'),
+      portadaAction: () => nav('noticias', { newsId: datoParaTi.id }),
     },
     descubrimientoParaTi && {
       ...descubrimientoParaTi,
@@ -934,7 +934,7 @@ function Home({ currentUser, onNavigate, onCrear }) {
     .map(item => {
       if (item.portadaAction) return item
       if (item.type === 'event') return { ...item, portadaLabel: 'PANORAMA', portadaMeta: fechaEventoPortada(item.starts_at, item.ends_at), portadaAction: () => nav('eventdetail', { postId: item.id }) }
-      if (item.type === 'news') return { ...item, portadaLabel: 'DATO ÚTIL', portadaMeta: item.news_source || 'Información para tu barrio', portadaAction: () => nav('noticias') }
+      if (item.type === 'news') return { ...item, portadaLabel: 'DATO ÚTIL', portadaMeta: item.news_source || 'Información para tu barrio', portadaAction: () => nav('noticias', { newsId: item.id }) }
       return { ...item, portadaLabel: item.type === 'gift' ? 'PARA COMPARTIR' : 'DESCUBRE', portadaMeta: item.price > 0 ? plata(item.price) : (TIPOS[item.type]?.corto || 'Cerca de casa'), portadaAction: () => nav('post', { postId: item.id }) }
     })
 
@@ -1216,7 +1216,7 @@ function Home({ currentUser, onNavigate, onCrear }) {
                       : p.type === 'event'
                         ? nav('eventdetail', { postId: p.id })
                         : p.type === 'news'
-                          ? nav('noticias')
+                          ? nav('noticias', { newsId: p.id })
                       : nav('post', { postId: p.id })}
                   >
                     <div style={{ ...s.postFoto, background: t.bg }}>

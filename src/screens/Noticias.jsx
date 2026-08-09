@@ -137,7 +137,7 @@ const normalizarTipo = (post) => {
 /* ============================================================
    COMPONENTE
    ============================================================ */
-export default function Noticias({ currentUser, onNavigate }) {
+export default function Noticias({ currentUser, onNavigate, initialNewsId = null }) {
   const [news, setNews] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -189,6 +189,12 @@ export default function Noticias({ currentUser, onNavigate }) {
   useEffect(() => {
     fetchNews()
   }, [fetchNews])
+
+  useEffect(() => {
+    if (!initialNewsId || !news.length) return
+    const requested = news.find(item => item.id === initialNewsId)
+    if (requested) setSelectedNews(requested)
+  }, [initialNewsId, news])
 
   useEffect(() => {
     supabase.from('news_categories').select('key, name, icon').eq('is_active', true).order('sort_order').then(({ data }) => {
@@ -286,6 +292,7 @@ export default function Noticias({ currentUser, onNavigate }) {
 
   /* ── Helper: source (badge chiquito) ── */
   const getSource = (n) => n?.news_source || n?.source || null
+  const getLink = (n) => /^https?:\/\/\S+$/i.test(n?.news_url || '') ? n.news_url : null
 
   /* ── Helper: extracto / descripción ── */
   const getExtracto = (n) => n?.description || n?.excerpt || n?.content || ''
@@ -524,6 +531,7 @@ export default function Noticias({ currentUser, onNavigate }) {
         const official = esNoticiaOficial(selectedNews)
         const images = getImages(selectedNews)
         const source = getSource(selectedNews)
+        const link = getLink(selectedNews)
         return <div style={s.modalOverlay} role="dialog" aria-modal="true" aria-label={selectedNews.title || 'Noticia'} onClick={() => setSelectedNews(null)}>
           <article className="noticias-modal-sheet" style={s.modalSheet} onClick={event => event.stopPropagation()}>
             <header style={s.modalHeader}><button type="button" style={s.modalClose} onClick={() => setSelectedNews(null)} aria-label="Cerrar">×</button><span aria-hidden="true" /><i /></header>
@@ -534,6 +542,7 @@ export default function Noticias({ currentUser, onNavigate }) {
                 <h2 style={s.modalTitle}>{selectedNews.title || 'Noticia del barrio'}</h2>
                 <div style={s.modalMeta}>{source && <span>{source}</span>}<span>{hace(selectedNews.created_at)}</span></div>
                 <div style={s.modalContent}>{getExtracto(selectedNews)}</div>
+                {link && <a href={link} target="_blank" rel="noopener noreferrer" style={s.modalLink}>Abrir enlace relacionado ↗</a>}
               </div>
             </div>
           </article>
@@ -759,6 +768,7 @@ const s = {
   modalTitle: { margin: '4px 0 8px', color: C.texto, fontSize: 24, lineHeight: 1.18, letterSpacing: '-.5px' },
   modalMeta: { display: 'flex', justifyContent: 'space-between', gap: 12, color: C.textoTenue, fontSize: 11.5, paddingBottom: 15, borderBottom: `1px solid ${C.borde}` },
   modalContent: { paddingTop: 17, color: C.textoSuave, fontSize: 15, lineHeight: 1.72, whiteSpace: 'pre-wrap' },
+  modalLink: { marginTop: 18, minHeight: 46, padding: '0 16px', borderRadius: 13, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', background: C.verde, fontSize: 13, fontWeight: 800, textDecoration: 'none' },
 
   /* ── FOOTER AUTOR + TIMESTAMP ── */
   cardFooter: {

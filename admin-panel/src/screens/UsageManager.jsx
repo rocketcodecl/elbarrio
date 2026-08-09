@@ -14,6 +14,14 @@ function Status({ ok, children }) {
   return <span className={`service-status ${ok ? 'is-ok' : 'is-warning'}`}><i />{children}</span>
 }
 
+const functionErrorMessage = async (error, fallback) => {
+  try {
+    const payload = await error?.context?.clone?.().json()
+    if (payload?.error) return payload.error
+  } catch { /* Supabase no entregó cuerpo JSON */ }
+  return error?.message || fallback
+}
+
 export default function UsageManager() {
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -24,7 +32,7 @@ export default function UsageManager() {
   const load = useCallback(async () => {
     setLoading(true); setError('')
     const { data: response, error: requestError } = await supabase.functions.invoke('admin-service-metrics', { body: {} })
-    if (requestError) setError(requestError.message || 'No fue posible consultar las métricas.')
+    if (requestError) setError(await functionErrorMessage(requestError, 'No fue posible consultar las métricas.'))
     else setData(response)
     setLoading(false)
   }, [])
@@ -41,7 +49,7 @@ export default function UsageManager() {
   const runCleanup = async () => {
     setCleaning(true); setNotice(''); setError('')
     const { data: response, error: requestError } = await supabase.functions.invoke('cleanup-storage-assets', { body: {} })
-    if (requestError) setError(requestError.message || 'No fue posible ejecutar la limpieza.')
+    if (requestError) setError(await functionErrorMessage(requestError, 'No fue posible ejecutar la limpieza.'))
     else {
       setNotice(`Limpieza terminada: ${response?.deleted || 0} archivos eliminados y ${response?.failed || 0} errores.`)
       await load()

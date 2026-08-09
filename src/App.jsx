@@ -720,6 +720,7 @@ export default function App() {
         <Noticias
           currentUser={{ ...user, neighborhoodId: profile?.neighborhood_id }}
           onNavigate={onNavigate}
+          initialNewsId={params?.newsId || null}
         />
       )
     }

@@ -6,3 +6,12 @@ verify_jwt = false
 
 [functions.delete-my-account]
 verify_jwt = false
+
+[functions.admin-service-metrics]
+verify_jwt = false
+
+[functions.cleanup-storage-assets]
+verify_jwt = false
+
+[functions.admin-update-user]
+verify_jwt = false

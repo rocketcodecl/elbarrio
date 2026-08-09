@@ -24,6 +24,7 @@ const ACTION_LABELS = {
   remove_superadmin: 'Retiró el nivel de superadministrador',
   suspend: 'Suspendió la cuenta',
   reactivate: 'Reactivó la cuenta',
+  edit_profile: 'Editó los datos del perfil',
 }
 
 const ACTIVITY_LABELS = {
@@ -107,10 +108,30 @@ export default function UserManager({ profile }) {
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [deletePhrase, setDeletePhrase] = useState('')
   const [deleting, setDeleting] = useState(false)
+  const [profileEditing, setProfileEditing] = useState(false)
+  const [profileSaving, setProfileSaving] = useState(false)
+  const [neighborhoodOptions, setNeighborhoodOptions] = useState([])
+  const [profileDraft, setProfileDraft] = useState({ full_name: '', email: '', phone: '', rut: '', address: '', comuna: '', bio: '', user_type: '', neighborhood_id: '', new_password: '', reason: '' })
 
   const selected = users.find(user => user.id === selectedId) || null
   const selectedCoordinates = profileCoordinates(selected)
   const isSelf = selected?.id === profile?.id
+
+  useEffect(() => {
+    if (!isSuperadmin) return
+    supabase.from('neighborhoods').select('id,name,uv_code').order('name').then(({ data }) => setNeighborhoodOptions(data || []))
+  }, [isSuperadmin])
+
+  useEffect(() => {
+    if (!selected) return
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- prepara el formulario al cambiar el usuario seleccionado
+    setProfileDraft({
+      full_name: selected.full_name || '', email: selected.email || '', phone: selected.phone || '', rut: selected.rut || '',
+      address: selected.address || '', comuna: selected.comuna || '', bio: selected.bio || '', user_type: selected.user_type || '',
+      neighborhood_id: selected.neighborhood_id || '', new_password: '', reason: '',
+    })
+    setProfileEditing(false)
+  }, [selected])
 
   const loadUsers = useCallback(async preferredId => {
     setLoading(true)
@@ -283,6 +304,27 @@ export default function UserManager({ profile }) {
     await loadUsers(nextActiveId)
   }
 
+  const saveProfileDetails = async event => {
+    event.preventDefault()
+    if (!selected || !isSuperadmin || profileSaving) return
+    if (!profileDraft.full_name.trim()) return setError('El nombre del usuario es obligatorio.')
+    if (profileDraft.new_password && profileDraft.new_password.length < 8) return setError('La nueva contraseña debe tener al menos 8 caracteres.')
+    if (profileDraft.reason.trim().length < 3) return setError('Indica brevemente el motivo del cambio.')
+    setProfileSaving(true); setError('')
+    const changes = {
+      full_name: profileDraft.full_name.trim(), email: profileDraft.email.trim(), phone: profileDraft.phone.trim(), rut: profileDraft.rut.trim(),
+      address: profileDraft.address.trim(), comuna: profileDraft.comuna.trim(), bio: profileDraft.bio.trim(), user_type: profileDraft.user_type.trim(),
+      neighborhood_id: profileDraft.neighborhood_id || null,
+    }
+    const { data, error: updateError } = await supabase.functions.invoke('admin-update-user', { body: { target_profile_id: selected.id, changes, new_password: profileDraft.new_password, reason: profileDraft.reason.trim() } })
+    setProfileSaving(false)
+    if (updateError || !data?.ok) return setError(data?.error || updateError?.message || 'No fue posible editar este usuario.')
+    setProfileEditing(false)
+    setNotice(`Perfil de ${changes.full_name} actualizado`)
+    window.setTimeout(() => setNotice(''), 2800)
+    await loadUsers(selected.id); await loadHistory(selected.id)
+  }
+
   return <div className="user-manager">
     <section className="page-heading commerce-page-heading">
       <div><p className="eyebrow">Comunidad y permisos</p><h1>Usuarios</h1><p>Verifica vecinos, autoriza actores y protege el acceso a El Barrio.</p></div>
@@ -313,6 +355,8 @@ export default function UserManager({ profile }) {
 
           <div className="user-detail-grid">
             <section className="user-info-card"><h3>Identidad y verificación</h3><dl><div><dt>RUT</dt><dd>{selected.rut || 'No informado'}</dd></div><div><dt>Correo</dt><dd>{selected.email || 'No informado'}</dd></div><div><dt>Dirección</dt><dd>{selected.address || 'No informada'}</dd></div><div><dt>Comuna / barrio</dt><dd>{[selected.barrio, selected.comuna].filter(Boolean).join(', ') || 'No informado'}</dd></div><div><dt>Estado de verificación</dt><dd>{isVerified(selected) ? `Verificado · ${dateLabel(selected.verified_at)}` : selected.verification_status || 'Pendiente'}</dd></div><div><dt>Tipo de perfil</dt><dd>{selected.user_type || 'Vecino'}</dd></div></dl>{!isVerified(selected) && <button className="user-primary-action" type="button" disabled={!!changing} onClick={() => manage('verify')}>{changing === 'verify' ? 'Guardando…' : '✓ Aprobar verificación'}</button>}</section>
+
+            {isSuperadmin && <section className="user-info-card user-profile-editor"><div className="user-card-heading"><h3>Editar usuario</h3>{!profileEditing && <button type="button" onClick={() => setProfileEditing(true)}>Editar datos</button>}</div>{!profileEditing ? <p className="user-muted">Puedes corregir nombre, contacto, RUT, domicilio, barrio y contraseña. Cada cambio queda auditado.</p> : <form onSubmit={saveProfileDetails}><div className="user-edit-grid"><label>Nombre completo<input value={profileDraft.full_name} onChange={e => setProfileDraft(d => ({...d,full_name:e.target.value}))} required /></label><label>Correo de acceso<input type="email" value={profileDraft.email} onChange={e => setProfileDraft(d => ({...d,email:e.target.value}))} /></label><label>Teléfono<input value={profileDraft.phone} onChange={e => setProfileDraft(d => ({...d,phone:e.target.value}))} /></label><label>RUT<input value={profileDraft.rut} onChange={e => setProfileDraft(d => ({...d,rut:e.target.value}))} /></label><label>Dirección<input value={profileDraft.address} onChange={e => setProfileDraft(d => ({...d,address:e.target.value}))} /></label><label>Comuna<input value={profileDraft.comuna} onChange={e => setProfileDraft(d => ({...d,comuna:e.target.value}))} /></label><label>Tipo de usuario<input value={profileDraft.user_type} onChange={e => setProfileDraft(d => ({...d,user_type:e.target.value}))} /></label><label>Barrio<select value={profileDraft.neighborhood_id} onChange={e => setProfileDraft(d => ({...d,neighborhood_id:e.target.value}))}><option value="">Sin barrio</option>{neighborhoodOptions.map(item => <option key={item.id} value={item.id}>{item.name}{item.uv_code ? ` · ${item.uv_code}` : ''}</option>)}</select></label><label className="user-edit-wide">Biografía<textarea rows="3" value={profileDraft.bio} onChange={e => setProfileDraft(d => ({...d,bio:e.target.value}))} /></label><label>Nueva contraseña <small>Opcional</small><input type="password" value={profileDraft.new_password} onChange={e => setProfileDraft(d => ({...d,new_password:e.target.value}))} minLength="8" autoComplete="new-password" /></label><label>Motivo del cambio<input value={profileDraft.reason} onChange={e => setProfileDraft(d => ({...d,reason:e.target.value}))} placeholder="Ej: corrección solicitada" required /></label></div><div className="user-edit-actions"><button type="button" onClick={() => setProfileEditing(false)}>Cancelar</button><button type="submit" disabled={profileSaving}>{profileSaving ? 'Guardando…' : 'Guardar usuario'}</button></div></form>}</section>}
 
             <section className="user-info-card user-location-card"><h3>Ubicación registrada</h3><div className="user-location-status"><span>{isVerified(selected) && selected.neighborhood_id ? '✓' : '!'}</span><div><strong>{isVerified(selected) && selected.neighborhood_id ? 'GPS verificado en el barrio' : 'Ubicación todavía no verificada'}</strong><small>{neighborhood ? `${neighborhood.name}${neighborhood.uv_code ? ` · Unidad Vecinal ${neighborhood.uv_code}` : ''}` : selected.address || 'Sin dirección registrada'}</small></div></div><ProfileMap user={selected} />{selectedCoordinates && <p className="user-map-coordinates">{selectedCoordinates.source}: {selectedCoordinates.lat.toFixed(6)}, {selectedCoordinates.lng.toFixed(6)}</p>}</section>
 

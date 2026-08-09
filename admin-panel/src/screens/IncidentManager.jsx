@@ -3,6 +3,7 @@ import L from 'leaflet'
 import { MapContainer, Marker, TileLayer } from 'react-leaflet'
 import 'leaflet/dist/leaflet.css'
 import { supabase } from '../lib/supabase.js'
+import { prepareImageUpload } from '../../../shared/imageUpload.js'
 
 const FILTERS = [
   ['all', 'Todos'],
@@ -26,6 +27,8 @@ const ACTIONS = {
   mark_official: 'La marcó como alerta oficial',
   unmark_official: 'Quitó la marca oficial',
   resolve: 'Cerró la alerta como resuelta',
+  create: 'Creó la alerta desde el panel',
+  edit: 'Editó el contenido de la alerta',
 }
 
 const CATEGORY = {
@@ -34,7 +37,15 @@ const CATEGORY = {
   infraestructura: ['🔧', 'Infraestructura'],
   mascotas: ['🐕', 'Mascotas'],
   convivencia: ['🤝', 'Convivencia'],
+  incendio: ['🔥', 'Incendio'],
+  servicios: ['🛠️', 'Servicios'],
+  animales: ['🐾', 'Animales'],
+  fugas: ['💧', 'Fugas'],
+  luz: ['💡', 'Luz'],
+  otro: ['📌', 'Otro'],
 }
+
+const EMPTY_INCIDENT = { title: '', description: '', category: 'seguridad', severity: 'media', neighborhood_id: '', location_text: '', latitude: '', longitude: '', status: 'active', is_official: true, expires_at: '', images: [] }
 
 const dateLabel = value => value
   ? new Date(value).toLocaleString('es-CL', { dateStyle: 'medium', timeStyle: 'short' })
@@ -81,6 +92,11 @@ export default function IncidentManager({ profile }) {
   const [changing, setChanging] = useState('')
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
+  const [neighborhoods, setNeighborhoods] = useState([])
+  const [editorOpen, setEditorOpen] = useState(false)
+  const [editorId, setEditorId] = useState(null)
+  const [draft, setDraft] = useState(EMPTY_INCIDENT)
+  const [saving, setSaving] = useState(false)
 
   const selected = incidents.find(item => item.id === selectedId) || null
 
@@ -111,10 +127,18 @@ export default function IncidentManager({ profile }) {
     setLoading(false)
   }, [isSuperadmin, neighborhoodId])
 
+  // La carga remota es el sistema externo sincronizado por este efecto.
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { loadIncidents() }, [loadIncidents])
 
   useEffect(() => {
+    if (!isSuperadmin) return
+    supabase.from('neighborhoods').select('id,name,uv_code').order('name').then(({ data }) => setNeighborhoods(data || []))
+  }, [isSuperadmin])
+
+  useEffect(() => {
     if (!selectedId) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setActions([])
       return
     }
@@ -179,6 +203,43 @@ export default function IncidentManager({ profile }) {
     setActions(data || [])
   }
 
+  const openEditor = incident => {
+    setEditorId(incident?.id || null)
+    setDraft(incident ? {
+      title: incident.title || '', description: incident.description || '', category: incident.category || 'otro', severity: incident.severity || 'media',
+      neighborhood_id: incident.neighborhood_id || '', location_text: incident.location_text || '', latitude: incident.latitude ?? '', longitude: incident.longitude ?? '',
+      status: incident.status || 'active', is_official: !!incident.is_official, expires_at: incident.expires_at ? new Date(incident.expires_at).toISOString().slice(0, 16) : '',
+      images: [incident.photo_url, ...(Array.isArray(incident.images) ? incident.images : [])].filter(Boolean),
+    } : { ...EMPTY_INCIDENT, neighborhood_id: neighborhoods[0]?.id || '' })
+    setEditorOpen(true)
+    setError('')
+  }
+
+  const uploadEvidence = async event => {
+    const file = event.target.files?.[0]
+    event.target.value = ''
+    if (!file) return
+    setSaving(true)
+    try {
+      const prepared = await prepareImageUpload(file, `incidents/admin-${Date.now()}-${file.name}`)
+      const { error: uploadError } = await supabase.storage.from('posts').upload(prepared.path, prepared.file, { contentType: prepared.file.type })
+      if (uploadError) throw uploadError
+      const url = supabase.storage.from('posts').getPublicUrl(prepared.path).data.publicUrl
+      setDraft(current => ({ ...current, images: [...current.images, url].slice(0, 8) }))
+    } catch (uploadError) { setError(uploadError.message || 'No fue posible subir la imagen.') } finally { setSaving(false) }
+  }
+
+  const saveIncident = async event => {
+    event.preventDefault()
+    if (!draft.title.trim() || !draft.description.trim() || !draft.neighborhood_id) return setError('Completa título, descripción y barrio.')
+    setSaving(true); setError('')
+    const { data, error: saveError } = await supabase.rpc('admin_save_incident', { p_incident_id: editorId, p_data: draft, p_reason: editorId ? 'Edición desde panel global' : 'Creación desde panel global' })
+    setSaving(false)
+    if (saveError) return setError(saveError.message)
+    setEditorOpen(false); setNotice(editorId ? 'Alerta actualizada' : 'Alerta creada y publicada'); setTimeout(() => setNotice(''), 2600)
+    await loadIncidents(data?.id)
+  }
+
   const category = selected ? (CATEGORY[selected.category] || ['📌', selected.category || 'Otro']) : null
   const coordinates = incidentCoordinates(selected)
   const images = selected ? [selected.photo_url, ...(Array.isArray(selected.images) ? selected.images : [])].filter(Boolean) : []
@@ -187,11 +248,27 @@ export default function IncidentManager({ profile }) {
     <div className="incident-manager">
       <section className="page-heading commerce-page-heading">
         <div><p className="eyebrow">Moderación comunitaria</p><h1>Incidentes y alertas</h1><p>Revisa los reportes antes de hacerlos visibles y registra cada decisión.</p></div>
-        <div className="incident-metrics"><span><strong>{counts.pending}</strong>Pendientes</span><span><strong>{counts.active}</strong>Publicadas</span><span><strong>{counts.official}</strong>Oficiales</span></div>
+        <div className="incident-heading-actions"><div className="incident-metrics"><span><strong>{counts.pending}</strong>Pendientes</span><span><strong>{counts.active}</strong>Publicadas</span><span><strong>{counts.official}</strong>Oficiales</span></div>{isSuperadmin && <button className="button button-primary" type="button" onClick={() => openEditor(null)}>+ Nueva alerta</button>}</div>
       </section>
 
       {error && <div className="admin-alert" role="alert"><span>⚠️</span><p>{error}</p><button type="button" onClick={() => setError('')}>×</button></div>}
       {notice && <div className="admin-toast">✓ {notice}</div>}
+
+      {editorOpen && <section className="incident-editor-card"><header><div><p className="eyebrow">Control global</p><h2>{editorId ? 'Editar alerta' : 'Publicar alerta'}</h2></div><button type="button" onClick={() => setEditorOpen(false)}>×</button></header><form onSubmit={saveIncident}>
+        <label>Título<input value={draft.title} onChange={e => setDraft({ ...draft, title: e.target.value })} required /></label>
+        <label className="wide">Descripción<textarea value={draft.description} onChange={e => setDraft({ ...draft, description: e.target.value })} rows="4" required /></label>
+        <label>Tipo<select value={draft.category} onChange={e => setDraft({ ...draft, category: e.target.value })}>{['seguridad','incendio','servicios','animales','fugas','luz','salud','infraestructura','mascotas','convivencia','otro'].map(value => <option key={value} value={value}>{CATEGORY[value]?.[1] || value}</option>)}</select></label>
+        <label>Prioridad<select value={draft.severity} onChange={e => setDraft({ ...draft, severity: e.target.value })}><option value="alta">Crítica</option><option value="media">Moderada</option><option value="baja">Informativa</option></select></label>
+        <label>Barrio<select value={draft.neighborhood_id} onChange={e => setDraft({ ...draft, neighborhood_id: e.target.value })} required><option value="">Seleccionar…</option>{neighborhoods.map(item => <option key={item.id} value={item.id}>{item.name}{item.uv_code ? ` · ${item.uv_code}` : ''}</option>)}</select></label>
+        <label>Estado<select value={draft.status} onChange={e => setDraft({ ...draft, status: e.target.value })}><option value="active">Publicada</option><option value="pendiente">Pendiente</option><option value="rechazado">Rechazada</option><option value="resuelto">Cerrada</option></select></label>
+        <label className="wide">Dirección o referencia<input value={draft.location_text} onChange={e => setDraft({ ...draft, location_text: e.target.value })} /></label>
+        <label>Latitud<input type="number" step="any" value={draft.latitude} onChange={e => setDraft({ ...draft, latitude: e.target.value })} /></label><label>Longitud<input type="number" step="any" value={draft.longitude} onChange={e => setDraft({ ...draft, longitude: e.target.value })} /></label>
+        <label>Vigente hasta<input type="datetime-local" value={draft.expires_at} onChange={e => setDraft({ ...draft, expires_at: e.target.value })} /></label>
+        <label className="incident-check"><input type="checkbox" checked={draft.is_official} onChange={e => setDraft({ ...draft, is_official: e.target.checked })} /> Alerta oficial</label>
+        <label className="wide">Evidencia fotográfica<input type="file" accept="image/*" onChange={uploadEvidence} /></label>
+        {draft.images.length > 0 && <div className="incident-editor-images wide">{draft.images.map(url => <span key={url}><img src={url} alt="" /><button type="button" onClick={() => setDraft({ ...draft, images: draft.images.filter(item => item !== url) })}>×</button></span>)}</div>}
+        <footer className="wide"><button className="button button-secondary" type="button" onClick={() => setEditorOpen(false)}>Cancelar</button><button className="button button-primary" type="submit" disabled={saving}>{saving ? 'Guardando…' : editorId ? 'Guardar cambios' : 'Publicar alerta'}</button></footer>
+      </form></section>}
 
       <section className="incident-workspace">
         <aside className="incident-list-panel">
@@ -216,6 +293,7 @@ export default function IncidentManager({ profile }) {
             <header className="incident-detail-header">
               <div><span className="incident-category">{category[0]} {category[1]}</span><h2>{selected.title || category[1]}</h2><div><StatusBadge incident={selected} /><small>Reportada {dateLabel(selected.created_at)}</small></div></div>
               <div className="incident-actions">
+                {isSuperadmin && <button className="incident-action neutral" type="button" onClick={() => openEditor(selected)}>Editar contenido</button>}
                 {selected.status !== 'active' && <button className="incident-action approve" type="button" disabled={!!changing} onClick={() => moderate('approve')}>{changing === 'approve' ? 'Guardando…' : '✓ Aprobar'}</button>}
                 {selected.status === 'active' && !selected.is_official && <button className="incident-action official" type="button" disabled={!!changing} onClick={() => moderate('mark_official')}>{changing === 'mark_official' ? 'Guardando…' : '★ Hacer oficial'}</button>}
                 {selected.is_official && <button className="incident-action neutral" type="button" disabled={!!changing} onClick={() => moderate('unmark_official')}>Quitar oficial</button>}
