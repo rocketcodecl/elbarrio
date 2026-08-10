@@ -163,9 +163,9 @@ const ClimaIcon = ({ type, size = 34 }) => {
 }
 
 const ACCESOS_HOME = [
-  { id: 'eventos',   emoji: '📅', label: 'Eventos' },
-  { id: 'noticias',  emoji: '📰', label: 'Noticias' },
-  { id: 'alertas',   emoji: '🚨', label: 'Alertas' },
+  { id: 'eventos',  icon: 'eventos', label: 'Eventos' },
+  { id: 'noticias', icon: 'noticias', label: 'Noticias' },
+  { id: 'alertas',  icon: 'alerta', label: 'Alertas' },
 ]
 
 const ACTIVIDAD_VISIBLE_INICIAL = 10
@@ -237,6 +237,43 @@ const Ico = {
       stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z" />
       <circle cx="12" cy="10" r="3" />
+    </svg>
+  ),
+  mapa: ({ size = 21, color = C.textoSuave }) => (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
+      stroke={color} strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
+      <path d="m3 6 5-3 8 3 5-3v15l-5 3-8-3-5 3V6Z" />
+      <path d="M8 3v15M16 6v15" />
+    </svg>
+  ),
+  campana: ({ size = 21, color = C.textoSuave }) => (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
+      stroke={color} strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9" />
+      <path d="M10 21h4" />
+    </svg>
+  ),
+  noticias: ({ size = 21, color = C.verde }) => (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
+      stroke={color} strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M4 4h13v16H4z" />
+      <path d="M17 8h3v10a2 2 0 0 1-2 2" />
+      <path d="M7 8h7M7 12h7M7 16h4" />
+    </svg>
+  ),
+  ayuda: ({ size = 21, color = C.dorado }) => (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
+      stroke={color} strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M8.5 11.5a3.5 3.5 0 1 1 5.8 2.6c-1.5 1.1-2.3 1.8-2.3 3" />
+      <path d="M12 21h.01" />
+      <circle cx="12" cy="12" r="10" />
+    </svg>
+  ),
+  farmacia: ({ size = 14, color = C.verde }) => (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
+      stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="m8 4 12 12a3 3 0 0 1-4 4L4 8a3 3 0 0 1 4-4Z" />
+      <path d="m7 11 4-4" />
     </svg>
   ),
 }
@@ -1022,7 +1059,7 @@ function Home({ currentUser, onNavigate, onCrear }) {
           <div style={{ minWidth: 0, flex: 1 }}>
             <div style={s.saludo}>¡{saludo()}, {nombre}! 👋</div>
             <div style={s.barrioRow}>
-              <span style={{ fontSize: 13 }}>📍</span>
+              <Ico.pin size={12} color={C.verde} />
               <span style={s.barrioNombre}>
                 {barrio?.name || 'Mi barrio'}
                 {barrio?.city ? `, ${barrio.city}` : ''}
@@ -1033,10 +1070,10 @@ function Home({ currentUser, onNavigate, onCrear }) {
           <div style={s.headerBtns}>
             <span style={s.headerDivider} aria-hidden="true" />
             <button style={s.iconBtn} onClick={() => nav('mapa')} aria-label="Mapa del barrio">
-              <span aria-hidden="true" style={{ fontSize: 21, lineHeight: 1, transform: 'translateY(-1px)' }}>📍</span>
+              <Ico.mapa />
             </button>
             <button style={s.iconBtn} onClick={() => nav('notificaciones')} aria-label="Notificaciones">
-              🔔
+              <Ico.campana />
               {noLeidos > 0 && (
                 <span style={s.badge}>{noLeidos > 9 ? '9+' : noLeidos}</span>
               )}
@@ -1097,7 +1134,7 @@ function Home({ currentUser, onNavigate, onCrear }) {
             {farmaciasTurno.length > 0 && (
               <button style={s.farmaciaBloque} onClick={() => setVerFarmacias(true)}>
                 <div style={s.farmaciaLabel}>
-                  💊 Farmacia de turno
+                  <Ico.farmacia /> Farmacia de turno
                   {farmaciasTurno.length > 1 && (
                     <span style={s.farmaciaMas}> +{farmaciasTurno.length - 1}</span>
                   )}
@@ -1161,7 +1198,14 @@ function Home({ currentUser, onNavigate, onCrear }) {
               style={s.acceso}
               onClick={() => onAcceso(a.id)}
             >
-              <span style={s.accesoIcono}>{a.emoji}</span>
+              <span style={{
+                ...s.accesoIcono,
+                ...(a.id === 'alertas' ? s.accesoIconoAlerta : {}),
+              }}>
+                {a.icon === 'eventos' && <Ico.eventos size={22} />}
+                {a.icon === 'noticias' && <Ico.noticias size={22} />}
+                {a.icon === 'alerta' && <Ico.alerta size={22} color={C.rojo} />}
+              </span>
               <span style={s.accesoLabel}>{a.label}</span>
             </button>
           ))}
@@ -1171,7 +1215,7 @@ function Home({ currentUser, onNavigate, onCrear }) {
         {!buscando && (
           <div style={{ ...s.seccion, margin: '8px 0' }}>
             <button style={s.pedirBarra} onClick={() => crear('request')}>
-              <span style={s.pedirBarraEmoji}>🙋</span>
+              <span style={s.pedirBarraIcon}><Ico.ayuda /></span>
               <span style={s.pedirBarraTxt}>
                 <span style={s.pedirBarraTit}>¿Necesitás una mano?</span>
                 <span style={s.pedirBarraSub}>Gasfíter, flete, cuidado de perro...</span>
@@ -1513,7 +1557,7 @@ const s = {
     flexShrink: 0,
   },
   climaTemp: { fontSize: 19, fontWeight: 700, color: C.texto, lineHeight: 1.1 },
-  climaTxt: { fontSize: 11, color: C.textoTenue, fontWeight: 500, marginTop: 2 },
+  climaTxt: { fontSize: 12, color: C.textoTenue, fontWeight: 500, marginTop: 2 },
   tiraDivisor: { width: 1, height: 34, background: C.tiraBorde, margin: '0 12px', flexShrink: 0 },
   farmaciaBloque: {
     flex: 1, minWidth: 0,
@@ -1521,14 +1565,14 @@ const s = {
     cursor: 'pointer', fontFamily: 'inherit', textAlign: 'right',
     display: 'flex', flexDirection: 'column', alignItems: 'flex-end',
   },
-  farmaciaLabel: { fontSize: 10, color: C.textoTenue, fontWeight: 500 },
+  farmaciaLabel: { display: 'flex', alignItems: 'center', gap: 4, fontSize: 11.5, color: C.textoTenue, fontWeight: 500 },
   farmaciaNombre: {
     fontSize: 13, fontWeight: 700, color: C.texto, marginTop: 2,
     whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
     maxWidth: '100%',
   },
   farmaciaDir: {
-    fontSize: 10, color: C.textoTenue, fontWeight: 400, marginTop: 2,
+    fontSize: 11, color: C.textoTenue, fontWeight: 400, marginTop: 2,
     whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
     maxWidth: '100%',
   },
@@ -1542,7 +1586,7 @@ const s = {
     color: C.texto,
   },
   paraTiHeadingTitle: { display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 14, fontWeight: 600, letterSpacing: 0, color: C.texto },
-  paraTiHeadingHint: { color: C.textoTenue, fontSize: 8.5, fontWeight: 600 },
+  paraTiHeadingHint: { color: C.textoTenue, fontSize: 10.5, fontWeight: 600 },
   paraTiScroll: {
     width: '100%', margin: 0, padding: '0 0 3px',
     display: 'flex', gap: 18,
@@ -1579,7 +1623,7 @@ const s = {
   },
   paraTiMeta: {
     overflow: 'hidden', color: 'rgba(255,255,255,.88)',
-    fontSize: 10.5, fontWeight: 600, whiteSpace: 'nowrap', textOverflow: 'ellipsis',
+    fontSize: 11.5, fontWeight: 600, whiteSpace: 'nowrap', textOverflow: 'ellipsis',
   },
   paraTiArrow: {
     position: 'absolute', right: 14, bottom: 14,
@@ -1637,30 +1681,30 @@ const s = {
   /* ── accesos ── */
   accesos: {
     display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)',
-    gap: 9, marginBottom: 7,
+    gap: 9, marginBottom: 12,
   },
   acceso: {
     display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3,
     background: C.card, border: `1px solid ${C.borde}`,
-    borderRadius: 13, padding: '7px 3px 6px',
+    borderRadius: 14, padding: '9px 3px 8px',
     cursor: 'pointer', fontFamily: 'inherit',
   },
   accesoIcono: {
-    width: 38, height: 38, borderRadius: 11,
+    width: 38, height: 38, borderRadius: 11, background: C.verdeBg,
     display: 'flex', alignItems: 'center', justifyContent: 'center',
-    fontSize: 24, lineHeight: 1,
   },
-  accesoLabel: { fontSize: 11, fontWeight: 600, color: C.textoSuave },
+  accesoIconoAlerta: { background: C.rojoBg },
+  accesoLabel: { fontSize: 12.5, fontWeight: 650, color: C.textoSuave },
 
   /* ── secciones ── */
   // marginBottom reducido (20→8) para que el gap entre Alertas y Mercado
   // sea más apretado. Afecta a todas las secciones (queda uniforme).
-  seccion: { marginBottom: 8 },
+  seccion: { marginBottom: 12 },
   // marginBottom reducido (10→3) para que el título quede más pegado a
   // sus tarjetas. El scrollH ya aporta 14px de paddingTop (para el halo
   // del pulse de alertas), así que no hace falta más gap aquí.
-  seccionTit: { display: 'flex', alignItems: 'center', marginBottom: 3, gap: 8 },
-  seccionTxt: { fontSize: 15, fontWeight: 600, color: C.texto },
+  seccionTit: { display: 'flex', alignItems: 'center', marginBottom: 7, gap: 7 },
+  seccionTxt: { fontSize: 16, fontWeight: 650, color: C.texto },
   pulso: {
     width: 8, height: 8, borderRadius: '50%', background: C.rojo,
     marginLeft: 'auto', boxShadow: `0 0 0 4px ${C.rojoSuave}`,
@@ -1679,18 +1723,22 @@ const s = {
     borderRadius: 14, padding: '11px 13px',
     cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left',
   },
-  pedirBarraEmoji: { fontSize: 20, flexShrink: 0, lineHeight: 1 },
+  pedirBarraIcon: {
+    width: 36, height: 36, borderRadius: 11, flexShrink: 0,
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    background: C.doradoSuave,
+  },
   pedirBarraTxt: { display: 'flex', flexDirection: 'column', gap: 1, flex: 1, minWidth: 0 },
   pedirBarraTit: {
     fontSize: 13.5, fontWeight: 700, color: C.texto,
     whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
   },
   pedirBarraSub: {
-    fontSize: 11.5, fontWeight: 400, color: C.textoTenue,
+    fontSize: 12.5, fontWeight: 400, color: C.textoTenue,
     whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
   },
   pedirBarraCta: {
-    fontSize: 12, fontWeight: 700, color: '#fff',
+    fontSize: 13, fontWeight: 700, color: '#fff',
     background: C.verde, padding: '7px 14px',
     borderRadius: 999, flexShrink: 0,
     display: 'flex', alignItems: 'center',
@@ -1701,7 +1749,7 @@ const s = {
     marginLeft: 'auto',
     display: 'flex', alignItems: 'center', gap: 4,
     background: 'none', border: 'none', padding: 0,
-    fontSize: 11.5, fontWeight: 700, color: C.verde,
+    fontSize: 12.5, fontWeight: 700, color: C.verde,
     cursor: 'pointer', fontFamily: 'inherit',
   },
   verTodasFlecha: { fontSize: 13, lineHeight: 1 },
@@ -1992,10 +2040,10 @@ const s = {
     display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
     color: '#fff', background: C.verde, fontSize: 9, fontWeight: 900,
   },
-  activityTime: { fontSize: 11.5, color: C.textoTenue, fontWeight: 550 },
+  activityTime: { fontSize: 12, color: C.textoTenue, fontWeight: 550 },
   activityChip: {
     display: 'inline-flex', alignItems: 'center', gap: 4,
-    fontSize: 10.5, fontWeight: 750, padding: '5px 7px', borderRadius: 999,
+    fontSize: 11.5, fontWeight: 750, padding: '5px 7px', borderRadius: 999,
     flexShrink: 0, maxWidth: 112, whiteSpace: 'nowrap', overflow: 'hidden',
     textOverflow: 'ellipsis',
   },
@@ -2041,7 +2089,7 @@ const s = {
     borderTop: `1px solid ${C.bordeSuave}`, marginTop: 13, paddingTop: 11,
   },
   activityResponse: {
-    minWidth: 0, fontSize: 11.5, color: C.textoTenue, fontWeight: 550,
+    minWidth: 0, fontSize: 12, color: C.textoTenue, fontWeight: 550,
     whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
   },
   activityAction: {

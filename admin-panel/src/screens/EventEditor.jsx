@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase.js'
 import LocationPicker from '../components/LocationPicker.jsx'
 import { prepareImageUpload } from '../../../shared/imageUpload.js'
+import { normalizeHttpUrl } from '../../../shared/externalUrl.js'
 
 const DEFAULT_EVENT_TYPES = [
   ['asambleas', '🏛️', 'Asamblea'],
@@ -44,6 +45,8 @@ const initialState = event => ({
   event_family_friendly: !!event?.event_family_friendly,
   event_requires_registration: !!event?.event_requires_registration,
   event_registration_url: event?.event_registration_url || '',
+  event_external_url: event?.event_external_url || '',
+  event_external_label: event?.event_external_label || 'Más información',
   event_show_attendees: event?.event_show_attendees !== false,
   show_in_activity: event?.show_in_activity === true,
   show_on_home: event?.show_on_home === true,
@@ -119,8 +122,16 @@ export default function EventEditor({ event, profile, onBack, onSaved }) {
     }
     const ticketPrices = draft.ticket_prices.map(ticket => ({ label: ticket.label.trim(), price: Number(ticket.price) })).filter(ticket => ticket.label || ticket.price || ticket.price === 0)
     if (draft.event_entry_type === 'paid' && (!ticketPrices.length || ticketPrices.some(ticket => !ticket.label || !Number.isFinite(ticket.price) || ticket.price < 0))) return setError('Indica el nombre y valor de cada entrada.')
-    if (draft.event_requires_registration && draft.event_registration_url && !/^https?:\/\//i.test(draft.event_registration_url)) {
-      setError('El enlace de inscripción debe comenzar con http:// o https://.')
+    const registrationUrl = draft.event_requires_registration && draft.event_registration_url.trim()
+      ? normalizeHttpUrl(draft.event_registration_url)
+      : null
+    const externalUrl = draft.event_external_url.trim() ? normalizeHttpUrl(draft.event_external_url) : null
+    if (draft.event_requires_registration && draft.event_registration_url.trim() && !registrationUrl) {
+      setError('Escribe un enlace de inscripción válido.')
+      return
+    }
+    if (draft.event_external_url.trim() && !externalUrl) {
+      setError('Escribe un enlace principal válido.')
       return
     }
 
@@ -148,7 +159,9 @@ export default function EventEditor({ event, profile, onBack, onSaved }) {
       event_accessible: draft.event_accessible,
       event_family_friendly: draft.event_family_friendly,
       event_requires_registration: draft.event_requires_registration,
-      event_registration_url: draft.event_requires_registration ? (draft.event_registration_url.trim() || null) : null,
+      event_registration_url: registrationUrl,
+      event_external_url: externalUrl,
+      event_external_label: externalUrl ? (draft.event_external_label.trim() || 'Más información') : null,
       event_show_attendees: draft.event_show_attendees,
       show_in_activity: draft.show_in_activity,
       status: draft.status,
@@ -237,6 +250,8 @@ export default function EventEditor({ event, profile, onBack, onSaved }) {
           <div className="admin-form-grid event-data-grid">
             {draft.event_entry_type === 'paid' && <div className="field field-full"><span>Valores de entrada</span><div className="ticket-price-list">{draft.ticket_prices.map((ticket, index) => <div className="ticket-price-row" key={index}><input value={ticket.label} onChange={e => setTicket(index, 'label', e.target.value)} placeholder="Ej: Adultos" /><span>$</span><input type="number" min="0" value={ticket.price} onChange={e => setTicket(index, 'price', e.target.value)} placeholder="5000" /><button type="button" disabled={draft.ticket_prices.length === 1} onClick={() => removeTicket(index)} aria-label="Quitar tarifa">×</button></div>)}</div><button className="add-ticket-button" type="button" onClick={addTicket}>＋ Agregar otro valor</button></div>}
             <label className="field">Cupos <small>Opcional</small><input type="number" min="1" value={draft.event_capacity} onChange={e => set('event_capacity', e.target.value)} placeholder="Ej: 80 personas" /></label>
+            <label className="field field-full">Enlace principal <small>Opcional</small><input inputMode="url" value={draft.event_external_url} onChange={e => set('event_external_url', e.target.value)} placeholder="lascondes.cl/evento" /><small>Para información, entradas o el sitio oficial. La app abrirá el enlace de forma segura.</small></label>
+            {draft.event_external_url && <label className="field">Texto del botón<select value={draft.event_external_label} onChange={e => set('event_external_label', e.target.value)}><option>Más información</option><option>Comprar entradas</option><option>Visitar sitio oficial</option><option>Ver programación</option></select></label>}
           </div>
           <div className="event-option-grid">
             {[
@@ -246,7 +261,7 @@ export default function EventEditor({ event, profile, onBack, onSaved }) {
               ['event_requires_registration', '📝', 'Con inscripción'],
             ].map(([field, emoji, label]) => <button key={field} type="button" className={draft[field] ? 'is-selected' : ''} onClick={() => set(field, !draft[field])}><span>{emoji}</span>{label}{draft[field] && <b>✓</b>}</button>)}
           </div>
-          {draft.event_requires_registration && <label className="field event-registration-field">Enlace de inscripción <small>Opcional</small><input type="url" value={draft.event_registration_url} onChange={e => set('event_registration_url', e.target.value)} placeholder="https://..." /></label>}
+          {draft.event_requires_registration && <label className="field event-registration-field">Enlace de inscripción <small>Opcional</small><input inputMode="url" value={draft.event_registration_url} onChange={e => set('event_registration_url', e.target.value)} placeholder="lascondes.cl/inscripcion" /></label>}
         </section>
 
         <section className="editor-section">

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { supabase } from '../lib/supabase.js'
 import NewsCategoryManager, { NEWS_CATEGORY_ICONS, newsCategoryKey } from './NewsCategoryManager.jsx'
 import { prepareImageUpload } from '../../../shared/imageUpload.js'
+import { normalizeHttpUrl } from '../../../shared/externalUrl.js'
 
 const DEFAULT_CATEGORIES = [
   { key: 'general', icon: '📰', name: 'General' },
@@ -103,9 +104,9 @@ function NewsEditor({ news, profile, categories, onCategoryCreated, onBack, onSa
       setError('Completa el título y el contenido de la noticia.')
       return
     }
-    const normalizedUrl = draft.url.trim()
-    if (normalizedUrl && !/^https?:\/\/\S+$/i.test(normalizedUrl)) {
-      setError('El enlace debe comenzar con http:// o https://')
+    const normalizedUrl = draft.url.trim() ? normalizeHttpUrl(draft.url) : null
+    if (draft.url.trim() && !normalizedUrl) {
+      setError('Escribe un enlace válido, por ejemplo lascondes.cl/evento')
       return
     }
     const neighborhoodId = news?.neighborhood_id || targetNeighborhoodId
@@ -178,7 +179,7 @@ function NewsEditor({ news, profile, categories, onCategoryCreated, onBack, onSa
             <label className="field field-full">Título<input value={draft.title} onChange={event => set('title', event.target.value)} maxLength={140} placeholder="Título claro y directo" required /></label>
             <div className="field news-category-field"><label>Categoría<select value={draft.category} onChange={event => set('category', event.target.value)}>{categories.map(category => <option value={category.key} key={category.key}>{category.icon} {category.name}</option>)}</select></label><button type="button" onClick={() => setShowCategoryCreator(current => !current)}>＋ Crear categoría</button></div>
             <label className="field">Fuente <small>Opcional</small><input value={draft.source} onChange={event => set('source', event.target.value)} maxLength={100} placeholder="Ej: Municipalidad de Las Condes" /></label>
-            <label className="field field-full">Enlace relacionado <small>Opcional</small><input type="url" value={draft.url} onChange={event => set('url', event.target.value)} maxLength={500} placeholder="https://www.ejemplo.cl/noticia" /></label>
+            <label className="field field-full">Fuente o enlace relacionado <small>Opcional</small><input inputMode="url" value={draft.url} onChange={event => set('url', event.target.value)} maxLength={500} placeholder="lascondes.cl/noticia" /><small>Si no agregas un enlace, la noticia se leerá íntegramente dentro de El Barrio.</small></label>
             {showCategoryCreator && <div className="news-inline-category field-full"><div><label>Nombre<input value={categoryName} onChange={event => setCategoryName(event.target.value)} maxLength="32" placeholder="Ej: Comunidad" autoFocus /></label><span>Ícono</span><div className="category-icon-picker news-icon-picker">{NEWS_CATEGORY_ICONS.map(icon => <button key={icon} type="button" className={categoryIcon === icon ? 'is-selected' : ''} onClick={() => setCategoryIcon(icon)}>{icon}</button>)}</div><label>Usar otro emoji<input value={categoryIcon} onChange={event => setCategoryIcon(event.target.value)} maxLength="12" placeholder="Pega cualquier emoji" /></label></div><footer><button type="button" className="button button-secondary" onClick={() => setShowCategoryCreator(false)}>Cancelar</button><button type="button" className="button button-primary" disabled={categorySaving} onClick={createCategory}>{categorySaving ? 'Creando…' : 'Crear y seleccionar'}</button></footer></div>}
             <label className="field field-full">Contenido<textarea value={draft.content} onChange={event => set('content', event.target.value)} rows="8" maxLength={5000} placeholder="Escribe la información completa…" required /></label>
           </div>

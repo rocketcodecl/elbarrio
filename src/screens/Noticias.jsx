@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { supabase } from '../lib/supabase'
-import { C, T, iniciales, hace } from '../lib/design'
+import { C, T, hace } from '../lib/design'
+import { normalizeHttpUrl, openExternalUrl } from '../lib/openExternal'
 
 /* ============================================================
    Noticias.jsx — Pantalla "Noticias del barrio".
@@ -44,8 +45,8 @@ const NEWS_CSS = `
   animation: noticiasModalIn 0.28s cubic-bezier(.22,.8,.3,1) both;
 }
 @keyframes noticiasModalIn {
-  from { opacity: 0; transform: translateY(28px); }
-  to { opacity: 1; transform: translateY(0); }
+  from { opacity: 0; transform: translateX(12px); }
+  to { opacity: 1; transform: translateX(0); }
 }
 .noticias-modal-image { animation: noticiasImageFade .38s ease both; }
 @keyframes noticiasImageFade { from { opacity: .35; } to { opacity: 1; } }
@@ -72,12 +73,6 @@ const IcoShield = (p) => (
     <path d="m9 12 2 2 4-4" />
   </Ico>
 )
-const IcoPin = (p) => (
-  <Ico {...p}>
-    <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
-    <circle cx="12" cy="10" r="3" />
-  </Ico>
-)
 const IcoClock = (p) => (
   <Ico {...p}>
     <circle cx="12" cy="12" r="10" />
@@ -91,6 +86,14 @@ const IcoRefresh = (p) => (
     <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
   </Ico>
 )
+
+const LinkedNewsText = ({ text }) => String(text || '').split(/((?:https?:\/\/|www\.)[^\s]+)/gi).map((part, index) => {
+  const clean = part.replace(/[),.;!?]+$/, '')
+  const url = /^(?:https?:\/\/|www\.)/i.test(clean) ? normalizeHttpUrl(clean) : null
+  if (!url) return part
+  const trailing = part.slice(clean.length)
+  return <span key={`${clean}-${index}`}><button type="button" style={s.inlineLink} onClick={() => openExternalUrl(url)}>{clean}</button>{trailing}</span>
+})
 const IcoAlert = (p) => (
   <Ico {...p}>
     <circle cx="12" cy="12" r="10" />
@@ -292,7 +295,7 @@ export default function Noticias({ currentUser, onNavigate, initialNewsId = null
 
   /* ── Helper: source (badge chiquito) ── */
   const getSource = (n) => n?.news_source || n?.source || null
-  const getLink = (n) => /^https?:\/\/\S+$/i.test(n?.news_url || '') ? n.news_url : null
+  const getLink = (n) => normalizeHttpUrl(n?.news_url)
 
   /* ── Helper: extracto / descripción ── */
   const getExtracto = (n) => n?.description || n?.excerpt || n?.content || ''
@@ -362,10 +365,6 @@ export default function Noticias({ currentUser, onNavigate, initialNewsId = null
   )
 
   const renderCard = (n, idx) => {
-    const autor = n.author || n.profiles || n.profile || {}
-    const name = autor.full_name || 'Perfil oficial'
-    const initials = iniciales(name)
-    const tipo = normalizarTipo(n)
     const cat = getCategory(n)
     const oficial = esNoticiaOficial(n)
     const img = getImagen(n)
@@ -377,9 +376,16 @@ export default function Noticias({ currentUser, onNavigate, initialNewsId = null
       <div
         key={n.id}
         className="noticias-card"
-        style={{ ...s.card, animationDelay: `${idx * 60}ms` }}
+        style={{ ...s.card, ...(idx === 0 ? s.cardLead : {}), animationDelay: `${idx * 60}ms` }}
         onClick={() => setSelectedNews(n)}
       >
+        {/* La primera historia funciona como portada editorial. */}
+        {img && (
+          <div style={{ ...s.imgBox, ...(idx === 0 ? s.imgBoxLead : {}) }}>
+            <img src={img} alt="" style={s.img} loading="lazy" />
+          </div>
+        )}
+
         {/* Badges superiores */}
         <div style={s.badgesRow}>
           <span style={{ ...s.catBadge, background: cat.bg, color: cat.color }}>
@@ -392,46 +398,18 @@ export default function Noticias({ currentUser, onNavigate, initialNewsId = null
               <span>OFICIAL</span>
             </span>
           )}
-          {source && (
-            <span style={s.sourceBadge}>
-              <IcoPin size={10} />
-              <span>{source}</span>
-            </span>
-          )}
         </div>
 
-        {/* Imagen opcional (16:9) */}
-        {img && (
-          <div style={s.imgBox}>
-            <img src={img} alt="" style={s.img} loading="lazy" />
-          </div>
-        )}
-
         {/* Título */}
-        <div style={s.cardTitle}>{n.title || 'Noticia del barrio'}</div>
+        <div style={{ ...s.cardTitle, ...(idx === 0 ? s.cardTitleLead : {}) }}>{n.title || 'Noticia del barrio'}</div>
 
         {/* Extracto (3 líneas clamp) */}
         {extracto && <div style={s.cardDesc}>{extracto}</div>}
         <button type="button" style={s.readMore} onClick={event => { event.stopPropagation(); setSelectedNews(n) }}>Leer noticia completa</button>
 
-        {/* Footer: autor + timestamp */}
+        {/* Pie editorial: procedencia y vigencia, no perfil social. */}
         <div style={s.cardFooter}>
-          <div style={s.authorBlock}>
-            {autor.avatar_url ? (
-              <img src={autor.avatar_url} alt="" style={s.avatar} />
-            ) : (
-              <div style={s.avatarFallback}>{initials}</div>
-            )}
-            <div style={s.authorInfo}>
-              <div style={s.authorNameRow}>
-                <span style={s.authorName}>{name.split(' ')[0]}</span>
-                {oficial && <IcoShield size={11} />}
-              </div>
-              <div style={s.authorMeta}>
-                {autor.role || autor.title || 'Autor'}
-              </div>
-            </div>
-          </div>
+          <span style={s.editorialSource}>{source || (oficial ? 'Información oficial' : 'El Barrio')}</span>
           {cuando && (
             <span style={s.timeTag}>
               <IcoClock size={11} />
@@ -532,17 +510,17 @@ export default function Noticias({ currentUser, onNavigate, initialNewsId = null
         const images = getImages(selectedNews)
         const source = getSource(selectedNews)
         const link = getLink(selectedNews)
-        return <div style={s.modalOverlay} role="dialog" aria-modal="true" aria-label={selectedNews.title || 'Noticia'} onClick={() => setSelectedNews(null)}>
-          <article className="noticias-modal-sheet" style={s.modalSheet} onClick={event => event.stopPropagation()}>
-            <header style={s.modalHeader}><button type="button" style={s.modalClose} onClick={() => setSelectedNews(null)} aria-label="Cerrar">×</button><span aria-hidden="true" /><i /></header>
+        return <div style={s.modalOverlay} role="dialog" aria-modal="true" aria-label={selectedNews.title || 'Noticia'}>
+          <article className="noticias-modal-sheet" style={s.modalSheet}>
+            <header style={s.modalHeader}><button type="button" style={s.modalClose} onClick={() => setSelectedNews(null)} aria-label="Volver"><IcoBack size={22} /></button><strong>Noticias de <span style={s.headerBrand}>el barrio</span></strong><i aria-hidden="true" /></header>
             <div style={s.modalScroll}>
               {images.length > 0 && <div style={s.modalCarousel} onTouchStart={onModalImageTouchStart} onTouchEnd={event => onModalImageTouchEnd(event, images.length)}><img key={`${images[modalImageIndex]}-${modalImageIndex}`} className="noticias-modal-image" src={images[modalImageIndex]} alt="" style={s.modalCover} draggable="false" />{images.length > 1 && <div style={s.modalDots}>{images.map((_, index) => <button key={index} type="button" aria-label={`Ver imagen ${index + 1}`} style={{ ...s.modalDot, ...(index === modalImageIndex ? s.modalDotActive : {}) }} onClick={() => setModalImageIndex(index)} />)}</div>}</div>}
               <div style={s.modalBody}>
-                <div style={s.badgesRow}><span style={{ ...s.catBadge, background: cat.bg, color: cat.color }}>{cat.emoji} {cat.label}</span>{official && <span style={s.oficialBadge}><IcoShield size={11} /> OFICIAL</span>}</div>
+                <div style={s.modalKicker}>{cat.label}{official && <span> · INFORMACIÓN OFICIAL</span>}</div>
                 <h2 style={s.modalTitle}>{selectedNews.title || 'Noticia del barrio'}</h2>
                 <div style={s.modalMeta}>{source && <span>{source}</span>}<span>{hace(selectedNews.created_at)}</span></div>
-                <div style={s.modalContent}>{getExtracto(selectedNews)}</div>
-                {link && <a href={link} target="_blank" rel="noopener noreferrer" style={s.modalLink}>Abrir enlace relacionado ↗</a>}
+                <div style={s.modalContent}><LinkedNewsText text={getExtracto(selectedNews)} /></div>
+                {link && <button type="button" style={s.modalLink} onClick={() => openExternalUrl(link)}>{source ? 'Leer fuente original' : 'Más información'} <span aria-hidden="true">↗</span></button>}
               </div>
             </div>
           </article>
@@ -672,6 +650,11 @@ const s = {
     boxShadow: '0 2px 10px rgba(0,0,0,0.04)',
     cursor: 'pointer',
   },
+  cardLead: {
+    padding: 14,
+    overflow: 'hidden',
+    borderRadius: 20,
+  },
 
   /* ── BADGES SUPERIORES ── */
   badgesRow: {
@@ -726,6 +709,12 @@ const s = {
     background: C.fondo,
     marginBottom: 12,
   },
+  imgBoxLead: {
+    width: 'calc(100% + 28px)',
+    aspectRatio: '16 / 10',
+    borderRadius: 0,
+    margin: '-14px -14px 14px',
+  },
   img: {
     width: '100%',
     height: '100%',
@@ -742,6 +731,11 @@ const s = {
     letterSpacing: '-0.2px',
     marginBottom: 6,
   },
+  cardTitleLead: {
+    fontSize: 22,
+    lineHeight: 1.18,
+    letterSpacing: '-.45px',
+  },
   cardDesc: {
     fontSize: 13.5,
     color: C.textoSuave,
@@ -754,21 +748,23 @@ const s = {
   },
   readMore: { marginTop: 9, padding: 0, border: 0, color: C.verdeOsc, background: 'transparent', fontSize: 11.5, fontWeight: 800 },
 
-  modalOverlay: { position: 'absolute', inset: 0, zIndex: 80, display: 'flex', alignItems: 'flex-end', background: 'rgba(17, 24, 20, 0.46)', backdropFilter: 'blur(2px)' },
-  modalSheet: { width: '100%', maxHeight: '94%', overflow: 'hidden', display: 'flex', flexDirection: 'column', background: C.fondo, borderRadius: '24px 24px 0 0', boxShadow: '0 -14px 40px rgba(0,0,0,.18)' },
-  modalHeader: { height: 54, flexShrink: 0, display: 'grid', gridTemplateColumns: '40px 1fr 40px', alignItems: 'center', padding: '0 14px', background: C.card, borderBottom: `1px solid ${C.borde}` },
-  modalClose: { width: 36, height: 36, borderRadius: '50%', border: `1px solid ${C.borde}`, background: C.fondo, color: C.texto, fontSize: 24, lineHeight: 1, cursor: 'pointer' },
+  modalOverlay: { position: 'absolute', inset: 0, zIndex: 80, display: 'flex', background: C.fondo },
+  modalSheet: { width: '100%', height: '100%', overflow: 'hidden', display: 'flex', flexDirection: 'column', background: C.fondo },
+  modalHeader: { minHeight: 58, flexShrink: 0, display: 'grid', gridTemplateColumns: '40px 1fr 40px', alignItems: 'center', gap: 8, padding: 'env(safe-area-inset-top, 0px) 14px 0', background: C.card, borderBottom: `1px solid ${C.borde}`, color: C.texto, fontSize: 15, textAlign: 'center' },
+  modalClose: { width: 36, height: 36, borderRadius: '50%', border: `1px solid ${C.borde}`, background: C.fondo, color: C.texto, display: 'grid', placeItems: 'center', cursor: 'pointer' },
   modalScroll: { minHeight: 0, overflowY: 'auto', WebkitOverflowScrolling: 'touch' },
-  modalCarousel: { position: 'relative', flexShrink: 0, background: '#e9efeb', touchAction: 'pan-y', userSelect: 'none' },
-  modalCover: { width: '100%', height: 'auto', display: 'block', objectFit: 'contain' },
+  modalCarousel: { position: 'relative', flexShrink: 0, height: 235, background: '#e9efeb', touchAction: 'pan-y', userSelect: 'none' },
+  modalCover: { width: '100%', height: '100%', display: 'block', objectFit: 'cover' },
   modalDots: { position: 'absolute', left: 0, right: 0, bottom: 10, display: 'flex', justifyContent: 'center', gap: 5 },
   modalDot: { width: 7, height: 7, padding: 0, border: '1px solid rgba(255,255,255,.9)', borderRadius: '50%', background: 'rgba(255,255,255,.5)', boxShadow: '0 1px 4px rgba(0,0,0,.25)' },
   modalDotActive: { width: 18, borderRadius: 999, background: '#fff' },
-  modalBody: { padding: '18px 18px 34px' },
-  modalTitle: { margin: '4px 0 8px', color: C.texto, fontSize: 24, lineHeight: 1.18, letterSpacing: '-.5px' },
-  modalMeta: { display: 'flex', justifyContent: 'space-between', gap: 12, color: C.textoTenue, fontSize: 11.5, paddingBottom: 15, borderBottom: `1px solid ${C.borde}` },
-  modalContent: { paddingTop: 17, color: C.textoSuave, fontSize: 15, lineHeight: 1.72, whiteSpace: 'pre-wrap' },
-  modalLink: { marginTop: 18, minHeight: 46, padding: '0 16px', borderRadius: 13, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', background: C.verde, fontSize: 13, fontWeight: 800, textDecoration: 'none' },
+  modalBody: { maxWidth: 620, margin: '0 auto', padding: '22px 20px calc(38px + env(safe-area-inset-bottom, 0px))' },
+  modalKicker: { color: C.verde, fontSize: 11.5, lineHeight: 1.3, fontWeight: 800, letterSpacing: '.055em', textTransform: 'uppercase' },
+  modalTitle: { margin: '9px 0 12px', color: C.texto, fontSize: 28, lineHeight: 1.13, fontWeight: 750, letterSpacing: '-.7px' },
+  modalMeta: { display: 'flex', justifyContent: 'space-between', gap: 12, color: C.textoTenue, fontSize: 12.5, paddingBottom: 17, borderBottom: `1px solid ${C.borde}` },
+  modalContent: { paddingTop: 20, color: C.textoSuave, fontSize: 15.5, lineHeight: 1.78, whiteSpace: 'pre-wrap' },
+  inlineLink: { display: 'inline', padding: 0, border: 0, color: C.verdeOsc, background: 'none', font: 'inherit', fontWeight: 700, textDecoration: 'underline', cursor: 'pointer' },
+  modalLink: { width: '100%', marginTop: 24, minHeight: 50, padding: '0 18px', border: 0, borderRadius: 14, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, color: '#fff', background: C.verde, fontSize: 14, fontWeight: 800, textDecoration: 'none', cursor: 'pointer' },
 
   /* ── FOOTER AUTOR + TIMESTAMP ── */
   cardFooter: {
@@ -779,6 +775,15 @@ const s = {
     marginTop: 12,
     paddingTop: 10,
     borderTop: `1px solid ${C.bordeSuave}`,
+  },
+  editorialSource: {
+    minWidth: 0,
+    color: C.textoSuave,
+    fontSize: 12,
+    fontWeight: 700,
+    whiteSpace: 'nowrap',
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
   },
   authorBlock: {
     display: 'flex',

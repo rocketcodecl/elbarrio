@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { C, T } from '../lib/design'
 import MiniMap from '../components/MiniMap'
+import { openExternalUrl } from '../lib/openExternal'
 
 const Icon = ({ children, size = 20 }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">{children}</svg>
@@ -116,6 +117,12 @@ export default function EventDetail({ postId, neighborhoodId, profileId, onNavig
     : event.event_entry_type === 'paid' && event.event_price != null
       ? [{ label: 'Entrada general', price: event.event_price }]
       : []
+  const primaryActionUrl = event.event_requires_registration && event.event_registration_url
+    ? event.event_registration_url
+    : event.event_external_url
+  const primaryActionLabel = event.event_requires_registration && event.event_registration_url
+    ? 'Inscribirme'
+    : (event.event_external_label || 'Más información')
 
   return (
     <div style={s.wrap}>
@@ -149,8 +156,8 @@ export default function EventDetail({ postId, neighborhoodId, profileId, onNavig
             {event.event_requires_registration && <span style={s.featureChip}>📝 Requiere inscripción</span>}
             {event.event_capacity && <span style={s.featureChip}>👥 {event.event_capacity} cupos</span>}
           </div>
-          {event.event_requires_registration && event.event_registration_url && (
-            <a href={event.event_registration_url} target="_blank" rel="noreferrer" style={s.registrationLink}>Abrir inscripción →</a>
+          {event.event_external_url && event.event_external_url !== primaryActionUrl && (
+            <button type="button" style={s.registrationLink} onClick={() => openExternalUrl(event.event_external_url)}>{event.event_external_label || 'Más información'} <span aria-hidden="true">↗</span></button>
           )}
         </section>
 
@@ -158,10 +165,15 @@ export default function EventDetail({ postId, neighborhoodId, profileId, onNavig
           <h2 style={s.sectionTitle}>Ubicación</h2>
           {hasMap ? <div style={s.map}><MiniMap lat={event.lat} lng={event.lng} height={190} zoom={16} /></div> : <div style={s.noMap}><Pin /> El organizador aún no fijó el punto en el mapa.</div>}
           <div style={s.mapCaption}>{event.location_text || 'Lugar por confirmar'}</div>
-          {directionsUrl && <a href={directionsUrl} target="_blank" rel="noreferrer" style={s.directionsLink}><Pin /> Cómo llegar</a>}
+          {directionsUrl && <button type="button" onClick={() => openExternalUrl(directionsUrl)} style={s.directionsLink}><Pin /> Cómo llegar</button>}
         </section>
         <div style={{ height: 104, flexShrink: 0 }} />
       </div>
+      {primaryActionUrl && (
+        <div style={s.actionDock}>
+          <button type="button" style={s.primaryAction} onClick={() => openExternalUrl(primaryActionUrl)}>{primaryActionLabel}<span aria-hidden="true">↗</span></button>
+        </div>
+      )}
     </div>
   )
 }
@@ -192,12 +204,14 @@ const s = {
   followButtonActive: { color: '#fff', background: C.verde },
   features: { display: 'flex', flexWrap: 'wrap', gap: 7, marginTop: 15 },
   featureChip: { padding: '7px 9px', borderRadius: 999, background: '#fff', border: `1px solid ${C.borde}`, color: C.textoSuave, fontSize: 11.5, fontWeight: 500 },
-  registrationLink: { display: 'inline-flex', marginTop: 12, color: C.verde, fontSize: 12.5, fontWeight: 600, textDecoration: 'none' },
+  registrationLink: { display: 'inline-flex', alignItems: 'center', gap: 6, marginTop: 12, padding: 0, border: 0, background: 'none', color: C.verde, fontSize: 13, fontWeight: 700, cursor: 'pointer' },
   organizer: { margin: '22px 20px 0', padding: 12, borderRadius: 14, background: '#fff', border: `1px solid ${C.borde}`, display: 'flex', alignItems: 'center', gap: 10 },
   organizerAvatar: { width: 42, height: 42, borderRadius: '50%', objectFit: 'cover' },
   organizerFallback: { width: 42, height: 42, borderRadius: '50%', background: C.verde, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700 },
   map: { marginTop: 13, borderRadius: 15, overflow: 'hidden', border: `1px solid ${C.borde}` },
   noMap: { marginTop: 13, height: 115, borderRadius: 15, background: '#e9eef5', color: C.textoSuave, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7, fontSize: 12.5 },
   mapCaption: { textAlign: 'center', marginTop: 9, fontSize: 11.5, color: C.textoSuave },
-  directionsLink: { marginTop: 12, minHeight: 44, borderRadius: 12, background: C.verde, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, fontSize: 13.5, fontWeight: 600, textDecoration: 'none' },
+  directionsLink: { width: '100%', marginTop: 12, minHeight: 44, border: 0, borderRadius: 12, background: C.verde, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, fontSize: 13.5, fontWeight: 600, cursor: 'pointer' },
+  actionDock: { position: 'absolute', left: 0, right: 0, bottom: 0, zIndex: 12, padding: '11px 16px calc(11px + env(safe-area-inset-bottom, 0px))', background: 'rgba(255,255,255,.96)', borderTop: `1px solid ${C.borde}`, boxShadow: '0 -8px 24px rgba(21,45,32,.08)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)' },
+  primaryAction: { width: '100%', minHeight: 50, border: 0, borderRadius: 14, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, color: '#fff', background: C.verde, fontSize: 14.5, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' },
 }
