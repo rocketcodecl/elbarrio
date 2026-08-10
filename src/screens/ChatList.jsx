@@ -534,6 +534,7 @@ const s = {
 
   scrollArea: {
     flex: 1,
+    minHeight: 0,
     overflowY: 'auto',
     backgroundColor: '#f4f7f4', // Fondo sutil para destacar las cards blancas estilo Airbnb
     WebkitOverflowScrolling: 'touch'

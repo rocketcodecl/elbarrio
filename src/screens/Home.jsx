@@ -1521,7 +1521,7 @@ const s = {
   },
 
   scroll: {
-    flex: 1, overflowY: 'auto', overflowX: 'clip', padding: '6px 16px 120px',
+    flex: 1, minHeight: 0, overflowY: 'auto', overflowX: 'clip', padding: '6px 16px 120px',
     width: '100%', maxWidth: '100%',
     overscrollBehaviorY: 'contain', WebkitOverflowScrolling: 'touch',
   },

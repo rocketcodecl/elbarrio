@@ -808,10 +808,11 @@ const s = {
   },
 
   scroll: {
-    flex: 1, overflowY: 'auto',
-    padding: '12px 16px 110px',
+    flex: 1, minHeight: 0, overflowY: 'auto',
+    padding: '12px 16px calc(150px + env(safe-area-inset-bottom, 0px))',
     position: 'relative',
     WebkitOverflowScrolling: 'touch',
+    overscrollBehavior: 'contain',
   },
 
   /* ── pull-to-refresh ── */
@@ -1154,7 +1155,7 @@ const s = {
 
   /* ── FAB ── */
   fab: {
-    position: 'absolute', bottom: 18, right: 18,
+    position: 'absolute', bottom: 'calc(90px + env(safe-area-inset-bottom, 0px))', right: 18,
     display: 'flex', alignItems: 'center', gap: 7,
     background: C.verde, color: '#fff',
     border: 'none', borderRadius: 999,

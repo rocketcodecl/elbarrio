@@ -546,10 +546,12 @@ export default function App() {
 
   /* ── SCREEN RENDER ── */
   const flowScreens = ['splash', 'onboarding', 'register', 'profile', 'verification', 'complete']
-  const modalScreens = ['productDetail', 'serviceDetail', 'chatConversation', 'dealDone', 'alertaDetail', 'notificaciones', 'neighborhoodMap', 'sellerProfile', 'noticiasScreen', 'admin', 'adminFarmacias', 'adminComercios', 'adminUsuarios', 'adminIncidentes', 'settings', 'editProfile', 'about', 'terms', 'privacy', 'prohibited', 'invite', 'contact', 'deleteAccount']
-  const isModalScreen = modalScreens.includes(currentScreen)
+  // Solo `main` puede mostrar la navegación inferior. Clasificar las
+  // subpantallas una por una dejó EventDetail debajo del TabBar y cortó su
+  // contenido final. Esta regla también protege cualquier pantalla nueva.
+  const isMainApp = currentScreen === 'main'
+  const isModalScreen = !isMainApp && !flowScreens.includes(currentScreen)
   const isCommunityScreen = ['settings', 'editProfile', 'about', 'terms', 'privacy', 'prohibited', 'invite', 'contact', 'deleteAccount'].includes(currentScreen)
-  const isMainApp = !flowScreens.includes(currentScreen) && !isModalScreen
   const screenIdentity = currentScreen === 'main'
     ? `main-${activeTab}`
     : `${currentScreen}-${params?.postId || params?.id || params?.sellerId || ''}-${detailRevision}`

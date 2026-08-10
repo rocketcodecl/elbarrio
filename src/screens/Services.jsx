@@ -751,6 +751,7 @@ const s = {
   /* ── ÁREA DE SCROLL ── */
   scrollArea: {
     flex: 1,
+    minHeight: 0,
     overflowY: 'auto',
     overflowX: 'hidden',
     WebkitOverflowScrolling: 'touch',

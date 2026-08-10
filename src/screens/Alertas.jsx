@@ -452,7 +452,7 @@ const s = {
   headerTit: { minWidth: 0, textAlign: 'center', fontSize: 'var(--screen-header-title-size)', lineHeight: 1.2, fontWeight: 600, color: '#26302b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' },
   headerBrand: { color: C.verde, fontWeight: 700 },
 
-  scroll: { flex: 1, overflowY: 'auto', padding: '14px 16px 120px' },
+  scroll: { flex: 1, minHeight: 0, overflowY: 'auto', padding: '14px 16px 120px', WebkitOverflowScrolling: 'touch', overscrollBehavior: 'contain' },
 
   safetyCard: {
     display: 'flex', alignItems: 'center', gap: 11,

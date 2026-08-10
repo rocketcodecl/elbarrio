@@ -1788,7 +1788,7 @@ const s = {
 
   /* ── scroll principal ── */
   scroll: {
-    flex: 1, overflowY: 'auto',
+    flex: 1, minHeight: 0, overflowY: 'auto',
     padding: '4px 16px 0',
     WebkitOverflowScrolling: 'touch',
   },

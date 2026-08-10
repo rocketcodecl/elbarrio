@@ -1928,7 +1928,7 @@ const s = {
   subTabRow: { display: 'flex', gap: 8, overflowX: 'auto', padding: '14px 2px 4px', scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch' },
   subTab: { padding: '7px 14px', borderRadius: 22, fontSize: 12.5, fontWeight: 600, whiteSpace: 'nowrap', cursor: 'pointer', flexShrink: 0 },
 
-  scrollArea: { flex: 1, overflowY: 'auto', overflowX: 'hidden', WebkitOverflowScrolling: 'touch', padding: '0 18px' },
+  scrollArea: { flex: 1, minHeight: 0, overflowY: 'auto', overflowX: 'hidden', WebkitOverflowScrolling: 'touch', padding: '0 18px' },
 
   card: { backgroundColor: '#fff', borderRadius: 16, padding: 16, marginTop: 14, boxShadow: '0 2px 8px rgba(0,0,0,0.05)', cursor: 'pointer' },
 

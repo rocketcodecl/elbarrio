@@ -383,7 +383,7 @@ const s = {
     letterSpacing: '-0.2px',
   },
 
-  scroll: { flex: 1, overflowY: 'auto', padding: '14px 16px 110px' },
+  scroll: { flex: 1, minHeight: 0, overflowY: 'auto', padding: '14px 16px 110px' },
 
   /* ── stats mini ── */
   statsRow: {

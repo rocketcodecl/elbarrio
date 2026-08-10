@@ -167,7 +167,7 @@ export default function EventDetail({ postId, neighborhoodId, profileId, onNavig
           <div style={s.mapCaption}>{event.location_text || 'Lugar por confirmar'}</div>
           {directionsUrl && <button type="button" onClick={() => openExternalUrl(directionsUrl)} style={s.directionsLink}><Pin /> Cómo llegar</button>}
         </section>
-        <div style={{ height: 104, flexShrink: 0 }} />
+        <div style={{ height: primaryActionUrl ? 118 : 34, flexShrink: 0 }} />
       </div>
       {primaryActionUrl && (
         <div style={s.actionDock}>
@@ -180,7 +180,7 @@ export default function EventDetail({ postId, neighborhoodId, profileId, onNavig
 
 const s = {
   wrap: { width: '100%', height: '100%', background: '#f8f8fb', fontFamily: T.font, display: 'flex', flexDirection: 'column', overflow: 'hidden', position: 'relative' },
-  scroll: { flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch' },
+  scroll: { flex: 1, minHeight: 0, overflowY: 'auto', WebkitOverflowScrolling: 'touch', overscrollBehavior: 'contain', touchAction: 'pan-y' },
   center: { width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12, fontFamily: T.font, color: C.textoSuave },
   backText: { border: 'none', background: C.verde, color: '#fff', padding: '9px 14px', borderRadius: 10 },
   hero: { height: 240, position: 'relative', overflow: 'hidden', background: '#e8eee9' },
