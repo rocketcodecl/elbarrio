@@ -391,7 +391,7 @@ El botón de creación abre `CreatePost.jsx`, salvo la creación de comercios, q
 - El detalle de comercio abre su mapa por defecto. El detalle de evento ofrece “Cómo llegar” bajo el mapa mediante un enlace externo compatible con Google Maps o navegador.
 - El detalle de Noticias ya no muestra el rótulo “Noticia completa” y presenta la imagen a ancho completo.
 - Noticias usa una experiencia editorial propia: la primera historia funciona como portada, el detalle ocupa la pantalla completa, los enlaces escritos en el cuerpo son interactivos y el CTA externo solo aparece cuando existe una fuente o enlace. En APK/iOS los enlaces se abren mediante el navegador nativo.
-- Eventos conserva su lenguaje de agenda y suma una acción externa configurable (“Más información”, “Comprar entradas”, “Visitar sitio oficial” o “Ver programación”), separada de inscripción y “Cómo llegar”. Requiere ejecutar `202608100001_event_external_actions.sql` antes de publicar el panel actualizado.
+- Eventos conserva su lenguaje de agenda y suma una acción externa configurable (“Más información”, “Comprar entradas”, “Visitar sitio oficial” o “Ver programación”), separada de inscripción y “Cómo llegar”. `202608100001_event_external_actions.sql` fue ejecutada con resultado `Success` el 10 de agosto de 2026 y el panel actualizado fue publicado en `https://admin.elbarrio.lat/`.
 - El Inicio unifica mapa, notificaciones, accesos rápidos y ayuda mediante iconos lineales; emojis quedan reservados para categorías o contenido vecinal. Se aumentaron textos secundarios y se normalizó el aire entre secciones sin cambiar orden ni funciones.
 - El feed de Actividad identifica cada tipo de contenido mediante un ícono discreto en la esquina superior derecha.
 - Alertas fue reorganizada con resumen territorial, CTA principal, tarjetas compactas por nivel y detalle jerarquizado. La composición separa Seguridad, Incendio, Servicios, Animales, Fugas, Luz, Salud y Otros, conservando compatibilidad visual con categorías antiguas. La prioridad obligatoria guarda `alta`, `media` o `baja` en `incident_reports.severity`. Crear alerta ofrece accesos confirmados a 131, 132, 133 y 1402, sin reemplazar a los servicios de emergencia.
@@ -408,7 +408,6 @@ El botón de creación abre `CreatePost.jsx`, salvo la creación de comercios, q
 - Incorporar “Iniciar sesión con Apple” antes de enviar a revisión en iOS, porque la aplicación ofrece Google para autenticar la cuenta principal.
 
 - La migración `supabase/migrations/202608010003_home_carousel_pool.sql` fue ejecutada correctamente según confirmación manual. Falta ejecutar `supabase/migrations/202608050003_home_carousel_limit_15.sql` para que Supabase acepte las quince posiciones que ya ofrece el panel; la app mostrará hasta diez mezcladas por carga.
-- Ejecutar `supabase/migrations/202608100001_event_external_actions.sql` antes de desplegar el panel con acciones externas de Eventos. No asumirla aplicada hasta recibir confirmación manual.
 - Validar visualmente en móvil real el nuevo listado, detalle y composición de Alertas, incluidas las llamadas telefónicas.
 
 - Validar el correo de recuperación de contraseña tanto en local como en producción.
