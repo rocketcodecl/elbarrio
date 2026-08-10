@@ -407,6 +407,24 @@ const mezclarActividadRelevante = (items, limit = 30) => {
   return [...visible, ...deferred].slice(0, limit)
 }
 
+const accionActividad = (post) => {
+  if (post.__incident) return 'Ver alerta'
+  if (post.type === 'event') return 'Ver evento'
+  if (post.type === 'news') return 'Leer noticia'
+  if (['sell', 'gift', 'trade'].includes(post.type)) return 'Ver en Mercado'
+  if (post.type === 'request') return 'Ver pedido'
+  return 'Abrir publicación'
+}
+
+const contextoActividad = (post) => {
+  if (post.__incident) return 'Alerta activa'
+  if (post.type === 'event') return 'Panorama local'
+  if (post.type === 'news') return 'Información del barrio'
+  if (['sell', 'gift', 'trade'].includes(post.type)) return 'Disponible cerca de ti'
+  if (post.type === 'request') return 'Un vecino necesita ayuda'
+  return 'Conversación vecinal'
+}
+
 function Home({ currentUser, onNavigate, onCrear }) {
   const [profile, setProfile] = useState(null)
   const [barrio, setBarrio] = useState(null)
@@ -878,6 +896,7 @@ function Home({ currentUser, onNavigate, onCrear }) {
   }, [pedidos, alertasVecinales, eventos, eventoPortada, actividad])
 
   const filtrados = actividadBarrio
+  const actividadDestacadaId = filtrados.find(item => item.images?.[0])?.id
 
   const onAcceso = (id) => {
     if (id === 'pedidos') crear('request')
@@ -1216,10 +1235,16 @@ function Home({ currentUser, onNavigate, onCrear }) {
                 const t = reporte
                   ? { ...reporte, corto: reporte.label }
                   : (TIPOS[p.type] || TIPOS.general)
+                const autor = p.author || {}
+                const nombreAutor = autor.official_actor_name || autor.full_name || 'Vecino del barrio'
+                const esDestacada = p.id === actividadDestacadaId
                 return (
                   <div
                     key={p.id}
-                    style={s.postCard}
+                    style={{
+                      ...s.postCard,
+                      ...(p.__incident ? s.postCardAlert : {}),
+                    }}
                     onClick={() => p.__incident
                       ? nav('alerta', { id: p.incidentId })
                       : p.type === 'event'
@@ -1228,38 +1253,55 @@ function Home({ currentUser, onNavigate, onCrear }) {
                           ? nav('noticias', { newsId: p.id })
                       : nav('post', { postId: p.id })}
                   >
-                    <div style={{ ...s.postFoto, background: t.bg }}>
-                      {p.images?.[0]
-                        ? <img src={p.images[0]} alt="" style={s.postImg} />
-                        : <span style={s.postEmoji}>{t.emoji}</span>}
+                    <div style={s.activityHeader}>
+                      <span style={{ ...s.activityAvatar, background: t.bg, color: t.color }}>
+                        {autor.avatar_url
+                          ? <img src={autor.avatar_url} alt="" style={s.activityAvatarImg} />
+                          : iniciales(nombreAutor)}
+                      </span>
+                      <span style={s.activityIdentity}>
+                        <span style={s.activityAuthorLine}>
+                          <strong style={s.activityAuthor}>{nombreAutor}</strong>
+                          {(autor.verified || autor.is_official_actor) && <span style={s.activityVerified}>✓</span>}
+                          {autor.badge_founder && <span style={s.fundadorBadge} title="Vecino fundador">🏅</span>}
+                        </span>
+                        <span style={s.activityTime}>{hace(p.created_at)} · {barrio?.name || 'Tu barrio'}</span>
+                      </span>
+                      <span style={{ ...s.activityChip, background: t.bg, color: t.color }}>
+                        <span aria-hidden="true">{t.emoji}</span> {t.corto}
+                      </span>
                     </div>
 
-                    <div style={{
-                      ...s.postInfo,
-                      ...(p.__incident ? s.alertActivityInfo : {}),
-                    }}>
-                      <div style={s.postTit}>{p.title}</div>
-                      {p.content && <div style={s.postTxt}>{p.content}</div>}
-
-                      <div style={s.postMetaRow}>
-                        <span style={{ ...s.chip, background: t.bg, color: t.color }}>
-                          {t.corto}
-                        </span>
-                        <span style={s.postAutorTop}>
-                          <span style={s.postAutorSep}>|</span>
-                          <span>Por {(p.author?.official_actor_name || p.author?.full_name || 'Vecino').split(' ')[0]}</span>
-                          {p.author?.verified && <span style={s.verificadoMini}>✓</span>}
-                          {p.author?.is_official_actor && <span style={s.verificadoMini}>OFICIAL</span>}
-                          {p.author?.badge_founder && <span style={s.fundadorBadge} title="Vecino fundador" aria-label="Vecino fundador">🏅</span>}
-                          <span>· {hace(p.created_at)}</span>
-                        </span>
-                        {p.price > 0 && <span style={s.precio}>{plata(p.price)}</span>}
-                        {p.is_negotiable && <span style={s.chipNeg}>Conversable</span>}
+                    {esDestacada && (
+                      <div style={s.activityHeroMedia}>
+                        <img src={p.images[0]} alt="" style={s.postImg} />
                       </div>
+                    )}
+
+                    <div style={s.activityContentRow}>
+                      <div style={s.postInfo}>
+                        <div style={s.postTit}>{p.title}</div>
+                        {p.content && <div style={s.postTxt}>{p.content}</div>}
+                        {(p.price > 0 || p.is_negotiable) && (
+                          <div style={s.activityCommerceMeta}>
+                            {p.price > 0 && <span style={s.precio}>{plata(p.price)}</span>}
+                            {p.is_negotiable && <span style={s.chipNeg}>Conversable</span>}
+                          </div>
+                        )}
+                      </div>
+                      {!esDestacada && p.images?.[0] && (
+                        <div style={s.activityThumb}>
+                          <img src={p.images[0]} alt="" style={s.postImg} />
+                        </div>
+                      )}
                     </div>
-                    <span style={s.activityTypeIcon} aria-label={p.__incident ? 'Alerta vecinal' : (TIPOS[p.type]?.label || 'Publicación')}>
-                      {p.__incident ? '🚨' : (TIPOS[p.type]?.emoji || '💬')}
-                    </span>
+
+                    <div style={s.activityFooter}>
+                      <span style={s.activityResponse}>
+                        {contextoActividad(p)}
+                      </span>
+                      <span style={s.activityAction}>{accionActividad(p)} <span aria-hidden="true">→</span></span>
+                    </div>
                   </div>
                 )
               })}
@@ -1914,44 +1956,62 @@ const s = {
     whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
   },
 
-  /* ── posts verticales (Actividad, Option A) ── */
+  /* ── Actividad: identidad, contenido y una acción clara ── */
   postCard: {
     position: 'relative',
-    display: 'flex', gap: 12,
-    background: C.card, borderRadius: 14, padding: 10,
+    display: 'flex', flexDirection: 'column',
+    background: C.card, borderRadius: 18, padding: 14,
     border: `1px solid ${C.borde}`,
-    marginBottom: 9, cursor: 'pointer',
+    boxShadow: '0 3px 14px rgba(21, 48, 34, 0.045)',
+    marginBottom: 12, cursor: 'pointer', overflow: 'hidden',
   },
-  activityTypeIcon: {
-    position: 'absolute', top: 8, right: 9,
-    fontSize: 15, lineHeight: 1, opacity: .82,
-    filter: 'saturate(.82)', pointerEvents: 'none',
+  postCardAlert: {
+    borderLeft: `3px solid ${C.rojo}`,
+    background: '#fffdfd',
   },
-  alertActivityInfo: { paddingRight: 19 },
-  postFoto: {
-    width: 56, height: 'auto', minHeight: 56,
-    alignSelf: 'stretch', borderRadius: 11, flexShrink: 0, overflow: 'hidden',
+  activityHeader: {
+    display: 'flex', alignItems: 'center', gap: 9, minWidth: 0,
+    marginBottom: 12,
+  },
+  activityAvatar: {
+    width: 34, height: 34, borderRadius: '50%', overflow: 'hidden',
     display: 'flex', alignItems: 'center', justifyContent: 'center',
+    flexShrink: 0, fontSize: 11, fontWeight: 800,
   },
-  postImg: { width: '100%', height: '100%', objectFit: 'cover' },
-  postEmoji: { fontSize: 24 },
-
-  postInfo: { flex: 1, minWidth: 0, paddingRight: 19 },
-  postMetaRow: {
-    display: 'flex', alignItems: 'center', gap: 5, minWidth: 0,
-    marginTop: 6,
+  activityAvatarImg: { width: '100%', height: '100%', objectFit: 'cover' },
+  activityIdentity: {
+    display: 'flex', flexDirection: 'column', minWidth: 0, flex: 1, gap: 2,
   },
-  chip: {
-    fontSize: 10, fontWeight: 700, padding: '2px 6px', borderRadius: 5,
-    flexShrink: 0,
-  },
-  postAutorTop: {
-    minWidth: 0, display: 'flex', alignItems: 'center', gap: 3,
-    fontSize: 9.5, color: C.textoTenue, fontWeight: 500,
+  activityAuthorLine: { display: 'flex', alignItems: 'center', gap: 4, minWidth: 0 },
+  activityAuthor: {
+    fontSize: 13.5, fontWeight: 750, color: C.texto,
     whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
   },
-  postAutorSep: { color: C.borde, marginRight: 1 },
-  verificadoMini: { color: C.verde, fontSize: 10, fontWeight: 800 },
+  activityVerified: {
+    width: 15, height: 15, borderRadius: '50%', flexShrink: 0,
+    display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+    color: '#fff', background: C.verde, fontSize: 9, fontWeight: 900,
+  },
+  activityTime: { fontSize: 11.5, color: C.textoTenue, fontWeight: 550 },
+  activityChip: {
+    display: 'inline-flex', alignItems: 'center', gap: 4,
+    fontSize: 10.5, fontWeight: 750, padding: '5px 7px', borderRadius: 999,
+    flexShrink: 0, maxWidth: 112, whiteSpace: 'nowrap', overflow: 'hidden',
+    textOverflow: 'ellipsis',
+  },
+  activityHeroMedia: {
+    width: 'calc(100% + 28px)', height: 164,
+    margin: '0 -14px 13px', overflow: 'hidden', background: C.fondo,
+  },
+  activityContentRow: {
+    display: 'flex', alignItems: 'stretch', gap: 12, minWidth: 0,
+  },
+  activityThumb: {
+    width: 92, minHeight: 76, maxHeight: 92, borderRadius: 12,
+    overflow: 'hidden', flexShrink: 0, background: C.fondo,
+  },
+  postImg: { width: '100%', height: '100%', objectFit: 'cover' },
+  postInfo: { flex: 1, minWidth: 0 },
   fundadorBadge: {
     flexShrink: 0,
     display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
@@ -1963,15 +2023,29 @@ const s = {
     background: C.fondo, padding: '2px 6px', borderRadius: 5,
   },
   postTit: {
-    fontSize: 13.5, fontWeight: 700, color: C.texto,
-    lineHeight: 1.3, marginTop: 0,
-    display: '-webkit-box', WebkitLineClamp: 1,
+    fontSize: 15, fontWeight: 750, color: C.texto,
+    lineHeight: 1.35, marginTop: 0,
+    display: '-webkit-box', WebkitLineClamp: 2,
     WebkitBoxOrient: 'vertical', overflow: 'hidden',
   },
   postTxt: {
-    fontSize: 12, color: C.textoSuave, lineHeight: 1.4, marginTop: 2,
-    display: '-webkit-box', WebkitLineClamp: 1,
+    fontSize: 13, color: C.textoSuave, lineHeight: 1.45, marginTop: 4,
+    display: '-webkit-box', WebkitLineClamp: 2,
     WebkitBoxOrient: 'vertical', overflow: 'hidden',
+  },
+  activityCommerceMeta: {
+    display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 7, marginTop: 9,
+  },
+  activityFooter: {
+    display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10,
+    borderTop: `1px solid ${C.bordeSuave}`, marginTop: 13, paddingTop: 11,
+  },
+  activityResponse: {
+    minWidth: 0, fontSize: 11.5, color: C.textoTenue, fontWeight: 550,
+    whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+  },
+  activityAction: {
+    flexShrink: 0, fontSize: 12.5, color: C.verde, fontWeight: 750,
   },
   /* ── vacío ── */
   vacio: {

@@ -387,6 +387,7 @@ El botón de creación abre `CreatePost.jsx`, salvo la creación de comercios, q
 - Páginas Nosotros, Términos, Productos prohibidos, Invitar vecinos, Contáctanos e Información y ayuda conectadas.
 - Inicio incorpora un carrusel editorial administrable. El panel puede preparar hasta quince contenidos con fotografía y la aplicación mezcla el conjunto para mostrar hasta diez por carga, sin alterar clima ni farmacia. La ampliación del límite remoto requiere ejecutar manualmente `202608050003_home_carousel_limit_15.sql`.
 - Actividad de el barrio mezcla publicaciones comunitarias, alertas, pedidos, eventos seleccionados y artículos de Mercado. Prioriza un conjunto de publicaciones recientes o vistas y altera su orden por carga para evitar un ranking rígido.
+- Actividad de el barrio usa tarjetas centradas en contenido: identidad y verificación del autor, contexto territorial, categoría, fotografía jerarquizada y un CTA específico por tipo. La primera publicación con imagen recibe una portada amplia; las restantes conservan un formato compacto. No se agregaron nuevas secciones ni métricas decorativas.
 - El detalle de comercio abre su mapa por defecto. El detalle de evento ofrece “Cómo llegar” bajo el mapa mediante un enlace externo compatible con Google Maps o navegador.
 - El detalle de Noticias ya no muestra el rótulo “Noticia completa” y presenta la imagen a ancho completo.
 - El feed de Actividad identifica cada tipo de contenido mediante un ícono discreto en la esquina superior derecha.
