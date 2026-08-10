@@ -115,6 +115,7 @@ export const TIPOS = {
   alert:   { emoji: '🚨', label: 'Alerta',       corto: 'Alerta',      color: C.rojo,    bg: C.rojoSuave },
   event:   { emoji: '📅', label: 'Evento',       corto: 'Evento',      color: C.verde,   bg: C.verdeSuave },
   news:    { emoji: '📰', label: 'Noticia',      corto: 'Noticia',     color: C.azul,    bg: C.azulSuave },
+  service: { emoji: '🛠️', label: 'Servicio',     corto: 'Servicio',    color: C.verde,   bg: C.verdeSuave },
   general: { emoji: '📢', label: 'Publicar',     corto: 'Publicación', color: C.verde,   bg: C.verdeSuave },
   request: { emoji: '🙋', label: 'Pedir ayuda',  corto: 'Pedido',      color: C.dorado,  bg: C.doradoSuave },
 }

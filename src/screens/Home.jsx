@@ -448,6 +448,7 @@ const accionActividad = (post) => {
   if (post.__incident) return 'Ver alerta'
   if (post.type === 'event') return 'Ver evento'
   if (post.type === 'news') return 'Leer noticia'
+  if (post.type === 'service') return 'Ver servicio'
   if (['sell', 'gift', 'trade'].includes(post.type)) return 'Ver en Mercado'
   if (post.type === 'request') return 'Ver pedido'
   return 'Abrir publicación'
@@ -457,6 +458,7 @@ const contextoActividad = (post) => {
   if (post.__incident) return 'Alerta activa'
   if (post.type === 'event') return 'Panorama local'
   if (post.type === 'news') return 'Información del barrio'
+  if (post.type === 'service') return 'Servicio disponible cerca de ti'
   if (['sell', 'gift', 'trade'].includes(post.type)) return 'Disponible cerca de ti'
   if (post.type === 'request') return 'Un vecino necesita ayuda'
   return 'Conversación vecinal'
@@ -678,7 +680,7 @@ function Home({ currentUser, onNavigate, onCrear }) {
       // ── Paso 2: 4 queries en paralelo (antes eran 9) ──
       // Unificamos pedidos/ventas/regalos/eventos/actividad en UNA sola
       // query a posts con type IN (...) y limit alto. Particionamos en JS.
-      const TIPOS_FEED = ['request', 'sell', 'gift', 'trade', 'event', 'news', 'general']
+      const TIPOS_FEED = ['request', 'sell', 'gift', 'trade', 'service', 'event', 'news', 'general']
       const selectPost = '*, author:profiles!author_id (full_name, avatar_url, badge_founder, verified, is_official_actor, official_actor_name)'
 
       const [profileRes, hoodRes, alertRes, postsRes, msgRes, spotlightRes, carouselRes, blocksRes] = await Promise.all([
@@ -789,7 +791,7 @@ function Home({ currentUser, onNavigate, onCrear }) {
       // Actividad también descubre publicaciones de Mercado. La selección
       // final mezcla contenidos recientes y vistos para evitar un orden fijo.
       const actividad = todos.filter((x) =>
-        ['general', 'sell', 'gift', 'trade'].includes(x.type)
+        ['general', 'sell', 'gift', 'trade', 'service'].includes(x.type)
         || (x.type === 'news' && x.show_in_activity === true)
       ).slice(0, 40)
 
@@ -1134,7 +1136,8 @@ function Home({ currentUser, onNavigate, onCrear }) {
             {farmaciasTurno.length > 0 && (
               <button style={s.farmaciaBloque} onClick={() => setVerFarmacias(true)}>
                 <div style={s.farmaciaLabel}>
-                  <Ico.farmacia /> Farmacia de turno
+                  <span style={s.farmaciaIcon} aria-hidden="true">💊</span>
+                  Farmacia de turno
                   {farmaciasTurno.length > 1 && (
                     <span style={s.farmaciaMas}> +{farmaciasTurno.length - 1}</span>
                   )}
@@ -1295,7 +1298,9 @@ function Home({ currentUser, onNavigate, onCrear }) {
                         ? nav('eventdetail', { postId: p.id })
                         : p.type === 'news'
                           ? nav('noticias', { newsId: p.id })
-                      : nav('post', { postId: p.id })}
+                          : p.type === 'service'
+                            ? nav('servicedetail', { postId: p.id })
+                            : nav('post', { postId: p.id })}
                   >
                     <div style={s.activityHeader}>
                       <span style={{ ...s.activityAvatar, background: t.bg, color: t.color }}>
@@ -1566,6 +1571,7 @@ const s = {
     display: 'flex', flexDirection: 'column', alignItems: 'flex-end',
   },
   farmaciaLabel: { display: 'flex', alignItems: 'center', gap: 4, fontSize: 11.5, color: C.textoTenue, fontWeight: 500 },
+  farmaciaIcon: { display: 'inline-flex', fontSize: 15, lineHeight: 1, flexShrink: 0 },
   farmaciaNombre: {
     fontSize: 13, fontWeight: 700, color: C.texto, marginTop: 2,
     whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
