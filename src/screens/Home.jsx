@@ -4,7 +4,6 @@ import {
   C, T, TIPOS, REPORTES, FARMACIAS,
   iniciales, hace, plata, saludo,
 } from '../lib/design'
-import CommunityImpact from '../components/CommunityImpact'
 
 /*
   INICIO — el Radar del barrio.
@@ -1192,8 +1191,6 @@ function Home({ currentUser, onNavigate, onCrear }) {
             </div>
           </div>
         )}
-
-        {!buscando && <CommunityImpact />}
 
         {/* ══════ ACTIVIDAD DE EL BARRIO (vertical, 10 + "+ ver más") ══════
             Feed principal — publicaciones generales de vecinos.

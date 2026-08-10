@@ -92,7 +92,6 @@ function DetailSheet({ section, posts, favorites, deals, onClose, onNavigate }) 
     posts: ['Mis publicaciones', posts],
     favorites: ['Mis favoritos', favorites],
     deals: ['Mis compras y ventas', deals],
-    events: ['Eventos guardados', posts],
   }[section]
   if (!config) return null
 
@@ -121,10 +120,6 @@ function DetailSheet({ section, posts, favorites, deals, onClose, onNavigate }) 
           {reviewMessage && <div className="profile-sheet-message">{reviewMessage}</div>}
           {items.length === 0 && <div className="profile-sheet-empty">Todavía no hay actividad en esta sección.</div>}
           {items.map(item => {
-            if (section === 'events') {
-              const event = item.event || item
-              return <button type="button" className="profile-activity-row" key={item.event_id || event.id} onClick={() => onNavigate?.('eventdetail', { postId: item.event_id || event.id })}><span>{event.images?.[0] ? <img src={event.images[0]} alt="" /> : '📅'}</span><div><strong>{event.title || 'Evento del barrio'}</strong><small>{event.starts_at ? new Date(event.starts_at).toLocaleDateString('es-CL', { day: 'numeric', month: 'long' }) : 'Fecha por confirmar'}</small></div><LineIcon name="chevron" size={17} /></button>
-            }
             if (section === 'posts') {
               return (
                 <button type="button" className="profile-activity-row" key={item.id} onClick={() => onNavigate?.('productdetail', { postId: item.id })}>
@@ -175,6 +170,17 @@ function DetailSheet({ section, posts, favorites, deals, onClose, onNavigate }) 
   )
 }
 
+function SettingsSheet({ onClose, onNavigate, accessibleMode, onAccessibleModeChange }) {
+  return <div className="profile-sheet-backdrop"><section className="profile-sheet" role="dialog" aria-modal="true" aria-label="Configuración"><header><button type="button" onClick={onClose} aria-label="Volver a Mi perfil"><LineIcon name="back" /></button><div><small>Mi perfil</small><h2>Configuración</h2></div><span aria-hidden="true" /></header><div className="profile-sheet-list"><section className="profile-menu">
+    <MenuRow icon="settings" tone="#e5f5ef" title="Editar mi perfil" onClick={() => onNavigate?.('editprofile')} />
+    <MenuRow icon="bell" tone="#fff7dc" title="Notificaciones" subtitle="Elige qué avisos llegan a tu teléfono" onClick={() => onNavigate?.('notificationpreferences')} />
+    <MenuRow icon="accessible" tone="#fff0e5" title="Modo accesible" subtitle="Fuentes y controles más grandes" active={accessibleMode} onClick={() => onAccessibleModeChange?.(!accessibleMode)} />
+    <MenuRow icon="shield" tone="#e9f3f8" title="Privacidad y seguridad" onClick={() => onNavigate?.('settings')} />
+    <MenuRow icon="heart" tone="#e5f5ef" title="Nosotros" onClick={() => onNavigate?.('about')} />
+    <MenuRow icon="logout" tone="#ffe9eb" title="Eliminar mi cuenta" danger onClick={() => onNavigate?.('deleteaccount')} />
+  </section></div></section></div>
+}
+
 export default function MyProfile({
   currentUser,
   profile: profileProp,
@@ -188,7 +194,6 @@ export default function MyProfile({
   const [posts, setPosts] = useState([])
   const [favorites, setFavorites] = useState([])
   const [deals, setDeals] = useState([])
-  const [followedEvents, setFollowedEvents] = useState([])
   const [loading, setLoading] = useState(true)
   const [section, setSection] = useState('')
 
@@ -211,7 +216,7 @@ export default function MyProfile({
         return
       }
 
-      const [postResult, favoriteResult, postFavoriteResult, dealResult, neighborhoodResult, followedEventsResult] = await Promise.all([
+      const [postResult, favoriteResult, postFavoriteResult, dealResult, neighborhoodResult] = await Promise.all([
         supabase.from('posts').select('id, title, type, status, images, created_at').eq('author_id', loadedProfile.id).order('created_at', { ascending: false }).limit(40),
         supabase.from('commerce_favorites').select('commerce_id').eq('profile_id', loadedProfile.id),
         supabase.from('post_likes').select('post_id').eq('user_id', currentUser.id),
@@ -219,7 +224,6 @@ export default function MyProfile({
         loadedProfile.neighborhood_id
           ? supabase.from('neighborhoods').select('name').eq('id', loadedProfile.neighborhood_id).maybeSingle()
           : Promise.resolve({ data: null }),
-        supabase.from('event_follows').select('event_id, created_at, event:posts!event_id(id,title,images,starts_at,status)').eq('profile_id', loadedProfile.id).order('created_at', { ascending: false }),
       ])
       if (!active) return
       const loadedPosts = postResult.data || []
@@ -251,7 +255,6 @@ export default function MyProfile({
         role: item.seller_id === loadedProfile.id ? 'seller' : 'buyer',
         post: dealPosts.get(item.post_id),
       })))
-      setFollowedEvents((followedEventsResult.data || []).filter(item => item.event?.status === 'active'))
       setNeighborhoodName(neighborhoodResult.data?.name || loadedProfile.neighborhood_name || loadedProfile.barrio || '')
       setLoading(false)
     }
@@ -290,7 +293,7 @@ export default function MyProfile({
       <div className="profile-scroll">
         <header className="profile-header">
           <h1>Mi perfil</h1>
-          <span className="profile-header-balance" aria-hidden="true" />
+          <button className="profile-settings-button" type="button" onClick={() => setSection('settings')} aria-label="Abrir configuración"><LineIcon name="settings" /></button>
         </header>
 
         <section className="profile-identity">
@@ -328,32 +331,18 @@ export default function MyProfile({
         </section>
 
         <section className="profile-menu">
-          <MenuRow icon="search" tone="#e5f5ef" title="Buscar en El Barrio" subtitle="Publicaciones, servicios, comercios y eventos" onClick={() => onNavigate?.('search')} />
-          <MenuRow icon="settings" tone="#e5f5ef" title="Editar mi perfil" onClick={() => onNavigate?.('editprofile')} />
           <MenuRow icon="post" tone="#e5f5ef" title="Mis publicaciones" count={posts.length} onClick={() => setSection('posts')} />
           <MenuRow icon="heart" tone="#f3e8ff" title="Mis favoritos" count={favorites.length} onClick={() => setSection('favorites')} />
           <MenuRow icon="deals" tone="#e7f3f6" title="Mis compras y ventas" count={deals.length} onClick={() => setSection('deals')} />
-          <MenuRow icon="post" tone="#fff7dc" title="Eventos guardados" count={followedEvents.length} onClick={() => setSection('events')} />
           <MenuRow icon="users" tone="#e8f5ec" title="Invitar vecinos" onClick={() => onNavigate?.('invite')} />
           <MenuRow icon="whatsapp" tone="#e4f8ed" title="Hablemos por WhatsApp" onClick={() => openWhatsApp('Hola El Barrio, necesito ayuda.')} />
-          <MenuRow icon="bell" tone="#fff7dc" title="Preferencias de notificaciones" subtitle="Elige qué avisos llegan a tu teléfono" onClick={() => onNavigate?.('notificationpreferences')} />
-          <MenuRow
-            icon="accessible"
-            tone="#fff0e5"
-            title="Modo accesible"
-            subtitle="Para tercera edad: fuentes grandes"
-            active={accessibleMode}
-            onClick={() => onAccessibleModeChange?.(!accessibleMode)}
-          />
-          <MenuRow icon="shield" tone="#e9f3f8" title="Privacidad y seguridad" onClick={() => onNavigate?.('settings')} />
-          <MenuRow icon="heart" tone="#e5f5ef" title="Nosotros" onClick={() => onNavigate?.('about')} />
-          {profile?.role === 'admin' && <MenuRow icon="settings" tone="#e5f5ef" title="Panel de administración" onClick={() => onNavigate?.('admin')} />}
           <MenuRow icon="logout" tone="#ffe9eb" title="Cerrar sesión" danger onClick={onLogout} />
         </section>
         <div className="profile-bottom-space" />
       </div>
 
-      <DetailSheet section={section} posts={section === 'events' ? followedEvents : posts} favorites={favorites} deals={deals} onClose={() => setSection('')} onNavigate={onNavigate} />
+      <DetailSheet section={section} posts={posts} favorites={favorites} deals={deals} onClose={() => setSection('')} onNavigate={onNavigate} />
+      {section === 'settings' && <SettingsSheet onClose={() => setSection('')} onNavigate={onNavigate} accessibleMode={accessibleMode} onAccessibleModeChange={onAccessibleModeChange} />}
     </div>
   )
 }
@@ -361,7 +350,7 @@ export default function MyProfile({
 const PROFILE_CSS = `
 .my-profile{width:100%;height:100%;background:#f7faf7;color:#1d211f;font-family:'Plus Jakarta Sans',system-ui,sans-serif;overflow:hidden}
 .profile-scroll{height:100%;overflow-y:auto;padding:52px 20px 92px;scrollbar-width:none}.profile-scroll::-webkit-scrollbar{display:none}
-.profile-header{height:44px;display:flex;align-items:center;justify-content:space-between}.profile-header h1{margin:0;font-size:26px;line-height:1;font-weight:800;letter-spacing:-.7px}.profile-header-balance{width:40px;height:40px;display:block}
+.profile-header{height:44px;display:flex;align-items:center;justify-content:space-between}.profile-header h1{margin:0;font-size:26px;line-height:1;font-weight:800;letter-spacing:-.7px}.profile-settings-button{width:40px;height:40px;display:grid;place-items:center;border:1px solid #dce2de;border-radius:50%;background:#fff;color:#34423a}
 .profile-identity{text-align:center;padding:16px 0 15px}.profile-avatar{width:98px;height:98px;margin:0 auto 9px;border-radius:50%;overflow:hidden;background:linear-gradient(145deg,#daf3e7,#a8d5c0);display:grid;place-items:center;color:#126a45;font-size:28px;font-weight:800}.profile-avatar img{width:100%;height:100%;object-fit:cover}.profile-identity h2{margin:0;font-size:23px;line-height:1.25;font-weight:800;letter-spacing:-.45px}.profile-verified{display:inline-grid;place-items:center;width:15px;height:15px;margin-left:5px;border-radius:50%;background:#159969;color:#fff;font-size:10px;vertical-align:2px}.profile-identity p{margin:4px 0 0;color:#657078;font-size:14px}
 .profile-reputation{background:#fff;border:1px solid #dce2de;border-radius:16px;padding:16px;margin-top:0}.profile-reputation-top{display:flex;align-items:center;justify-content:space-between;padding-bottom:12px}.profile-reputation-top>div{display:flex;flex-direction:column;gap:3px}.profile-reputation-top strong{font-size:24px;line-height:1;font-weight:800}.profile-reputation-top strong small{font-size:12px;color:#727a83;font-weight:600}.profile-reputation-top>div>span{font-size:11px;color:#128155;font-weight:700}.profile-star{font-size:35px;line-height:1;color:#ffc52d;text-shadow:0 1px 0 #e59c00}
 .profile-stats{display:grid;grid-template-columns:repeat(3,1fr);border-top:1px solid #e7ebe8;border-bottom:1px solid #e7ebe8;padding:12px 0}.profile-stats div{text-align:center;border-right:1px solid #e7ebe8}.profile-stats div:last-child{border:0}.profile-stats strong,.profile-stats span{display:block}.profile-stats strong{font-size:18px}.profile-stats span{font-size:10px;color:#657078;margin-top:2px}.profile-progress-title{display:flex;justify-content:space-between;margin:12px 0 6px;color:#626d75;font-size:10.5px}.profile-progress-title strong{color:#128155}.profile-progress{height:8px;border-radius:999px;background:#e4e8ee;overflow:hidden}.profile-progress i{display:block;height:100%;min-width:0;border-radius:inherit;background:#139b70;transition:width .3s ease}.profile-reputation>p{margin:7px 0 0;color:#68727b;font-size:9.5px}.profile-loading{min-height:150px;display:grid;place-items:center;color:#68727b;font-size:12px}
