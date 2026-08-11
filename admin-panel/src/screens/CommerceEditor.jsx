@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase.js'
 import { COMMERCE_CATEGORIES, COMMERCE_CATEGORY_ICONS } from '../lib/design.js'
 import LocationPicker from '../components/LocationPicker.jsx'
 import { prepareImageUpload } from '../../../shared/imageUpload.js'
+import usePersistentDraft from '../hooks/usePersistentDraft.js'
 
 const DAYS = [
   ['1', 'Lunes'], ['2', 'Martes'], ['3', 'Miércoles'], ['4', 'Jueves'], ['5', 'Viernes'], ['6', 'Sábado'], ['0', 'Domingo'],
@@ -60,14 +61,21 @@ const initialState = commerce => {
 }
 
 export default function CommerceEditor({ commerce, profile, onBack, onSaved, onDeleted }) {
-  const [draft, setDraft] = useState(() => initialState(commerce))
+  const draftKey = `commerce:${profile?.id || 'admin'}:${commerce?.id || 'new'}`
+  const draftVersion = commerce?.updated_at || 'new-v1'
+  const [draft, setDraft, clearFormDraft] = usePersistentDraft(`${draftKey}:form`, initialState(commerce), draftVersion)
   const [saving, setSaving] = useState(false)
   const [uploading, setUploading] = useState('')
   const [error, setError] = useState('')
   const [neighborhoods, setNeighborhoods] = useState([])
-  const [targetNeighborhoodId, setTargetNeighborhoodId] = useState(() => (
-    commerce?.neighborhood_id || (profile?.is_superadmin ? '' : profile?.neighborhood_id || '')
-  ))
+  const [targetNeighborhoodId, setTargetNeighborhoodId, clearNeighborhoodDraft] = usePersistentDraft(
+    `${draftKey}:neighborhood`,
+    commerce?.neighborhood_id || (profile?.is_superadmin ? '' : profile?.neighborhood_id || ''),
+    draftVersion,
+  )
+
+  const clearCommerceDraft = () => { clearFormDraft(); clearNeighborhoodDraft() }
+  const discardAndClose = () => { clearCommerceDraft(); onBack() }
 
   const set = (field, value) => setDraft(current => ({ ...current, [field]: value }))
 
@@ -195,6 +203,7 @@ export default function CommerceEditor({ commerce, profile, onBack, onSaved, onD
       setError(saveError.message || 'No fue posible guardar el comercio.')
       return
     }
+    clearCommerceDraft()
     onSaved()
   }
 
@@ -207,6 +216,7 @@ export default function CommerceEditor({ commerce, profile, onBack, onSaved, onD
       setError(deleteError.message || 'No fue posible eliminar el comercio.')
       return
     }
+    clearCommerceDraft()
     onDeleted()
   }
 
@@ -309,7 +319,7 @@ export default function CommerceEditor({ commerce, profile, onBack, onSaved, onD
           </div>
         </section>
 
-        <footer className="commerce-editor-footer"><button className="button button-secondary" type="button" onClick={onBack}>Cancelar</button><button className="button button-primary" type="submit" disabled={saving || !!uploading}>{saving ? 'Guardando…' : 'Guardar comercio'}</button></footer>
+        <footer className="commerce-editor-footer"><button className="button button-secondary" type="button" onClick={discardAndClose}>Descartar borrador</button><button className="button button-primary" type="submit" disabled={saving || !!uploading}>{saving ? 'Guardando…' : 'Guardar comercio'}</button></footer>
       </form>
     </div>
   )

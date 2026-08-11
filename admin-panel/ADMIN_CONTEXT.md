@@ -146,3 +146,10 @@
 
 - Las Edge Functions `admin-service-metrics` y `cleanup-storage-assets` aceptan `x-client-info`, además de autorización, API key y tipo de contenido. Ambas fueron redesplegadas y sus preflight remotos respondieron HTTP 200.
 - No fue necesario volver a publicar el panel ni ejecutar SQL: el fallo era un bloqueo CORS en las funciones remotas.
+
+## Borradores automáticos — 11 de agosto de 2026
+
+- Los editores extensos de Eventos, Noticias, Comercios, Servicios, Farmacias, Mercado, Alertas, Notificaciones, Productos, Promociones y Contenido institucional guardan el trabajo no publicado en `localStorage`, aislado por administrador, módulo y registro.
+- Guardar/publicar o `Descartar borrador` elimina la copia local. Salir mediante la flecha o cambiar de módulo conserva el contenido para restaurarlo al regresar.
+- Nunca se persisten contraseñas ni motivos de moderación. Los archivos locales todavía no cargados no pueden restaurarse; las imágenes que ya tienen URL sí.
+- El build vigente publicado y verificado usa `index-Bmq8pts-.js` e `index-CAACCql-.css`.

@@ -495,3 +495,10 @@ La entrega generada es un build firmado y reproducible de cierre técnico. No de
 
 - `admin-service-metrics` y `cleanup-storage-assets` permiten el encabezado `x-client-info` enviado por el cliente oficial de Supabase. Ambas funciones fueron redesplegadas con JWT validado internamente y su preflight remoto respondió HTTP 200 con los encabezados requeridos.
 - Esta corrección elimina el bloqueo CORS que el panel mostraba como `Failed to send a request to the Edge Function`; no requirió SQL ni cambios de esquema.
+
+## Borradores administrativos — 11 de agosto de 2026
+
+- El panel conserva automáticamente en el navegador los cambios no publicados de Eventos, Noticias, Comercios, Servicios, Farmacias, Mercado, Alertas, Notificaciones, Productos, Promociones y Contenido institucional.
+- Los borradores se separan por administrador, módulo y registro. Se eliminan al guardar/publicar correctamente o al usar `Descartar borrador`; la flecha superior permite salir sin perder el trabajo.
+- No se guardan contraseñas ni motivos de moderación. Los archivos elegidos pero todavía no subidos deben seleccionarse nuevamente por restricciones del navegador; las URLs de imágenes ya subidas sí se conservan.
+- Es una protección local del dispositivo y navegador actual, no sincronización entre computadores. No requirió SQL ni cambios de esquema.

@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase.js'
 import NewsCategoryManager, { NEWS_CATEGORY_ICONS, newsCategoryKey } from './NewsCategoryManager.jsx'
 import { prepareImageUpload } from '../../../shared/imageUpload.js'
 import { normalizeHttpUrl } from '../../../shared/externalUrl.js'
+import usePersistentDraft from '../hooks/usePersistentDraft.js'
 
 const DEFAULT_CATEGORIES = [
   { key: 'general', icon: '📰', name: 'General' },
@@ -31,7 +32,9 @@ const initialState = news => ({
 })
 
 function NewsEditor({ news, profile, categories, onCategoryCreated, onBack, onSaved, onDeleted }) {
-  const [draft, setDraft] = useState(() => initialState(news))
+  const draftKey = `news:${profile?.id || 'admin'}:${news?.id || 'new'}`
+  const draftVersion = news?.updated_at || 'new-v1'
+  const [draft, setDraft, clearFormDraft] = usePersistentDraft(`${draftKey}:form`, initialState(news), draftVersion)
   const [saving, setSaving] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [error, setError] = useState('')
@@ -40,9 +43,13 @@ function NewsEditor({ news, profile, categories, onCategoryCreated, onBack, onSa
   const [categoryIcon, setCategoryIcon] = useState('📰')
   const [categorySaving, setCategorySaving] = useState(false)
   const [neighborhoods, setNeighborhoods] = useState([])
-  const [targetNeighborhoodId, setTargetNeighborhoodId] = useState(() => (
-    news?.neighborhood_id || (profile?.is_superadmin ? '' : profile?.neighborhood_id || '')
-  ))
+  const [targetNeighborhoodId, setTargetNeighborhoodId, clearNeighborhoodDraft] = usePersistentDraft(
+    `${draftKey}:neighborhood`,
+    news?.neighborhood_id || (profile?.is_superadmin ? '' : profile?.neighborhood_id || ''),
+    draftVersion,
+  )
+  const clearNewsDraft = () => { clearFormDraft(); clearNeighborhoodDraft() }
+  const discardAndClose = () => { clearNewsDraft(); onBack() }
   const set = (field, value) => setDraft(current => ({ ...current, [field]: value }))
 
   useEffect(() => {
@@ -137,6 +144,7 @@ function NewsEditor({ news, profile, categories, onCategoryCreated, onBack, onSa
       setError(saveError.message || 'No fue posible guardar la noticia.')
       return
     }
+    clearNewsDraft()
     onSaved()
   }
 
@@ -146,6 +154,7 @@ function NewsEditor({ news, profile, categories, onCategoryCreated, onBack, onSa
     const { error: deleteError } = await supabase.from('posts').delete().eq('id', news.id).eq('type', 'news')
     setSaving(false)
     if (deleteError) return setError(deleteError.message || 'No fue posible eliminar la noticia.')
+    clearNewsDraft()
     onDeleted()
   }
 
@@ -194,7 +203,7 @@ function NewsEditor({ news, profile, categories, onCategoryCreated, onBack, onSa
           </div>
         </section>
 
-        <footer className="commerce-editor-footer"><button className="button button-secondary" type="button" onClick={onBack}>Cancelar</button><button className="button button-primary" type="submit" disabled={saving || uploading}>{saving ? 'Guardando…' : news ? 'Guardar cambios' : 'Publicar noticia'}</button></footer>
+        <footer className="commerce-editor-footer"><button className="button button-secondary" type="button" onClick={discardAndClose}>Descartar borrador</button><button className="button button-primary" type="submit" disabled={saving || uploading}>{saving ? 'Guardando…' : news ? 'Guardar cambios' : 'Publicar noticia'}</button></footer>
       </form>
     </div>
   )

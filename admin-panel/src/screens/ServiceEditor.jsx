@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabase.js";
 import { prepareImageUpload } from "../../../shared/imageUpload.js";
+import usePersistentDraft from "../hooks/usePersistentDraft.js";
 
 const RUBROS = {
   gasfiter: ["🔧", "Gasfitería"],
@@ -30,11 +31,13 @@ export default function ServiceEditor({
   onSaved,
 }) {
   const editing = Boolean(service?.id);
+  const draftKey = `service:${profile?.id || "admin"}:${service?.id || "new"}`;
+  const draftVersion = service?.updated_at || "new-v1";
   const [providers, setProviders] = useState([]);
   const [rubros, setRubros] = useState(() =>
     Object.entries(RUBROS).map(([key, [icon, label]]) => ({ key, icon, label }))
   );
-  const [draft, setDraft] = useState({
+  const [draft, setDraft, clearServiceDraft] = usePersistentDraft(draftKey, {
     authorId: service?.author_id || "",
     title: service?.title || "",
     serviceKey: service?.service_key || service?.category || "otro",
@@ -46,7 +49,7 @@ export default function ServiceEditor({
     phone: service?.service_phone || "",
     whatsapp: service?.service_whatsapp || "",
     instagram: service?.service_instagram || "",
-  });
+  }, draftVersion);
   const [imageChanged, setImageChanged] = useState(false);
   const [loadingProviders, setLoadingProviders] = useState(true);
   const [uploading, setUploading] = useState(false);
@@ -98,7 +101,7 @@ export default function ServiceEditor({
       }));
       setLoadingProviders(false);
     });
-  }, [profile?.id, profile?.is_superadmin, profile?.neighborhood_id]);
+  }, [profile?.id, profile?.is_superadmin, profile?.neighborhood_id, setDraft]);
 
   const uploadImage = async (event) => {
     const file = event.target.files?.[0];
@@ -179,6 +182,7 @@ export default function ServiceEditor({
           saveError.message
         }`
       );
+    clearServiceDraft();
     onSaved(service?.id);
   };
 
@@ -360,9 +364,9 @@ export default function ServiceEditor({
           <button
             className="button button-secondary"
             type="button"
-            onClick={onBack}
+            onClick={() => { clearServiceDraft(); onBack(); }}
           >
-            Cancelar
+            Descartar borrador
           </button>
           <button
             className="button button-primary"

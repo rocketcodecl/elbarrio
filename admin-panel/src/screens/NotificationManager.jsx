@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { supabase } from '../lib/supabase.js'
+import usePersistentDraft from '../hooks/usePersistentDraft.js'
 
 const AUDIENCES = [
   { id: 'all', icon: '🏘️', name: 'Todo el barrio', description: 'Todos los perfiles activos del barrio.' },
@@ -18,10 +19,17 @@ const dateLabel = value => value
 
 export default function NotificationManager({ profile }) {
   const isSuperadmin = profile?.is_superadmin === true
-  const [audience, setAudience] = useState('all')
-  const [title, setTitle] = useState('')
-  const [body, setBody] = useState('')
-  const [category, setCategory] = useState('general_push')
+  const [compose, setCompose, clearNotificationDraft] = usePersistentDraft(
+    `notification:${profile?.id || 'admin'}`,
+    { audience: 'all', title: '', body: '', category: 'general_push', targetNeighborhoodId: '' },
+    'v1',
+  )
+  const { audience, title, body, category, targetNeighborhoodId } = compose
+  const setAudience = value => setCompose(current => ({ ...current, audience: value }))
+  const setTitle = value => setCompose(current => ({ ...current, title: value }))
+  const setBody = value => setCompose(current => ({ ...current, body: value }))
+  const setCategory = value => setCompose(current => ({ ...current, category: value }))
+  const setTargetNeighborhoodId = value => setCompose(current => ({ ...current, targetNeighborhoodId: value }))
   const [counts, setCounts] = useState({})
   const [history, setHistory] = useState([])
   const [loading, setLoading] = useState(true)
@@ -29,7 +37,6 @@ export default function NotificationManager({ profile }) {
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
   const [neighborhoods, setNeighborhoods] = useState([])
-  const [targetNeighborhoodId, setTargetNeighborhoodId] = useState('')
 
   const selectedAudience = useMemo(() => AUDIENCES.find(item => item.id === audience) || AUDIENCES[0], [audience])
   const recipientCount = Number(counts[audience] || 0)
@@ -116,8 +123,8 @@ export default function NotificationManager({ profile }) {
       else if (Number(pushResult?.devices || 0) > 0) pushNotice = ` Push entregado a ${Number(pushResult.sent || 0)} dispositivo(s).`
       else pushNotice = ' Ningún teléfono ha activado push todavía.'
     }
-    setTitle('')
-    setBody('')
+    clearNotificationDraft()
+    setCompose(current => ({ ...current, title: '', body: '' }))
     await load()
     setSending(false)
     setNotice(`Notificación enviada correctamente a ${sent} ${sent === 1 ? 'persona' : 'personas'}.${pushNotice}`)

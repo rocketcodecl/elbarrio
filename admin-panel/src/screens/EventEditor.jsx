@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase.js'
 import LocationPicker from '../components/LocationPicker.jsx'
 import { prepareImageUpload } from '../../../shared/imageUpload.js'
 import { normalizeHttpUrl } from '../../../shared/externalUrl.js'
+import usePersistentDraft from '../hooks/usePersistentDraft.js'
 
 const DEFAULT_EVENT_TYPES = [
   ['asambleas', '🏛️', 'Asamblea'],
@@ -54,15 +55,29 @@ const initialState = event => ({
 })
 
 export default function EventEditor({ event, profile, onBack, onSaved }) {
-  const [draft, setDraft] = useState(() => initialState(event))
+  const draftKey = `event:${profile?.id || 'admin'}:${event?.id || 'new'}`
+  const draftVersion = event?.updated_at || 'new-v1'
+  const [draft, setDraft, clearFormDraft] = usePersistentDraft(`${draftKey}:form`, initialState(event), draftVersion)
   const [saving, setSaving] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [error, setError] = useState('')
   const [categories, setCategories] = useState(DEFAULT_EVENT_TYPES.map(([key, icon, name]) => ({ key, icon, name })))
   const [neighborhoods, setNeighborhoods] = useState([])
-  const [targetNeighborhoodId, setTargetNeighborhoodId] = useState(() => (
-    event?.neighborhood_id || (profile?.is_superadmin ? '' : profile?.neighborhood_id || '')
-  ))
+  const [targetNeighborhoodId, setTargetNeighborhoodId, clearNeighborhoodDraft] = usePersistentDraft(
+    `${draftKey}:neighborhood`,
+    event?.neighborhood_id || (profile?.is_superadmin ? '' : profile?.neighborhood_id || ''),
+    draftVersion,
+  )
+
+  const clearEventDraft = () => {
+    clearFormDraft()
+    clearNeighborhoodDraft()
+  }
+
+  const discardAndClose = () => {
+    clearEventDraft()
+    onBack()
+  }
 
   const set = (field, value) => setDraft(current => ({ ...current, [field]: value }))
   const setTicket = (index, field, value) => setDraft(current => ({ ...current, ticket_prices: current.ticket_prices.map((ticket, ticketIndex) => ticketIndex === index ? { ...ticket, [field]: value } : ticket) }))
@@ -195,6 +210,7 @@ export default function EventEditor({ event, profile, onBack, onSaved }) {
       setError(`El evento se guardó, pero no pudimos actualizar la portada de Inicio: ${spotlightError.message}`)
       return
     }
+    clearEventDraft()
     onSaved()
   }
 
@@ -279,7 +295,7 @@ export default function EventEditor({ event, profile, onBack, onSaved }) {
           </label>
         </section>
 
-        <footer className="commerce-editor-footer"><button className="button button-secondary" type="button" onClick={onBack}>Cancelar</button><button className="button button-primary" type="submit" disabled={saving || uploading}>{saving ? 'Guardando…' : event ? 'Guardar cambios' : 'Publicar evento'}</button></footer>
+        <footer className="commerce-editor-footer"><button className="button button-secondary" type="button" onClick={discardAndClose}>Descartar borrador</button><button className="button button-primary" type="submit" disabled={saving || uploading}>{saving ? 'Guardando…' : event ? 'Guardar cambios' : 'Publicar evento'}</button></footer>
       </form>
     </div>
   )

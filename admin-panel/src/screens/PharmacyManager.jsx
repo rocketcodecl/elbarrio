@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { supabase } from '../lib/supabase.js'
 import LocationPicker from '../components/LocationPicker.jsx'
+import usePersistentDraft from '../hooks/usePersistentDraft.js'
 
 const EMPTY_PHARMACY = {
   nombre: '', direccion: '', comuna: 'Las Condes', horario: '24 horas', telefono: '',
@@ -16,7 +17,7 @@ const compactMapAddress = value => {
 }
 
 function PharmacyEditor({ pharmacy, onBack, onSaved, onDeleted }) {
-  const [draft, setDraft] = useState(() => pharmacy ? {
+  const initialDraft = pharmacy ? {
     nombre: pharmacy.nombre || '',
     direccion: pharmacy.direccion || '',
     comuna: pharmacy.comuna || 'Las Condes',
@@ -27,7 +28,12 @@ function PharmacyEditor({ pharmacy, onBack, onSaved, onDeleted }) {
     is_active: pharmacy.is_active !== false,
     is_on_duty: pharmacy.is_on_duty === true,
     sort_order: pharmacy.sort_order ?? 0,
-  } : EMPTY_PHARMACY)
+  } : EMPTY_PHARMACY
+  const [draft, setDraft, clearPharmacyDraft] = usePersistentDraft(
+    `pharmacy:${pharmacy?.id || 'new'}`,
+    initialDraft,
+    pharmacy?.updated_at || 'new-v1',
+  )
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const set = (key, value) => setDraft(current => ({ ...current, [key]: value }))
@@ -66,6 +72,7 @@ function PharmacyEditor({ pharmacy, onBack, onSaved, onDeleted }) {
       setError(saveError.message || 'No fue posible guardar la farmacia.')
       return
     }
+    clearPharmacyDraft()
     onSaved()
   }
 
@@ -79,6 +86,7 @@ function PharmacyEditor({ pharmacy, onBack, onSaved, onDeleted }) {
       setError(deleteError.message || 'No fue posible eliminar la farmacia.')
       return
     }
+    clearPharmacyDraft()
     onDeleted()
   }
 
@@ -123,7 +131,7 @@ function PharmacyEditor({ pharmacy, onBack, onSaved, onDeleted }) {
           </div>
         </section>
 
-        <footer className="commerce-editor-footer"><button className="button button-secondary" type="button" onClick={onBack}>Cancelar</button><button className="button button-primary" type="submit" disabled={saving}>{saving ? 'Guardando…' : 'Guardar farmacia'}</button></footer>
+        <footer className="commerce-editor-footer"><button className="button button-secondary" type="button" onClick={() => { clearPharmacyDraft(); onBack() }}>Descartar borrador</button><button className="button button-primary" type="submit" disabled={saving}>{saving ? 'Guardando…' : 'Guardar farmacia'}</button></footer>
       </form>
     </div>
   )

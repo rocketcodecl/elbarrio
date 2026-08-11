@@ -4,6 +4,7 @@ import { MapContainer, Marker, TileLayer } from 'react-leaflet'
 import 'leaflet/dist/leaflet.css'
 import { supabase } from '../lib/supabase.js'
 import { prepareImageUpload } from '../../../shared/imageUpload.js'
+import usePersistentDraft from '../hooks/usePersistentDraft.js'
 
 const FILTERS = [
   ['all', 'Todos'],
@@ -46,6 +47,13 @@ const CATEGORY = {
 }
 
 const EMPTY_INCIDENT = { title: '', description: '', category: 'seguridad', severity: 'media', neighborhood_id: '', location_text: '', latitude: '', longitude: '', status: 'active', is_official: true, expires_at: '', images: [] }
+
+const incidentDraft = incident => incident ? {
+  title: incident.title || '', description: incident.description || '', category: incident.category || 'otro', severity: incident.severity || 'media',
+  neighborhood_id: incident.neighborhood_id || '', location_text: incident.location_text || '', latitude: incident.latitude ?? '', longitude: incident.longitude ?? '',
+  status: incident.status || 'active', is_official: !!incident.is_official, expires_at: incident.expires_at ? new Date(incident.expires_at).toISOString().slice(0, 16) : '',
+  images: [incident.photo_url, ...(Array.isArray(incident.images) ? incident.images : [])].filter(Boolean),
+} : EMPTY_INCIDENT
 
 const dateLabel = value => value
   ? new Date(value).toLocaleString('es-CL', { dateStyle: 'medium', timeStyle: 'short' })
@@ -95,7 +103,12 @@ export default function IncidentManager({ profile }) {
   const [neighborhoods, setNeighborhoods] = useState([])
   const [editorOpen, setEditorOpen] = useState(false)
   const [editorId, setEditorId] = useState(null)
-  const [draft, setDraft] = useState(EMPTY_INCIDENT)
+  const editorSource = incidents.find(item => item.id === editorId) || null
+  const [draft, setDraft, clearIncidentDraft] = usePersistentDraft(
+    `incident:${profile?.id || 'admin'}:${editorId || 'new'}`,
+    incidentDraft(editorSource),
+    editorSource?.updated_at || 'new-v1',
+  )
   const [saving, setSaving] = useState(false)
 
   const selected = incidents.find(item => item.id === selectedId) || null
@@ -205,12 +218,7 @@ export default function IncidentManager({ profile }) {
 
   const openEditor = incident => {
     setEditorId(incident?.id || null)
-    setDraft(incident ? {
-      title: incident.title || '', description: incident.description || '', category: incident.category || 'otro', severity: incident.severity || 'media',
-      neighborhood_id: incident.neighborhood_id || '', location_text: incident.location_text || '', latitude: incident.latitude ?? '', longitude: incident.longitude ?? '',
-      status: incident.status || 'active', is_official: !!incident.is_official, expires_at: incident.expires_at ? new Date(incident.expires_at).toISOString().slice(0, 16) : '',
-      images: [incident.photo_url, ...(Array.isArray(incident.images) ? incident.images : [])].filter(Boolean),
-    } : { ...EMPTY_INCIDENT, neighborhood_id: neighborhoods[0]?.id || '' })
+    setDraft(incident ? incidentDraft(incident) : { ...EMPTY_INCIDENT, neighborhood_id: neighborhoods[0]?.id || '' })
     setEditorOpen(true)
     setError('')
   }
@@ -236,6 +244,7 @@ export default function IncidentManager({ profile }) {
     const { data, error: saveError } = await supabase.rpc('admin_save_incident', { p_incident_id: editorId, p_data: draft, p_reason: editorId ? 'Edición desde panel global' : 'Creación desde panel global' })
     setSaving(false)
     if (saveError) return setError(saveError.message)
+    clearIncidentDraft()
     setEditorOpen(false); setNotice(editorId ? 'Alerta actualizada' : 'Alerta creada y publicada'); setTimeout(() => setNotice(''), 2600)
     await loadIncidents(data?.id)
   }
@@ -267,7 +276,7 @@ export default function IncidentManager({ profile }) {
         <label className="incident-check"><input type="checkbox" checked={draft.is_official} onChange={e => setDraft({ ...draft, is_official: e.target.checked })} /> Alerta oficial</label>
         <label className="wide">Evidencia fotográfica<input type="file" accept="image/*" onChange={uploadEvidence} /></label>
         {draft.images.length > 0 && <div className="incident-editor-images wide">{draft.images.map(url => <span key={url}><img src={url} alt="" /><button type="button" onClick={() => setDraft({ ...draft, images: draft.images.filter(item => item !== url) })}>×</button></span>)}</div>}
-        <footer className="wide"><button className="button button-secondary" type="button" onClick={() => setEditorOpen(false)}>Cancelar</button><button className="button button-primary" type="submit" disabled={saving}>{saving ? 'Guardando…' : editorId ? 'Guardar cambios' : 'Publicar alerta'}</button></footer>
+        <footer className="wide"><button className="button button-secondary" type="button" onClick={() => { clearIncidentDraft(); setEditorOpen(false) }}>Descartar borrador</button><button className="button button-primary" type="submit" disabled={saving}>{saving ? 'Guardando…' : editorId ? 'Guardar cambios' : 'Publicar alerta'}</button></footer>
       </form></section>}
 
       <section className="incident-workspace">

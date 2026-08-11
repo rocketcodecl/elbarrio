@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase.js'
 import { prepareImageUpload } from '../../../shared/imageUpload.js'
+import usePersistentDraft, { hasPersistentDraft } from '../hooks/usePersistentDraft.js'
 
 const ASSET = 'https://elbarrio.lat/el-barrio/community-assets/about-hero.jpg'
 const ABOUT_DEFAULTS = {
@@ -27,8 +28,10 @@ const mergeAbout = content => ({
 
 export default function ContentManager({ profile }) {
   const [tab, setTab] = useState('privacy_security')
-  const [privacy, setPrivacy] = useState(PRIVACY_DEFAULTS)
-  const [about, setAbout] = useState(ABOUT_DEFAULTS)
+  const privacyKey = `content:${profile?.id || 'admin'}:privacy_security`
+  const aboutKey = `content:${profile?.id || 'admin'}:about`
+  const [privacy, setPrivacy, clearPrivacyDraft, replacePrivacy] = usePersistentDraft(privacyKey, PRIVACY_DEFAULTS, 'v1')
+  const [about, setAbout, clearAboutDraft, replaceAbout] = usePersistentDraft(aboutKey, ABOUT_DEFAULTS, 'v1')
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [uploading, setUploading] = useState('')
@@ -42,11 +45,11 @@ export default function ContentManager({ profile }) {
       setLoading(false)
       if (loadError) return setError(`No fue posible cargar el contenido: ${loadError.message}`)
       const pages = new Map((data || []).map(item => [item.slug, item.content || {}]))
-      setPrivacy({ ...PRIVACY_DEFAULTS, ...(pages.get('privacy_security') || {}) })
-      setAbout(mergeAbout(pages.get('about') || {}))
+      if (!hasPersistentDraft(privacyKey)) replacePrivacy({ ...PRIVACY_DEFAULTS, ...(pages.get('privacy_security') || {}) })
+      if (!hasPersistentDraft(aboutKey)) replaceAbout(mergeAbout(pages.get('about') || {}))
     })
     return () => { active = false }
-  }, [])
+  }, [aboutKey, privacyKey, replaceAbout, replacePrivacy])
 
   const save = async event => {
     event.preventDefault()
@@ -55,6 +58,8 @@ export default function ContentManager({ profile }) {
     const { error: saveError } = await supabase.rpc('admin_update_app_content', { p_slug: tab, p_content: content })
     setSaving(false)
     if (saveError) return setError(`No fue posible guardar: ${saveError.message}`)
+    if (tab === 'about') clearAboutDraft()
+    else clearPrivacyDraft()
     setNotice('Contenido actualizado. La app mostrará los cambios al volver a abrir la sección.')
   }
 

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { supabase } from '../lib/supabase.js'
 import { prepareImageUpload } from '../../../shared/imageUpload.js'
+import usePersistentDraft from '../hooks/usePersistentDraft.js'
 
 const TYPES = [['sell', 'Venta'], ['gift', 'Regalo'], ['trade', 'Trueque']]
 const STATUS_LABELS = { active: 'Visible', pending: 'Pendiente', closed: 'Pausada', rejected: 'Oculta', removed: 'Retirada', sold: 'Finalizada' }
@@ -18,7 +19,7 @@ export default function MarketplaceManager({ profile }) {
   const [neighborhoods, setNeighborhoods] = useState([])
   const [authors, setAuthors] = useState([])
   const [categories, setCategories] = useState([])
-  const [draft, setDraft] = useState(EMPTY)
+  const [draft, setDraft, clearMarketplaceDraft] = usePersistentDraft(`marketplace:${profile?.id || 'admin'}:new`, EMPTY, 'v1')
   const [files, setFiles] = useState([])
   const [query, setQuery] = useState('')
   const [filter, setFilter] = useState('all')
@@ -47,7 +48,7 @@ export default function MarketplaceManager({ profile }) {
       neighborhoodId: current.neighborhoodId || profile?.neighborhood_id || neighborhoodResult.data?.[0]?.id || '',
     }))
     setLoading(false)
-  }, [profile?.neighborhood_id])
+  }, [profile?.neighborhood_id, setDraft])
 
   useEffect(() => { Promise.resolve().then(load) }, [load])
 
@@ -68,7 +69,7 @@ export default function MarketplaceManager({ profile }) {
           : (next.find(item => item.id === profile?.id)?.id || next[0]?.id || ''),
       }))
     })
-  }, [draft.neighborhoodId, profile?.id])
+  }, [draft.neighborhoodId, profile?.id, setDraft])
 
   const filtered = useMemo(() => {
     const needle = query.trim().toLowerCase()
@@ -121,6 +122,7 @@ export default function MarketplaceManager({ profile }) {
         p_images: images.length ? images : null,
       })
       if (createError) throw createError
+      clearMarketplaceDraft()
       setDraft(current => ({ ...EMPTY, neighborhoodId: current.neighborhoodId, authorId: current.authorId }))
       setFiles([])
       setCreating(false)
@@ -187,7 +189,7 @@ export default function MarketplaceManager({ profile }) {
           <label className="wide market-admin-images">Fotografías<input type="file" accept="image/*" multiple onChange={selectFiles} /><small>{files.length ? `${files.length} fotografía${files.length === 1 ? '' : 's'} seleccionada${files.length === 1 ? '' : 's'}` : 'Hasta cuatro imágenes. Se comprimen antes de subir.'}</small></label>
         </div>
       </section>
-      <footer><button type="button" onClick={() => setCreating(false)}>Cancelar</button><button className="button button-primary" type="submit" disabled={saving}>{saving ? 'Subiendo y publicando…' : 'Publicar en Mercado'}</button></footer>
+      <footer><button type="button" onClick={() => { clearMarketplaceDraft(); setDraft(EMPTY); setFiles([]); setCreating(false) }}>Descartar borrador</button><button className="button button-primary" type="submit" disabled={saving}>{saving ? 'Subiendo y publicando…' : 'Publicar en Mercado'}</button></footer>
     </form>
   </div>
 

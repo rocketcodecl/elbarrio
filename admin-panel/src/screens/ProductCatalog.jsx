@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase.js'
 import { prepareImageUpload } from '../../../shared/imageUpload.js'
+import usePersistentDraft from '../hooks/usePersistentDraft.js'
 
 const EMPTY = { name: '', description: '', price: '', unit_label: '', image_url: '', is_available: true, is_featured: true, sort_order: 0 }
 
@@ -18,7 +19,12 @@ export default function ProductCatalog({ commerce, onBack }) {
   const [notice, setNotice] = useState('')
   const [editorOpen, setEditorOpen] = useState(false)
   const [editing, setEditing] = useState(null)
-  const [draft, setDraft] = useState(EMPTY)
+  const productFallback = editing ? { name: editing.name || '', description: editing.description || '', price: editing.price ?? '', unit_label: editing.unit_label || '', image_url: editing.image_url || '', is_available: editing.is_available !== false, is_featured: editing.is_featured !== false, sort_order: editing.sort_order || 0 } : EMPTY
+  const [draft, setDraft, clearProductDraft] = usePersistentDraft(
+    `product:${commerce.id}:${editing?.id || 'new'}`,
+    productFallback,
+    editing?.updated_at || 'new-v1',
+  )
   const [imageFile, setImageFile] = useState(null)
   const [preview, setPreview] = useState('')
   const [saving, setSaving] = useState(false)
@@ -42,7 +48,7 @@ export default function ProductCatalog({ commerce, onBack }) {
     setDraft({ name: product.name || '', description: product.description || '', price: product.price ?? '', unit_label: product.unit_label || '', image_url: product.image_url || '', is_available: product.is_available !== false, is_featured: product.is_featured !== false, sort_order: product.sort_order || 0 })
     setImageFile(null); setPreview(product.image_url || ''); setEditorOpen(true)
   }
-  const close = () => { if (!saving) { setEditorOpen(false); setEditing(null); setDraft(EMPTY); setImageFile(null); setPreview('') } }
+  const close = () => { if (!saving) { clearProductDraft(); setEditorOpen(false); setEditing(null); setDraft(EMPTY); setImageFile(null); setPreview('') } }
   const chooseImage = event => {
     const file = event.target.files?.[0]
     if (!file) return
@@ -70,6 +76,7 @@ export default function ProductCatalog({ commerce, onBack }) {
       const request = editing ? supabase.from('commerce_products').update(payload).eq('id', editing.id).select().single() : supabase.from('commerce_products').insert(payload).select().single()
       const { error: saveError } = await request
       if (saveError) throw saveError
+      clearProductDraft()
       setSaving(false); setEditorOpen(false); setEditing(null); setDraft(EMPTY); setImageFile(null); setPreview('')
       await load(); showNotice(wasEditing ? 'Producto actualizado' : 'Producto creado')
     } catch (saveError) { setSaving(false); setError(saveError?.message || 'No fue posible guardar el producto.') }
