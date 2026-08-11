@@ -700,8 +700,8 @@ const s = {
   },
   header: { display: 'flex', alignItems: 'center', paddingTop: 34, paddingBottom: 12 },
   backBtn: {
-    width: 40, height: 40, borderRadius: '50%',
-    background: '#fff', color: '#374151',
+    width: 38, height: 38, minWidth: 38, minHeight: 38, padding: 0, borderRadius: '50%',
+    background: '#fff', color: '#1D211F',
     display: 'flex', alignItems: 'center', justifyContent: 'center',
     boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
     border: 'none', cursor: 'pointer', flexShrink: 0,

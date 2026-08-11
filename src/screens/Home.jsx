@@ -227,8 +227,10 @@ const Ico = {
   actividad: ({ size = 17, color = C.verde }) => (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
       stroke={color} strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
-      <path d="m3 11 18-5v12L3 14v-3z" />
-      <path d="M11.6 16.8a3 3 0 1 1-5.8-1.6" />
+      <circle cx="9" cy="7" r="3" />
+      <path d="M3 21v-2a6 6 0 0 1 12 0v2" />
+      <path d="M16 3.2a4 4 0 0 1 0 7.6" />
+      <path d="M21 21v-2a6 6 0 0 0-4.5-5.8" />
     </svg>
   ),
   /* Pin de mapa lineal (verde marca) — reemplaza al pin con fondo blanco */
@@ -264,9 +266,10 @@ const Ico = {
   ayuda: ({ size = 21, color = C.dorado }) => (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
       stroke={color} strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M8.5 11.5a3.5 3.5 0 1 1 5.8 2.6c-1.5 1.1-2.3 1.8-2.3 3" />
-      <path d="M12 21h.01" />
-      <circle cx="12" cy="12" r="10" />
+      <path d="M18 11V6a2 2 0 0 0-4 0v5" />
+      <path d="M14 10V4a2 2 0 0 0-4 0v7" />
+      <path d="M10 10.5V6a2 2 0 0 0-4 0v8" />
+      <path d="M6 14v-2a2 2 0 1 0-4 0v2c0 5.5 4.5 10 10 10s10-4.5 10-10V8a2 2 0 0 0-4 0v3" />
     </svg>
   ),
   farmacia: ({ size = 14, color = C.verde }) => (
@@ -1571,7 +1574,7 @@ const s = {
     display: 'flex', flexDirection: 'column', alignItems: 'flex-end',
   },
   farmaciaLabel: { display: 'flex', alignItems: 'center', gap: 4, fontSize: 11.5, color: C.textoTenue, fontWeight: 500 },
-  farmaciaIcon: { display: 'inline-flex', fontSize: 15, lineHeight: 1, flexShrink: 0 },
+  farmaciaIcon: { display: 'inline-flex', fontSize: 12, lineHeight: 1, flexShrink: 0 },
   farmaciaNombre: {
     fontSize: 13, fontWeight: 700, color: C.texto, marginTop: 2,
     whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
@@ -1606,7 +1609,7 @@ const s = {
     padding: 14, overflow: 'hidden',
     display: 'flex', flexDirection: 'column', alignItems: 'flex-start', justifyContent: 'space-between',
     scrollSnapAlign: 'start', scrollSnapStop: 'always',
-    border: 'none', outline: 'none', WebkitAppearance: 'none', borderRadius: 18,
+    border: 'none', outline: 'none', WebkitAppearance: 'none', borderRadius: '18px 18px 0 0',
     color: '#fff', backgroundColor: '#dcebe4', backgroundSize: 'cover', backgroundPosition: 'center',
     boxShadow: 'none',
     textAlign: 'left', fontFamily: 'inherit', cursor: 'pointer',

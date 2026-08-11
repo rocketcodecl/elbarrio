@@ -142,8 +142,8 @@ function Register({ existingAccount = false, initialEmail = '', recoveryMode = f
     <div style={styles.container}>
       {/* HEADER: back + stepper */}
       <div style={styles.header}>
-        <button style={styles.backButton} onClick={onBack}>
-          <span style={{ fontSize: 18 }}>←</span>
+        <button style={styles.backButton} onClick={onBack} aria-label="Volver">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M19 12H5"/><path d="m12 19-7-7 7-7"/></svg>
         </button>
         <div style={{ flex: 1, marginLeft: 12 }}>
           <Stepper currentStep={1} totalSteps={4} />
@@ -328,14 +328,19 @@ const styles = {
     paddingBottom: 20,
   },
   backButton: {
-    width: 40,
-    height: 40,
+    width: 38,
+    height: 38,
+    minWidth: 38,
+    minHeight: 38,
+    padding: 0,
     borderRadius: '50%',
     background: 'white',
+    color: '#1D211F',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
     boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+    border: 'none',
     flexShrink: 0,
   },
   logoSection: {
