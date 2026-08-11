@@ -490,3 +490,8 @@ La entrega generada es un build firmado y reproducible de cierre técnico. No de
 - El panel web permite al superadministrador publicar ventas, regalos y trueques en nombre de un perfil seleccionado, además de aceptar/restaurar, pausar, ocultar o retirar cada publicación directamente desde su tarjeta.
 - Las imágenes de las tarjetas administrativas quedan contenidas en una portada fija de 168 px y ya no pueden desbordarse sobre la información ni los botones de moderación.
 - El build corregido está publicado en `admin.elbarrio.lat` y sus archivos remotos fueron verificados byte por byte contra `admin-panel/dist`.
+
+## Uso y servicios — corrección del 11 de agosto de 2026
+
+- `admin-service-metrics` y `cleanup-storage-assets` permiten el encabezado `x-client-info` enviado por el cliente oficial de Supabase. Ambas funciones fueron redesplegadas con JWT validado internamente y su preflight remoto respondió HTTP 200 con los encabezados requeridos.
+- Esta corrección elimina el bloqueo CORS que el panel mostraba como `Failed to send a request to the Edge Function`; no requirió SQL ni cambios de esquema.

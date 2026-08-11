@@ -141,3 +141,8 @@
 - El módulo Mercado permite publicar ventas, regalos y trueques en nombre de un perfil seleccionado y moderar cada publicación desde su propia tarjeta, sin redirigir al editor global.
 - Las portadas tienen una altura fija de 168 px, recorte `cover` y desbordamiento contenido; la información y las acciones permanecen debajo de la imagen.
 - El build vigente publicado y verificado usa `index-DB8k8sR3.js` e `index-CAACCql-.css`.
+
+## Uso y servicios — 11 de agosto de 2026
+
+- Las Edge Functions `admin-service-metrics` y `cleanup-storage-assets` aceptan `x-client-info`, además de autorización, API key y tipo de contenido. Ambas fueron redesplegadas y sus preflight remotos respondieron HTTP 200.
+- No fue necesario volver a publicar el panel ni ejecutar SQL: el fallo era un bloqueo CORS en las funciones remotas.
