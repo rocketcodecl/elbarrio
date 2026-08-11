@@ -70,7 +70,7 @@
 - Usuarios: implementado con directorio, verificación, permisos, suspensión y trazabilidad.
 - Notificaciones: implementado con audiencias por barrio, verificados, comercios y actores autorizados, más historial administrativo.
 - Invitaciones: implementado con métricas reales y alcance territorial para administradores normales o global para el superadministrador.
-- Portada de Inicio: implementada para seleccionar y retirar hasta quince tarjetas reales por barrio; la app mezcla el conjunto y muestra cinco por carga. `202608010003_home_carousel_pool.sql` fue ejecutada correctamente según confirmación manual.
+- Portada de Inicio: implementada para seleccionar y retirar hasta quince tarjetas reales por barrio; la app mezcla el conjunto y muestra hasta diez por carga. `202608010003_home_carousel_pool.sql` y `202608050003_home_carousel_limit_15.sql` figuran aplicadas en la auditoría remota del 10 de agosto de 2026.
 
 ## Decisiones
 
@@ -122,3 +122,13 @@
 - Mantener deshabilitada la asistencia. No crear ni aplicar cambios de asistencia hasta definir y autorizar cómo alinear `event_attendees` con los eventos actuales de `posts`.
 - Validar funcionalmente Incidentes, Usuarios, mapa e historial, Noticias y categorías una vez certificado el schema remoto.
 - Limpiar el lint de fuentes del panel y excluir `dist` del lint raíz; el build de producción sí pasa.
+
+## Auditoría de cierre del 10 de agosto de 2026
+
+- El build de producción del panel pasa.
+- `https://admin.elbarrio.lat/` responde HTTP 200.
+- El JavaScript y CSS publicados coinciden byte por byte con `admin-panel/dist/`: `index-DbC1fFsC.js` e `index-DEc27saH.css`.
+- Los 19 módulos visibles del panel están conectados a componentes reales; no hay entradas actuales que terminen en el placeholder de módulo futuro.
+- “Uso y servicios” llama a `admin-service-metrics`. La función remota responde, exige sesión y su preflight CORS responde correctamente. Aún falta validar su respuesta completa desde una sesión real de superadministrador.
+- El superadministrador dispone de edición auditada de datos de usuario, permisos, suspensión, reactivación y eliminación; control global de publicaciones; comentarios y reseñas; alertas; categorías; noticias; eventos; comercios y servicios.
+- La auditoría encontró tres cuentas superadministradoras activas. Se debe confirmar si `elbarrio.lat@gmail.com` debe conservar el nivel global.

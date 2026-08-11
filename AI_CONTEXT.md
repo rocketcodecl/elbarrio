@@ -385,7 +385,7 @@ El botón de creación abre `CreatePost.jsx`, salvo la creación de comercios, q
 - El engranaje de Mi perfil abre la edición de foto, nombre, apellido y teléfono. El RUT verificado se muestra deshabilitado y nunca se incluye en la actualización del perfil. Privacidad y seguridad permanece como una entrada independiente del menú.
 - Plus Jakarta Sans instalada y aplicada globalmente.
 - Páginas Nosotros, Términos, Productos prohibidos, Invitar vecinos, Contáctanos e Información y ayuda conectadas.
-- Inicio incorpora un carrusel editorial administrable. El panel puede preparar hasta quince contenidos con fotografía y la aplicación mezcla el conjunto para mostrar hasta diez por carga, sin alterar clima ni farmacia. La ampliación del límite remoto requiere ejecutar manualmente `202608050003_home_carousel_limit_15.sql`.
+- Inicio incorpora un carrusel editorial administrable. El panel puede preparar hasta quince contenidos con fotografía y la aplicación mezcla el conjunto para mostrar hasta diez por carga, sin alterar clima ni farmacia. `202608050003_home_carousel_limit_15.sql` figura aplicada en el historial remoto al auditar el 10 de agosto de 2026.
 - Actividad de el barrio mezcla publicaciones comunitarias, alertas, pedidos, servicios activos, eventos seleccionados y artículos de Mercado. Prioriza un conjunto de publicaciones recientes o vistas y altera su orden por carga para evitar un ranking rígido.
 - Actividad de el barrio usa tarjetas centradas en contenido: identidad y verificación del autor, contexto territorial, categoría, fotografía jerarquizada y un CTA específico por tipo. La primera publicación con imagen recibe una portada amplia; las restantes conservan un formato compacto. No se agregaron nuevas secciones ni métricas decorativas.
 - El detalle de comercio abre su mapa por defecto. El detalle de evento ofrece “Cómo llegar” bajo el mapa mediante un enlace externo compatible con Google Maps o navegador.
@@ -405,10 +405,10 @@ El botón de creación abre `CreatePost.jsx`, salvo la creación de comercios, q
 
 - Agregar `lat.elbarrio.app://auth/callback` a Authentication → URL Configuration → Redirect URLs en Supabase y validar Google OAuth y recuperación de contraseña desde Android real.
 - Instalar Xcode, abrir `ios/App/App.xcworkspace` y validar la compilación gratuita en un iPhone propio. Para TestFlight/App Store se necesita la membresía anual de Apple Developer; el proyecto no debe esperar ese pago para seguir avanzando Android y pruebas locales iOS.
-- Implementar push reales con registro de dispositivo, Firebase Cloud Messaging para Android, APNs para iOS, contador de ícono y apertura directa de la pantalla correspondiente.
+- Android ya registra dispositivos y recibe push mediante Firebase Cloud Messaging. APNs permanece pendiente para iOS. Al tocar un push Android se abre actualmente Notificaciones; falta navegación directa al contenido relacionado y contador nativo del ícono.
 - Incorporar “Iniciar sesión con Apple” antes de enviar a revisión en iOS, porque la aplicación ofrece Google para autenticar la cuenta principal.
 
-- La migración `supabase/migrations/202608010003_home_carousel_pool.sql` fue ejecutada correctamente según confirmación manual. Falta ejecutar `supabase/migrations/202608050003_home_carousel_limit_15.sql` para que Supabase acepte las quince posiciones que ya ofrece el panel; la app mostrará hasta diez mezcladas por carga.
+- Las migraciones `supabase/migrations/202608010003_home_carousel_pool.sql` y `supabase/migrations/202608050003_home_carousel_limit_15.sql` están aplicadas; la app puede mezclar hasta diez tarjetas desde una selección administrativa de quince.
 - Validar visualmente en móvil real el nuevo listado, detalle y composición de Alertas, incluidas las llamadas telefónicas.
 
 - Validar el correo de recuperación de contraseña tanto en local como en producción.
@@ -452,3 +452,32 @@ Para cada nueva tarea:
 6. Resume exactamente qué cambiaste.
 7. Si el cambio altera la arquitectura, navegación o reglas del proyecto, actualiza AI_CONTEXT.md al finalizar.
 8. Si durante la implementación descubres que el plan inicial debe cambiar, detente, explica el motivo y espera una nueva aprobación antes de continuar.
+
+## Auditoría integral y entrega Android — 10 de agosto de 2026
+
+Estado verificado sobre `main` en commit `16191d4`:
+
+- Aplicación principal: build Vite aprobado.
+- Panel administrativo: build Vite aprobado y despliegue remoto idéntico byte por byte al build local.
+- Dependencias de producción: `npm audit --omit=dev` sin vulnerabilidades conocidas en app y panel.
+- Capacitor: los assets actuales de `dist` quedaron sincronizados con Android e iOS.
+- Android: `testReleaseUnitTest`, `lintVitalRelease`, `assembleRelease` y `bundleRelease` aprobaron.
+- APK y AAB: firmados con el certificado SHA-256 `f369dbfe7b45dbf79a3ddeeb53dcdd1c6f0ca7b842cd1940153a15351e3bca2a`.
+- Entrega Android actual: `release/android/el-barrio-1.0.0/`.
+- APK SHA-256: `e98329ab35ffd2cf288477e9d8971f7799f51c7eb925e3672351e68d789a6d39`.
+- AAB SHA-256: `14c4b7d7da6576994c6ef3cc72be7edd20ffea8f1758871993b79a2c1d9c64d3`.
+- iOS: build de simulador aprobado, bundle `lat.elbarrio.app`, versión 1.0 build 1, deployment target iOS 15.0. No está listo para App Store porque APNs y la alternativa de login exigida por Apple permanecen pendientes.
+- Supabase: las auditorías estructurales del MVP y núcleo competitivo devolvieron OK; las 31 tablas públicas utilizadas tienen RLS y no se detectaron relaciones críticas huérfanas.
+
+Bloqueadores que no deben marcarse terminados por el solo hecho de compilar:
+
+1. `https://elbarrio.lat/privacidad` responde HTTP 404 y debe publicarse antes de enviar a revisión.
+2. La función remota `bump_view` intenta actualizar `posts.views`; el esquema vigente usa `posts.views_count`.
+3. `202608100001_event_external_actions.sql` está aplicada en estructura pero ausente del historial de migraciones. No ejecutar el SQL de nuevo; reparar únicamente el historial con autorización.
+4. Probar Google OAuth y recuperación de contraseña en el APK actual con un teléfono real.
+5. Confirmar que `soporte@elbarrio.lat` existe y recibe mensajes.
+6. Preparar cuenta vecinal de revisión, capturas e imagen destacada de Google Play.
+7. Confirmar si la tercera cuenta superadministradora `elbarrio.lat@gmail.com` debe conservarse.
+8. Android mantiene `android:allowBackup="true"`; se recomienda desactivarlo antes de publicación definitiva.
+
+La entrega generada es un build firmado y reproducible de cierre técnico. No debe describirse como “aprobada por Google Play” ni como “validada completamente en dispositivo” hasta completar los puntos anteriores.
