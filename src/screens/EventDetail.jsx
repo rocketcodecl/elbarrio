@@ -24,7 +24,15 @@ const formatDate = (value) => {
   return `${day.charAt(0).toUpperCase() + day.slice(1)} · ${time} hrs`
 }
 
-const formatSchedule = (startsAt, endsAt) => {
+const formatSchedule = (startsAt, endsAt, allDay = false) => {
+  if (allDay) {
+    const startDate = new Date(startsAt)
+    const start = startDate.toLocaleDateString('es-CL', { weekday: 'long', day: 'numeric', month: 'long' })
+    const normalizedStart = start.charAt(0).toUpperCase() + start.slice(1)
+    if (!endsAt || startDate.toDateString() === new Date(endsAt).toDateString()) return normalizedStart
+    const end = new Date(endsAt).toLocaleDateString('es-CL', { day: 'numeric', month: 'long' })
+    return `${normalizedStart} al ${end}`
+  }
   const start = formatDate(startsAt)
   if (!endsAt) return start
   const end = new Date(endsAt).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' })
@@ -138,7 +146,7 @@ export default function EventDetail({ postId, neighborhoodId, profileId, onNavig
           <div style={s.badges}><span style={s.primaryBadge}>{category[1]} {category[0]}</span></div>
           <h1 style={s.title}>{event.title || 'Evento del barrio'}</h1>
           {event.event_recurrence && event.event_recurrence !== 'none' && <div style={s.recurring}>↻ {event.event_recurrence === 'weekly' ? 'Todas las semanas' : event.event_recurrence === 'biweekly' ? 'Cada dos semanas' : 'Todos los meses'}</div>}
-          <div style={s.infoRow}><span style={s.infoIcon}><Calendar /></span><span>{formatSchedule(event.starts_at, event.ends_at)}</span></div>
+          <div style={s.infoRow}><span style={s.infoIcon}><Calendar /></span><span>{formatSchedule(event.starts_at, event.ends_at, event.event_all_day)}</span></div>
           <div style={s.infoRow}><span style={s.infoIcon}><Pin /></span><span>{event.location_text || 'Lugar por confirmar'}</span></div>
         </section>
 

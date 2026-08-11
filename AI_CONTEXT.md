@@ -504,3 +504,10 @@ La entrega generada es un build firmado y reproducible de cierre técnico. No de
 - No se guardan contraseñas ni motivos de moderación. Los archivos elegidos pero todavía no subidos deben seleccionarse nuevamente por restricciones del navegador; las URLs de imágenes ya subidas sí se conservan.
 - Es una protección local del dispositivo y navegador actual, no sincronización entre computadores. No requirió SQL ni cambios de esquema.
 - El build corregido fue publicado en `https://admin.elbarrio.lat/` después de respaldar la versión anterior en `admin-backups/20260811-draft-recovery`. El HTML, JavaScript `index-DeA5fRBm.js` y CSS `index-CAACCql-.css` públicos coinciden por SHA-256 con el build local.
+
+## Eventos sin horario específico — 11 de agosto de 2026
+
+- La migración `202608110002_event_all_day.sql` fue ejecutada con resultado `Success`, según confirmación manual del usuario. Agrega `posts.event_all_day` sin alterar los eventos existentes.
+- El panel y el creador vecinal permiten marcar un evento como “Sin hora específica”. En ese caso solicitan solo el día y la app omite la hora técnica en portada, búsqueda, listado y detalle.
+- Los eventos de día completo permanecen visibles durante todo su día. Los eventos con hora mantienen su orden y formato anteriores.
+- App y panel compilan. El panel fue respaldado en `admin-backups/20260811-event-all-day` y publicado en `https://admin.elbarrio.lat/`; sus archivos `index-DQTjKzxm.js` e `index-BD26-XwI.css` coinciden por SHA-256 con el build local.

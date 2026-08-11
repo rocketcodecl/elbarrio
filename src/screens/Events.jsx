@@ -200,8 +200,10 @@ const esManana = (fecha) => {
   return inicioDelDia(fecha).getTime() === inicioDelDia(manana).getTime()
 }
 
-const esDentroDe7Dias = (fecha) => {
-  const f = new Date(fecha).getTime()
+const esDentroDe7Dias = (fecha, allDay = false) => {
+  const eventDate = new Date(fecha)
+  if (allDay) eventDate.setHours(23, 59, 59, 999)
+  const f = eventDate.getTime()
   const ahora = Date.now()
   const en7 = ahora + 7 * 24 * 60 * 60 * 1000
   return f >= ahora && f <= en7
@@ -214,7 +216,12 @@ const hhmm = (fecha) => {
   return `${hh}:${mm}`
 }
 
-const horarioEvento = (startsAt, endsAt) => endsAt ? `${hhmm(startsAt)}–${hhmm(endsAt)} hrs` : `${hhmm(startsAt)} hrs`
+const horarioEvento = (startsAt, endsAt, allDay = false) => allDay ? '' : (endsAt ? `${hhmm(startsAt)}–${hhmm(endsAt)} hrs` : `${hhmm(startsAt)} hrs`)
+const fechaYHorario = evento => {
+  const date = fechaCorta(evento.starts_at)
+  const time = horarioEvento(evento.starts_at, evento.ends_at, evento.event_all_day)
+  return time ? `${date} · ${time}` : date
+}
 
 const diaMesCorto = (fecha) => {
   const d = new Date(fecha)
@@ -303,7 +310,7 @@ function Events({ currentUser, onNavigate, onCrear }) {
         .eq('neighborhood_id', profile.neighborhood_id)
         .eq('type', 'event')
         .eq('status', 'active')
-        .gte('starts_at', new Date().toISOString())
+        .gte('starts_at', (() => { const today = new Date(); today.setHours(0, 0, 0, 0); return today.toISOString() })())
         .order('starts_at', { ascending: true })
 
       const { data, error: e } = await q.limit(60)
@@ -312,7 +319,8 @@ function Events({ currentUser, onNavigate, onCrear }) {
         setError('No pudimos cargar los eventos. Tira para abajo para reintentar.')
         return
       }
-      setEventos(data || [])
+      const currentEvents = (data || []).filter(event => event.event_all_day || new Date(event.ends_at || event.starts_at).getTime() >= Date.now())
+      setEventos(currentEvents)
 
       // Intentar cargar contadores de asistencia para cada evento
       // Si la tabla event_attendees no existe o falla RLS, se ignora silenciosamente
@@ -448,7 +456,7 @@ function Events({ currentUser, onNavigate, onCrear }) {
     ? eventos
     : eventos.filter((e) => e.category === filtro || catDePost(e) === filtro)
 
-  const estaSemana = eventos.filter((e) => esDentroDe7Dias(e.starts_at)).slice(0, 12)
+  const estaSemana = eventos.filter((e) => esDentroDe7Dias(e.starts_at, e.event_all_day)).slice(0, 12)
   const destacados = [...eventosFiltrados]
     .sort((a, b) => Number(!!b.images?.[0]) - Number(!!a.images?.[0]))
     .slice(0, 6)
@@ -646,7 +654,7 @@ function HeroEventCard({ evento, asistiendo, count, attendanceEnabled, showAtten
       <div style={s.heroContent}>
         <strong style={s.heroTitle}>{evento.title || 'Evento del barrio'}</strong>
         <span style={s.heroMeta}>
-          <IcoCalendario size={12} /> {fechaCorta(evento.starts_at)} · {horarioEvento(evento.starts_at, evento.ends_at)}
+          <IcoCalendario size={12} /> {fechaYHorario(evento)}
         </span>
         <span style={s.heroMeta}><IcoPin size={12} /> {place}</span>
         {attendanceEnabled && <div style={s.heroBottom}>
@@ -682,7 +690,7 @@ function EventCard({ evento, asistiendo, count, attendanceEnabled, showAttendees
           <strong style={s.listTitle}>{evento.title || 'Evento del barrio'}</strong>
           <span style={{ ...s.listCategory, color: category.color }}>{category.emoji} {category.label}</span>
         </div>
-        <span style={s.listMeta}>{fechaCorta(f)} · {horarioEvento(f, evento.ends_at)} · {lugar}</span>
+        <span style={s.listMeta}>{fechaYHorario(evento)} · {lugar}</span>
         {attendanceEnabled && <div style={s.listBottom}>
           {showAttendees && <span style={s.listCount}><IcoPersonas size={12} /> {count > 0 ? `${count} vecinos van` : 'Aún sin asistentes'}</span>}
           <button

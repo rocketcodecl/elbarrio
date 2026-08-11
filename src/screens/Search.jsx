@@ -201,7 +201,8 @@ export default function Search({ currentUser, onNavigate }) {
       .select(`*, author:profiles!author_id (full_name, avatar_url, reputation_score, verification_status)`)
       .eq('type', 'service').eq('status', 'active').or(`title.ilike.${like},content.ilike.${like}`).order('is_featured', { ascending: false }).limit(15)
     let commercesQuery = supabase.from('commerces').select('*').eq('is_active', true).or(`name.ilike.${like},description.ilike.${like}`).order('is_premium', { ascending: false }).order('rating', { ascending: false }).limit(10)
-    let eventsQuery = supabase.from('posts').select(`*, author:profiles!author_id (full_name, avatar_url)`).eq('type', 'event').eq('status', 'active').gte('starts_at', new Date().toISOString()).or(`title.ilike.${like},content.ilike.${like}`).order('starts_at', { ascending: true }).limit(10)
+    const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0)
+    let eventsQuery = supabase.from('posts').select(`*, author:profiles!author_id (full_name, avatar_url)`).eq('type', 'event').eq('status', 'active').gte('starts_at', todayStart.toISOString()).or(`title.ilike.${like},content.ilike.${like}`).order('starts_at', { ascending: true }).limit(10)
     let neighborsQuery = supabase.from('profiles').select('id, user_id, full_name, avatar_url, reputation_score, badge_founder, badge_trusted_seller, member_since, total_sales, total_gifts, is_official_actor, official_actor_name').not('full_name', 'is', null).ilike('full_name', like).limit(10)
     if (hoodId) {
       postsQuery = postsQuery.eq('neighborhood_id', hoodId)
@@ -623,7 +624,7 @@ function EventoRow({ evento, onClick }) {
   const fecha = evento.starts_at ? new Date(evento.starts_at) : null
   const dia = fecha ? fecha.getDate() : '?'
   const mes = fecha ? ['ENE','FEB','MAR','ABR','MAY','JUN','JUL','AGO','SEP','OCT','NOV','DIC'][fecha.getMonth()] : ''
-  const hora = fecha ? `${fecha.getHours().toString().padStart(2,'0')}:${fecha.getMinutes().toString().padStart(2,'0')}` : ''
+  const hora = fecha && !evento.event_all_day ? `${fecha.getHours().toString().padStart(2,'0')}:${fecha.getMinutes().toString().padStart(2,'0')}` : ''
 
   return (
     <button style={s.rowCard} onClick={onClick}>

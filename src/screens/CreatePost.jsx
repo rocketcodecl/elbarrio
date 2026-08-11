@@ -342,8 +342,9 @@ function CreatePost({ onClose, onPublished, startWith, existingPost = null }) {
   const [loadingAddr, setLoadingAddr] = useState(false)
   const [eventType, setEventType] = useState(existingPost?.event_type || existingPost?.category || '')
   const [eventStartsAt, setEventStartsAt] = useState(
-    existingPost?.starts_at ? new Date(existingPost.starts_at).toISOString().slice(0, 16) : ''
+    existingPost?.starts_at ? (existingPost.event_all_day ? new Date(existingPost.starts_at).toLocaleDateString('en-CA') : new Date(existingPost.starts_at).toISOString().slice(0, 16)) : ''
   )
+  const [eventAllDay, setEventAllDay] = useState(existingPost?.event_all_day === true)
   const [eventRecurrence, setEventRecurrence] = useState(existingPost?.event_recurrence || 'none')
   const [eventRecurrenceUntil, setEventRecurrenceUntil] = useState(
     existingPost?.recurrence_until ? new Date(existingPost.recurrence_until).toISOString().slice(0, 10) : ''
@@ -732,10 +733,12 @@ function CreatePost({ onClose, onPublished, startWith, existingPost = null }) {
     } else if (t === 'event') {
       if (!title.trim()) return setError('Ponle un nombre al evento')
       if (!eventType) return setError('Elige un tipo de evento')
-      if (!eventStartsAt) return setError('Indica la fecha y hora')
-      if (new Date(eventStartsAt).getTime() <= Date.now()) return setError('La fecha debe ser futura')
+      if (!eventStartsAt) return setError(eventAllDay ? 'Indica el día del evento' : 'Indica la fecha y hora')
+      const eventStartValue = eventAllDay ? `${eventStartsAt.slice(0, 10)}T00:00:00` : eventStartsAt
+      const eventExpiryValue = eventAllDay ? `${eventStartsAt.slice(0, 10)}T23:59:59` : eventStartsAt
+      if (new Date(eventExpiryValue).getTime() <= Date.now()) return setError('La fecha debe ser futura')
       if (eventRecurrence !== 'none' && !eventRecurrenceUntil) return setError('Indica hasta cuándo se repite el evento')
-      if (eventRecurrenceUntil && new Date(eventRecurrenceUntil).getTime() < new Date(eventStartsAt).getTime()) return setError('La fecha final debe ser posterior al primer evento')
+      if (eventRecurrenceUntil && new Date(eventRecurrenceUntil).getTime() < new Date(eventStartValue).getTime()) return setError('La fecha final debe ser posterior al primer evento')
       if (!alertLocation.trim()) return setError('Indica dónde será')
       if (!content.trim()) return setError('Cuenta de qué se trata')
       if (eventEntryType === 'paid' && !eventPrice) return setError('Indica el valor de la entrada')
@@ -874,7 +877,8 @@ function CreatePost({ onClose, onPublished, startWith, existingPost = null }) {
         if (!editing) post.status = 'pending'
       } else if (t === 'event') {
         post.category = eventType
-        post.starts_at = new Date(eventStartsAt).toISOString()
+        post.starts_at = new Date(eventAllDay ? `${eventStartsAt.slice(0, 10)}T00:00:00` : eventStartsAt).toISOString()
+        post.event_all_day = eventAllDay
         post.event_recurrence = eventRecurrence
         post.recurrence_until = eventRecurrence !== 'none' && eventRecurrenceUntil
           ? new Date(`${eventRecurrenceUntil}T23:59:59`).toISOString()
@@ -1512,10 +1516,18 @@ function CreatePost({ onClose, onPublished, startWith, existingPost = null }) {
             <CharCounter value={title.length} max={TITLE_MAX} />
 
             <label style={s.label}>¿Cuándo será?</label>
+            <label style={s.eventAllDayToggle}>
+              <input type="checkbox" checked={eventAllDay} onChange={(e) => {
+                const checked = e.target.checked
+                setEventAllDay(checked)
+                setEventStartsAt((current) => checked ? current.slice(0, 10) : (current ? `${current.slice(0, 10)}T12:00` : ''))
+              }} />
+              <span style={{ display: 'grid', gap: 2 }}><strong>Sin hora específica</strong><small>Se mostrará solamente el día.</small></span>
+            </label>
             <input
-              type="datetime-local"
+              type={eventAllDay ? 'date' : 'datetime-local'}
               value={eventStartsAt}
-              min={new Date().toISOString().slice(0, 16)}
+              min={eventAllDay ? new Date().toLocaleDateString('en-CA') : new Date().toISOString().slice(0, 16)}
               onChange={(e) => setEventStartsAt(e.target.value)}
               style={s.input}
             />
@@ -2608,6 +2620,12 @@ const s = {
     background: 'rgba(22,163,74,0.15)', color: C.verdeOsc,
     border: 'none', cursor: 'pointer', padding: 0,
     display: 'flex', alignItems: 'center', justifyContent: 'center',
+  },
+  eventAllDayToggle: {
+    display: 'flex', alignItems: 'center', gap: 10,
+    marginBottom: 10, padding: '11px 12px',
+    background: C.verdeBg, border: `1px solid ${C.bordeSuave}`,
+    borderRadius: 12, color: C.texto, fontSize: 13,
   },
 
   /* --- mapa inline --- */

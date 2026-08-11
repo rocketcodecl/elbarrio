@@ -170,7 +170,7 @@ const ACCESOS_HOME = [
 
 const ACTIVIDAD_VISIBLE_INICIAL = 10
 
-const fechaEventoPortada = (start, end) => {
+const fechaEventoPortada = (start, end, allDay = false) => {
   if (!start) return 'Fecha por confirmar'
   const startDate = new Date(start)
   if (Number.isNaN(startDate.getTime())) return 'Fecha por confirmar'
@@ -179,6 +179,11 @@ const fechaEventoPortada = (start, end) => {
     day: 'numeric',
     month: 'short',
   }).format(startDate)
+  if (allDay) {
+    if (!end || startDate.toDateString() === new Date(end).toDateString()) return day
+    const endDay = new Intl.DateTimeFormat('es-CL', { day: 'numeric', month: 'short' }).format(new Date(end))
+    return `${day} al ${endDay}`
+  }
   const startTime = new Intl.DateTimeFormat('es-CL', {
     hour: '2-digit',
     minute: '2-digit',
@@ -720,7 +725,7 @@ function Home({ currentUser, onNavigate, onCrear }) {
           .eq('type', 'event')
           .eq('status', 'active')
           .eq('show_on_home', true)
-          .gte('starts_at', new Date().toISOString())
+          .gte('starts_at', (() => { const today = new Date(); today.setHours(0, 0, 0, 0); return today.toISOString() })())
           .order('starts_at', { ascending: true })
           .limit(1)
           .maybeSingle(),
@@ -971,7 +976,7 @@ function Home({ currentUser, onNavigate, onCrear }) {
   // se completan con información editorial y un descubrimiento del Mercado.
   const eventoParaTi = [eventoPortada, ...eventos]
     .filter((item, index, list) => item?.images?.[0] && list.findIndex(candidate => candidate?.id === item.id) === index)
-    .filter(item => !item.starts_at || new Date(item.starts_at).getTime() >= Date.now())
+    .filter(item => !item.starts_at || item.event_all_day || new Date(item.ends_at || item.starts_at).getTime() >= Date.now())
     .sort((a, b) => {
       if (a.id === eventoPortada?.id) return -1
       if (b.id === eventoPortada?.id) return 1
@@ -983,7 +988,7 @@ function Home({ currentUser, onNavigate, onCrear }) {
     eventoParaTi && {
       ...eventoParaTi,
       portadaLabel: 'PANORAMA',
-      portadaMeta: fechaEventoPortada(eventoParaTi.starts_at, eventoParaTi.ends_at),
+      portadaMeta: fechaEventoPortada(eventoParaTi.starts_at, eventoParaTi.ends_at, eventoParaTi.event_all_day),
       portadaAction: () => nav('eventdetail', { postId: eventoParaTi.id }),
     },
     datoParaTi && {
@@ -1003,7 +1008,7 @@ function Home({ currentUser, onNavigate, onCrear }) {
     .slice(0, 10)
     .map(item => {
       if (item.portadaAction) return item
-      if (item.type === 'event') return { ...item, portadaLabel: 'PANORAMA', portadaMeta: fechaEventoPortada(item.starts_at, item.ends_at), portadaAction: () => nav('eventdetail', { postId: item.id }) }
+      if (item.type === 'event') return { ...item, portadaLabel: 'PANORAMA', portadaMeta: fechaEventoPortada(item.starts_at, item.ends_at, item.event_all_day), portadaAction: () => nav('eventdetail', { postId: item.id }) }
       if (item.type === 'news') return { ...item, portadaLabel: 'DATO ÚTIL', portadaMeta: item.news_source || 'Información para tu barrio', portadaAction: () => nav('noticias', { newsId: item.id }) }
       return { ...item, portadaLabel: item.type === 'gift' ? 'PARA COMPARTIR' : 'DESCUBRE', portadaMeta: item.price > 0 ? plata(item.price) : (TIPOS[item.type]?.corto || 'Cerca de casa'), portadaAction: () => nav('post', { postId: item.id }) }
     })

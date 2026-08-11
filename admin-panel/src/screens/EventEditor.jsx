@@ -21,12 +21,16 @@ const localDateTime = value => {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`
 }
 
+const dateOnly = value => value ? String(value).slice(0, 10) : ''
+const dateWithDefaultTime = value => value ? `${dateOnly(value)}T12:00` : ''
+
 const initialState = event => ({
   title: event?.title || '',
   category: event?.category || 'otros',
   content: event?.content || '',
-  starts_at: localDateTime(event?.starts_at),
-  ends_at: localDateTime(event?.ends_at),
+  starts_at: event?.event_all_day ? dateOnly(localDateTime(event?.starts_at)) : localDateTime(event?.starts_at),
+  ends_at: event?.event_all_day ? dateOnly(localDateTime(event?.ends_at)) : localDateTime(event?.ends_at),
+  event_all_day: event?.event_all_day === true,
   event_recurrence: event?.event_recurrence || 'none',
   recurrence_until: localDateTime(event?.recurrence_until),
   location_text: event?.location_text || '',
@@ -83,6 +87,12 @@ export default function EventEditor({ event, profile, onBack, onSaved }) {
   const setTicket = (index, field, value) => setDraft(current => ({ ...current, ticket_prices: current.ticket_prices.map((ticket, ticketIndex) => ticketIndex === index ? { ...ticket, [field]: value } : ticket) }))
   const addTicket = () => setDraft(current => ({ ...current, ticket_prices: [...current.ticket_prices, { label: '', price: '' }] }))
   const removeTicket = index => setDraft(current => ({ ...current, ticket_prices: current.ticket_prices.length === 1 ? current.ticket_prices : current.ticket_prices.filter((_, ticketIndex) => ticketIndex !== index) }))
+  const setAllDay = checked => setDraft(current => ({
+    ...current,
+    event_all_day: checked,
+    starts_at: checked ? dateOnly(current.starts_at) : dateWithDefaultTime(current.starts_at),
+    ends_at: checked ? dateOnly(current.ends_at) : dateWithDefaultTime(current.ends_at),
+  }))
 
   useEffect(() => {
     supabase.from('event_categories').select('key, name, icon').eq('is_active', true).order('sort_order').then(({ data }) => {
@@ -131,8 +141,12 @@ export default function EventEditor({ event, profile, onBack, onSaved }) {
       setError('Selecciona el barrio donde se publicará el evento.')
       return
     }
-    if (draft.ends_at && new Date(draft.ends_at).getTime() <= new Date(draft.starts_at).getTime()) {
-      setError('La hora de término debe ser posterior al inicio.')
+    const startsAtValue = draft.event_all_day ? `${dateOnly(draft.starts_at)}T00:00:00` : draft.starts_at
+    const endsAtValue = draft.ends_at
+      ? (draft.event_all_day ? `${dateOnly(draft.ends_at)}T23:59:59` : draft.ends_at)
+      : null
+    if (endsAtValue && new Date(endsAtValue).getTime() <= new Date(startsAtValue).getTime()) {
+      setError(draft.event_all_day ? 'El día de término no puede ser anterior al inicio.' : 'La hora de término debe ser posterior al inicio.')
       return
     }
     const ticketPrices = draft.ticket_prices.map(ticket => ({ label: ticket.label.trim(), price: Number(ticket.price) })).filter(ticket => ticket.label || ticket.price || ticket.price === 0)
@@ -158,10 +172,13 @@ export default function EventEditor({ event, profile, onBack, onSaved }) {
       title: draft.title.trim(),
       category: draft.category,
       content: draft.content.trim(),
-      starts_at: new Date(draft.starts_at).toISOString(),
-      ends_at: draft.ends_at ? new Date(draft.ends_at).toISOString() : null,
+      starts_at: new Date(startsAtValue).toISOString(),
+      ends_at: endsAtValue ? new Date(endsAtValue).toISOString() : null,
+      event_all_day: draft.event_all_day,
       event_recurrence: draft.event_recurrence,
-      recurrence_until: draft.event_recurrence !== 'none' && draft.recurrence_until ? new Date(draft.recurrence_until).toISOString() : null,
+      recurrence_until: draft.event_recurrence !== 'none' && draft.recurrence_until
+        ? new Date(draft.event_all_day ? `${dateOnly(draft.recurrence_until)}T23:59:59` : draft.recurrence_until).toISOString()
+        : null,
       location_text: draft.location_text.trim(),
       lat: toNumberOrNull(draft.lat),
       lng: toNumberOrNull(draft.lng),
@@ -240,10 +257,11 @@ export default function EventEditor({ event, profile, onBack, onSaved }) {
           </label>
           <div className="admin-form-grid event-data-grid">
             <label className="field field-full">Nombre del evento<input value={draft.title} onChange={e => set('title', e.target.value)} maxLength={120} placeholder="Ej: Feria de emprendedores del barrio" required /></label>
-            <label className="field">Desde<input type="datetime-local" value={draft.starts_at} onChange={e => set('starts_at', e.target.value)} required /></label>
-            <label className="field">Hasta <small>Opcional</small><input type="datetime-local" value={draft.ends_at} min={draft.starts_at || undefined} onChange={e => set('ends_at', e.target.value)} /></label>
+            <div className="field field-full"><span>Horario</span><label className="event-all-day-toggle"><input type="checkbox" checked={draft.event_all_day} onChange={e => setAllDay(e.target.checked)} /><span><strong>Este evento no tiene una hora específica</strong><small>La aplicación mostrará solamente la fecha.</small></span></label></div>
+            <label className="field">{draft.event_all_day ? 'Día de inicio' : 'Desde'}<input type={draft.event_all_day ? 'date' : 'datetime-local'} value={draft.starts_at} onChange={e => set('starts_at', e.target.value)} required /></label>
+            <label className="field">{draft.event_all_day ? 'Día de término' : 'Hasta'} <small>Opcional</small><input type={draft.event_all_day ? 'date' : 'datetime-local'} value={draft.ends_at} min={draft.starts_at || undefined} onChange={e => set('ends_at', e.target.value)} /></label>
             <label className="field">Se repite<select value={draft.event_recurrence} onChange={e => set('event_recurrence', e.target.value)}><option value="none">No se repite</option><option value="weekly">Cada semana</option><option value="biweekly">Cada dos semanas</option><option value="monthly">Cada mes</option></select></label>
-            {draft.event_recurrence !== 'none' && <label className="field">Repetir hasta<input type="datetime-local" value={draft.recurrence_until} min={draft.starts_at || undefined} onChange={e => set('recurrence_until', e.target.value)} /></label>}
+            {draft.event_recurrence !== 'none' && <label className="field">Repetir hasta<input type={draft.event_all_day ? 'date' : 'datetime-local'} value={draft.event_all_day ? dateOnly(draft.recurrence_until) : draft.recurrence_until} min={draft.starts_at || undefined} onChange={e => set('recurrence_until', e.target.value)} /></label>}
             <label className="field field-full">Tipo de actividad<select value={draft.category} onChange={e => set('category', e.target.value)}>{categories.map(category => <option value={category.key} key={category.key}>{category.icon} {category.name}</option>)}</select></label>
             <label className="field field-full">Descripción<textarea value={draft.content} onChange={e => set('content', e.target.value)} rows="5" placeholder="Qué se hará, quiénes pueden participar y qué deben llevar…" required /></label>
           </div>

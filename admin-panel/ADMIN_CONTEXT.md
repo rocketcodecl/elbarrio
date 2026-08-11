@@ -133,6 +133,12 @@
 - El build de producción pasó y fue publicado tras respaldar la versión anterior en `admin-backups/20260811-draft-recovery`.
 - `https://admin.elbarrio.lat/` sirve `index-DeA5fRBm.js` e `index-CAACCql-.css`; los hashes SHA-256 de HTML, JavaScript y CSS remotos coinciden con `admin-panel/dist`.
 
+## Eventos sin hora específica — 11 de agosto de 2026
+
+- `202608110002_event_all_day.sql` fue ejecutada con resultado `Success`, según confirmación manual del usuario.
+- Eventos permite seleccionar “Este evento no tiene una hora específica”, usar solo día de inicio y un día de término opcional. La aplicación no muestra una hora inventada para esos registros.
+- El build fue respaldado en `admin-backups/20260811-event-all-day` y publicado en `https://admin.elbarrio.lat/`. Los archivos públicos `index-DQTjKzxm.js` e `index-BD26-XwI.css` coinciden por SHA-256 con `admin-panel/dist`.
+
 ## Auditoría de cierre del 10 de agosto de 2026
 
 - El build de producción del panel pasa.
