@@ -135,3 +135,9 @@
 - “Uso y servicios” llama a `admin-service-metrics`. La función remota responde, exige sesión y su preflight CORS responde correctamente. Aún falta validar su respuesta completa desde una sesión real de superadministrador.
 - El superadministrador dispone de edición auditada de datos de usuario, permisos, suspensión, reactivación y eliminación; control global de publicaciones; comentarios y reseñas; alertas; categorías; noticias; eventos; comercios y servicios.
 - La auditoría encontró tres cuentas superadministradoras activas. Se debe confirmar si `elbarrio.lat@gmail.com` debe conservar el nivel global.
+
+## Mercado vecinal — 11 de agosto de 2026
+
+- El módulo Mercado permite publicar ventas, regalos y trueques en nombre de un perfil seleccionado y moderar cada publicación desde su propia tarjeta, sin redirigir al editor global.
+- Las portadas tienen una altura fija de 168 px, recorte `cover` y desbordamiento contenido; la información y las acciones permanecen debajo de la imagen.
+- El build vigente publicado y verificado usa `index-DB8k8sR3.js` e `index-CAACCql-.css`.

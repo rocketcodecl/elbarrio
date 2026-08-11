@@ -484,3 +484,9 @@ Bloqueadores que no deben marcarse terminados por el solo hecho de compilar:
 8. Android mantiene `android:allowBackup="true"`; se recomienda desactivarlo antes de publicación definitiva.
 
 La entrega generada es un build firmado y reproducible de cierre técnico. No debe describirse como “aprobada por Google Play” ni como “validada completamente en dispositivo” hasta completar los puntos anteriores.
+
+## Mercado administrado — 11 de agosto de 2026
+
+- El panel web permite al superadministrador publicar ventas, regalos y trueques en nombre de un perfil seleccionado, además de aceptar/restaurar, pausar, ocultar o retirar cada publicación directamente desde su tarjeta.
+- Las imágenes de las tarjetas administrativas quedan contenidas en una portada fija de 168 px y ya no pueden desbordarse sobre la información ni los botones de moderación.
+- El build corregido está publicado en `admin.elbarrio.lat` y sus archivos remotos fueron verificados byte por byte contra `admin-panel/dist`.
