@@ -6,6 +6,7 @@
 ## Estado de continuidad — 9 de agosto de 2026
 
 - Bloque Mercado Ultra Admin cerrado el 11 de agosto: el panel publicado agrega un módulo “Mercado” para publicar ventas, regalos y trueques en nombre de un vendedor activo del barrio, con hasta cuatro fotografías comprimidas y trazabilidad administrativa. `202608110001_admin_marketplace_publishing.sql` fue ejecutada con `Success`, la RPC se validó con una sesión real sin crear contenido y el historial remoto fue reparado para registrar `202608100001` y `202608110001` como aplicadas. El panel real sirve `index-DDPseqSh.js` e `index-D4UpwmXt.css`, verificados contra el build local por HTTP y hash.
+- La moderación de Mercado se realiza directamente desde cada tarjeta: aceptar/restaurar, pausar, ocultar y retirar llaman a la RPC auditada vigente sin redirigir al editor global. El panel real fue actualizado a `index-Bq4rERhr.js` e `index-j_Risn2a.css` y ambos recursos fueron verificados.
 
 - Punto de retorno previo al bloque competitivo: tag remoto `pre-mejoras-competitivas-20260809` sobre `ec5084f`.
 - Núcleo competitivo aplicado en Supabase mediante `202608090005_competitive_community_core.sql`, `202608090006_event_follow_reminders.sql` y `202608090007_notification_campaign_categories.sql`. La auditoría `supabase/COMPETITIVE_CORE_AUDIT.sql` confirmó todas sus tablas, columnas y funciones con estado `OK`.

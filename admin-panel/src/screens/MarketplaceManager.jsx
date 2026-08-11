@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase.js'
 import { prepareImageUpload } from '../../../shared/imageUpload.js'
 
 const TYPES = [['sell', 'Venta'], ['gift', 'Regalo'], ['trade', 'Trueque']]
+const STATUS_LABELS = { active: 'Visible', pending: 'Pendiente', closed: 'Pausada', rejected: 'Oculta', removed: 'Retirada', sold: 'Finalizada' }
 const EMPTY = {
   neighborhoodId: '', authorId: '', type: 'sell', title: '', content: '',
   category: '', price: '', isNegotiable: false, lookingFor: '',
@@ -12,7 +13,7 @@ const imageOf = post => Array.isArray(post?.images) ? post.images.find(Boolean) 
 const money = value => value === null || value === undefined ? '' : `$${Number(value).toLocaleString('es-CL')}`
 const dateLabel = value => value ? new Date(value).toLocaleString('es-CL', { dateStyle: 'medium', timeStyle: 'short' }) : ''
 
-export default function MarketplaceManager({ profile, onNavigate }) {
+export default function MarketplaceManager({ profile }) {
   const [posts, setPosts] = useState([])
   const [neighborhoods, setNeighborhoods] = useState([])
   const [authors, setAuthors] = useState([])
@@ -24,6 +25,7 @@ export default function MarketplaceManager({ profile, onNavigate }) {
   const [creating, setCreating] = useState(false)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [changingId, setChangingId] = useState('')
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
 
@@ -132,6 +134,36 @@ export default function MarketplaceManager({ profile, onNavigate }) {
     }
   }
 
+  const moderate = async (post, action) => {
+    const actionKey = `${post.id}:${action}`
+    let reason = {
+      restore: post.status === 'pending' ? 'Publicación aceptada desde Mercado' : 'Publicación restaurada desde Mercado',
+      close: 'Publicación pausada desde Mercado',
+    }[action]
+    if (action === 'hide') {
+      reason = window.prompt('Motivo para ocultar esta publicación:')?.trim()
+      if (!reason) return
+    }
+    if (action === 'remove') {
+      if (!window.confirm('La publicación será retirada del Mercado y conservará su trazabilidad. ¿Continuar?')) return
+      reason = window.prompt('Motivo para retirar esta publicación:')?.trim()
+      if (!reason) return
+    }
+    setChangingId(actionKey)
+    setError('')
+    const { error: actionError } = await supabase.rpc('admin_moderate_post', {
+      p_post_id: post.id,
+      p_action: action,
+      p_reason: reason,
+    })
+    setChangingId('')
+    if (actionError) return setError(`No fue posible moderar: ${actionError.message}`)
+    const messages = { restore: 'Publicación visible en Mercado', close: 'Publicación pausada', hide: 'Publicación oculta', remove: 'Publicación retirada' }
+    setNotice(messages[action])
+    window.setTimeout(() => setNotice(''), 2400)
+    await load()
+  }
+
   if (!profile?.is_superadmin) return <div className="panel-empty"><strong>Acceso exclusivo del superadministrador</strong></div>
 
   if (creating) return <div className="market-admin-editor">
@@ -160,12 +192,15 @@ export default function MarketplaceManager({ profile, onNavigate }) {
   </div>
 
   return <div className="market-admin-page">
-    <section className="page-heading commerce-page-heading"><div><p className="eyebrow">Comunidad</p><h1>Mercado</h1><p>Crea publicaciones de venta, regalo o trueque y controla después su contenido desde Publicaciones.</p></div><div className="service-heading-actions"><div className="service-metrics"><span><strong>{posts.length}</strong>Total</span><span><strong>{posts.filter(item => item.status === 'active').length}</strong>Visibles</span><span><strong>{posts.filter(item => item.type === 'sell').length}</strong>Ventas</span></div><button className="button button-primary" type="button" onClick={() => setCreating(true)}>＋ Nueva publicación</button></div></section>
+    <section className="page-heading commerce-page-heading"><div><p className="eyebrow">Comunidad</p><h1>Mercado</h1><p>Crea, acepta, pausa, oculta o retira publicaciones directamente desde esta pantalla.</p></div><div className="service-heading-actions"><div className="service-metrics"><span><strong>{posts.length}</strong>Total</span><span><strong>{posts.filter(item => item.status === 'active').length}</strong>Visibles</span><span><strong>{posts.filter(item => item.type === 'sell').length}</strong>Ventas</span></div><button className="button button-primary" type="button" onClick={() => setCreating(true)}>＋ Nueva publicación</button></div></section>
     {error && <div className="admin-alert" role="alert"><span>⚠️</span><p>{error}</p><button type="button" onClick={() => setError('')}>×</button></div>}
     {notice && <div className="admin-toast">✓ {notice}</div>}
-    <section className="market-admin-toolbar"><label className="admin-search"><span>⌕</span><input value={query} onChange={event => setQuery(event.target.value)} placeholder="Buscar producto, categoría o vendedor…" /></label><div className="filter-row"><button className={filter === 'all' ? 'is-active' : ''} onClick={() => setFilter('all')}>Todos</button>{TYPES.map(([value, label]) => <button key={value} className={filter === value ? 'is-active' : ''} onClick={() => setFilter(value)}>{label}</button>)}</div><button className="market-admin-global" type="button" onClick={() => onNavigate('publicaciones')}>Administrar contenido →</button></section>
+    <section className="market-admin-toolbar"><label className="admin-search"><span>⌕</span><input value={query} onChange={event => setQuery(event.target.value)} placeholder="Buscar producto, categoría o vendedor…" /></label><div className="filter-row"><button className={filter === 'all' ? 'is-active' : ''} onClick={() => setFilter('all')}>Todos</button>{TYPES.map(([value, label]) => <button key={value} className={filter === value ? 'is-active' : ''} onClick={() => setFilter(value)}>{label}</button>)}</div></section>
     {loading && <div className="panel-loading">Cargando Mercado…</div>}
     {!loading && !filtered.length && <div className="panel-empty"><span>◫</span><strong>No hay publicaciones en este filtro</strong><small>Crea la primera desde el panel.</small></div>}
-    {!loading && !!filtered.length && <section className="market-admin-grid">{filtered.map(post => <article key={post.id} className="market-admin-card"><div className="market-admin-card-image">{imageOf(post) ? <img src={imageOf(post)} alt="" /> : <span>◫</span>}<em>{TYPES.find(([value]) => value === post.type)?.[1] || post.type}</em></div><div><small>{post.category || 'Sin categoría'} · {dateLabel(post.created_at)}</small><h2>{post.title}</h2><p>{post.content}</p>{post.type === 'sell' && <strong>{money(post.price)}{post.is_negotiable ? ' · conversable' : ''}</strong>}{post.type === 'trade' && <strong>Busca: {post.looking_for}</strong>}<footer><span>{post.author?.full_name || 'Sin autor'}</span><i className={post.status === 'active' ? 'is-active' : ''}>{post.status === 'active' ? 'Visible' : post.status}</i></footer></div></article>)}</section>}
+    {!loading && !!filtered.length && <section className="market-admin-grid">{filtered.map(post => {
+      const busy = changingId.startsWith(`${post.id}:`)
+      return <article key={post.id} className="market-admin-card"><div className="market-admin-card-image">{imageOf(post) ? <img src={imageOf(post)} alt="" /> : <span>◫</span>}<em>{TYPES.find(([value]) => value === post.type)?.[1] || post.type}</em></div><div><small>{post.category || 'Sin categoría'} · {dateLabel(post.created_at)}</small><h2>{post.title}</h2><p>{post.content}</p>{post.type === 'sell' && <strong>{money(post.price)}{post.is_negotiable ? ' · conversable' : ''}</strong>}{post.type === 'trade' && <strong>Busca: {post.looking_for}</strong>}<footer><span>{post.author?.full_name || 'Sin autor'}</span><i className={post.status === 'active' ? 'is-active' : ''}>{STATUS_LABELS[post.status] || post.status}</i></footer><div className="market-admin-actions">{post.status !== 'active' && <button className="approve" type="button" disabled={busy} onClick={() => moderate(post, 'restore')}>{post.status === 'pending' ? '✓ Aceptar' : '↻ Restaurar'}</button>}{post.status === 'active' && <button type="button" disabled={busy} onClick={() => moderate(post, 'close')}>Pausar</button>}{!['rejected', 'removed'].includes(post.status) && <button className="hide" type="button" disabled={busy} onClick={() => moderate(post, 'hide')}>Ocultar</button>}{post.status !== 'removed' && <button className="remove" type="button" disabled={busy} onClick={() => moderate(post, 'remove')}>Retirar</button>}</div></div></article>
+    })}</section>}
   </div>
 }

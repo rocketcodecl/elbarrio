@@ -146,7 +146,7 @@ export default function App() {
       {activeSection === 'notificaciones' && <NotificationManager profile={profile} />}
       {activeSection === 'consultas' && <ContactManager />}
       {activeSection === 'portada' && <HomeCarouselManager profile={profile} />}
-      {activeSection === 'mercado' && <MarketplaceManager profile={profile} onNavigate={setActiveSection} />}
+      {activeSection === 'mercado' && <MarketplaceManager profile={profile} />}
       {activeSection === 'categorias' && <CategoryManager profile={profile} />}
       {activeSection === 'publicaciones' && <PostManager profile={profile} />}
       {activeSection === 'uso' && <UsageManager />}
