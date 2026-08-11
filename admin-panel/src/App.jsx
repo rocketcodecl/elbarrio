@@ -21,6 +21,7 @@ import PostManager from './screens/PostManager.jsx'
 import UsageManager from './screens/UsageManager.jsx'
 import UserContentManager from './screens/UserContentManager.jsx'
 import ReportManager from './screens/ReportManager.jsx'
+import MarketplaceManager from './screens/MarketplaceManager.jsx'
 
 const ADMIN_ROLE = 'admin'
 
@@ -145,12 +146,13 @@ export default function App() {
       {activeSection === 'notificaciones' && <NotificationManager profile={profile} />}
       {activeSection === 'consultas' && <ContactManager />}
       {activeSection === 'portada' && <HomeCarouselManager profile={profile} />}
+      {activeSection === 'mercado' && <MarketplaceManager profile={profile} onNavigate={setActiveSection} />}
       {activeSection === 'categorias' && <CategoryManager profile={profile} />}
       {activeSection === 'publicaciones' && <PostManager profile={profile} />}
       {activeSection === 'uso' && <UsageManager />}
       {activeSection === 'contenido-usuarios' && <UserContentManager />}
       {activeSection === 'reportes' && <ReportManager onNavigate={setActiveSection} />}
-      {!['dashboard', 'comercios', 'servicios', 'eventos', 'farmacias', 'noticias', 'incidentes', 'usuarios', 'espera', 'invitaciones', 'contenido', 'notificaciones', 'consultas', 'portada', 'categorias', 'publicaciones', 'contenido-usuarios', 'reportes', 'uso'].includes(activeSection) && (
+      {!['dashboard', 'mercado', 'comercios', 'servicios', 'eventos', 'farmacias', 'noticias', 'incidentes', 'usuarios', 'espera', 'invitaciones', 'contenido', 'notificaciones', 'consultas', 'portada', 'categorias', 'publicaciones', 'contenido-usuarios', 'reportes', 'uso'].includes(activeSection) && (
         <section className="placeholder-module"><span>🚧</span><h1>Módulo en preparación</h1><p>Lo construiremos en una siguiente fase.</p></section>
       )}
     </AdminShell>
