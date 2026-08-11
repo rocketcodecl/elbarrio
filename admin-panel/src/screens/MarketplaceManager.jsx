@@ -23,7 +23,7 @@ export default function MarketplaceManager({ profile }) {
   const [files, setFiles] = useState([])
   const [query, setQuery] = useState('')
   const [filter, setFilter] = useState('all')
-  const [creating, setCreating] = useState(false)
+  const [creating, setCreating] = usePersistentDraft(`workspace:mercado:${profile?.id || 'admin'}:creating`, false, 'v1')
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [changingId, setChangingId] = useState('')

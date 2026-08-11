@@ -218,7 +218,7 @@ export default function NewsManager({ profile }) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
-  const [view, setView] = useState({ type: 'list', news: null })
+  const [view, setView] = usePersistentDraft(`workspace:noticias:${profile?.id || 'admin'}`, { type: 'list', news: null }, 'v1')
   const [changingId, setChangingId] = useState(null)
   const [categories, setCategories] = useState(DEFAULT_CATEGORIES)
 

@@ -126,6 +126,13 @@
 - Validar funcionalmente Incidentes, Usuarios, mapa e historial, Noticias y categorías una vez certificado el schema remoto.
 - Limpiar el lint de fuentes del panel y excluir `dist` del lint raíz; el build de producción sí pasa.
 
+## Recuperación real de editores — 11 de agosto de 2026
+
+- El guardado local de formularios se ejecuta dentro del mismo cambio de estado; ya no depende de que React alcance a ejecutar un efecto antes de abandonar la pestaña.
+- Se conserva además la sección administrativa y el editor que estaban abiertos. Al volver al panel se restaura el flujo de Eventos, Noticias, Comercios, Servicios, Farmacias, Mercado, Alertas, Productos o Promociones con su borrador visible.
+- El build de producción pasó y fue publicado tras respaldar la versión anterior en `admin-backups/20260811-draft-recovery`.
+- `https://admin.elbarrio.lat/` sirve `index-DeA5fRBm.js` e `index-CAACCql-.css`; los hashes SHA-256 de HTML, JavaScript y CSS remotos coinciden con `admin-panel/dist`.
+
 ## Auditoría de cierre del 10 de agosto de 2026
 
 - El build de producción del panel pasa.

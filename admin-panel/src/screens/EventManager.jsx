@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { supabase } from '../lib/supabase.js'
 import EventEditor from './EventEditor.jsx'
 import EventCategoryManager from './EventCategoryManager.jsx'
+import usePersistentDraft from '../hooks/usePersistentDraft.js'
 
 const CATEGORY_LABELS = {
   asambleas: '🏛️ Asamblea', ferias: '🥬 Feria', talleres: '🎨 Taller', deportes: '⚽ Deporte', otros: '📌 Otro',
@@ -19,7 +20,7 @@ export default function EventManager({ profile }) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
-  const [view, setView] = useState({ type: 'list', event: null })
+  const [view, setView] = usePersistentDraft(`workspace:eventos:${profile?.id || 'admin'}`, { type: 'list', event: null }, 'v1')
   const [changingId, setChangingId] = useState(null)
   const [categoryLabels, setCategoryLabels] = useState(CATEGORY_LABELS)
 

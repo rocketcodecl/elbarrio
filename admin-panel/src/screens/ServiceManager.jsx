@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { supabase } from '../lib/supabase.js'
 import ServiceEditor from './ServiceEditor.jsx'
+import usePersistentDraft from '../hooks/usePersistentDraft.js'
 
 const FILTERS = [
   ['all', 'Todos'],
@@ -71,8 +72,8 @@ export default function ServiceManager({ profile }) {
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
   const [featureDates, setFeatureDates] = useState({ starts: '', ends: '' })
-  const [creating, setCreating] = useState(false)
-  const [editingService, setEditingService] = useState(null)
+  const [creating, setCreating] = usePersistentDraft(`workspace:servicios:${profile?.id || 'admin'}:creating`, false, 'v1')
+  const [editingService, setEditingService] = usePersistentDraft(`workspace:servicios:${profile?.id || 'admin'}:editing`, null, 'v1')
 
   const selected = services.find(service => service.id === selectedId) || null
 

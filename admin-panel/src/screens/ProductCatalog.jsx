@@ -17,8 +17,8 @@ export default function ProductCatalog({ commerce, onBack }) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
-  const [editorOpen, setEditorOpen] = useState(false)
-  const [editing, setEditing] = useState(null)
+  const [editorOpen, setEditorOpen] = usePersistentDraft(`workspace:productos:${commerce.id}:open`, false, 'v1')
+  const [editing, setEditing] = usePersistentDraft(`workspace:productos:${commerce.id}:editing`, null, 'v1')
   const productFallback = editing ? { name: editing.name || '', description: editing.description || '', price: editing.price ?? '', unit_label: editing.unit_label || '', image_url: editing.image_url || '', is_available: editing.is_available !== false, is_featured: editing.is_featured !== false, sort_order: editing.sort_order || 0 } : EMPTY
   const [draft, setDraft, clearProductDraft] = usePersistentDraft(
     `product:${commerce.id}:${editing?.id || 'new'}`,

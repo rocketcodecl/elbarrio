@@ -101,8 +101,8 @@ export default function IncidentManager({ profile }) {
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
   const [neighborhoods, setNeighborhoods] = useState([])
-  const [editorOpen, setEditorOpen] = useState(false)
-  const [editorId, setEditorId] = useState(null)
+  const [editorOpen, setEditorOpen] = usePersistentDraft(`workspace:incidentes:${profile?.id || 'admin'}:open`, false, 'v1')
+  const [editorId, setEditorId] = usePersistentDraft(`workspace:incidentes:${profile?.id || 'admin'}:id`, null, 'v1')
   const editorSource = incidents.find(item => item.id === editorId) || null
   const [draft, setDraft, clearIncidentDraft] = usePersistentDraft(
     `incident:${profile?.id || 'admin'}:${editorId || 'new'}`,

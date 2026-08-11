@@ -144,7 +144,7 @@ export default function PharmacyManager() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
-  const [view, setView] = useState({ type: 'list', pharmacy: null })
+  const [view, setView] = usePersistentDraft('workspace:farmacias', { type: 'list', pharmacy: null }, 'v1')
 
   const showNotice = message => {
     setNotice(message)

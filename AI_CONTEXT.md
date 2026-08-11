@@ -500,5 +500,7 @@ La entrega generada es un build firmado y reproducible de cierre técnico. No de
 
 - El panel conserva automáticamente en el navegador los cambios no publicados de Eventos, Noticias, Comercios, Servicios, Farmacias, Mercado, Alertas, Notificaciones, Productos, Promociones y Contenido institucional.
 - Los borradores se separan por administrador, módulo y registro. Se eliminan al guardar/publicar correctamente o al usar `Descartar borrador`; la flecha superior permite salir sin perder el trabajo.
+- Corrección posterior: el guardado ahora ocurre de forma síncrona en cada cambio y el panel conserva también el módulo y editor abiertos. Al abandonar la página y regresar, reabre el editor exacto con su borrador en Eventos, Noticias, Comercios, Servicios, Farmacias, Mercado, Alertas, Productos y Promociones.
 - No se guardan contraseñas ni motivos de moderación. Los archivos elegidos pero todavía no subidos deben seleccionarse nuevamente por restricciones del navegador; las URLs de imágenes ya subidas sí se conservan.
 - Es una protección local del dispositivo y navegador actual, no sincronización entre computadores. No requirió SQL ni cambios de esquema.
+- El build corregido fue publicado en `https://admin.elbarrio.lat/` después de respaldar la versión anterior en `admin-backups/20260811-draft-recovery`. El HTML, JavaScript `index-DeA5fRBm.js` y CSS `index-CAACCql-.css` públicos coinciden por SHA-256 con el build local.

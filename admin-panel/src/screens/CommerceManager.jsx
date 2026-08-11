@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase.js'
 import CommerceEditor from './CommerceEditor.jsx'
 import ProductCatalog from './ProductCatalog.jsx'
 import PromotionCatalog from './PromotionCatalog.jsx'
+import usePersistentDraft from '../hooks/usePersistentDraft.js'
 
 const commerceImage = commerce => commerce.cover_url || commerce.logo_url || null
 
@@ -16,7 +17,7 @@ export default function CommerceManager({ profile }) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
-  const [view, setView] = useState({ type: 'list', commerce: null })
+  const [view, setView] = usePersistentDraft(`workspace:comercios:${profile?.id || 'admin'}`, { type: 'list', commerce: null }, 'v1')
 
   const showNotice = message => {
     setNotice(message)

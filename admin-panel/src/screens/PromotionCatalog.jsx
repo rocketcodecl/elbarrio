@@ -7,7 +7,7 @@ const EMPTY={title:'',description:'',image_url:'',starts_at:'',expires_at:'',is_
 const inputDate=value=>{if(!value)return'';const d=new Date(value);if(Number.isNaN(d.getTime()))return'';return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,16)}
 
 export default function PromotionCatalog({commerce,onBack}){
-  const [rows,setRows]=useState([]),[editing,setEditing]=useState(null),[editorOpen,setEditorOpen]=useState(false),[loading,setLoading]=useState(true),[saving,setSaving]=useState(false),[error,setError]=useState('')
+  const [rows,setRows]=useState([]),[editing,setEditing]=usePersistentDraft(`workspace:promociones:${commerce.id}:editing`,null,'v1'),[editorOpen,setEditorOpen]=usePersistentDraft(`workspace:promociones:${commerce.id}:open`,false,'v1'),[loading,setLoading]=useState(true),[saving,setSaving]=useState(false),[error,setError]=useState('')
   const promoFallback=editing?{...editing,starts_at:inputDate(editing.starts_at),expires_at:inputDate(editing.expires_at)}:EMPTY
   const [draft,setDraft,clearPromotionDraft]=usePersistentDraft(`promotion:${commerce.id}:${editing?.id||'new'}`,promoFallback,editing?.updated_at||'new-v1')
   const load=useCallback(async()=>{setLoading(true);const{data,error:loadError}=await supabase.from('commerce_promos').select('*').eq('commerce_id',commerce.id).order('created_at',{ascending:false});if(loadError)setError(loadError.message);setRows(data||[]);setLoading(false)},[commerce.id])

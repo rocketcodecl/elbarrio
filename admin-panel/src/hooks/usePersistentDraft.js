@@ -22,39 +22,43 @@ const readDraft = (key, fallback, version) => {
   }
 }
 
+const writeDraft = (key, version, value) => {
+  if (!key || typeof window === 'undefined') return
+  try {
+    window.localStorage.setItem(`${PREFIX}${key}`, JSON.stringify({
+      version,
+      savedAt: new Date().toISOString(),
+      value,
+    }))
+  } catch {
+    // El formulario sigue funcionando aunque el navegador bloquee Storage.
+  }
+}
+
 export default function usePersistentDraft(key, fallback, version = '1') {
   const identity = `${key || ''}:${version}`
   const identityRef = useRef(identity)
   const [value, setValue] = useState(() => readDraft(key, fallback, version))
-  const lastValueRef = useRef(value)
   const skipNextWriteRef = useRef(false)
 
   useEffect(() => {
     if (identityRef.current !== identity) {
       identityRef.current = identity
       const restored = readDraft(key, fallback, version)
-      lastValueRef.current = restored
       setValue(restored)
-      return
     }
-    if (skipNextWriteRef.current) {
+  }, [fallback, identity, key, version])
+
+  // Persistir dentro del mismo cambio evita perder la última edición si el
+  // usuario abandona la pestaña antes de que React alcance a ejecutar un efecto.
+  const setPersistentValue = useCallback(nextValue => {
+    setValue(currentValue => {
+      const resolvedValue = typeof nextValue === 'function' ? nextValue(currentValue) : nextValue
+      if (!skipNextWriteRef.current) writeDraft(key, version, resolvedValue)
       skipNextWriteRef.current = false
-      lastValueRef.current = value
-      return
-    }
-    if (Object.is(lastValueRef.current, value)) return
-    lastValueRef.current = value
-    if (!key || typeof window === 'undefined') return
-    try {
-      window.localStorage.setItem(`${PREFIX}${key}`, JSON.stringify({
-        version,
-        savedAt: new Date().toISOString(),
-        value,
-      }))
-    } catch {
-      // El formulario sigue funcionando aunque el navegador bloquee Storage.
-    }
-  }, [fallback, identity, key, value, version])
+      return resolvedValue
+    })
+  }, [key, version])
 
   const clearDraft = useCallback(() => {
     if (!key || typeof window === 'undefined') return
@@ -67,8 +71,8 @@ export default function usePersistentDraft(key, fallback, version = '1') {
 
   const replaceWithoutSaving = useCallback(nextValue => {
     skipNextWriteRef.current = true
-    setValue(nextValue)
-  }, [])
+    setPersistentValue(nextValue)
+  }, [setPersistentValue])
 
-  return [value, setValue, clearDraft, replaceWithoutSaving]
+  return [value, setPersistentValue, clearDraft, replaceWithoutSaving]
 }

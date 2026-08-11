@@ -22,6 +22,7 @@ import UsageManager from './screens/UsageManager.jsx'
 import UserContentManager from './screens/UserContentManager.jsx'
 import ReportManager from './screens/ReportManager.jsx'
 import MarketplaceManager from './screens/MarketplaceManager.jsx'
+import usePersistentDraft from './hooks/usePersistentDraft.js'
 
 const ADMIN_ROLE = 'admin'
 
@@ -47,7 +48,7 @@ export default function App() {
   const [profile, setProfile] = useState(null)
   const [loading, setLoading] = useState(true)
   const [profileError, setProfileError] = useState('')
-  const [activeSection, setActiveSection] = useState('dashboard')
+  const [activeSection, setActiveSection, clearActiveSection] = usePersistentDraft('workspace:active-section', 'dashboard', 'v1')
 
   const loadProfile = useCallback(async (currentSession) => {
     if (!currentSession?.user) {
@@ -95,6 +96,7 @@ export default function App() {
     await supabase.auth.signOut()
     setSession(null)
     setProfile(null)
+    clearActiveSection()
     setActiveSection('dashboard')
   }
 
