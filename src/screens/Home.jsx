@@ -1371,15 +1371,13 @@ function Home({ currentUser, onNavigate, onCrear }) {
           </div>
         )}
 
-        {/* ══════ ACTIVIDAD DE EL BARRIO (vertical, 10 + "+ ver más") ══════
+        {/* ══════ ACTIVIDAD DEL BARRIO (vertical, 10 + "+ ver más") ══════
             Feed principal — publicaciones generales de vecinos.
             Ahora queda ARRIBA de Eventos para que no se pierda. */}
         <div style={s.seccion}>
           <div style={s.seccionTit}>
             <Ico.actividad />
-            <span style={s.seccionTxt}>
-              Actividad de <span style={s.marca}>el barrio</span>
-            </span>
+            <span style={s.seccionTxt}>Actividad del Barrio</span>
           </div>
 
           {filtrados.length === 0 ? (
