@@ -15,6 +15,8 @@ const STATUS = {
   discarded: ['Descartado', '#94a3b8'],
 }
 
+const PIPELINE_STATUS = Object.entries(STATUS).filter(([value]) => value !== 'discarded')
+
 const EMPTY_EDIT = {
   name: '', category: 'Otro', source_type: '', address: '', phone: '', whatsapp: '', email: '', website: '', social_url: '',
   status: 'new', contact_name: '', notes: '', next_follow_up_at: '',
@@ -138,7 +140,7 @@ export default function CommercialRadar({ profile, onNavigate }) {
     const needle = normalize(query)
     return withExisting.filter(item => {
       const textMatch = !needle || normalize([item.name, item.address, item.category, item.source_type].join(' ')).includes(needle)
-      const statusMatch = statusFilter === 'all' || item.status === statusFilter
+      const statusMatch = statusFilter === 'all' ? item.status !== 'discarded' : item.status === statusFilter
       const categoryMatch = categoryFilter === 'all' || item.category === categoryFilter
       const sourceMatch = sourceFilter === 'all' || item.source === sourceFilter
       return textMatch && statusMatch && categoryMatch && sourceMatch
@@ -244,6 +246,32 @@ export default function CommercialRadar({ profile, onNavigate }) {
     setNotice('Prospecto verificado. Continúa privado hasta que decidas publicarlo.')
   }
 
+  const setDiscarded = async discard => {
+    if (!selected || selected.isNew) return
+    if (discard) {
+      const suffix = selected.existingCommerce
+        ? ' Esto solo lo quitará del Radar; la ficha publicada en Comercios no será modificada.'
+        : ' Podrás restaurarlo más adelante desde el filtro “Descartados”.'
+      if (!window.confirm(`¿Quitar “${selected.name || edit.name}” del Radar?${suffix}`)) return
+    }
+    setSaving(discard ? 'discard' : 'restore'); setError(''); setNotice('')
+    const patch = { status: discard ? 'discarded' : 'new', updated_by: profile.id, updated_at: new Date().toISOString() }
+    const { error: updateError } = await supabase.from('commercial_prospects').update(patch).eq('id', selected.id)
+    if (!updateError) {
+      await supabase.from('commercial_prospect_interactions').insert({
+        prospect_id: selected.id,
+        admin_profile_id: profile.id,
+        interaction_type: 'status',
+        summary: discard ? 'Prospecto descartado y retirado del Radar.' : 'Prospecto restaurado al Radar para revisión.',
+      })
+    }
+    setSaving('')
+    if (updateError) return setError(updateError.message)
+    setProspects(current => current.map(item => item.id === selected.id ? { ...item, ...patch } : item))
+    setSelectedId(null); setManualDraft(null)
+    setNotice(discard ? 'Comercio quitado del Radar. Puedes recuperarlo desde “Descartados”.' : 'Comercio restaurado al Radar.')
+  }
+
   const convert = async publish => {
     if (!selected || selected.isNew || selected.existingCommerce) return
     if (publish && !window.confirm(`Se creará una ficha básica visible para los vecinos de “${edit.name.trim()}”. ¿Publicar ahora?`)) return
@@ -299,10 +327,11 @@ export default function CommercialRadar({ profile, onNavigate }) {
   }
 
   const counts = useMemo(() => ({
-    total: withExisting.length,
+    total: withExisting.filter(item => item.status !== 'discarded').length,
     new: withExisting.filter(item => item.status === 'new').length,
     contacted: withExisting.filter(item => ['contacted', 'visit_scheduled', 'interested', 'proposal_sent'].includes(item.status)).length,
     converted: withExisting.filter(item => item.status === 'converted' || item.existingCommerce).length,
+    discarded: withExisting.filter(item => item.status === 'discarded').length,
   }), [withExisting])
 
   return (
@@ -315,7 +344,7 @@ export default function CommercialRadar({ profile, onNavigate }) {
       {notice && <div className="admin-toast">✓ {notice}</div>}
       <section className="radar-controls">
         <label>Barrio<select value={neighborhoodId} onChange={event => { setNeighborhoodId(event.target.value); setSelectedId(null) }}>{neighborhoods.map(item => <option value={item.id} key={item.id}>{item.name}{item.uv_code ? ` · UV ${item.uv_code}` : ''}</option>)}</select></label>
-        <div className="radar-metrics"><span><strong>{counts.total}</strong>Detectados</span><span><strong>{counts.new}</strong>Por revisar</span><span><strong>{counts.contacted}</strong>En gestión</span><span><strong>{counts.converted}</strong>Incorporados</span></div>
+        <div className="radar-metrics"><span><strong>{counts.total}</strong>En el radar</span><span><strong>{counts.new}</strong>Por revisar</span><span><strong>{counts.contacted}</strong>En gestión</span><span><strong>{counts.converted}</strong>Incorporados</span><span><strong>{counts.discarded}</strong>Descartados</span></div>
       </section>
       <section className="radar-workspace">
         <div className="radar-map-card">
@@ -350,7 +379,7 @@ export default function CommercialRadar({ profile, onNavigate }) {
             <label>Email<input type="email" value={edit.email} onChange={event => setEdit(current => ({ ...current, email: event.target.value }))} placeholder="contacto@comercio.cl" /></label>
             <label>Sitio web<input value={edit.website} onChange={event => setEdit(current => ({ ...current, website: event.target.value }))} placeholder="https://…" /></label>
             <label className="wide">Instagram o red social<input value={edit.social_url} onChange={event => setEdit(current => ({ ...current, social_url: event.target.value }))} placeholder="https://instagram.com/…" /></label>
-            <label>Estado<select value={edit.status} onChange={event => setEdit(current => ({ ...current, status: event.target.value }))}>{Object.entries(STATUS).map(([value, [label]]) => <option value={value} key={value}>{label}</option>)}</select></label>
+            <label>Estado<select value={edit.status === 'discarded' ? 'new' : edit.status} disabled={selected.status === 'discarded'} onChange={event => setEdit(current => ({ ...current, status: event.target.value }))}>{PIPELINE_STATUS.map(([value, [label]]) => <option value={value} key={value}>{label}</option>)}</select></label>
             <label>Persona de contacto<input value={edit.contact_name} onChange={event => setEdit(current => ({ ...current, contact_name: event.target.value }))} placeholder="Nombre o cargo" /></label>
             <label className="wide">Próximo seguimiento<input type="datetime-local" value={edit.next_follow_up_at} onChange={event => setEdit(current => ({ ...current, next_follow_up_at: event.target.value }))} /></label>
             <label className="wide">Notas<textarea rows="4" value={edit.notes} onChange={event => setEdit(current => ({ ...current, notes: event.target.value }))} placeholder="Interés en publicidad, conversación y próxima acción…" /></label>
@@ -362,9 +391,14 @@ export default function CommercialRadar({ profile, onNavigate }) {
           </section>}
         </div>
         <footer className="radar-detail-actions">
-          <button className="button button-secondary" type="button" onClick={saveProspect} disabled={!!saving}>{saving === 'prospect' ? 'Guardando…' : selected.isNew ? 'Agregar al CRM' : 'Guardar ficha'}</button>
-          {!selected.isNew && !selected.verified_at && !selected.existingCommerce && <button className="button button-secondary" type="button" onClick={verifyProspect} disabled={!!saving}>{saving === 'verify' ? 'Verificando…' : '✓ Verificar'}</button>}
-          {selected.existingCommerce ? <button className="button button-primary" type="button" onClick={() => onNavigate('comercios')}>Abrir en Comercios</button> : !selected.isNew && <><button className="button button-secondary" type="button" onClick={() => convert(false)} disabled={!!saving}>Crear borrador</button><button className="button button-primary" type="button" onClick={() => convert(true)} disabled={!!saving}>{saving === 'convert' ? 'Creando…' : 'Verificar y publicar'}</button></>}
+          {selected.status === 'discarded'
+            ? <button className="button radar-restore-action" type="button" onClick={() => setDiscarded(false)} disabled={!!saving}>{saving === 'restore' ? 'Restaurando…' : '↻ Restaurar al radar'}</button>
+            : <>
+              {!selected.isNew && <button className="button radar-discard-action" type="button" onClick={() => setDiscarded(true)} disabled={!!saving}>{saving === 'discard' ? 'Quitando…' : 'Quitar del radar'}</button>}
+              <button className="button button-secondary" type="button" onClick={saveProspect} disabled={!!saving}>{saving === 'prospect' ? 'Guardando…' : selected.isNew ? 'Agregar al CRM' : 'Guardar ficha'}</button>
+              {!selected.isNew && !selected.verified_at && !selected.existingCommerce && <button className="button button-secondary" type="button" onClick={verifyProspect} disabled={!!saving}>{saving === 'verify' ? 'Verificando…' : '✓ Verificar'}</button>}
+              {selected.existingCommerce ? <button className="button button-primary" type="button" onClick={() => onNavigate('comercios')}>Abrir en Comercios</button> : !selected.isNew && <><button className="button button-secondary" type="button" onClick={() => convert(false)} disabled={!!saving}>Crear borrador</button><button className="button button-primary" type="button" onClick={() => convert(true)} disabled={!!saving}>{saving === 'convert' ? 'Creando…' : 'Verificar y publicar'}</button></>}
+            </>}
         </footer>
       </aside>}
     </div>

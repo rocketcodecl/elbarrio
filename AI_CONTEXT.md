@@ -533,6 +533,8 @@ La entrega generada es un build firmado y reproducible de cierre técnico. No de
 - La resincronización de Overture mantuvo 480 prospectos sin duplicarlos y dejó 187 emails y 334 redes en columnas visibles del CRM.
 - El panel está publicado en `https://admin.elbarrio.lat/` después del respaldo `admin-backups/20260811-commercial-crm`. Los archivos públicos `index-oZUZ8-ti.js` e `index-B3FW_woe.css`, además del HTML, coinciden por SHA-256 con el build local.
 - La inserción de cronología fue validada con RLS. El DELETE devolvió 204 pero no eliminó la nota porque el historial es deliberadamente inmutable; ejecutar `202608110005_cleanup_crm_validation.sql` una sola vez para retirar exclusivamente ese registro técnico.
+- El Radar oculta por defecto los prospectos descartados. Cada ficha permite “Quitar del radar” con confirmación; el registro se conserva con estado `discarded` para que las sincronizaciones no lo reincorporen. El filtro “Descartados” permite revisarlo y restaurarlo al estado “Por revisar”. Esta mejora reutiliza el esquema y las RLS vigentes, por lo que no requiere SQL.
+- El panel con descarte reversible fue respaldado en `admin-backups/20260812-radar-discard` y publicado en `https://admin.elbarrio.lat/`. Los recursos públicos `index-DWXxLOSh.js` e `index-Bdp-MiLG.css` respondieron HTTP 200 y coinciden por SHA-256 con el build local.
 
 ## Entrega Google Play 1.0.1 — 11 de agosto de 2026
 

@@ -188,4 +188,6 @@
 - Verificar un prospecto no lo publica. El superadministrador decide entre crear un borrador inactivo o verificar y publicar una ficha básica en Comercios mediante una confirmación explícita.
 - La resincronización final conserva 480 prospectos, con 187 emails y 334 redes en campos visibles.
 - Build publicado y verificado por SHA-256: `index-oZUZ8-ti.js` e `index-B3FW_woe.css`. Respaldo: `admin-backups/20260811-commercial-crm`.
+- Limpieza reversible del Radar: los prospectos con estado `discarded` quedan fuera del mapa y listado normal, pueden consultarse mediante el filtro “Descartados” y restaurarse a “Por revisar”. La ficha incluye confirmación antes de quitar; si ya existe una ficha publicada en Comercios, avisa que esa ficha no será modificada. No requiere migración porque el estado y las políticas ya existían.
+- Build publicado en `https://admin.elbarrio.lat/` y verificado por SHA-256: `index-DWXxLOSh.js` e `index-Bdp-MiLG.css`. Respaldo: `admin-backups/20260812-radar-discard`.
 - Ejecutar una vez `202608110005_cleanup_crm_validation.sql` para eliminar exclusivamente la nota creada al probar la política de inserción del historial.
