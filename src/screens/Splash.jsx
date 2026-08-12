@@ -1,22 +1,34 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 export default function Splash({ onFinish }) {
   const [leaving, setLeaving] = useState(false)
+  const onFinishRef = useRef(onFinish)
+
+  useEffect(() => { onFinishRef.current = onFinish }, [onFinish])
 
   useEffect(() => {
-    ;['comunidad.webp', 'confianza.webp', 'informado.webp'].forEach(file => {
+    let active = true
+    const images = ['comunidad.webp', 'confianza.webp', 'informado.webp'].map(file => {
       const image = new Image()
       image.src = `${import.meta.env.BASE_URL}onboarding/${file}`
+      return image
     })
+    const firstImageReady = images[0].decode
+      ? images[0].decode().catch(() => undefined)
+      : new Promise(resolve => {
+        images[0].onload = resolve
+        images[0].onerror = resolve
+      })
     const exitTimer = setTimeout(() => setLeaving(true), 2650)
     const finishTimer = setTimeout(() => {
-      onFinish()
+      firstImageReady.then(() => { if (active) onFinishRef.current() })
     }, 3000)
     return () => {
+      active = false
       clearTimeout(exitTimer)
       clearTimeout(finishTimer)
     }
-  }, [onFinish])
+  }, [])
 
   return (
     <div className={leaving ? 'splash-screen splash-screen--leaving' : 'splash-screen'} style={styles.container}>
@@ -38,7 +50,7 @@ export default function Splash({ onFinish }) {
         @keyframes splashExit {
           0% { opacity: 1; transform: scale(1); filter: brightness(1); }
           55% { opacity: 1; transform: scale(1.035); filter: brightness(1.12); }
-          100% { opacity: 0; transform: scale(1.08); filter: brightness(1.18); }
+          100% { opacity: 1; transform: scale(1.08); filter: brightness(1.18); }
         }
         .splash-screen { transform-origin: center; }
         .splash-screen--leaving { animation: splashExit .35s cubic-bezier(.4,0,.2,1) both; }
@@ -53,7 +65,7 @@ export default function Splash({ onFinish }) {
           33%, 100% { opacity: 0; transform: translateY(-5px); }
         }
         @media (prefers-reduced-motion: reduce) {
-          .splash-screen--leaving { animation: none; opacity: 0; }
+          .splash-screen--leaving { animation: none; opacity: 1; }
         }
       `}</style>
       <div style={styles.logoBox}>

@@ -548,3 +548,9 @@ La entrega generada es un build firmado y reproducible de cierre técnico. No de
 - Las páginas públicas `https://elbarrio.lat/privacidad` y `https://elbarrio.lat/eliminar-cuenta` fueron incorporadas al proyecto Next.js de `elbarrio.lat`, compiladas y verificadas con HTTP 200. Sus fuentes de continuidad están en `store-assets/google-play/next-routes/`.
 - La imagen destacada y el ícono de ficha están preparados; las capturas Android deben tomarse después de la prueba física final y sin datos personales reales.
 - La compilación no equivale a publicación. Falta ingresar a Play Console, disponer de una cuenta Developer activa, completar formularios, crear una cuenta vecinal de revisión y cumplir la prueba cerrada de Google si corresponde.
+
+## Continuidad visual de acceso — 12 de agosto de 2026
+
+- El Splash ejecuta su secuencia una sola vez aunque la resolución de sesión provoque nuevos renders, mantiene el fondo verde durante la salida y espera que la primera imagen del onboarding esté decodificada antes de desmontarse. Esto elimina el destello blanco entre ambas pantallas.
+- El evento `SIGNED_IN` ya no expone un usuario parcial antes de consultar su perfil. Sesión y perfil se resuelven juntos mediante `checkSession`, evitando que un inicio de sesión existente muestre fugazmente “Tu cuenta está creada” antes del Feed o del paso pendiente.
+- La app compila y el lint focalizado de `App.jsx` y `Splash.jsx` pasa. Este cambio todavía no fue sincronizado con Capacitor ni incorporado a una nueva entrega móvil.

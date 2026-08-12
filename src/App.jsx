@@ -152,12 +152,16 @@ export default function App() {
     const sessionTimer = window.setTimeout(checkSession, 0)
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (session?.user) {
-        setUser({ id: session.user.id, email: session.user.email })
         if (event === 'PASSWORD_RECOVERY') {
+          setUser({ id: session.user.id, email: session.user.email })
           setPasswordRecovery(true)
           setCurrentScreen('register')
           setLoading(false)
-        } else if (event === 'SIGNED_IN') window.setTimeout(checkSession, 0)
+        } else if (event === 'SIGNED_IN') {
+          // `checkSession` resuelve usuario y perfil juntos. No exponer antes
+          // el usuario evita mostrar fugazmente "Tu cuenta está creada".
+          window.setTimeout(checkSession, 0)
+        }
       } else {
         setUser(null)
         setProfile(null)
