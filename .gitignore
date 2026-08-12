@@ -12,6 +12,7 @@ dist
 dist-ssr
 *.local
 release/android/
+ios/build-device/
 landing-page/admin/config.php
 landing-page/releases/
 landing-page/publish-config.php

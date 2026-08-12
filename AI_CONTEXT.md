@@ -472,16 +472,16 @@ Estado verificado sobre `main` en commit `16191d4`:
 - iOS: build de simulador aprobado, bundle `lat.elbarrio.app`, versión 1.0 build 1, deployment target iOS 15.0. No está listo para App Store porque APNs y la alternativa de login exigida por Apple permanecen pendientes.
 - Supabase: las auditorías estructurales del MVP y núcleo competitivo devolvieron OK; las 31 tablas públicas utilizadas tienen RLS y no se detectaron relaciones críticas huérfanas.
 
-Bloqueadores que no deben marcarse terminados por el solo hecho de compilar:
+Bloqueadores registrados en esa auditoría (los puntos 1 y 8 fueron resueltos el 11 de agosto; revisar la entrega 1.0.1 al final de este archivo):
 
-1. `https://elbarrio.lat/privacidad` responde HTTP 404 y debe publicarse antes de enviar a revisión.
+1. ~~`https://elbarrio.lat/privacidad` respondía HTTP 404.~~ Resuelto: la ruta pública responde HTTP 200.
 2. La función remota `bump_view` intenta actualizar `posts.views`; el esquema vigente usa `posts.views_count`.
 3. `202608100001_event_external_actions.sql` está aplicada en estructura pero ausente del historial de migraciones. No ejecutar el SQL de nuevo; reparar únicamente el historial con autorización.
 4. Probar Google OAuth y recuperación de contraseña en el APK actual con un teléfono real.
 5. Confirmar que `soporte@elbarrio.lat` existe y recibe mensajes.
 6. Preparar cuenta vecinal de revisión, capturas e imagen destacada de Google Play.
 7. Confirmar si la tercera cuenta superadministradora `elbarrio.lat@gmail.com` debe conservarse.
-8. Android mantiene `android:allowBackup="true"`; se recomienda desactivarlo antes de publicación definitiva.
+8. ~~Android mantenía `android:allowBackup="true"`.~~ Resuelto: la entrega 1.0.1 lo establece en `false`.
 
 La entrega generada es un build firmado y reproducible de cierre técnico. No debe describirse como “aprobada por Google Play” ni como “validada completamente en dispositivo” hasta completar los puntos anteriores.
 
@@ -533,3 +533,16 @@ La entrega generada es un build firmado y reproducible de cierre técnico. No de
 - La resincronización de Overture mantuvo 480 prospectos sin duplicarlos y dejó 187 emails y 334 redes en columnas visibles del CRM.
 - El panel está publicado en `https://admin.elbarrio.lat/` después del respaldo `admin-backups/20260811-commercial-crm`. Los archivos públicos `index-oZUZ8-ti.js` e `index-B3FW_woe.css`, además del HTML, coinciden por SHA-256 con el build local.
 - La inserción de cronología fue validada con RLS. El DELETE devolvió 204 pero no eliminó la nota porque el historial es deliberadamente inmutable; ejecutar `202608110005_cleanup_crm_validation.sql` una sola vez para retirar exclusivamente ese registro técnico.
+
+## Entrega Google Play 1.0.1 — 11 de agosto de 2026
+
+- Android avanza a `versionName 1.0.1` y `versionCode 2`; la siguiente publicación debe usar como mínimo `versionCode 3`.
+- `android:allowBackup` quedó desactivado para la entrega de tienda.
+- Después de `npm run mobile:sync`, Gradle aprobó `testReleaseUnitTest`, `lintVitalRelease`, `assembleRelease` y `bundleRelease` con `BUILD SUCCESSFUL`.
+- El APK y el AAB están firmados con la llave definitiva existente y el certificado SHA-256 `f369dbfe7b45dbf79a3ddeeb53dcdd1c6f0ca7b842cd1940153a15351e3bca2a`.
+- Entrega local ignorada por Git: `release/android/el-barrio-1.0.1/`. Contiene APK, AAB, sumas SHA-256, respaldo privado de firma, textos y recursos base para Google Play.
+- APK SHA-256: `adc93657705f007fcfd2bf38af1ff8518d53b5c71b9e93f63dff6847c593c57a`.
+- AAB SHA-256: `97b6c649ab11a5b7229223cdf15aafde1ac8399075b1097c7f2c056af6ed1dc4`.
+- Las páginas públicas `https://elbarrio.lat/privacidad` y `https://elbarrio.lat/eliminar-cuenta` fueron incorporadas al proyecto Next.js de `elbarrio.lat`, compiladas y verificadas con HTTP 200. Sus fuentes de continuidad están en `store-assets/google-play/next-routes/`.
+- La imagen destacada y el ícono de ficha están preparados; las capturas Android deben tomarse después de la prueba física final y sin datos personales reales.
+- La compilación no equivale a publicación. Falta ingresar a Play Console, disponer de una cuenta Developer activa, completar formularios, crear una cuenta vecinal de revisión y cumplir la prueba cerrada de Google si corresponde.
