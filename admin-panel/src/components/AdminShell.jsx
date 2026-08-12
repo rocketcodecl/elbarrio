@@ -7,6 +7,7 @@ const NAVIGATION = [
   { id: 'reportes', icon: '⚑', label: 'Reportes de vecinos' },
   { id: 'categorias', icon: '☷', label: 'Categorías', superOnly: true },
   { id: 'comercios', icon: '🏪', label: 'Comercios' },
+  { id: 'radar-comercial', icon: '⌖', label: 'Radar comercial', superOnly: true },
   { id: 'servicios', icon: '🧰', label: 'Servicios' },
   { id: 'eventos', icon: '📅', label: 'Eventos' },
   { id: 'farmacias', icon: '💊', label: 'Farmacias' },

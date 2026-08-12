@@ -511,3 +511,13 @@ La entrega generada es un build firmado y reproducible de cierre técnico. No de
 - El panel y el creador vecinal permiten marcar un evento como “Sin hora específica”. En ese caso solicitan solo el día y la app omite la hora técnica en portada, búsqueda, listado y detalle.
 - Los eventos de día completo permanecen visibles durante todo su día. Los eventos con hora mantienen su orden y formato anteriores.
 - App y panel compilan. El panel fue respaldado en `admin-backups/20260811-event-all-day` y publicado en `https://admin.elbarrio.lat/`; sus archivos `index-DQTjKzxm.js` e `index-BD26-XwI.css` coinciden por SHA-256 con el build local.
+
+## Radar comercial privado — 11 de agosto de 2026
+
+- La migración `202608110003_commercial_radar.sql` fue ejecutada con resultado `Success`, según confirmación manual del usuario. Crea `commercial_prospects` con RLS y control exclusivo de superadministrador.
+- El panel incorpora `Radar comercial`: consulta OpenStreetMap dentro del polígono real del barrio, muestra prospectos en mapa y listado, permite filtrar, registrar estado/notas/contacto, exportar CSV y convertir un prospecto en borrador inactivo de `commerces`.
+- Los hallazgos son privados y nunca se publican automáticamente en la aplicación. Se identifican posibles duplicados por nombre normalizado o cercanía de hasta 30 metros con comercios existentes.
+- La consulta externa se ejecuta mediante la Edge Function `admin-discover-commerces`, desplegada con validación JWT activa en el gateway y una segunda validación interna de sesión, cuenta activa y `is_superadmin=true`. Una solicitud anónima fue rechazada con HTTP 401.
+- El panel compiló y el lint focalizado pasó. Se respaldó la versión anterior en `admin-backups/20260811-commercial-radar` y se publicó en `https://admin.elbarrio.lat/`.
+- Los archivos públicos `index-DKSYInA6.js` e `index-Dbm-8Yte.css`, además del HTML, coinciden por SHA-256 con `admin-panel/dist`.
+- OpenStreetMap es una fuente auxiliar y puede estar incompleta; el Radar sirve para descubrir y organizar visitas comerciales, no como catastro oficial.

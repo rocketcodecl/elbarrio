@@ -325,6 +325,49 @@ button { cursor: pointer; }
 .event-editor-form { display: grid; gap: 17px; }
 .event-data-grid { max-width: 920px; }
 .event-all-day-toggle { min-height: 58px; padding: 11px 13px; display: flex; align-items: center; gap: 11px; border: 1px solid #dce8df; border-radius: 11px; background: #f7fbf8; cursor: pointer; }.event-all-day-toggle input { width: 18px; height: 18px; flex: 0 0 auto; accent-color: #16a34a; }.event-all-day-toggle > span { display: grid; gap: 3px; }.event-all-day-toggle strong { color: #26322a; font-size: 11px; }.event-all-day-toggle small { color: #768279; font-size: 9px; font-weight: 500; }
+
+/* Radar comercial privado */
+.commercial-radar-page { position: relative; min-height: 100%; }
+.radar-heading { align-items: flex-end; }
+.radar-heading-actions { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.radar-controls { margin-bottom: 14px; min-height: 76px; padding: 13px 15px; display: flex; align-items: center; justify-content: space-between; gap: 20px; border: 1px solid #dfe8e1; border-radius: 14px; background: #fff; box-shadow: 0 8px 24px rgba(24,53,34,.04); }
+.radar-controls > label { display: grid; gap: 5px; color: #69756d; font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; }
+.radar-controls select { min-width: 230px; height: 38px; padding: 0 11px; border: 1px solid #dce5de; border-radius: 9px; background: #f9fbf9; color: #26322a; font: inherit; font-size: 10px; text-transform: none; letter-spacing: 0; }
+.radar-metrics { display: flex; align-items: stretch; gap: 8px; flex-wrap: wrap; }
+.radar-metrics span { min-width: 86px; padding: 7px 12px; display: grid; gap: 2px; border-left: 1px solid #e5ebe6; color: #7d8980; font-size: 8px; }
+.radar-metrics strong { color: #163d27; font-size: 17px; line-height: 1; }
+.radar-workspace { min-height: 590px; display: grid; grid-template-columns: minmax(440px, 1.28fr) minmax(330px, .72fr); gap: 14px; }
+.radar-map-card, .radar-directory { min-width: 0; overflow: hidden; border: 1px solid #dce6de; border-radius: 16px; background: #fff; box-shadow: 0 10px 30px rgba(24,53,34,.05); }
+.radar-map-card { position: relative; }
+.commercial-radar-map { width: 100%; height: 590px; z-index: 0; }
+.radar-map-legend { position: absolute; z-index: 500; left: 14px; bottom: 14px; padding: 9px 11px; display: flex; gap: 11px; flex-wrap: wrap; border: 1px solid rgba(214,226,217,.9); border-radius: 10px; background: rgba(255,255,255,.92); box-shadow: 0 5px 18px rgba(20,45,29,.12); backdrop-filter: blur(8px); }
+.radar-map-legend span { display: flex; align-items: center; gap: 5px; color: #59665d; font-size: 8px; font-weight: 700; }
+.radar-map-legend i { width: 8px; height: 8px; border-radius: 50%; }.radar-map-legend i.new { background: #64748b; }.radar-map-legend i.contacted { background: #2563eb; }.radar-map-legend i.interested { background: #d97706; }.radar-map-legend i.converted { background: #16a34a; }
+.radar-directory { height: 590px; display: flex; flex-direction: column; }
+.radar-directory > header { padding: 12px; display: grid; gap: 9px; border-bottom: 1px solid #e5ebe6; }
+.radar-directory .admin-search { width: 100%; }
+.radar-directory > header > div { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; }
+.radar-directory select { min-width: 0; height: 34px; padding: 0 8px; border: 1px solid #dce5de; border-radius: 8px; background: #f9fbf9; color: #5a675e; font: inherit; font-size: 8px; }
+.radar-list { flex: 1; min-height: 0; overflow-y: auto; }
+.radar-list > button { width: 100%; min-height: 64px; padding: 10px 11px; display: grid; grid-template-columns: 9px minmax(0,1fr) auto; align-items: center; gap: 9px; border: 0; border-bottom: 1px solid #edf1ee; background: #fff; text-align: left; cursor: pointer; font: inherit; }
+.radar-list > button:hover, .radar-list > button.is-selected { background: #f0faf4; }
+.radar-list-dot { width: 8px; height: 8px; border-radius: 50%; }
+.radar-list button div { min-width: 0; display: grid; gap: 4px; }
+.radar-list button strong { overflow: hidden; color: #243129; font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+.radar-list button small { overflow: hidden; color: #7a867e; font-size: 8px; text-overflow: ellipsis; white-space: nowrap; }
+.radar-list button em { padding: 4px 6px; border-radius: 999px; background: #eef4ef; color: #5f6d63; font-size: 7px; font-style: normal; font-weight: 700; white-space: nowrap; }
+.radar-detail { position: fixed; z-index: 1300; top: 0; right: 0; bottom: 0; width: min(430px, 94vw); display: flex; flex-direction: column; background: #fff; box-shadow: -22px 0 60px rgba(13,35,21,.22); }
+.radar-detail > header { min-height: 108px; padding: 22px 22px 18px; display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; border-bottom: 1px solid #e3eae4; background: #f4faf6; }
+.radar-detail > header > div { display: grid; gap: 4px; }.radar-detail h2 { margin: 0; color: #16211a; font-size: 20px; }.radar-detail header span { color: #718078; font-size: 9px; }.radar-detail header button { width: 34px; height: 34px; border: 1px solid #d8e3da; border-radius: 50%; background: #fff; color: #526159; font-size: 18px; cursor: pointer; }
+.radar-detail-body { flex: 1; min-height: 0; padding: 18px 22px; display: flex; flex-direction: column; gap: 13px; overflow-y: auto; }
+.radar-detail-location { padding: 12px; display: grid; gap: 5px; border-radius: 11px; background: #f5f8f6; }.radar-detail-location strong { font-size: 10px; }.radar-detail-location small { color: #829087; font-size: 8px; }
+.radar-detail-body > a { color: #0f7f4d; font-size: 10px; font-weight: 700; text-decoration: none; }
+.radar-existing { padding: 11px; border: 1px solid #bfe6cb; border-radius: 10px; background: #ecf9f0; color: #33724a; font-size: 9px; line-height: 1.5; }
+.radar-detail-body > label { display: grid; gap: 6px; color: #526159; font-size: 9px; font-weight: 700; }
+.radar-detail-body input, .radar-detail-body select, .radar-detail-body textarea { width: 100%; padding: 10px 11px; border: 1px solid #d9e3db; border-radius: 9px; background: #fff; color: #26322a; font: inherit; font-size: 10px; box-sizing: border-box; resize: vertical; }
+.radar-detail > footer { padding: 14px 18px calc(14px + env(safe-area-inset-bottom,0px)); display: flex; justify-content: flex-end; gap: 8px; border-top: 1px solid #e3eae4; background: #fff; }
+@media (max-width: 1050px) { .radar-workspace { grid-template-columns: 1fr; }.radar-directory { height: 460px; }.commercial-radar-map { height: 500px; } }
+@media (max-width: 720px) { .radar-controls { align-items: stretch; flex-direction: column; }.radar-controls select { width: 100%; }.radar-metrics { display: grid; grid-template-columns: 1fr 1fr; }.radar-heading-actions { width: 100%; }.radar-heading-actions .button { flex: 1; }.radar-workspace { min-height: 0; }.commercial-radar-map { height: 430px; }.radar-directory { height: 430px; } }
 .event-cover-uploader { position: relative; width: min(100%, 640px); aspect-ratio: 16 / 9; overflow: hidden; display: grid; place-items: center; border: 1px dashed #b9c9bd; border-radius: 14px; background: #f4f8f5; cursor: pointer; }
 .event-cover-uploader img { width: 100%; height: 100%; object-fit: cover; object-position: center; }
 .event-cover-uploader > span { display: grid; justify-items: center; gap: 6px; color: #5f6b62; font-size: 27px; }.event-cover-uploader strong { color: #16211a; font-size: 11px; }.event-cover-uploader small { font-size: 8px; }.event-cover-uploader input { display: none; }.event-cover-uploader em { position: absolute; right: 10px; bottom: 10px; padding: 7px 9px; border-radius: 8px; color: #fff; background: rgba(15,95,54,.9); font-size: 8px; font-style: normal; font-weight: 700; }

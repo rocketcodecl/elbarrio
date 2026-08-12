@@ -166,3 +166,13 @@
 - Guardar/publicar o `Descartar borrador` elimina la copia local. Salir mediante la flecha o cambiar de módulo conserva el contenido para restaurarlo al regresar.
 - Nunca se persisten contraseñas ni motivos de moderación. Los archivos locales todavía no cargados no pueden restaurarse; las imágenes que ya tienen URL sí.
 - El build vigente publicado y verificado usa `index-Bmq8pts-.js` e `index-CAACCql-.css`.
+
+## Radar comercial — 11 de agosto de 2026
+
+- Módulo disponible únicamente para `is_superadmin=true` desde la navegación principal del panel.
+- Descubre comercios y actividades de OpenStreetMap dentro de `neighborhoods.boundary`; no altera la aplicación vecinal ni publica registros por sí solo.
+- La tabla `commercial_prospects` conserva fuente, coordenadas, categoría, datos de contacto, estado comercial, notas y trazabilidad administrativa. La migración `202608110003_commercial_radar.sql` fue confirmada como ejecutada con `Success`.
+- El superadministrador puede filtrar, revisar posibles duplicados, actualizar seguimiento, exportar CSV y crear un borrador inactivo en `commerces` para completarlo antes de publicarlo.
+- `admin-discover-commerces` está desplegada con JWT obligatorio y vuelve a validar dentro de la función que el usuario sea un superadministrador activo. La prueba anónima devolvió HTTP 401.
+- El build publicado en `https://admin.elbarrio.lat/` usa `index-DKSYInA6.js` e `index-Dbm-8Yte.css`; HTML, JavaScript y CSS remotos coinciden por SHA-256 con el build local.
+- Respaldo anterior: `admin-backups/20260811-commercial-radar`.
