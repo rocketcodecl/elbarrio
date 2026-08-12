@@ -406,6 +406,10 @@ const advertisingEventKey = () => {
 
 function SponsoredCard({ campaign, placement, compact = false }) {
   const impressionKey = useRef(advertisingEventKey())
+  const touchStartX = useRef(null)
+  const availableImages = campaign?.image_urls?.filter(Boolean) || []
+  const images = availableImages.length ? availableImages.slice(0, 3) : (campaign?.image_url ? [campaign.image_url] : [])
+  const [activeImage, setActiveImage] = useState(0)
 
   useEffect(() => {
     if (!campaign?.id) return
@@ -418,6 +422,16 @@ function SponsoredCard({ campaign, placement, compact = false }) {
       if (error) console.warn('[home] no se pudo registrar impresión publicitaria:', error.message)
     })
   }, [campaign?.id, placement])
+
+  useEffect(() => {
+    if (images.length < 2) return undefined
+    const timer = window.setInterval(() => {
+      setActiveImage(current => (current + 1) % images.length)
+    }, 3600)
+    return () => window.clearInterval(timer)
+  }, [campaign?.id, images.length])
+
+  const visibleImage = images.length ? activeImage % images.length : 0
 
   if (!campaign) return null
 
@@ -435,16 +449,33 @@ function SponsoredCard({ campaign, placement, compact = false }) {
     })
   }
 
+  const onTouchEnd = event => {
+    if (touchStartX.current == null || images.length < 2) return
+    const distance = event.changedTouches[0].clientX - touchStartX.current
+    touchStartX.current = null
+    if (Math.abs(distance) < 34) return
+    setActiveImage(current => distance < 0
+      ? (current + 1) % images.length
+      : (current - 1 + images.length) % images.length)
+  }
+
   return (
-    <button type="button" style={{ ...s.sponsoredCard, ...(compact ? s.sponsoredCardCompact : {}) }} onClick={openCampaign}>
-      <img src={campaign.image_url} alt="" style={{ ...s.sponsoredImage, ...(compact ? s.sponsoredImageCompact : {}) }} />
+    <article style={{ ...s.sponsoredCard, ...(compact ? s.sponsoredCardCompact : {}) }}>
+      <span
+        style={{ ...s.sponsoredMedia, ...(compact ? s.sponsoredImageCompact : {}) }}
+        onTouchStart={event => { touchStartX.current = event.touches[0].clientX }}
+        onTouchEnd={onTouchEnd}
+      >
+        {images.map((url, index) => <img key={url} src={url} alt="" style={{ ...s.sponsoredImage, opacity: index === visibleImage ? 1 : 0 }} />)}
+        {images.length > 1 && <span style={s.sponsoredDots} aria-label={`Imagen ${visibleImage + 1} de ${images.length}`}>{images.map((url, index) => <i key={url} style={{ ...s.sponsoredDot, ...(index === visibleImage ? s.sponsoredDotActive : {}) }} />)}</span>}
+      </span>
       <span style={s.sponsoredCopy}>
         <span style={s.sponsoredMeta}><b>{campaign.label || 'Patrocinado'}</b><span>{campaign.advertiser_name}</span></span>
         <strong style={s.sponsoredTitle}>{campaign.title}</strong>
         <span style={s.sponsoredBody}>{campaign.body}</span>
-        <span style={s.sponsoredAction}>{campaign.cta_label || 'Conocer más'} <span aria-hidden="true">→</span></span>
+        <button type="button" style={s.sponsoredAction} onClick={openCampaign}>{campaign.cta_label || 'Conocer más'} <span aria-hidden="true">→</span></button>
       </span>
-    </button>
+    </article>
   )
 }
 
@@ -1731,8 +1762,12 @@ const s = {
     fontFamily: 'inherit', cursor: 'pointer', boxShadow: '0 3px 15px rgba(21,48,34,.045)',
   },
   sponsoredCardCompact: { gridTemplateColumns: '35% minmax(0, 1fr)', marginBottom: 12 },
-  sponsoredImage: { width: '100%', height: '100%', minHeight: 142, objectFit: 'cover', background: C.fondo },
+  sponsoredMedia: { position: 'relative', display: 'block', minHeight: 142, overflow: 'hidden', background: C.fondo },
+  sponsoredImage: { position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', transition: 'opacity 520ms ease' },
   sponsoredImageCompact: { minHeight: 126 },
+  sponsoredDots: { position: 'absolute', left: 0, right: 0, bottom: 7, display: 'flex', justifyContent: 'center', gap: 4 },
+  sponsoredDot: { width: 5, height: 5, borderRadius: 99, background: 'rgba(255,255,255,.6)', boxShadow: '0 1px 3px rgba(0,0,0,.18)' },
+  sponsoredDotActive: { width: 13, background: '#fff' },
   sponsoredCopy: {
     minWidth: 0, padding: '12px 13px', display: 'flex', flexDirection: 'column',
     alignItems: 'flex-start', justifyContent: 'center', gap: 5,
@@ -1750,7 +1785,7 @@ const s = {
     maxWidth: '100%', color: C.textoSuave, fontSize: 11.5, lineHeight: 1.35,
     display: '-webkit-box', WebkitBoxOrient: 'vertical', WebkitLineClamp: 2, overflow: 'hidden',
   },
-  sponsoredAction: { marginTop: 2, color: C.verdeOsc, fontSize: 11.5, fontWeight: 800 },
+  sponsoredAction: { margin: '2px 0 0', padding: 0, border: 0, background: 'transparent', color: C.verdeOsc, fontFamily: 'inherit', fontSize: 11.5, fontWeight: 800, cursor: 'pointer' },
 
   modalFondo: {
     position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,

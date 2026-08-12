@@ -4,7 +4,7 @@ import usePersistentDraft from '../hooks/usePersistentDraft.js'
 import { prepareImageUpload } from '../../../shared/imageUpload.js'
 
 const EMPTY_FORM = {
-  id: '', advertiser_name: '', campaign_name: '', title: '', body: '', image_url: '',
+  id: '', advertiser_name: '', campaign_name: '', title: '', body: '', image_url: '', image_urls: [],
   label: 'Patrocinado', cta_label: 'Conocer más', cta_url: '',
   placements: ['home_feature'], neighborhood_ids: [], starts_at: '', ends_at: '',
   status: 'draft', priority: 100, contracted_amount: '', payment_status: 'pending',
@@ -28,7 +28,7 @@ export default function AdvertisingManager({ profile }) {
   const [campaigns, setCampaigns] = useState([])
   const [neighborhoods, setNeighborhoods] = useState([])
   const [metrics, setMetrics] = useState({})
-  const [form, setForm, clearDraft, replaceForm] = usePersistentDraft('advertising:campaign', EMPTY_FORM, 'v1')
+  const [form, setForm, clearDraft, replaceForm] = usePersistentDraft('advertising:campaign', EMPTY_FORM, 'v2')
   const [editing, setEditing] = useState(false)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -81,6 +81,7 @@ export default function AdvertisingManager({ profile }) {
       id: item.id,
       advertiser_name: item.advertiser_name || '', campaign_name: item.campaign_name || '',
       title: item.title || '', body: item.body || '', image_url: item.image_url || '',
+      image_urls: item.image_urls?.length ? item.image_urls : (item.image_url ? [item.image_url] : []),
       label: item.label || 'Patrocinado', cta_label: item.cta_label || 'Conocer más',
       cta_url: item.cta_url || '', placements: item.placements || ['home_feature'],
       neighborhood_ids: (item.targets || []).map(target => target.neighborhood_id),
@@ -94,15 +95,29 @@ export default function AdvertisingManager({ profile }) {
   }
 
   const uploadImage = async event => {
-    const source = event.target.files?.[0]
-    if (!source) return
+    const sources = Array.from(event.target.files || [])
+    if (!sources.length) return
+    const availableSlots = Math.max(0, 3 - form.image_urls.length)
+    const selectedSources = sources.slice(0, availableSlots)
+    if (!selectedSources.length) {
+      setError('La campaña ya tiene el máximo de tres imágenes.')
+      event.target.value = ''
+      return
+    }
     setUploading(true); setError('')
     try {
-      const prepared = await prepareImageUpload(source, `advertising/${Date.now()}-${source.name}`, { maxWidth: 1800, maxHeight: 1200 })
-      const { error: uploadError } = await supabase.storage.from('commerces').upload(prepared.path, prepared.file, { upsert: false })
-      if (uploadError) throw uploadError
-      const { data } = supabase.storage.from('commerces').getPublicUrl(prepared.path)
-      update('image_url', data.publicUrl)
+      const uploadedUrls = []
+      for (const [index, source] of selectedSources.entries()) {
+        const prepared = await prepareImageUpload(source, `advertising/${Date.now()}-${index}-${source.name}`, { maxWidth: 1800, maxHeight: 1200 })
+        const { error: uploadError } = await supabase.storage.from('commerces').upload(prepared.path, prepared.file, { upsert: false })
+        if (uploadError) throw uploadError
+        const { data } = supabase.storage.from('commerces').getPublicUrl(prepared.path)
+        uploadedUrls.push(data.publicUrl)
+      }
+      setForm(current => {
+        const imageUrls = [...current.image_urls, ...uploadedUrls].slice(0, 3)
+        return { ...current, image_urls: imageUrls, image_url: imageUrls[0] || '' }
+      })
     } catch (uploadError) {
       setError(`No pudimos cargar la imagen: ${uploadError.message}`)
     } finally {
@@ -113,7 +128,7 @@ export default function AdvertisingManager({ profile }) {
 
   const save = async event => {
     event.preventDefault(); setSaving(true); setError(''); setNotice('')
-    if (!form.image_url || !form.neighborhood_ids.length || !form.placements.length) {
+    if (!form.image_urls.length || !form.neighborhood_ids.length || !form.placements.length) {
       setSaving(false); setError('Agrega una imagen y selecciona al menos un barrio y una ubicación.')
       return
     }
@@ -124,6 +139,7 @@ export default function AdvertisingManager({ profile }) {
       p_title: form.title,
       p_body: form.body,
       p_image_url: form.image_url,
+      p_image_urls: form.image_urls,
       p_label: form.label,
       p_cta_label: form.cta_label,
       p_cta_url: form.cta_url,
@@ -173,7 +189,7 @@ export default function AdvertisingManager({ profile }) {
         <label>Etiqueta<input value={form.label} onChange={e => update('label', e.target.value)} placeholder="Patrocinado" /></label>
         <label>Texto del botón<input value={form.cta_label} onChange={e => update('cta_label', e.target.value)} placeholder="Conocer más" /></label>
         <label className="wide">Enlace externo<input required type="url" value={form.cta_url} onChange={e => update('cta_url', e.target.value)} placeholder="https://..." /></label>
-        <label className="wide advertising-image-field">Imagen<input type="file" accept="image/*" onChange={uploadImage} disabled={uploading} />{uploading && <small>Optimizando y cargando…</small>}{form.image_url && <img src={form.image_url} alt="Vista previa de la campaña" />}</label>
+        <label className="wide advertising-image-field">Imágenes (1 a 3)<input type="file" accept="image/*" multiple onChange={uploadImage} disabled={uploading || form.image_urls.length >= 3} />{uploading && <small>Optimizando y cargando…</small>}<small>Orden de reproducción: izquierda a derecha. Puedes elegir varias de una vez.</small>{form.image_urls.length > 0 && <span className="advertising-image-list">{form.image_urls.map((url, index) => <span key={url}><img src={url} alt={`Imagen ${index + 1}`} /><b>{index + 1}</b><button type="button" onClick={() => setForm(current => { const imageUrls = current.image_urls.filter(item => item !== url); return { ...current, image_urls: imageUrls, image_url: imageUrls[0] || '' } })}>Quitar</button></span>)}</span>}</label>
 
         <fieldset className="wide"><legend>Ubicaciones en la app</legend><div className="advertising-check-grid">
           <label><input type="checkbox" checked={form.placements.includes('home_feature')} onChange={() => toggleArrayValue('placements', 'home_feature')} /><span><b>Inicio</b><small>Tarjeta destacada bajo el carrusel.</small></span></label>
@@ -203,7 +219,7 @@ export default function AdvertisingManager({ profile }) {
         const campaignMetrics = metrics[item.id] || {}
         const ctr = Number(campaignMetrics.impressions) > 0 ? (Number(campaignMetrics.clicks || 0) / Number(campaignMetrics.impressions) * 100).toFixed(1) : '0.0'
         return <article key={item.id} className={`advertising-card is-${item.status}`}>
-          <img src={item.image_url} alt="" />
+          <div className="advertising-card-cover"><img src={item.image_urls?.[0] || item.image_url} alt="" />{(item.image_urls?.length || 1) > 1 && <span>{item.image_urls.length} imágenes</span>}</div>
           <div className="advertising-card-body">
             <div className="advertising-card-state"><span>{STATUS[item.status] || item.status}</span><small>{item.advertiser_name}</small></div>
             <h3>{item.title}</h3><p>{item.body}</p>
