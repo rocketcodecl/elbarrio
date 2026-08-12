@@ -209,3 +209,9 @@
 
 - Publicidad documenta y previsualiza dos formatos: estándar `1200 × 628` y franja `1200 × 220`, ambos disponibles en Inicio y Actividad. En un carrusel, las gráficas deben compartir formato.
 - Las previsualizaciones ya no fuerzan todas las campañas a la proporción estándar. No requiere SQL. El build y el lint focalizado pasan; este ajuste aún no se ha publicado en `admin.elbarrio.lat`.
+
+## Publicidad en Servicios y Comercios — 12 de agosto de 2026
+
+- El editor suma las ubicaciones `Servicios` y `Comercios`, además de Inicio y Actividad. Cada ubicación conserva métricas independientes y admite gráficas estándar o franja.
+- Requiere ejecutar `supabase/migrations/202608120003_advertising_section_placements.sql`, que amplía las restricciones, lectura, medición y crea `admin_upsert_advertising_campaign_v2` sin romper el RPC del panel publicado.
+- App y panel compilan. La migración aún no está confirmada y este build todavía no se publica en `admin.elbarrio.lat`.

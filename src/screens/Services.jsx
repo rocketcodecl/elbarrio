@@ -4,6 +4,8 @@ import { C, T, distancia, iniciales, RUBROS } from '../lib/design'
 import { openWhatsApp } from '../lib/contact'
 import ThumbUpIcon from '../components/ThumbUpIcon'
 import { getContentCategories } from '../lib/contentCategories'
+import AdvertisingCard from '../components/AdvertisingCard'
+import { getActiveAdvertisingCampaign } from '../lib/advertising'
 
 /* ============================================================
    Services.jsx — Tab "servicios" de El Barrio.
@@ -162,6 +164,7 @@ export default function Services({ currentUser, onNavigate, onCrear }) {
   const [category, setCategory] = useState('Todos')
   const [search, setSearch] = useState('')
   const [expandedServiceId, setExpandedServiceId] = useState(null)
+  const [advertisingCampaign, setAdvertisingCampaign] = useState(null)
   const [featuredOrder, setFeaturedOrder] = useState([])
   const [featuredIndex, setFeaturedIndex] = useState(0)
   const featuredScrollRef = useRef(null)
@@ -226,6 +229,14 @@ export default function Services({ currentUser, onNavigate, onCrear }) {
   useEffect(() => {
     fetchServices()
   }, [fetchServices])
+
+  useEffect(() => {
+    let active = true
+    getActiveAdvertisingCampaign('services_feed').then(campaign => {
+      if (active) setAdvertisingCampaign(campaign)
+    })
+    return () => { active = false }
+  }, [currentUser?.id])
 
   // Búsqueda en cliente sobre title + description (instantáneo).
   const filtered = services.filter((svc) => {
@@ -575,6 +586,12 @@ export default function Services({ currentUser, onNavigate, onCrear }) {
             </section>
           )}
 
+          {!loading && !error && advertisingCampaign && (
+            <div style={s.advertisingPlacement}>
+              <AdvertisingCard campaign={advertisingCampaign} placement="services_feed" />
+            </div>
+          )}
+
           {!loading && !error && regular.length > 0 && (
             <div style={s.regularHeading}>Servicios del barrio</div>
           )}
@@ -783,6 +800,7 @@ const s = {
     paddingTop: 12,
   },
   featuredSection: { paddingTop: 14, margin: '0 -16px' },
+  advertisingPlacement: { paddingTop: 14 },
   sectionHeading: {
     padding: '0 16px 9px', color: C.texto,
   },

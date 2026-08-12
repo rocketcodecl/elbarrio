@@ -132,7 +132,7 @@ export default function AdvertisingManager({ profile }) {
       setSaving(false); setError('Agrega una imagen y selecciona al menos un barrio y una ubicación.')
       return
     }
-    const { error: saveError } = await supabase.rpc('admin_upsert_advertising_campaign', {
+    const { error: saveError } = await supabase.rpc('admin_upsert_advertising_campaign_v2', {
       p_campaign_id: form.id || null,
       p_advertiser_name: form.advertiser_name,
       p_campaign_name: form.campaign_name,
@@ -192,6 +192,8 @@ export default function AdvertisingManager({ profile }) {
         <fieldset className="wide"><legend>Ubicaciones en la app</legend><div className="advertising-check-grid">
           <label><input type="checkbox" checked={form.placements.includes('home_feature')} onChange={() => toggleArrayValue('placements', 'home_feature')} /><span><b>Inicio</b><small>Formato estándar o franja bajo “Para ti”.</small></span></label>
           <label><input type="checkbox" checked={form.placements.includes('activity_feed')} onChange={() => toggleArrayValue('placements', 'activity_feed')} /><span><b>Actividad</b><small>Formato estándar o franja después de la tercera publicación.</small></span></label>
+          <label><input type="checkbox" checked={form.placements.includes('services_feed')} onChange={() => toggleArrayValue('placements', 'services_feed')} /><span><b>Servicios</b><small>Entre destacados y el listado de servicios.</small></span></label>
+          <label><input type="checkbox" checked={form.placements.includes('commerces_feed')} onChange={() => toggleArrayValue('placements', 'commerces_feed')} /><span><b>Comercios</b><small>Entre destacados y comercios cercanos.</small></span></label>
         </div></fieldset>
 
         <fieldset className="wide"><legend>Barrios</legend><div className="advertising-neighborhoods">

@@ -580,3 +580,10 @@ La entrega generada es un build firmado y reproducible de cierre técnico. No de
 - Las campañas aceptan dos proporciones de ancho completo: estándar `1200 × 628` y franja `1200 × 220`. Ambos formatos funcionan tanto bajo “Para ti” como dentro de “Actividad del Barrio”.
 - La app reconoce automáticamente el formato de la primera gráfica y adapta la altura sin recortar el anuncio ni reservar un espacio estándar. Las campañas con carrusel deben usar el mismo formato en sus una a tres gráficas para evitar cambios de altura entre diapositivas.
 - El panel informa ambos tamaños y muestra las vistas previas con su proporción real. No requirió migración ni cambios en Supabase. App, panel y lint focalizado compilan correctamente; queda pendiente publicar el nuevo build del panel y regenerar una entrega móvil cuando se cierre el siguiente lote.
+
+## Publicidad en Servicios y Comercios — 12 de agosto de 2026
+
+- El sistema incorpora dos ubicaciones comerciales independientes: `services_feed`, entre servicios destacados y el listado, y `commerces_feed`, entre comercios destacados y cercanos. Cada una admite formato estándar o franja y registra impresiones/clics diferenciados.
+- El render publicitario se centralizó en `src/components/AdvertisingCard.jsx`, manteniendo el mismo comportamiento, medición, carrusel y adaptación de proporción en las cuatro ubicaciones.
+- El panel permite seleccionar Inicio, Actividad, Servicios y Comercios por campaña. La migración `202608120003_advertising_section_placements.sql` amplía restricciones y RPC conservando compatibilidad con el panel anterior.
+- Estado: app, panel y lint focalizado compilan. La migración todavía no está confirmada como aplicada; no publicar el panel ni regenerar APK hasta recibir `Success` del usuario.

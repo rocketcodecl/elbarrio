@@ -9,6 +9,8 @@ import { DIAS_SEMANA } from '../lib/horarios'
 import { moderatePublicContent } from '../lib/moderation'
 import { openWhatsApp } from '../lib/contact'
 import ThumbUpIcon from '../components/ThumbUpIcon'
+import AdvertisingCard from '../components/AdvertisingCard'
+import { getActiveAdvertisingCampaign } from '../lib/advertising'
 
 /*
   COMERCIOS — el directorio del barrio.
@@ -1195,6 +1197,7 @@ function Comercios({ currentUser, onNavigate, onCrear, onEditar, initialCommerce
   const [busqueda, setBusqueda] = useState('')
   const [featuredIndex, setFeaturedIndex] = useState(0)
   const [featuredOrder, setFeaturedOrder] = useState([])
+  const [advertisingCampaign, setAdvertisingCampaign] = useState(null)
   const [refrescando, setRefrescando] = useState(false)
   const [pullDistance, setPullDistance] = useState(0)
   const pullStartYRef = useRef(null)
@@ -1216,6 +1219,14 @@ function Comercios({ currentUser, onNavigate, onCrear, onEditar, initialCommerce
       { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
     )
   }, [])
+
+  useEffect(() => {
+    let active = true
+    getActiveAdvertisingCampaign('commerces_feed').then(campaign => {
+      if (active) setAdvertisingCampaign(campaign)
+    })
+    return () => { active = false }
+  }, [currentUser?.id])
 
   async function cargar({ silencioso = false } = {}) {
     if (!currentUser?.id) {
@@ -1603,6 +1614,11 @@ function Comercios({ currentUser, onNavigate, onCrear, onEditar, initialCommerce
                 )}
               </section>
             )}
+            {advertisingCampaign && (
+              <div style={s.campaignPlacement}>
+                <AdvertisingCard campaign={advertisingCampaign} placement="commerces_feed" />
+              </div>
+            )}
             {cercanos.length > 0 && (
               <section style={{ ...s.feedSection, marginTop: -16 }}>
                 <div style={s.nearbyHeading}>
@@ -1685,6 +1701,7 @@ const s = {
     border: '1px solid rgba(27,158,117,.24)', borderRadius: 15, background: 'rgba(27,158,117,.10)',
     color: C.texto, textAlign: 'left', fontFamily: 'inherit', cursor: 'pointer',
   },
+  campaignPlacement: { marginBottom: 24 },
   advertisingIcon: { width: 30, height: 30, borderRadius: 9, display: 'grid', placeItems: 'center', color: '#fff', background: C.verde },
   advertisingCopy: { minWidth: 0, display: 'grid', gap: 4 },
   advertisingTitle: { fontSize: 13, fontWeight: 800 },
