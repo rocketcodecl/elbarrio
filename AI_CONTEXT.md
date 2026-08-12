@@ -524,3 +524,12 @@ La entrega generada es un build firmado y reproducible de cierre técnico. No de
 - La cobertura fue ampliada sin costo con Overture Maps. El primer cruce descargó 822 lugares, conservó 406 entidades comerciales dentro del polígono, insertó 380 nuevas y enriqueció 26 coincidencias con OpenStreetMap. El Radar quedó con 480 prospectos: 100 de OpenStreetMap y 380 de Overture.
 - El importador reproducible vive en `scripts/import-overture-commercial-radar.mjs`. Filtra por polígono y rubros comerciales, descarta cierres permanentes, deduplica por nombre/similitud y distancia, y conserva todas las propiedades originales en `raw_data`.
 - Tras la importación, 351 prospectos tienen teléfono, 281 sitio web, 453 dirección, 181 email en datos originales y 315 redes sociales en datos originales. Email y redes aún no tienen campos visibles propios; no se debe volver a descargar la fuente para agregarlos al panel.
+
+## CRM comercial territorial — 11 de agosto de 2026
+
+- La migración `202608110004_commercial_crm.sql` fue ejecutada con resultado `Success`, según confirmación manual del usuario. Agrega contacto enriquecido, asignación, próximo seguimiento, verificación y la cronología privada `commercial_prospect_interactions`.
+- Radar comercial permite editar nombre, categoría, rubro, dirección, teléfono, WhatsApp, email, sitio y red social; agregar un prospecto tocando dentro del polígono; usar un pipeline comercial; programar seguimientos y registrar notas, llamadas, mensajes, emails o visitas.
+- “Verificar” mantiene el prospecto privado. “Crear borrador” crea una ficha inactiva. “Verificar y publicar” exige confirmación y crea una ficha básica visible en `commerces`; nunca se publica automáticamente por importar datos.
+- La resincronización de Overture mantuvo 480 prospectos sin duplicarlos y dejó 187 emails y 334 redes en columnas visibles del CRM.
+- El panel está publicado en `https://admin.elbarrio.lat/` después del respaldo `admin-backups/20260811-commercial-crm`. Los archivos públicos `index-oZUZ8-ti.js` e `index-B3FW_woe.css`, además del HTML, coinciden por SHA-256 con el build local.
+- La inserción de cronología fue validada con RLS. El DELETE devolvió 204 pero no eliminó la nota porque el historial es deliberadamente inmutable; ejecutar `202608110005_cleanup_crm_validation.sql` una sola vez para retirar exclusivamente ese registro técnico.

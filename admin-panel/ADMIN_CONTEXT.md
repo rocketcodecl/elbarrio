@@ -179,3 +179,13 @@
 - La fuente fue ampliada con Overture Maps sin costo ni API key. La primera importación dejó 480 prospectos privados: 100 de OpenStreetMap y 380 de Overture, después de enriquecer 26 duplicados detectados.
 - `scripts/import-overture-commercial-radar.mjs` permite repetir la importación de una futura versión de Overture. Aplica el polígono real, filtra grupos comerciales y deduplica espacialmente antes de escribir.
 - Los datos originales de Overture permanecen completos en `commercial_prospects.raw_data`; actualmente existen emails y redes sociales que todavía no se muestran en la interfaz y podrán exponerse cuando se defina el siguiente conjunto de campos.
+
+## CRM comercial territorial — 11 de agosto de 2026
+
+- `202608110004_commercial_crm.sql` fue confirmado como ejecutado con `Success`. El Radar funciona además como CRM privado de captación y venta de publicidad local.
+- Cada ficha permite corregir los datos importados, completar teléfono, WhatsApp, email, web y redes, gestionar un pipeline, programar el próximo seguimiento y registrar una cronología inmutable de contactos y visitas.
+- El mapa permite crear prospectos manuales únicamente dentro del polígono. Los filtros incluyen estado, rubro y fuente.
+- Verificar un prospecto no lo publica. El superadministrador decide entre crear un borrador inactivo o verificar y publicar una ficha básica en Comercios mediante una confirmación explícita.
+- La resincronización final conserva 480 prospectos, con 187 emails y 334 redes en campos visibles.
+- Build publicado y verificado por SHA-256: `index-oZUZ8-ti.js` e `index-B3FW_woe.css`. Respaldo: `admin-backups/20260811-commercial-crm`.
+- Ejecutar una vez `202608110005_cleanup_crm_validation.sql` para eliminar exclusivamente la nota creada al probar la política de inserción del historial.

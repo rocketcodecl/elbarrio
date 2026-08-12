@@ -111,7 +111,7 @@ if (!rings.length) throw new Error('El barrio no tiene un polígono válido.')
 
 const { data: currentRows, error: currentError } = await supabase
   .from('commercial_prospects')
-  .select('id, source, source_id, name, latitude, longitude, phone, website, address, raw_data')
+  .select('id, source, source_id, name, latitude, longitude, phone, email, website, social_url, address, raw_data')
   .eq('neighborhood_id', neighborhood.id)
   .limit(5000)
 if (currentError) throw new Error(currentError.message)
@@ -135,7 +135,9 @@ const candidates = collection.features.flatMap(feature => {
     source_type: properties.basic_category || group || 'comercio',
     address: address?.freeform || null,
     phone: properties.phones?.[0] || null,
+    email: properties.emails?.[0] || null,
     website: properties.websites?.[0] || null,
+    social_url: properties.socials?.[0] || null,
     latitude,
     longitude,
     raw_data: properties,
@@ -149,6 +151,11 @@ const accepted = []
 const enriched = []
 const known = [...(currentRows || [])]
 for (const candidate of candidates) {
+  const sameSource = known.find(existing => existing.source === candidate.source && existing.source_id === candidate.source_id)
+  if (sameSource) {
+    accepted.push(candidate)
+    continue
+  }
   const match = known.find(existing => {
     const distance = distanceMeters(candidate, existing)
     return (normalize(candidate.name) === normalize(existing.name) && distance <= 120)
@@ -174,7 +181,9 @@ for (const { match, candidate } of enriched) {
   const { error } = await supabase.from('commercial_prospects').update({
     address: match.address || candidate.address,
     phone: match.phone || candidate.phone,
+    email: match.email || candidate.email,
     website: match.website || candidate.website,
+    social_url: match.social_url || candidate.social_url,
     raw_data: rawData,
     updated_by: profile.id,
     updated_at: new Date().toISOString(),
@@ -183,11 +192,13 @@ for (const { match, candidate } of enriched) {
 }
 
 await supabase.auth.signOut()
+const uniqueNew = accepted.filter(candidate => !(currentRows || []).some(row => row.source === candidate.source && row.source_id === candidate.source_id)).length
 console.log(JSON.stringify({
   neighborhood: neighborhood.name,
   downloaded: collection.features.length,
   commercial_inside_polygon: candidates.length,
-  inserted: accepted.length,
+  upserted: accepted.length,
+  newly_inserted: uniqueNew,
   duplicates_enriched: enriched.length,
-  total_after_import: (currentRows?.length || 0) + accepted.length,
+  total_after_import: (currentRows?.length || 0) + uniqueNew,
 }, null, 2))
