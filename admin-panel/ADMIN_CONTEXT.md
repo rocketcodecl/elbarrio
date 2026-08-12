@@ -204,3 +204,8 @@
 - `202608120002_advertising_gallery.sql` fue ejecutada con resultado `Success`, según confirmación manual del usuario. El editor admite y ordena hasta tres imágenes, conserva compatibilidad con campañas de una imagen y muestra su cantidad en el listado.
 - El formato comercial definitivo usa de una a tres gráficas `1200 × 628` que contienen todo el mensaje. El panel no pide copy ni botón visibles: conserva anunciante y campaña como datos internos, solicita el enlace de destino y muestra vistas previas con la proporción real. Inicio y Actividad usan gráficas de ancho completo.
 - El panel corregido está publicado en `https://admin.elbarrio.lat/`; el HTML, `index-BNdDdGOv.js` e `index-DKClirSj.css` públicos coinciden byte por byte con `admin-panel/dist` y el dominio responde HTTP 200. La versión previa quedó respaldada localmente en `admin-panel/admin-backups/20260812-full-width-ad-predeploy`.
+
+## Formatos publicitarios adaptables — 12 de agosto de 2026
+
+- Publicidad documenta y previsualiza dos formatos: estándar `1200 × 628` y franja `1200 × 220`, ambos disponibles en Inicio y Actividad. En un carrusel, las gráficas deben compartir formato.
+- Las previsualizaciones ya no fuerzan todas las campañas a la proporción estándar. No requiere SQL. El build y el lint focalizado pasan; este ajuste aún no se ha publicado en `admin.elbarrio.lat`.

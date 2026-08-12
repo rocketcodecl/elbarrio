@@ -411,6 +411,23 @@ function SponsoredCard({ campaign, placement, compact = false }) {
   const availableImages = campaign?.image_urls?.filter(Boolean) || []
   const images = availableImages.length ? availableImages.slice(0, 3) : (campaign?.image_url ? [campaign.image_url] : [])
   const [activeImage, setActiveImage] = useState(0)
+  const [creativeRatio, setCreativeRatio] = useState('1200 / 628')
+  const firstImage = images[0] || ''
+
+  useEffect(() => {
+    if (!firstImage) return undefined
+    let active = true
+    const image = new Image()
+    image.onload = () => {
+      if (!active || !image.naturalWidth || !image.naturalHeight) return
+      // La primera gráfica fija la altura de todo el carrusel para que las
+      // diapositivas no hagan saltar el feed al alternarse.
+      const ratio = image.naturalWidth / image.naturalHeight
+      setCreativeRatio(ratio >= 3.2 ? '1200 / 220' : '1200 / 628')
+    }
+    image.src = firstImage
+    return () => { active = false }
+  }, [campaign?.id, firstImage])
 
   useEffect(() => {
     if (!campaign?.id) return
@@ -473,7 +490,7 @@ function SponsoredCard({ campaign, placement, compact = false }) {
       onClick={openCampaign}
     >
       <span
-        style={{ ...s.sponsoredMedia, ...(compact ? s.sponsoredImageCompact : {}) }}
+        style={{ ...s.sponsoredMedia, aspectRatio: creativeRatio, ...(compact ? s.sponsoredImageCompact : {}) }}
         onTouchStart={event => { touchStartX.current = event.touches[0].clientX; swiped.current = false }}
         onTouchEnd={onTouchEnd}
       >
@@ -1765,7 +1782,7 @@ const s = {
     fontFamily: 'inherit', cursor: 'pointer', boxShadow: '0 3px 15px rgba(21,48,34,.045)',
   },
   sponsoredCardCompact: { marginBottom: 12 },
-  sponsoredMedia: { position: 'relative', display: 'block', width: '100%', aspectRatio: '1200 / 628', overflow: 'hidden', background: C.fondo },
+  sponsoredMedia: { position: 'relative', display: 'block', width: '100%', aspectRatio: '1200 / 628', overflow: 'hidden', background: C.fondo, transition: 'aspect-ratio 180ms ease' },
   sponsoredImage: { position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', transition: 'opacity 520ms ease' },
   sponsoredImageCompact: {},
   sponsoredLabel: { position: 'absolute', left: 9, top: 9, padding: '4px 7px', borderRadius: 999, background: 'rgba(17,32,24,.66)', color: '#fff', fontSize: 8, fontWeight: 750, letterSpacing: '.02em' },

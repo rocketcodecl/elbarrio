@@ -574,3 +574,9 @@ La entrega generada es un build firmado y reproducible de cierre técnico. No de
 - El fondo del contenedor inicial web, la configuración de Capacitor, Android, iOS, el manifiesto PWA y el color de tema usan ahora el verde marca `#1b9e75`. Android conserva ese mismo color al pasar del splash nativo al WebView, evitando que se interponga una pantalla blanca antes de la animación React.
 - El encabezado del feed cambió a `Actividad del Barrio` completamente en negro; ya no resalta “el barrio” en verde.
 - App web compilada, Capacitor sincronizado y Android debug compilado con `BUILD SUCCESSFUL`. APK de prueba actualizado en `release/android/el-barrio-prueba-20260812/el-barrio-prueba-publicidad.apk`, SHA-256 `9004de6f425237372439829d88aebda46e34fd7881da04215773434398addffd`; firma debug v2 verificada.
+
+## Formatos publicitarios adaptables — 12 de agosto de 2026
+
+- Las campañas aceptan dos proporciones de ancho completo: estándar `1200 × 628` y franja `1200 × 220`. Ambos formatos funcionan tanto bajo “Para ti” como dentro de “Actividad del Barrio”.
+- La app reconoce automáticamente el formato de la primera gráfica y adapta la altura sin recortar el anuncio ni reservar un espacio estándar. Las campañas con carrusel deben usar el mismo formato en sus una a tres gráficas para evitar cambios de altura entre diapositivas.
+- El panel informa ambos tamaños y muestra las vistas previas con su proporción real. No requirió migración ni cambios en Supabase. App, panel y lint focalizado compilan correctamente; queda pendiente publicar el nuevo build del panel y regenerar una entrega móvil cuando se cierre el siguiente lote.
