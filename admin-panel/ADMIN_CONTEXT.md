@@ -191,3 +191,13 @@
 - Limpieza reversible del Radar: los prospectos con estado `discarded` quedan fuera del mapa y listado normal, pueden consultarse mediante el filtro “Descartados” y restaurarse a “Por revisar”. La ficha incluye confirmación antes de quitar; si ya existe una ficha publicada en Comercios, avisa que esa ficha no será modificada. No requiere migración porque el estado y las políticas ya existían.
 - Build publicado en `https://admin.elbarrio.lat/` y verificado por SHA-256: `index-DWXxLOSh.js` e `index-Bdp-MiLG.css`. Respaldo: `admin-backups/20260812-radar-discard`.
 - Ejecutar una vez `202608110005_cleanup_crm_validation.sql` para eliminar exclusivamente la nota creada al probar la política de inserción del historial.
+
+## Publicidad — 12 de agosto de 2026
+
+- `Publicidad` es un módulo independiente y exclusivo de `is_superadmin=true`; admite anunciantes del barrio o marcas nacionales sin exigir una ficha previa en Comercios.
+- Administra anunciante, nombre interno, título, texto, imagen optimizada, etiqueta, CTA y URL externa, ubicaciones en la app, barrios, inicio/término, estado, prioridad, monto contratado, estado de pago y notas privadas.
+- Las ubicaciones iniciales son `home_feature` (Inicio, bajo la portada) y `activity_feed` (Actividad). La ausencia de una campaña vigente no deja ningún espacio en la app.
+- Las campañas pueden quedar en borrador, activarse, pausarse inmediatamente o finalizarse. El listado informa impresiones, clics y CTR.
+- La persistencia usa el borrador local `advertising:campaign`; cambiar de módulo no elimina el trabajo todavía no publicado.
+- `supabase/migrations/202608120001_advertising_campaigns.sql` fue ejecutada con resultado `Success`, según confirmación manual del usuario. Las tres tablas respondieron HTTP 200 bajo RLS y la RPC administrativa rechazó correctamente acceso anónimo con HTTP 401.
+- Build de panel y lint focalizado aprobados localmente. Este bloque todavía no fue publicado en `admin.elbarrio.lat`: el acceso SSH automático fue rechazado y el despliegue debe continuar mediante el acceso FTP/Plesk autorizado, sin exponer credenciales.

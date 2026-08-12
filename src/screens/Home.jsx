@@ -1,5 +1,6 @@
-import { useState, useEffect, useRef, useMemo } from 'react'
+import { Fragment, useState, useEffect, useRef, useMemo } from 'react'
 import { supabase } from '../lib/supabase'
+import { openExternalUrl } from '../lib/openExternal'
 import {
   C, T, TIPOS, REPORTES, FARMACIAS,
   iniciales, hace, plata, saludo,
@@ -395,6 +396,58 @@ function HomeDiscoveryCarousel({ items }) {
   )
 }
 
+const advertisingEventKey = () => {
+  if (globalThis.crypto?.randomUUID) return globalThis.crypto.randomUUID()
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, character => {
+    const random = Math.floor(Math.random() * 16)
+    return (character === 'x' ? random : (random & 3) | 8).toString(16)
+  })
+}
+
+function SponsoredCard({ campaign, placement, compact = false }) {
+  const impressionKey = useRef(advertisingEventKey())
+
+  useEffect(() => {
+    if (!campaign?.id) return
+    supabase.rpc('record_advertising_event', {
+      p_campaign_id: campaign.id,
+      p_placement: placement,
+      p_event_type: 'impression',
+      p_event_key: impressionKey.current,
+    }).then(({ error }) => {
+      if (error) console.warn('[home] no se pudo registrar impresión publicitaria:', error.message)
+    })
+  }, [campaign?.id, placement])
+
+  if (!campaign) return null
+
+  const openCampaign = async () => {
+    const clickKey = advertisingEventKey()
+    const opened = await openExternalUrl(campaign.cta_url)
+    if (!opened) return
+    supabase.rpc('record_advertising_event', {
+      p_campaign_id: campaign.id,
+      p_placement: placement,
+      p_event_type: 'click',
+      p_event_key: clickKey,
+    }).then(({ error }) => {
+      if (error) console.warn('[home] no se pudo registrar clic publicitario:', error.message)
+    })
+  }
+
+  return (
+    <button type="button" style={{ ...s.sponsoredCard, ...(compact ? s.sponsoredCardCompact : {}) }} onClick={openCampaign}>
+      <img src={campaign.image_url} alt="" style={{ ...s.sponsoredImage, ...(compact ? s.sponsoredImageCompact : {}) }} />
+      <span style={s.sponsoredCopy}>
+        <span style={s.sponsoredMeta}><b>{campaign.label || 'Patrocinado'}</b><span>{campaign.advertiser_name}</span></span>
+        <strong style={s.sponsoredTitle}>{campaign.title}</strong>
+        <span style={s.sponsoredBody}>{campaign.body}</span>
+        <span style={s.sponsoredAction}>{campaign.cta_label || 'Conocer más'} <span aria-hidden="true">→</span></span>
+      </span>
+    </button>
+  )
+}
+
 // haversine: distancia en METROS entre 2 coords (lat/lng).
 // Se usa para calcular qué tan lejos está cada alerta del usuario.
 // No necesita PostGIS ni triggers — puro JS con la lat/lng que ya
@@ -484,6 +537,8 @@ function Home({ currentUser, onNavigate, onCrear }) {
   const [eventoPortada, setEventoPortada] = useState(null)
   const [portadaSeleccionada, setPortadaSeleccionada] = useState([])
   const [actividad, setActividad] = useState([])
+  const [homeAd, setHomeAd] = useState(null)
+  const [activityAd, setActivityAd] = useState(null)
   const [noLeidos, setNoLeidos] = useState(0)
   const [clima, setClima] = useState(null)
   const [verFarmacias, setVerFarmacias] = useState(false)
@@ -691,7 +746,7 @@ function Home({ currentUser, onNavigate, onCrear }) {
       const TIPOS_FEED = ['request', 'sell', 'gift', 'trade', 'service', 'event', 'news', 'general']
       const selectPost = '*, author:profiles!author_id (full_name, avatar_url, badge_founder, verified, is_official_actor, official_actor_name)'
 
-      const [profileRes, hoodRes, alertRes, postsRes, msgRes, spotlightRes, carouselRes, blocksRes] = await Promise.all([
+      const [profileRes, hoodRes, alertRes, postsRes, msgRes, spotlightRes, carouselRes, blocksRes, homeAdRes, activityAdRes] = await Promise.all([
         // Refresca el profile en background si lo teníamos del cache.
         cache ? profilePromise : Promise.resolve({ data: p }),
         supabase.from('neighborhoods').select('*')
@@ -738,6 +793,8 @@ function Home({ currentUser, onNavigate, onCrear }) {
           .order('home_carousel_order', { ascending: true })
           .limit(15),
         supabase.from('user_blocks').select('blocked_id').eq('blocker_id', p.id),
+        supabase.rpc('get_active_advertising_campaign', { p_placement: 'home_feature' }),
+        supabase.rpc('get_active_advertising_campaign', { p_placement: 'activity_feed' }),
       ])
 
       if (hoodRes.error) throw hoodRes.error
@@ -810,7 +867,14 @@ function Home({ currentUser, onNavigate, onCrear }) {
       setEventoPortada(spotlightEvent || null)
       setPortadaSeleccionada(carouselItems)
       setActividad(actividad)
+      setHomeAd(homeAdRes.error ? null : (homeAdRes.data?.[0] || null))
+      setActivityAd(activityAdRes.error ? null : (activityAdRes.data?.[0] || null))
       setNoLeidos(msgRes.count || 0)
+
+      if (homeAdRes.error || activityAdRes.error) {
+        // La publicidad falla cerrada: nunca bloquea Inicio ni reserva un hueco.
+        console.warn('[home] publicidad todavía no disponible:', homeAdRes.error?.message || activityAdRes.error?.message)
+      }
 
       // ── Guardar cache para la próxima vez ──
       escribirCache({
@@ -1162,6 +1226,10 @@ function Home({ currentUser, onNavigate, onCrear }) {
         {/* ══════ PARA TI, CERCA DE CASA — contenido real, útil y visual ══════ */}
         {!buscando && <HomeDiscoveryCarousel items={paraTi} />}
 
+        {!buscando && homeAd && (
+          <SponsoredCard campaign={homeAd} placement="home_feature" />
+        )}
+
         {/* ══════ ALERTA OFICIAL (solo creada/marcada desde el panel) ══════ */}
         {!buscando && alertas.length > 0 && (
           <div style={{ ...s.seccion, marginBottom: 12 }}>
@@ -1285,7 +1353,7 @@ function Home({ currentUser, onNavigate, onCrear }) {
             </div>
           ) : (
             <>
-              {filtrados.slice(0, verMasActividad ? filtrados.length : ACTIVIDAD_VISIBLE_INICIAL).map((p) => {
+              {filtrados.slice(0, verMasActividad ? filtrados.length : ACTIVIDAD_VISIBLE_INICIAL).map((p, index, visibleItems) => {
                 const reporte = p.__incident ? (REPORTES[p.category] || REPORTES.seguridad) : null
                 const t = reporte
                   ? { ...reporte, corto: reporte.label }
@@ -1294,8 +1362,8 @@ function Home({ currentUser, onNavigate, onCrear }) {
                 const nombreAutor = autor.official_actor_name || autor.full_name || 'Vecino del barrio'
                 const esDestacada = p.id === actividadDestacadaId
                 return (
+                  <Fragment key={p.id}>
                   <div
-                    key={p.id}
                     style={{
                       ...s.postCard,
                       ...(p.__incident ? s.postCardAlert : {}),
@@ -1360,6 +1428,10 @@ function Home({ currentUser, onNavigate, onCrear }) {
                       <span style={s.activityAction}>{accionActividad(p)} <span aria-hidden="true">→</span></span>
                     </div>
                   </div>
+                  {activityAd && index === Math.min(2, visibleItems.length - 1) && (
+                    <SponsoredCard campaign={activityAd} placement="activity_feed" compact />
+                  )}
+                  </Fragment>
                 )
               })}
 
@@ -1649,6 +1721,36 @@ const s = {
   paraTiDots: { height: 10, display: 'flex', alignItems: 'flex-end', justifyContent: 'center', gap: 5 },
   paraTiDot: { width: 5, height: 5, borderRadius: 999, background: '#c9d5cd', transition: 'width 220ms ease, background 220ms ease' },
   paraTiDotActive: { width: 16, background: C.verde },
+
+  /* Publicidad nativa: solo existe en el layout cuando hay campaña vigente. */
+  sponsoredCard: {
+    width: '100%', margin: '0 0 10px', padding: 0, overflow: 'hidden',
+    display: 'grid', gridTemplateColumns: '41% minmax(0, 1fr)',
+    border: `1px solid ${C.borde}`, borderRadius: 17,
+    background: '#fff', color: C.texto, textAlign: 'left',
+    fontFamily: 'inherit', cursor: 'pointer', boxShadow: '0 3px 15px rgba(21,48,34,.045)',
+  },
+  sponsoredCardCompact: { gridTemplateColumns: '35% minmax(0, 1fr)', marginBottom: 12 },
+  sponsoredImage: { width: '100%', height: '100%', minHeight: 142, objectFit: 'cover', background: C.fondo },
+  sponsoredImageCompact: { minHeight: 126 },
+  sponsoredCopy: {
+    minWidth: 0, padding: '12px 13px', display: 'flex', flexDirection: 'column',
+    alignItems: 'flex-start', justifyContent: 'center', gap: 5,
+  },
+  sponsoredMeta: {
+    width: '100%', display: 'flex', alignItems: 'center', gap: 6,
+    color: C.textoTenue, fontSize: 9.5, overflow: 'hidden',
+  },
+  sponsoredTitle: {
+    maxWidth: '100%', color: C.texto, fontSize: 14.5, fontWeight: 800,
+    lineHeight: 1.22, display: '-webkit-box', WebkitBoxOrient: 'vertical',
+    WebkitLineClamp: 2, overflow: 'hidden',
+  },
+  sponsoredBody: {
+    maxWidth: '100%', color: C.textoSuave, fontSize: 11.5, lineHeight: 1.35,
+    display: '-webkit-box', WebkitBoxOrient: 'vertical', WebkitLineClamp: 2, overflow: 'hidden',
+  },
+  sponsoredAction: { marginTop: 2, color: C.verdeOsc, fontSize: 11.5, fontWeight: 800 },
 
   modalFondo: {
     position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,

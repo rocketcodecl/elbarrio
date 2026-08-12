@@ -554,3 +554,13 @@ La entrega generada es un build firmado y reproducible de cierre técnico. No de
 - El Splash ejecuta su secuencia una sola vez aunque la resolución de sesión provoque nuevos renders, mantiene el fondo verde durante la salida y espera que la primera imagen del onboarding esté decodificada antes de desmontarse. Esto elimina el destello blanco entre ambas pantallas.
 - El evento `SIGNED_IN` ya no expone un usuario parcial antes de consultar su perfil. Sesión y perfil se resuelven juntos mediante `checkSession`, evitando que un inicio de sesión existente muestre fugazmente “Tu cuenta está creada” antes del Feed o del paso pendiente.
 - La app compila y el lint focalizado de `App.jsx` y `Splash.jsx` pasa. Este cambio todavía no fue sincronizado con Capacitor ni incorporado a una nueva entrega móvil.
+
+## Publicidad nativa — 12 de agosto de 2026
+
+- Se implementó un sistema propio de campañas para anunciantes locales o marcas externas; no depende de una ficha de Comercio ni de una red publicitaria de terceros.
+- La migración `202608120001_advertising_campaigns.sql` fue ejecutada con resultado `Success`, según confirmación manual del usuario. Una verificación posterior obtuvo HTTP 200 para las tres tablas mediante la API con RLS y la RPC administrativa rechazó correctamente una sesión anónima con HTTP 401.
+- Los únicos espacios iniciales son una tarjeta nativa bajo la portada de Inicio y una tarjeta dentro de Actividad. Cada ubicación muestra como máximo una campaña vigente por carga.
+- Si no existe una campaña activa, dentro de fecha y dirigida al barrio del vecino, la app no renderiza tarjeta, reserva ni espacio vacío. Publicidad no interviene en Alertas, farmacia, verificación, chat ni emergencias.
+- Cada tarjeta identifica `Patrocinado` o la etiqueta definida, anunciante, título, texto y CTA externo. La app registra impresiones y clics sin exponer montos ni notas internas.
+- El módulo `Publicidad` del panel es exclusivo de superadministradores. Permite crear y editar campañas, cargar y comprimir su imagen, elegir barrios y ubicaciones, programar fechas, definir prioridad, monto/estado de pago, activar o pausar inmediatamente y revisar impresiones, clics y CTR.
+- La app principal y el panel compilan; el lint focalizado pasa. El panel todavía no fue publicado porque el servidor no aceptó la llave SSH automática y no se debe improvisar con credenciales. Tampoco se ha sincronizado Capacitor ni generado una nueva entrega móvil para este bloque.

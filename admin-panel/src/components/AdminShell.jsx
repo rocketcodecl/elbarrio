@@ -1,6 +1,7 @@
 const NAVIGATION = [
   { id: 'dashboard', icon: '▦', label: 'Resumen' },
   { id: 'portada', icon: '▤', label: 'Portada de Inicio' },
+  { id: 'publicidad', icon: '◎', label: 'Publicidad', superOnly: true },
   { id: 'mercado', icon: '◫', label: 'Mercado', superOnly: true },
   { id: 'publicaciones', icon: '◫', label: 'Publicaciones', superOnly: true },
   { id: 'contenido-usuarios', icon: '◌', label: 'Comentarios y reseñas', superOnly: true },

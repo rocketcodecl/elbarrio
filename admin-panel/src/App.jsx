@@ -24,6 +24,7 @@ import ReportManager from './screens/ReportManager.jsx'
 import MarketplaceManager from './screens/MarketplaceManager.jsx'
 import usePersistentDraft from './hooks/usePersistentDraft.js'
 import CommercialRadar from './screens/CommercialRadar.jsx'
+import AdvertisingManager from './screens/AdvertisingManager.jsx'
 
 const ADMIN_ROLE = 'admin'
 
@@ -150,13 +151,14 @@ export default function App() {
       {activeSection === 'notificaciones' && <NotificationManager profile={profile} />}
       {activeSection === 'consultas' && <ContactManager />}
       {activeSection === 'portada' && <HomeCarouselManager profile={profile} />}
+      {activeSection === 'publicidad' && <AdvertisingManager profile={profile} />}
       {activeSection === 'mercado' && <MarketplaceManager profile={profile} />}
       {activeSection === 'categorias' && <CategoryManager profile={profile} />}
       {activeSection === 'publicaciones' && <PostManager profile={profile} />}
       {activeSection === 'uso' && <UsageManager />}
       {activeSection === 'contenido-usuarios' && <UserContentManager />}
       {activeSection === 'reportes' && <ReportManager onNavigate={setActiveSection} />}
-      {!['dashboard', 'mercado', 'comercios', 'radar-comercial', 'servicios', 'eventos', 'farmacias', 'noticias', 'incidentes', 'usuarios', 'espera', 'invitaciones', 'contenido', 'notificaciones', 'consultas', 'portada', 'categorias', 'publicaciones', 'contenido-usuarios', 'reportes', 'uso'].includes(activeSection) && (
+      {!['dashboard', 'mercado', 'comercios', 'radar-comercial', 'servicios', 'eventos', 'farmacias', 'noticias', 'incidentes', 'usuarios', 'espera', 'invitaciones', 'contenido', 'notificaciones', 'consultas', 'portada', 'publicidad', 'categorias', 'publicaciones', 'contenido-usuarios', 'reportes', 'uso'].includes(activeSection) && (
         <section className="placeholder-module"><span>🚧</span><h1>Módulo en preparación</h1><p>Lo construiremos en una siguiente fase.</p></section>
       )}
     </AdminShell>
