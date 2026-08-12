@@ -176,3 +176,6 @@
 - `admin-discover-commerces` está desplegada con JWT obligatorio y vuelve a validar dentro de la función que el usuario sea un superadministrador activo. La prueba anónima devolvió HTTP 401.
 - El build publicado en `https://admin.elbarrio.lat/` usa `index-DKSYInA6.js` e `index-Dbm-8Yte.css`; HTML, JavaScript y CSS remotos coinciden por SHA-256 con el build local.
 - Respaldo anterior: `admin-backups/20260811-commercial-radar`.
+- La fuente fue ampliada con Overture Maps sin costo ni API key. La primera importación dejó 480 prospectos privados: 100 de OpenStreetMap y 380 de Overture, después de enriquecer 26 duplicados detectados.
+- `scripts/import-overture-commercial-radar.mjs` permite repetir la importación de una futura versión de Overture. Aplica el polígono real, filtra grupos comerciales y deduplica espacialmente antes de escribir.
+- Los datos originales de Overture permanecen completos en `commercial_prospects.raw_data`; actualmente existen emails y redes sociales que todavía no se muestran en la interfaz y podrán exponerse cuando se defina el siguiente conjunto de campos.

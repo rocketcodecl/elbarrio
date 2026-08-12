@@ -521,3 +521,6 @@ La entrega generada es un build firmado y reproducible de cierre técnico. No de
 - El panel compiló y el lint focalizado pasó. Se respaldó la versión anterior en `admin-backups/20260811-commercial-radar` y se publicó en `https://admin.elbarrio.lat/`.
 - Los archivos públicos `index-DKSYInA6.js` e `index-Dbm-8Yte.css`, además del HTML, coinciden por SHA-256 con `admin-panel/dist`.
 - OpenStreetMap es una fuente auxiliar y puede estar incompleta; el Radar sirve para descubrir y organizar visitas comerciales, no como catastro oficial.
+- La cobertura fue ampliada sin costo con Overture Maps. El primer cruce descargó 822 lugares, conservó 406 entidades comerciales dentro del polígono, insertó 380 nuevas y enriqueció 26 coincidencias con OpenStreetMap. El Radar quedó con 480 prospectos: 100 de OpenStreetMap y 380 de Overture.
+- El importador reproducible vive en `scripts/import-overture-commercial-radar.mjs`. Filtra por polígono y rubros comerciales, descarta cierres permanentes, deduplica por nombre/similitud y distancia, y conserva todas las propiedades originales en `raw_data`.
+- Tras la importación, 351 prospectos tienen teléfono, 281 sitio web, 453 dirección, 181 email en datos originales y 315 redes sociales en datos originales. Email y redes aún no tienen campos visibles propios; no se debe volver a descargar la fuente para agregarlos al panel.
