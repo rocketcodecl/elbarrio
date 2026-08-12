@@ -12,6 +12,7 @@ dist
 dist-ssr
 *.local
 release/android/
+admin-panel/admin-backups/
 ios/build-device/
 landing-page/admin/config.php
 landing-page/releases/
