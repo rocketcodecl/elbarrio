@@ -28,7 +28,7 @@ export default function AdvertisingManager({ profile }) {
   const [campaigns, setCampaigns] = useState([])
   const [neighborhoods, setNeighborhoods] = useState([])
   const [metrics, setMetrics] = useState({})
-  const [form, setForm, clearDraft, replaceForm] = usePersistentDraft('advertising:campaign', EMPTY_FORM, 'v2')
+  const [form, setForm, clearDraft, replaceForm] = usePersistentDraft('advertising:campaign', EMPTY_FORM, 'v3')
   const [editing, setEditing] = useState(false)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -136,12 +136,14 @@ export default function AdvertisingManager({ profile }) {
       p_campaign_id: form.id || null,
       p_advertiser_name: form.advertiser_name,
       p_campaign_name: form.campaign_name,
-      p_title: form.title,
-      p_body: form.body,
+      // El schema conserva estos campos por compatibilidad, pero la app solo
+      // muestra la gráfica. Nunca se usan como copy visible del anuncio.
+      p_title: form.campaign_name,
+      p_body: `Publicidad de ${form.advertiser_name}`,
       p_image_url: form.image_url,
       p_image_urls: form.image_urls,
-      p_label: form.label,
-      p_cta_label: form.cta_label,
+      p_label: 'Publicidad',
+      p_cta_label: 'Abrir',
       p_cta_url: form.cta_url,
       p_placements: form.placements,
       p_neighborhood_ids: form.neighborhood_ids,
@@ -184,16 +186,12 @@ export default function AdvertisingManager({ profile }) {
       <form onSubmit={save}>
         <label>Anunciante<input required value={form.advertiser_name} onChange={e => update('advertiser_name', e.target.value)} placeholder="Ej: Little Caesars" /></label>
         <label>Nombre interno de campaña<input required value={form.campaign_name} onChange={e => update('campaign_name', e.target.value)} placeholder="Ej: Apertura agosto" /></label>
-        <label className="wide">Título visible<input required value={form.title} onChange={e => update('title', e.target.value)} placeholder="Una oferta cerca de ti" /></label>
-        <label className="wide">Texto visible<textarea required rows="3" value={form.body} onChange={e => update('body', e.target.value)} placeholder="Descripción breve, clara y útil para los vecinos." /></label>
-        <label>Etiqueta<input value={form.label} onChange={e => update('label', e.target.value)} placeholder="Patrocinado" /></label>
-        <label>Texto del botón<input value={form.cta_label} onChange={e => update('cta_label', e.target.value)} placeholder="Conocer más" /></label>
-        <label className="wide">Enlace externo<input required type="url" value={form.cta_url} onChange={e => update('cta_url', e.target.value)} placeholder="https://..." /></label>
-        <label className="wide advertising-image-field">Imágenes (1 a 3)<input type="file" accept="image/*" multiple onChange={uploadImage} disabled={uploading || form.image_urls.length >= 3} />{uploading && <small>Optimizando y cargando…</small>}<small>Orden de reproducción: izquierda a derecha. Puedes elegir varias de una vez.</small>{form.image_urls.length > 0 && <span className="advertising-image-list">{form.image_urls.map((url, index) => <span key={url}><img src={url} alt={`Imagen ${index + 1}`} /><b>{index + 1}</b><button type="button" onClick={() => setForm(current => { const imageUrls = current.image_urls.filter(item => item !== url); return { ...current, image_urls: imageUrls, image_url: imageUrls[0] || '' } })}>Quitar</button></span>)}</span>}</label>
+        <label className="wide">Enlace al tocar la gráfica<input required type="url" value={form.cta_url} onChange={e => update('cta_url', e.target.value)} placeholder="https://..." /></label>
+        <label className="wide advertising-image-field">Gráficas (1 a 3)<input type="file" accept="image/*" multiple onChange={uploadImage} disabled={uploading || form.image_urls.length >= 3} />{uploading && <small>Optimizando y cargando…</small>}<small>Formato recomendado: 1200 × 628 px. Toda la información comercial debe venir dentro de la gráfica. Orden de reproducción: izquierda a derecha.</small>{form.image_urls.length > 0 && <span className="advertising-image-list">{form.image_urls.map((url, index) => <span key={url}><img src={url} alt={`Gráfica ${index + 1}`} /><b>{index + 1}</b><button type="button" onClick={() => setForm(current => { const imageUrls = current.image_urls.filter(item => item !== url); return { ...current, image_urls: imageUrls, image_url: imageUrls[0] || '' } })}>Quitar</button></span>)}</span>}</label>
 
         <fieldset className="wide"><legend>Ubicaciones en la app</legend><div className="advertising-check-grid">
-          <label><input type="checkbox" checked={form.placements.includes('home_feature')} onChange={() => toggleArrayValue('placements', 'home_feature')} /><span><b>Inicio</b><small>Tarjeta destacada bajo el carrusel.</small></span></label>
-          <label><input type="checkbox" checked={form.placements.includes('activity_feed')} onChange={() => toggleArrayValue('placements', 'activity_feed')} /><span><b>Actividad</b><small>Tarjeta nativa dentro del feed.</small></span></label>
+          <label><input type="checkbox" checked={form.placements.includes('home_feature')} onChange={() => toggleArrayValue('placements', 'home_feature')} /><span><b>Inicio</b><small>Gráfica de ancho completo bajo “Para ti”.</small></span></label>
+          <label><input type="checkbox" checked={form.placements.includes('activity_feed')} onChange={() => toggleArrayValue('placements', 'activity_feed')} /><span><b>Actividad</b><small>Gráfica de ancho completo después de la tercera publicación.</small></span></label>
         </div></fieldset>
 
         <fieldset className="wide"><legend>Barrios</legend><div className="advertising-neighborhoods">
@@ -222,7 +220,7 @@ export default function AdvertisingManager({ profile }) {
           <div className="advertising-card-cover"><img src={item.image_urls?.[0] || item.image_url} alt="" />{(item.image_urls?.length || 1) > 1 && <span>{item.image_urls.length} imágenes</span>}</div>
           <div className="advertising-card-body">
             <div className="advertising-card-state"><span>{STATUS[item.status] || item.status}</span><small>{item.advertiser_name}</small></div>
-            <h3>{item.title}</h3><p>{item.body}</p>
+            <h3>{item.campaign_name}</h3><p>{item.cta_url}</p>
             <div className="advertising-card-metrics"><span><b>{campaignMetrics.impressions || 0}</b> impresiones</span><span><b>{campaignMetrics.clicks || 0}</b> clics</span><span><b>{ctr}%</b> CTR</span></div>
             <small>{new Date(item.starts_at).toLocaleString('es-CL')}{item.ends_at ? ` → ${new Date(item.ends_at).toLocaleString('es-CL')}` : ' · sin fecha de término'}</small>
             <footer><button type="button" onClick={() => edit(item)}>Editar</button>{item.status === 'active' ? <button className="pause" type="button" onClick={() => changeStatus(item, 'paused')}>Pausar ahora</button> : <button className="activate" type="button" onClick={() => changeStatus(item, 'active')}>Activar</button>}</footer>

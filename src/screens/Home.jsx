@@ -407,6 +407,7 @@ const advertisingEventKey = () => {
 function SponsoredCard({ campaign, placement, compact = false }) {
   const impressionKey = useRef(advertisingEventKey())
   const touchStartX = useRef(null)
+  const swiped = useRef(false)
   const availableImages = campaign?.image_urls?.filter(Boolean) || []
   const images = availableImages.length ? availableImages.slice(0, 3) : (campaign?.image_url ? [campaign.image_url] : [])
   const [activeImage, setActiveImage] = useState(0)
@@ -436,6 +437,10 @@ function SponsoredCard({ campaign, placement, compact = false }) {
   if (!campaign) return null
 
   const openCampaign = async () => {
+    if (swiped.current) {
+      swiped.current = false
+      return
+    }
     const clickKey = advertisingEventKey()
     const opened = await openExternalUrl(campaign.cta_url)
     if (!opened) return
@@ -454,28 +459,29 @@ function SponsoredCard({ campaign, placement, compact = false }) {
     const distance = event.changedTouches[0].clientX - touchStartX.current
     touchStartX.current = null
     if (Math.abs(distance) < 34) return
+    swiped.current = true
     setActiveImage(current => distance < 0
       ? (current + 1) % images.length
       : (current - 1 + images.length) % images.length)
   }
 
   return (
-    <article style={{ ...s.sponsoredCard, ...(compact ? s.sponsoredCardCompact : {}) }}>
+    <button
+      type="button"
+      aria-label={`Publicidad de ${campaign.advertiser_name}. Abrir enlace`}
+      style={{ ...s.sponsoredCard, ...(compact ? s.sponsoredCardCompact : {}) }}
+      onClick={openCampaign}
+    >
       <span
         style={{ ...s.sponsoredMedia, ...(compact ? s.sponsoredImageCompact : {}) }}
-        onTouchStart={event => { touchStartX.current = event.touches[0].clientX }}
+        onTouchStart={event => { touchStartX.current = event.touches[0].clientX; swiped.current = false }}
         onTouchEnd={onTouchEnd}
       >
         {images.map((url, index) => <img key={url} src={url} alt="" style={{ ...s.sponsoredImage, opacity: index === visibleImage ? 1 : 0 }} />)}
+        <span style={s.sponsoredLabel}>Publicidad</span>
         {images.length > 1 && <span style={s.sponsoredDots} aria-label={`Imagen ${visibleImage + 1} de ${images.length}`}>{images.map((url, index) => <i key={url} style={{ ...s.sponsoredDot, ...(index === visibleImage ? s.sponsoredDotActive : {}) }} />)}</span>}
       </span>
-      <span style={s.sponsoredCopy}>
-        <span style={s.sponsoredMeta}><b>{campaign.label || 'Patrocinado'}</b><span>{campaign.advertiser_name}</span></span>
-        <strong style={s.sponsoredTitle}>{campaign.title}</strong>
-        <span style={s.sponsoredBody}>{campaign.body}</span>
-        <button type="button" style={s.sponsoredAction} onClick={openCampaign}>{campaign.cta_label || 'Conocer más'} <span aria-hidden="true">→</span></button>
-      </span>
-    </article>
+    </button>
   )
 }
 
@@ -1755,37 +1761,19 @@ const s = {
 
   /* Publicidad nativa: solo existe en el layout cuando hay campaña vigente. */
   sponsoredCard: {
-    width: '100%', margin: '0 0 10px', padding: 0, overflow: 'hidden',
-    display: 'grid', gridTemplateColumns: '41% minmax(0, 1fr)',
+    width: '100%', margin: '0 0 10px', padding: 0, overflow: 'hidden', display: 'block',
     border: `1px solid ${C.borde}`, borderRadius: 17,
-    background: '#fff', color: C.texto, textAlign: 'left',
+    background: '#fff', color: C.texto, textAlign: 'left', appearance: 'none', WebkitAppearance: 'none',
     fontFamily: 'inherit', cursor: 'pointer', boxShadow: '0 3px 15px rgba(21,48,34,.045)',
   },
-  sponsoredCardCompact: { gridTemplateColumns: '35% minmax(0, 1fr)', marginBottom: 12 },
-  sponsoredMedia: { position: 'relative', display: 'block', minHeight: 142, overflow: 'hidden', background: C.fondo },
+  sponsoredCardCompact: { marginBottom: 12 },
+  sponsoredMedia: { position: 'relative', display: 'block', width: '100%', aspectRatio: '1200 / 628', overflow: 'hidden', background: C.fondo },
   sponsoredImage: { position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', transition: 'opacity 520ms ease' },
-  sponsoredImageCompact: { minHeight: 126 },
+  sponsoredImageCompact: {},
+  sponsoredLabel: { position: 'absolute', left: 9, top: 9, padding: '4px 7px', borderRadius: 999, background: 'rgba(17,32,24,.66)', color: '#fff', fontSize: 8, fontWeight: 750, letterSpacing: '.02em' },
   sponsoredDots: { position: 'absolute', left: 0, right: 0, bottom: 7, display: 'flex', justifyContent: 'center', gap: 4 },
   sponsoredDot: { width: 5, height: 5, borderRadius: 99, background: 'rgba(255,255,255,.6)', boxShadow: '0 1px 3px rgba(0,0,0,.18)' },
   sponsoredDotActive: { width: 13, background: '#fff' },
-  sponsoredCopy: {
-    minWidth: 0, padding: '12px 13px', display: 'flex', flexDirection: 'column',
-    alignItems: 'flex-start', justifyContent: 'center', gap: 5,
-  },
-  sponsoredMeta: {
-    width: '100%', display: 'flex', alignItems: 'center', gap: 6,
-    color: C.textoTenue, fontSize: 9.5, overflow: 'hidden',
-  },
-  sponsoredTitle: {
-    maxWidth: '100%', color: C.texto, fontSize: 14.5, fontWeight: 800,
-    lineHeight: 1.22, display: '-webkit-box', WebkitBoxOrient: 'vertical',
-    WebkitLineClamp: 2, overflow: 'hidden',
-  },
-  sponsoredBody: {
-    maxWidth: '100%', color: C.textoSuave, fontSize: 11.5, lineHeight: 1.35,
-    display: '-webkit-box', WebkitBoxOrient: 'vertical', WebkitLineClamp: 2, overflow: 'hidden',
-  },
-  sponsoredAction: { margin: '2px 0 0', padding: 0, border: 0, background: 'transparent', color: C.verdeOsc, fontFamily: 'inherit', fontSize: 11.5, fontWeight: 800, cursor: 'pointer' },
 
   modalFondo: {
     position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
