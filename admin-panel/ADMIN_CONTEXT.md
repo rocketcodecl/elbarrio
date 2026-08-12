@@ -214,4 +214,4 @@
 
 - El editor suma las ubicaciones `Servicios` y `Comercios`, además de Inicio y Actividad. Cada ubicación conserva métricas independientes y admite gráficas estándar o franja.
 - Requiere ejecutar `supabase/migrations/202608120003_advertising_section_placements.sql`, que amplía las restricciones, lectura, medición y crea `admin_upsert_advertising_campaign_v2` sin romper el RPC del panel publicado.
-- App y panel compilan. La migración aún no está confirmada y este build todavía no se publica en `admin.elbarrio.lat`.
+- La migración fue ejecutada con resultado `Success`, según confirmación manual del usuario. El build se publicó en `https://admin.elbarrio.lat/`; HTML, `index-Bpfds4RC.js` e `index-BlX8ZRQw.css` coinciden por SHA-256 con `admin-panel/dist`.
