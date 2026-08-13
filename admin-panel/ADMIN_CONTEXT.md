@@ -215,3 +215,8 @@
 - El editor suma las ubicaciones `Servicios` y `Comercios`, además de Inicio y Actividad. Cada ubicación conserva métricas independientes y admite gráficas estándar o franja.
 - Requiere ejecutar `supabase/migrations/202608120003_advertising_section_placements.sql`, que amplía las restricciones, lectura, medición y crea `admin_upsert_advertising_campaign_v2` sin romper el RPC del panel publicado.
 - La migración fue ejecutada con resultado `Success`, según confirmación manual del usuario. El build se publicó en `https://admin.elbarrio.lat/`; HTML, `index-Bpfds4RC.js` e `index-BlX8ZRQw.css` coinciden por SHA-256 con `admin-panel/dist`.
+
+## Identificación del historial publicitario — 13 de agosto de 2026
+
+- Cada campaña en “Historial y control” muestra sin abrir el editor su nombre interno, ubicaciones seleccionadas, formato detectado (`Estándar · 1200 × 628` o `Franja · 1200 × 220`) y cantidad de gráficas.
+- Es un cambio exclusivo del panel y no requiere SQL ni nueva APK. El build fue publicado en `https://admin.elbarrio.lat/`; HTML, `index-BCAl0zbV.js` e `index-V4yirxsI.css` coinciden por SHA-256 con `admin-panel/dist`. Respaldo local: `admin-panel/admin-backups/20260813-ad-history-labels-predeploy`.

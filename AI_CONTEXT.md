@@ -588,3 +588,8 @@ La entrega generada es un build firmado y reproducible de cierre técnico. No de
 - El panel permite seleccionar Inicio, Actividad, Servicios y Comercios por campaña. La migración `202608120003_advertising_section_placements.sql` amplía restricciones y RPC conservando compatibilidad con el panel anterior.
 - La migración fue ejecutada con resultado `Success`, según confirmación manual del usuario. El panel se publicó en `https://admin.elbarrio.lat/`; su HTML, `index-Bpfds4RC.js` e `index-BlX8ZRQw.css` coinciden por SHA-256 con el build local. App y panel compilan.
 - Capacitor fue sincronizado y el APK de prueba se regeneró en `release/android/el-barrio-prueba-20260812/el-barrio-prueba-publicidad.apk`; SHA-256 `13125ea99b4e66934efb8bd45f71876a11f0bdc5a54289f5a7067e64a866391d`, firma debug v2 verificada. No reemplaza el AAB firmado de tienda.
+
+## Identificación del historial publicitario — 13 de agosto de 2026
+
+- “Historial y control” identifica cada campaña por nombre interno, ubicaciones, formato gráfico detectado y cantidad de gráficas sin obligar a abrir el editor. Es solo panel: no requiere SQL ni APK.
+- Panel publicado y verificado por SHA-256: `index-BCAl0zbV.js`, `index-V4yirxsI.css` y HTML coinciden con `admin-panel/dist`.

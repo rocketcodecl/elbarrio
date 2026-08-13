@@ -13,6 +13,18 @@ const EMPTY_FORM = {
 
 const STATUS = { draft: 'Borrador', active: 'Activa', paused: 'Pausada', finished: 'Finalizada' }
 const PAYMENT = { pending: 'Pendiente', paid: 'Pagada', courtesy: 'Cortesía', cancelled: 'Cancelada' }
+const PLACEMENT = {
+  home_feature: 'Inicio', activity_feed: 'Actividad',
+  services_feed: 'Servicios', commerces_feed: 'Comercios',
+}
+
+function CreativeFormat({ url, count }) {
+  const [format, setFormat] = useState('Detectando formato…')
+  return <span className="advertising-format"><img src={url} alt="" onLoad={event => {
+    const image = event.currentTarget
+    setFormat(image.naturalWidth / image.naturalHeight >= 3.2 ? 'Franja · 1200 × 220' : 'Estándar · 1200 × 628')
+  }} /><b>{format}</b><small>{count} {count === 1 ? 'gráfica' : 'gráficas'}</small></span>
+}
 
 const toLocalInput = value => {
   if (!value) return ''
@@ -187,7 +199,7 @@ export default function AdvertisingManager({ profile }) {
         <label>Anunciante<input required value={form.advertiser_name} onChange={e => update('advertiser_name', e.target.value)} placeholder="Ej: Little Caesars" /></label>
         <label>Nombre interno de campaña<input required value={form.campaign_name} onChange={e => update('campaign_name', e.target.value)} placeholder="Ej: Apertura agosto" /></label>
         <label className="wide">Enlace al tocar la gráfica<input required type="url" value={form.cta_url} onChange={e => update('cta_url', e.target.value)} placeholder="https://..." /></label>
-        <label className="wide advertising-image-field">Gráficas (1 a 3)<input type="file" accept="image/*" multiple onChange={uploadImage} disabled={uploading || form.image_urls.length >= 3} />{uploading && <small>Optimizando y cargando…</small>}<small>Formatos admitidos: estándar 1200 × 628 px o franja 1200 × 220 px. Ambos pueden aparecer en Inicio y en Actividad. Si la campaña tiene varias gráficas, todas deben usar el mismo formato. Toda la información comercial debe venir dentro de la gráfica.</small>{form.image_urls.length > 0 && <span className="advertising-image-list">{form.image_urls.map((url, index) => <span key={url}><img src={url} alt={`Gráfica ${index + 1}`} /><b>{index + 1}</b><button type="button" onClick={() => setForm(current => { const imageUrls = current.image_urls.filter(item => item !== url); return { ...current, image_urls: imageUrls, image_url: imageUrls[0] || '' } })}>Quitar</button></span>)}</span>}</label>
+        <label className="wide advertising-image-field">Gráficas (1 a 3)<input type="file" accept="image/*" multiple onChange={uploadImage} disabled={uploading || form.image_urls.length >= 3} />{uploading && <small>Optimizando y cargando…</small>}<small>Formatos admitidos: estándar 1200 × 628 px o franja 1200 × 220 px. Ambos pueden aparecer en cualquiera de las cuatro ubicaciones. Si la campaña tiene varias gráficas, todas deben usar el mismo formato. Toda la información comercial debe venir dentro de la gráfica.</small>{form.image_urls.length > 0 && <span className="advertising-image-list">{form.image_urls.map((url, index) => <span key={url}><img src={url} alt={`Gráfica ${index + 1}`} /><b>{index + 1}</b><button type="button" onClick={() => setForm(current => { const imageUrls = current.image_urls.filter(item => item !== url); return { ...current, image_urls: imageUrls, image_url: imageUrls[0] || '' } })}>Quitar</button></span>)}</span>}</label>
 
         <fieldset className="wide"><legend>Ubicaciones en la app</legend><div className="advertising-check-grid">
           <label><input type="checkbox" checked={form.placements.includes('home_feature')} onChange={() => toggleArrayValue('placements', 'home_feature')} /><span><b>Inicio</b><small>Formato estándar o franja bajo “Para ti”.</small></span></label>
@@ -217,12 +229,19 @@ export default function AdvertisingManager({ profile }) {
       {!loading && campaigns.length === 0 && <p className="advertising-empty">Todavía no hay campañas. Puedes dejar una como borrador antes de activarla.</p>}
       <div className="advertising-grid">{campaigns.map(item => {
         const campaignMetrics = metrics[item.id] || {}
+        const creativeUrl = item.image_urls?.[0] || item.image_url
+        const creativeCount = item.image_urls?.length || 1
         const ctr = Number(campaignMetrics.impressions) > 0 ? (Number(campaignMetrics.clicks || 0) / Number(campaignMetrics.impressions) * 100).toFixed(1) : '0.0'
         return <article key={item.id} className={`advertising-card is-${item.status}`}>
-          <div className="advertising-card-cover"><img src={item.image_urls?.[0] || item.image_url} alt="" />{(item.image_urls?.length || 1) > 1 && <span>{item.image_urls.length} imágenes</span>}</div>
+          <div className="advertising-card-cover"><img src={creativeUrl} alt="" />{creativeCount > 1 && <span>{creativeCount} imágenes</span>}</div>
           <div className="advertising-card-body">
             <div className="advertising-card-state"><span>{STATUS[item.status] || item.status}</span><small>{item.advertiser_name}</small></div>
-            <h3>{item.campaign_name}</h3><p>{item.cta_url}</p>
+            <h3>{item.campaign_name}</h3>
+            <div className="advertising-card-identification">
+              <div>{(item.placements || []).map(placement => <span key={placement}>{PLACEMENT[placement] || placement}</span>)}</div>
+              <CreativeFormat url={creativeUrl} count={creativeCount} />
+            </div>
+            <p>{item.cta_url}</p>
             <div className="advertising-card-metrics"><span><b>{campaignMetrics.impressions || 0}</b> impresiones</span><span><b>{campaignMetrics.clicks || 0}</b> clics</span><span><b>{ctr}%</b> CTR</span></div>
             <small>{new Date(item.starts_at).toLocaleString('es-CL')}{item.ends_at ? ` → ${new Date(item.ends_at).toLocaleString('es-CL')}` : ' · sin fecha de término'}</small>
             <footer><button type="button" onClick={() => edit(item)}>Editar</button>{item.status === 'active' ? <button className="pause" type="button" onClick={() => changeStatus(item, 'paused')}>Pausar ahora</button> : <button className="activate" type="button" onClick={() => changeStatus(item, 'active')}>Activar</button>}</footer>
