@@ -236,5 +236,5 @@
 - El módulo único `Publicidad` incorpora `Mercado` y `Eventos` a las cuatro ubicaciones existentes. No se agregaron entradas al menú ni un editor de contenido patrocinado.
 - `marketplace_feed` aparece integrado entre publicaciones del Mercado; `events_feed` aparece entre destacados y agenda. Conservan los dos formatos gráficos, hasta tres imágenes, enlace completo, barrios, fechas, prioridad, control de pago, impresiones, clics y CTR.
 - Los destacados propios se mantienen donde corresponde: `commerces.is_premium` en Comercios y `posts.is_featured` con vigencia en Servicios. El mapa ahora diferencia visualmente los comercios premium que ya recibía.
-- Requiere ejecutar manualmente `supabase/migrations/202608160001_advertising_marketplace_events.sql` después de `202608120003_advertising_section_placements.sql`. **Pendiente de confirmación del usuario**; no usar `supabase db push` ni inferir que está aplicada.
+- `supabase/migrations/202608160001_advertising_marketplace_events.sql` fue ejecutada manualmente con resultado `Success`, según confirmación del usuario. No volver a ejecutarla por inferencia ni usar `supabase db push`.
 - App y panel compilan. Todavía no se publicó `admin.elbarrio.lat`, no se sincronizó Capacitor y no hubo navegador conectado para aprobación visual.
