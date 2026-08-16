@@ -220,3 +220,12 @@
 
 - Cada campaña en “Historial y control” muestra sin abrir el editor su nombre interno, ubicaciones seleccionadas, formato detectado (`Estándar · 1200 × 628` o `Franja · 1200 × 220`) y cantidad de gráficas.
 - Es un cambio exclusivo del panel y no requiere SQL ni nueva APK. El build fue publicado en `https://admin.elbarrio.lat/`; HTML, `index-BCAl0zbV.js` e `index-V4yirxsI.css` coinciden por SHA-256 con `admin-panel/dist`. Respaldo local: `admin-panel/admin-backups/20260813-ad-history-labels-predeploy`.
+
+## Google Places en Radar comercial — preparado el 14 de agosto de 2026
+
+- El Radar incorpora búsqueda temporal por rubro y contraste individual contra Google Places mediante la función servidor `admin-google-places-radar`.
+- Los resultados de Google nunca se dibujan sobre el mapa OSM ni se publican automáticamente. Se muestran en un bloque separado, con atribución `Google Maps`, enlace a la fuente y clasificación local de coincidencia o posible cierre.
+- La única información de Google persistente es `google_place_id`; el resto se vuelve a consultar en vivo. Cada vínculo es manual, confirmado y registrado en la cronología del prospecto.
+- `commercial_google_usage` controla y audita consumo. El límite predeterminado es 10 consultas diarias globales; puede cambiarse con el secreto `GOOGLE_PLACES_DAILY_LIMIT`.
+- `202608140001_google_places_radar.sql` fue confirmado con `Success`; `GOOGLE_MAPS_API_KEY` y el límite 10 quedaron como secretos y la función fue desplegada. La protección anónima responde HTTP 401.
+- La prueba real autenticada permanece bloqueada por Google con `The caller does not have permission`. Revisar que Places API (New) esté habilitada y que la clave no tenga una restricción de aplicación incompatible con Supabase Edge; debe conservar la restricción de API a Places API (New). No publicar el build del panel hasta que la consulta real responda correctamente.

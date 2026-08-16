@@ -95,6 +95,11 @@ export default function CommercialRadar({ profile, onNavigate }) {
   const [manualDraft, setManualDraft] = useState(null)
   const [interactions, setInteractions] = useState([])
   const [interaction, setInteraction] = useState({ interaction_type: 'note', summary: '', scheduled_for: '' })
+  const [googleTerm, setGoogleTerm] = useState('comercios')
+  const [googlePlaces, setGooglePlaces] = useState([])
+  const [googleScope, setGoogleScope] = useState(null)
+  const [googleSearching, setGoogleSearching] = useState(false)
+  const [googleUsage, setGoogleUsage] = useState(null)
 
   const neighborhood = neighborhoods.find(item => item.id === neighborhoodId) || null
   const boundary = useMemo(() => polygonFeature(neighborhood), [neighborhood])
@@ -149,6 +154,16 @@ export default function CommercialRadar({ profile, onNavigate }) {
 
   const selected = manualDraft || withExisting.find(item => item.id === selectedId) || null
 
+  const comparedGooglePlaces = useMemo(() => googlePlaces.map(place => {
+    const linked = withExisting.find(item => item.google_place_id === place.id)
+    const nearby = linked || withExisting.find(item => {
+      const meters = distanceMeters(item, { lat: place.latitude, lng: place.longitude })
+      const sameName = normalize(item.name) === normalize(place.name)
+      return meters <= 25 || (sameName && meters <= 120)
+    })
+    return { ...place, matchedProspect: nearby || null }
+  }), [googlePlaces, withExisting])
+
   const openProspect = item => {
     setManualDraft(null)
     setInteractions([])
@@ -197,6 +212,48 @@ export default function CommercialRadar({ profile, onNavigate }) {
     } finally {
       setScanning(false)
     }
+  }
+
+  const runGoogleComparison = async payload => {
+    setGoogleSearching(true); setError(''); setNotice('')
+    try {
+      const { data, error: googleError } = await supabase.functions.invoke('admin-google-places-radar', { body: { neighborhood_id: neighborhoodId, ...payload } })
+      if (googleError) throw googleError
+      if (data?.error) throw new Error(data.error)
+      setGooglePlaces(data?.places || [])
+      setGoogleUsage(data?.usage || null)
+      setGoogleScope(payload.action === 'prospect_match' || payload.action === 'place_details' ? { kind: 'prospect', prospectId: payload.prospect_id || selected?.id } : { kind: 'area' })
+    } catch (googleError) {
+      setError(googleError?.message || 'No fue posible consultar Google Places.')
+    } finally {
+      setGoogleSearching(false)
+    }
+  }
+
+  const searchGoogleArea = event => {
+    event.preventDefault()
+    if (!googleTerm.trim()) return setError('Escribe qué tipo de comercio quieres buscar.')
+    runGoogleComparison({ action: 'area_search', search_term: googleTerm.trim() })
+  }
+
+  const checkSelectedWithGoogle = () => {
+    if (!selected || selected.isNew) return
+    runGoogleComparison(selected.google_place_id
+      ? { action: 'place_details', place_id: selected.google_place_id, prospect_id: selected.id }
+      : { action: 'prospect_match', prospect_id: selected.id })
+  }
+
+  const linkGooglePlace = async (place, prospect) => {
+    if (!prospect || !place?.id) return
+    if (!window.confirm(`¿Vincular “${prospect.name}” con este resultado de Google Maps? Solo se guardará su identificador.`)) return
+    setSaving('google-link'); setError('')
+    const patch = { google_place_id: place.id, google_linked_at: new Date().toISOString(), google_linked_by: profile.id, updated_by: profile.id, updated_at: new Date().toISOString() }
+    const { error: linkError } = await supabase.from('commercial_prospects').update(patch).eq('id', prospect.id)
+    if (!linkError) await supabase.from('commercial_prospect_interactions').insert({ prospect_id: prospect.id, admin_profile_id: profile.id, interaction_type: 'verification', summary: 'Ficha vinculada manualmente con un identificador de Google Maps.' })
+    setSaving('')
+    if (linkError) return setError(`No fue posible vincular: ${linkError.message}`)
+    setProspects(current => current.map(item => item.id === prospect.id ? { ...item, ...patch } : item))
+    setNotice('Identificador de Google Maps vinculado. Los datos seguirán consultándose en vivo.')
   }
 
   const saveProspect = async () => {
@@ -346,6 +403,18 @@ export default function CommercialRadar({ profile, onNavigate }) {
         <label>Barrio<select value={neighborhoodId} onChange={event => { setNeighborhoodId(event.target.value); setSelectedId(null) }}>{neighborhoods.map(item => <option value={item.id} key={item.id}>{item.name}{item.uv_code ? ` · UV ${item.uv_code}` : ''}</option>)}</select></label>
         <div className="radar-metrics"><span><strong>{counts.total}</strong>En el radar</span><span><strong>{counts.new}</strong>Por revisar</span><span><strong>{counts.contacted}</strong>En gestión</span><span><strong>{counts.converted}</strong>Incorporados</span><span><strong>{counts.discarded}</strong>Descartados</span></div>
       </section>
+      <section className="radar-google-search">
+        <div><p className="eyebrow">Contraste externo en vivo</p><h2>Encontrar faltantes con Google Maps</h2><p>Busca un rubro por vez. Los resultados no se copian ni se publican automáticamente.</p></div>
+        <form onSubmit={searchGoogleArea}><input value={googleTerm} onChange={event => setGoogleTerm(event.target.value)} placeholder="Ej. panaderías, veterinarias, peluquerías" maxLength="120" /><button className="button button-primary" type="submit" disabled={googleSearching || !neighborhoodId}>{googleSearching && googleScope?.kind !== 'prospect' ? 'Consultando…' : 'Contrastar zona'}</button></form>
+        {googleUsage && <small>{googleUsage.used} de {googleUsage.limit} consultas usadas hoy.</small>}
+      </section>
+      {googleScope?.kind === 'area' && <section className="radar-google-results">
+        <header><div><strong>Resultados temporales</strong><span>{comparedGooglePlaces.length} dentro del polígono · ordenados por relevancia de Google</span></div><span className="google-maps-attribution" translate="no">Google Maps</span><button type="button" onClick={() => { setGooglePlaces([]); setGoogleScope(null) }}>×</button></header>
+        {comparedGooglePlaces.length ? <div>{comparedGooglePlaces.map(place => {
+          const closed = place.business_status === 'CLOSED_PERMANENTLY' || place.business_status === 'CLOSED_TEMPORARILY'
+          return <article key={place.id}><div><strong>{place.name}</strong><span>{place.type_label || place.primary_type || 'Comercio'} · {place.address || 'Sin dirección visible'}</span></div><em className={closed ? 'is-closed' : place.matchedProspect ? 'is-match' : 'is-missing'}>{closed ? 'Posible cierre' : place.matchedProspect ? 'Coincide con Radar' : 'Sin coincidencia local'}</em><div className="radar-google-actions">{place.google_maps_uri && <a href={place.google_maps_uri} target="_blank" rel="noreferrer">Ver en Google Maps</a>}{place.matchedProspect && <button type="button" onClick={() => { openProspect(place.matchedProspect); setGooglePlaces([place]); setGoogleScope({ kind: 'prospect', prospectId: place.matchedProspect.id }) }}>Abrir ficha</button>}{place.matchedProspect && place.matchedProspect.google_place_id !== place.id && <button type="button" onClick={() => linkGooglePlace(place, place.matchedProspect)} disabled={saving === 'google-link'}>Vincular ID</button>}</div></article>
+        })}</div> : <div className="panel-empty"><strong>Sin resultados dentro del polígono</strong><small>Prueba un término más específico, como “panaderías” o “veterinarias”.</small></div>}
+      </section>}
       <section className="radar-workspace">
         <div className="radar-map-card">
           <MapContainer className="commercial-radar-map" center={[-33.425, -70.572]} zoom={15} scrollWheelZoom>
@@ -369,6 +438,8 @@ export default function CommercialRadar({ profile, onNavigate }) {
         <div className="radar-detail-body">
           {selected.verified_at && <div className="radar-verified">✓ Verificado por El Barrio el {new Date(selected.verified_at).toLocaleDateString('es-CL')}</div>}
           {selected.existingCommerce && <div className="radar-existing">✓ Ya existe en Comercios como <strong>{selected.existingCommerce.name}</strong>{selected.existingCommerce.is_active ? ' y está publicado.' : ', pero permanece inactivo.'}</div>}
+          {!selected.isNew && <section className="radar-google-check"><div><strong>{selected.google_place_id ? 'Ficha vinculada con Google Maps' : 'Comprobar vigencia en Google Maps'}</strong><small>{selected.google_place_id ? 'El identificador está guardado; nombre, estado y dirección se consultan en vivo.' : 'Busca coincidencias sin modificar la ficha.'}</small></div><button className="button button-secondary" type="button" onClick={checkSelectedWithGoogle} disabled={googleSearching}>{googleSearching && googleScope?.kind === 'prospect' ? 'Consultando…' : selected.google_place_id ? 'Actualizar comprobación' : 'Buscar coincidencia'}</button></section>}
+          {googleScope?.kind === 'prospect' && googleScope.prospectId === selected.id && <section className="radar-google-prospect-results"><div className="google-maps-attribution" translate="no">Google Maps</div>{comparedGooglePlaces.length ? comparedGooglePlaces.map(place => <article key={place.id}><div><strong>{place.name}</strong><span>{place.business_status === 'CLOSED_PERMANENTLY' ? 'Cerrado permanentemente según Google Maps' : place.business_status === 'CLOSED_TEMPORARILY' ? 'Cerrado temporalmente según Google Maps' : 'Operativo según Google Maps'}</span><small>{place.address || 'Sin dirección visible'}</small></div><div>{place.google_maps_uri && <a href={place.google_maps_uri} target="_blank" rel="noreferrer">Revisar</a>}{selected.google_place_id !== place.id && <button type="button" onClick={() => linkGooglePlace(place, selected)} disabled={saving === 'google-link'}>Vincular este ID</button>}</div></article>) : <small>No se encontró una coincidencia clara. La ficha local permanece sin cambios.</small>}</section>}
           <div className="radar-detail-grid">
             <label className="wide">Nombre<input value={edit.name} onChange={event => setEdit(current => ({ ...current, name: event.target.value }))} placeholder="Nombre del comercio" /></label>
             <label>Categoría<select value={edit.category} onChange={event => setEdit(current => ({ ...current, category: event.target.value }))}>{Object.keys(CATEGORY_LABELS).map(value => <option key={value}>{value}</option>)}</select></label>

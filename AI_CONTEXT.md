@@ -593,3 +593,13 @@ La entrega generada es un build firmado y reproducible de cierre técnico. No de
 
 - “Historial y control” identifica cada campaña por nombre interno, ubicaciones, formato gráfico detectado y cantidad de gráficas sin obligar a abrir el editor. Es solo panel: no requiere SQL ni APK.
 - Panel publicado y verificado por SHA-256: `index-BCAl0zbV.js`, `index-V4yirxsI.css` y HTML coinciden con `admin-panel/dist`.
+
+## Contraste del Radar con Google Places — 14 de agosto de 2026
+
+- Se preparó una integración exclusiva del panel para contrastar el Radar comercial con Google Places sin alterar la aplicación vecinal ni publicar registros automáticamente.
+- `admin-google-places-radar` permite buscar un rubro dentro del rectángulo del barrio, filtra los resultados al polígono exacto y comprobar individualmente un prospecto. Nombre, dirección, tipo y estado comercial se muestran únicamente en vivo; no se copian a la base.
+- Solo se persiste `commercial_prospects.google_place_id`, permitido para referencia estable, junto con quién y cuándo realizó el vínculo. `commercial_google_usage` audita cada consulta y aplica un límite servidor de 10 solicitudes diarias por defecto, configurable mediante `GOOGLE_PLACES_DAILY_LIMIT`.
+- El panel separa visualmente los resultados de Google Maps, incluye atribución, muestra coincidencias, posibles cierres y lugares sin coincidencia local. Vincular exige confirmación administrativa y guarda únicamente el identificador.
+- La migración `supabase/migrations/202608140001_google_places_radar.sql` fue ejecutada con resultado `Success`, según confirmación manual del usuario. `GOOGLE_MAPS_API_KEY` y `GOOGLE_PLACES_DAILY_LIMIT=10` quedaron cargados como secretos remotos y `admin-google-places-radar` fue desplegada; una solicitud anónima devolvió HTTP 401 correctamente.
+- La primera consulta autenticada llegó hasta Google, pero Google respondió `The caller does not have permission`. No consumió ni registró una consulta porque solo se auditan respuestas exitosas. Falta habilitar Places API (New) para la clave o corregir sus restricciones: sin restricción de aplicación para la llamada servidor de Supabase y restringida por API exclusivamente a Places API (New). El panel no debe publicarse hasta aprobar esta llamada real.
+- Validación local: build de producción del panel aprobado, ESLint focalizado aprobado y `deno lint`/`deno check` aprobados. No hubo navegador conectado para la aprobación visual final.
