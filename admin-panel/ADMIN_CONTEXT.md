@@ -229,3 +229,12 @@
 - `commercial_google_usage` controla y audita consumo. El límite predeterminado es 10 consultas diarias globales; puede cambiarse con el secreto `GOOGLE_PLACES_DAILY_LIMIT`.
 - `202608140001_google_places_radar.sql` fue confirmado con `Success`; `GOOGLE_MAPS_API_KEY` y el límite 10 quedaron como secretos y la función fue desplegada. La protección anónima responde HTTP 401.
 - La prueba real autenticada permanece bloqueada por Google con `The caller does not have permission`. Revisar que Places API (New) esté habilitada y que la clave no tenga una restricción de aplicación incompatible con Supabase Edge; debe conservar la restricción de API a Places API (New). No publicar el build del panel hasta que la consulta real responda correctamente.
+
+## Publicidad en Mercado, Eventos y mapa — preparada el 16 de agosto de 2026
+
+- Punto de retorno previo: `pre-expansion-publicitaria-20260816` sobre `b10d6d0`.
+- El módulo único `Publicidad` incorpora `Mercado` y `Eventos` a las cuatro ubicaciones existentes. No se agregaron entradas al menú ni un editor de contenido patrocinado.
+- `marketplace_feed` aparece integrado entre publicaciones del Mercado; `events_feed` aparece entre destacados y agenda. Conservan los dos formatos gráficos, hasta tres imágenes, enlace completo, barrios, fechas, prioridad, control de pago, impresiones, clics y CTR.
+- Los destacados propios se mantienen donde corresponde: `commerces.is_premium` en Comercios y `posts.is_featured` con vigencia en Servicios. El mapa ahora diferencia visualmente los comercios premium que ya recibía.
+- Requiere ejecutar manualmente `supabase/migrations/202608160001_advertising_marketplace_events.sql` después de `202608120003_advertising_section_placements.sql`. **Pendiente de confirmación del usuario**; no usar `supabase db push` ni inferir que está aplicada.
+- App y panel compilan. Todavía no se publicó `admin.elbarrio.lat`, no se sincronizó Capacitor y no hubo navegador conectado para aprobación visual.

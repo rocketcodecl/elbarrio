@@ -2,6 +2,8 @@ import { useEffect, useState, useRef, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
 import { C, T, S, CATEGORIAS, iniciales, hace, plata, distancia } from '../lib/design'
 import { getContentCategories } from '../lib/contentCategories'
+import { getActiveAdvertisingCampaign } from '../lib/advertising'
+import AdvertisingCard from '../components/AdvertisingCard'
 
 // ============================================================
 // Marketplace.jsx — Rediseño v8
@@ -228,6 +230,7 @@ export default function Marketplace({ currentUser, onNavigate, onCrear }) {
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [loadError, setLoadError] = useState('')
+  const [advertisingCampaign, setAdvertisingCampaign] = useState(null)
 
   // Pull-to-refresh state
   const [pullDist, setPullDist] = useState(0)
@@ -274,10 +277,12 @@ export default function Marketplace({ currentUser, onNavigate, onCrear }) {
       .order('created_at', { ascending: false })
       .limit(60)
 
-    const [{ data, error }, { data: blocks }] = await Promise.all([
+    const [{ data, error }, { data: blocks }, campaign] = await Promise.all([
       query,
       currentProfileId ? supabase.from('user_blocks').select('blocked_id').eq('blocker_id', currentProfileId) : Promise.resolve({ data: [] }),
+      getActiveAdvertisingCampaign('marketplace_feed'),
     ])
+    setAdvertisingCampaign(campaign)
     if (error) {
       console.error('Error marketplace:', error)
       setPosts([])
@@ -614,15 +619,18 @@ export default function Marketplace({ currentUser, onNavigate, onCrear }) {
               </div>
               {postsVisibles.length > 0 ? (
                 <div style={s.grid}>
-                  {postsVisibles.map((post) => (
+                  {postsVisibles.map((post, index) => [
                     <MarketCard
                       key={post.id}
                       post={post}
                       categories={categories}
                       currentUser={userWithCoords}
                       onClick={() => irA(post.id)}
-                    />
-                  ))}
+                    />,
+                    index === Math.min(3, postsVisibles.length - 1) && advertisingCampaign
+                      ? <div key={`advertising-${advertisingCampaign.id}`} style={s.advertisingSlot}><AdvertisingCard campaign={advertisingCampaign} placement="marketplace_feed" compact /></div>
+                      : null,
+                  ])}
                 </div>
               ) : (
                 <div style={s.noResults}>
@@ -1397,6 +1405,7 @@ const s = {
     gridTemplateColumns: '1fr 1fr',
     gap: 9,
   },
+  advertisingSlot: { gridColumn: '1 / -1', minWidth: 0 },
 
   // ---- Normal card ----
   card: {

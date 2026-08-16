@@ -3,6 +3,8 @@ import { supabase } from '../lib/supabase'
 import {
   C, T, S, iniciales,
 } from '../lib/design'
+import { getActiveAdvertisingCampaign } from '../lib/advertising'
+import AdvertisingCard from '../components/AdvertisingCard'
 
 /*
   EVENTS — Pantalla de Eventos de El Barrio (tab "eventos" del App.jsx).
@@ -257,6 +259,7 @@ function Events({ currentUser, onNavigate, onCrear }) {
   const [toast, setToast] = useState('')
   const [pulso, setPulso] = useState(null) // postId que acaba de confirmar (animacion)
   const [eventCategories, setEventCategories] = useState([])
+  const [advertisingCampaign, setAdvertisingCampaign] = useState(null)
 
   // Pull-to-refresh
   const scrollRef = useRef(null)
@@ -313,7 +316,11 @@ function Events({ currentUser, onNavigate, onCrear }) {
         .gte('starts_at', (() => { const today = new Date(); today.setHours(0, 0, 0, 0); return today.toISOString() })())
         .order('starts_at', { ascending: true })
 
-      const { data, error: e } = await q.limit(60)
+      const [{ data, error: e }, campaign] = await Promise.all([
+        q.limit(60),
+        getActiveAdvertisingCampaign('events_feed'),
+      ])
+      setAdvertisingCampaign(campaign)
       if (e) {
         console.error('[el barrio] Error cargando eventos:', e)
         setError('No pudimos cargar los eventos. Tira para abajo para reintentar.')
@@ -573,6 +580,8 @@ function Events({ currentUser, onNavigate, onCrear }) {
                 </div>
               </div>
             )}
+
+            {advertisingCampaign && <div style={s.advertisingSlot}><AdvertisingCard campaign={advertisingCampaign} placement="events_feed" /></div>}
 
             {/* ══════ PROXIMOS EVENTOS ══════ */}
             <div style={s.seccion}>
@@ -933,6 +942,7 @@ const s = {
   lista: { display: 'flex', flexDirection: 'column', gap: 12 },
 
   heroSection: { margin: '0 -16px 22px' },
+  advertisingSlot: { margin: '0 0 20px', minWidth: 0 },
   heroHeading: {
     padding: '0 16px 10px', display: 'flex', alignItems: 'baseline', justifyContent: 'space-between',
     fontSize: 17, fontWeight: 600, color: C.texto,

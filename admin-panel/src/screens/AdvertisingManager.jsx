@@ -16,6 +16,7 @@ const PAYMENT = { pending: 'Pendiente', paid: 'Pagada', courtesy: 'Cortesía', c
 const PLACEMENT = {
   home_feature: 'Inicio', activity_feed: 'Actividad',
   services_feed: 'Servicios', commerces_feed: 'Comercios',
+  marketplace_feed: 'Mercado', events_feed: 'Eventos',
 }
 
 function CreativeFormat({ url, count }) {
@@ -199,13 +200,15 @@ export default function AdvertisingManager({ profile }) {
         <label>Anunciante<input required value={form.advertiser_name} onChange={e => update('advertiser_name', e.target.value)} placeholder="Ej: Little Caesars" /></label>
         <label>Nombre interno de campaña<input required value={form.campaign_name} onChange={e => update('campaign_name', e.target.value)} placeholder="Ej: Apertura agosto" /></label>
         <label className="wide">Enlace al tocar la gráfica<input required type="url" value={form.cta_url} onChange={e => update('cta_url', e.target.value)} placeholder="https://..." /></label>
-        <label className="wide advertising-image-field">Gráficas (1 a 3)<input type="file" accept="image/*" multiple onChange={uploadImage} disabled={uploading || form.image_urls.length >= 3} />{uploading && <small>Optimizando y cargando…</small>}<small>Formatos admitidos: estándar 1200 × 628 px o franja 1200 × 220 px. Ambos pueden aparecer en cualquiera de las cuatro ubicaciones. Si la campaña tiene varias gráficas, todas deben usar el mismo formato. Toda la información comercial debe venir dentro de la gráfica.</small>{form.image_urls.length > 0 && <span className="advertising-image-list">{form.image_urls.map((url, index) => <span key={url}><img src={url} alt={`Gráfica ${index + 1}`} /><b>{index + 1}</b><button type="button" onClick={() => setForm(current => { const imageUrls = current.image_urls.filter(item => item !== url); return { ...current, image_urls: imageUrls, image_url: imageUrls[0] || '' } })}>Quitar</button></span>)}</span>}</label>
+        <label className="wide advertising-image-field">Gráficas (1 a 3)<input type="file" accept="image/*" multiple onChange={uploadImage} disabled={uploading || form.image_urls.length >= 3} />{uploading && <small>Optimizando y cargando…</small>}<small>Formatos admitidos: estándar 1200 × 628 px o franja 1200 × 220 px. Ambos pueden aparecer en cualquiera de las seis ubicaciones. Si la campaña tiene varias gráficas, todas deben usar el mismo formato. Toda la información comercial debe venir dentro de la gráfica.</small>{form.image_urls.length > 0 && <span className="advertising-image-list">{form.image_urls.map((url, index) => <span key={url}><img src={url} alt={`Gráfica ${index + 1}`} /><b>{index + 1}</b><button type="button" onClick={() => setForm(current => { const imageUrls = current.image_urls.filter(item => item !== url); return { ...current, image_urls: imageUrls, image_url: imageUrls[0] || '' } })}>Quitar</button></span>)}</span>}</label>
 
         <fieldset className="wide"><legend>Ubicaciones en la app</legend><div className="advertising-check-grid">
           <label><input type="checkbox" checked={form.placements.includes('home_feature')} onChange={() => toggleArrayValue('placements', 'home_feature')} /><span><b>Inicio</b><small>Formato estándar o franja bajo “Para ti”.</small></span></label>
           <label><input type="checkbox" checked={form.placements.includes('activity_feed')} onChange={() => toggleArrayValue('placements', 'activity_feed')} /><span><b>Actividad</b><small>Formato estándar o franja después de la tercera publicación.</small></span></label>
           <label><input type="checkbox" checked={form.placements.includes('services_feed')} onChange={() => toggleArrayValue('placements', 'services_feed')} /><span><b>Servicios</b><small>Entre destacados y el listado de servicios.</small></span></label>
           <label><input type="checkbox" checked={form.placements.includes('commerces_feed')} onChange={() => toggleArrayValue('placements', 'commerces_feed')} /><span><b>Comercios</b><small>Entre destacados y comercios cercanos.</small></span></label>
+          <label><input type="checkbox" checked={form.placements.includes('marketplace_feed')} onChange={() => toggleArrayValue('placements', 'marketplace_feed')} /><span><b>Mercado</b><small>Integrada entre las publicaciones de productos.</small></span></label>
+          <label><input type="checkbox" checked={form.placements.includes('events_feed')} onChange={() => toggleArrayValue('placements', 'events_feed')} /><span><b>Eventos</b><small>Entre los panoramas destacados y la agenda.</small></span></label>
         </div></fieldset>
 
         <fieldset className="wide"><legend>Barrios</legend><div className="advertising-neighborhoods">

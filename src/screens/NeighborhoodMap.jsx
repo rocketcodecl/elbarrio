@@ -5,11 +5,11 @@ import { supabase } from '../lib/supabase'
 import { BARRIO_BETA_BOUNDARY } from '../data/barrioBetaBoundary'
 import { C, T, REPORTES, hace } from '../lib/design'
 
-const markerIcon = (kind, symbol) => L.divIcon({
+const markerIcon = (kind, symbol, premium = false) => L.divIcon({
   className: '',
-  html: `<div style="width:27px;height:27px;border-radius:50%;background:${kind === 'commerce' ? '#1B9E75' : '#F5B800'};border:2px solid white;box-shadow:0 3px 9px rgba(15,23,42,.2);display:flex;align-items:center;justify-content:center;color:white;font-size:13px;line-height:1">${kind === 'commerce' ? '🏪' : symbol}</div>`,
-  iconSize: [27, 27],
-  iconAnchor: [13.5, 13.5],
+  html: `<div style="position:relative;width:${premium ? 32 : 27}px;height:${premium ? 32 : 27}px;border-radius:50%;background:${kind === 'commerce' ? '#1B9E75' : '#F5B800'};border:${premium ? 3 : 2}px solid white;box-shadow:${premium ? '0 0 0 3px rgba(245,184,0,.9),0 5px 14px rgba(15,23,42,.28)' : '0 3px 9px rgba(15,23,42,.2)'};display:flex;align-items:center;justify-content:center;color:white;font-size:${premium ? 15 : 13}px;line-height:1">${kind === 'commerce' ? '🏪' : symbol}${premium ? '<span style="position:absolute;right:-7px;top:-8px;width:16px;height:16px;border-radius:50%;background:#F5B800;border:2px solid white;color:#fff;font-size:9px;display:flex;align-items:center;justify-content:center">★</span>' : ''}</div>`,
+  iconSize: [premium ? 32 : 27, premium ? 32 : 27],
+  iconAnchor: premium ? [16, 16] : [13.5, 13.5],
 })
 
 const clusterIcon = (count, hasIncident) => L.divIcon({
@@ -146,7 +146,7 @@ export default function NeighborhoodMap({ currentUser, neighborhoodId, onNavigat
       if (cluster.items.length === 1) {
         const item = cluster.items[0]
         const incidentSymbol = REPORTES[item.category]?.emoji || '⚠️'
-        L.marker([item.latitude, item.longitude], { icon: markerIcon(item.kind, incidentSymbol), keyboard: true, title: item.title || item.name })
+        L.marker([item.latitude, item.longitude], { icon: markerIcon(item.kind, incidentSymbol, item.kind === 'commerce' && item.is_premium), keyboard: true, title: item.title || item.name })
           .on('click', () => setSelected(item))
           .addTo(layer)
         return
@@ -208,7 +208,7 @@ export default function NeighborhoodMap({ currentUser, neighborhoodId, onNavigat
             {selected.kind === 'incident' ? (REPORTES[selected.category]?.emoji || '⚠️') : '🏪'}
           </div>
           <div style={s.cardCopy}>
-            <span style={s.eyebrow}>{selected.kind === 'incident' ? (REPORTES[selected.category]?.label || 'Incidente') : (selected.category || 'Comercio')}</span>
+            <span style={s.eyebrow}>{selected.kind === 'incident' ? (REPORTES[selected.category]?.label || 'Incidente') : selected.is_premium ? `★ Destacado · ${selected.category || 'Comercio'}` : (selected.category || 'Comercio')}</span>
             <strong style={s.cardTitle}>{selected.title || selected.name}</strong>
             <span style={s.cardMeta}>{selected.location_text || selected.address || (selected.created_at ? hace(selected.created_at) : 'Dentro de tu barrio')}</span>
           </div>
