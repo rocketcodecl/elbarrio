@@ -612,3 +612,14 @@ La entrega generada es un build firmado y reproducible de cierre técnico. No de
 - Publicidad suma dos ubicaciones dentro del mismo editor: `marketplace_feed`, integrada después de hasta cuatro publicaciones visibles, y `events_feed`, entre los eventos destacados y la agenda. Ambas reutilizan las gráficas, carrusel, enlace, segmentación territorial, programación y medición existentes; si no hay campaña activa no reservan espacio.
 - La migración `202608160001_advertising_marketplace_events.sql` fue ejecutada manualmente con resultado `Success`, según confirmación del usuario. Amplía las restricciones y las RPC vigentes de cuatro a seis ubicaciones sin crear tablas ni un módulo adicional; no volver a ejecutarla por inferencia ni usar `supabase db push`.
 - App y panel compilan en producción. El lint focalizado del panel pasa; las pantallas antiguas de Mercado y Eventos conservan errores de lint previos no relacionados. No hubo navegador conectado para la aprobación visual final y el bloque aún no fue publicado ni sincronizado con Capacitor.
+
+## Entrega móvil Android 1.0.2 — 16 de agosto de 2026
+
+- Android avanza a `versionName 1.0.2` y `versionCode 3`; la siguiente publicación debe usar como mínimo `versionCode 4`.
+- Se ejecutaron correctamente los builds de producción de la app y del panel, `npm run mobile:sync` para Android/iOS y las tareas Gradle `testReleaseUnitTest`, `lintVitalRelease`, `assembleRelease` y `bundleRelease`.
+- El APK y el AAB de tienda están firmados con la llave definitiva existente. Certificado SHA-256: `f369dbfe7b45dbf79a3ddeeb53dcdd1c6f0ca7b842cd1940153a15351e3bca2a`.
+- Entrega local ignorada por Git: `release/android/el-barrio-1.0.2/`.
+- APK SHA-256: `d71063c369c0d46bbbe318f7e269e16b6cb4b9be489bd326c72e2236eb9e34be`.
+- AAB SHA-256: `ed9028553c71b183dad42ae8902308ee5af42ad877a67856bd8b5491c2d5baae`.
+- Esta entrega incluye la expansión publicitaria a Mercado y Eventos y la diferenciación de comercios premium en el mapa. La migración correspondiente ya fue confirmada como ejecutada con `Success`.
+- `admin-panel/dist` quedó compilado con el mismo bloque funcional, pero no fue publicado en `admin.elbarrio.lat` durante esta entrega.

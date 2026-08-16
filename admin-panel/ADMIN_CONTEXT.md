@@ -238,3 +238,10 @@
 - Los destacados propios se mantienen donde corresponde: `commerces.is_premium` en Comercios y `posts.is_featured` con vigencia en Servicios. El mapa ahora diferencia visualmente los comercios premium que ya recibía.
 - `supabase/migrations/202608160001_advertising_marketplace_events.sql` fue ejecutada manualmente con resultado `Success`, según confirmación del usuario. No volver a ejecutarla por inferencia ni usar `supabase db push`.
 - App y panel compilan. Todavía no se publicó `admin.elbarrio.lat`, no se sincronizó Capacitor y no hubo navegador conectado para aprobación visual.
+
+## Build de cierre — 16 de agosto de 2026
+
+- El panel volvió a compilar correctamente después de confirmar la migración de publicidad para Mercado y Eventos.
+- El artefacto listo para publicación está en `admin-panel/dist`.
+- Este build no fue desplegado en `admin.elbarrio.lat`; publicarlo requiere una autorización explícita de deploy.
+- La app fue sincronizada con Capacitor y se generó la entrega Android firmada `1.0.2` (`versionCode 3`).
